@@ -1,13 +1,12 @@
-// Обнови тест: AdminAuctionControllerTest.java
-
 package com.example.autoauction.admin.web;
 
 import com.example.autoauction.admin.application.AdminAuctionService;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.web.dto.AuctionCreateRequest;
 import com.example.autoauction.auction.web.dto.AuctionResponse;
-import com.example.autoauction.auth.infrastructure.security.JwtAuthenticationFilter;
 import com.example.autoauction.auth.infrastructure.security.JwtService;
+import com.example.autoauction.auth.infrastructure.security.WithMockCustomUser;
+import com.example.autoauction.user.domain.port.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,11 +16,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -36,13 +32,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(
-        controllers = AdminAuctionController.class,
-        excludeFilters = @ComponentScan.Filter(
-                type = FilterType.ASSIGNABLE_TYPE,
-                classes = JwtAuthenticationFilter.class
-        )
-)
+@WebMvcTest(controllers = AdminAuctionController.class)
 @Import(TestSecurityConfig.class)
 @DisplayName("Тесты контроллера администрирования аукционов")
 class AdminAuctionControllerTest {
@@ -54,7 +44,10 @@ class AdminAuctionControllerTest {
     private AdminAuctionService adminAuctionService;
 
     @MockBean
-    private JwtService jwtService;  // Нужен для Security
+    private JwtService jwtService;
+
+    @MockBean
+    private UserRepository userRepository;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -63,6 +56,7 @@ class AdminAuctionControllerTest {
     private AuctionResponse auctionResponse;
     private AuctionResponse activeAuctionResponse;
     private AuctionResponse cancelledAuctionResponse;
+    private AuctionResponse completedAuctionResponse;
     private final Long adminId = 1L;
 
     @BeforeEach
@@ -106,14 +100,24 @@ class AdminAuctionControllerTest {
                 new BigDecimal("10000"), startTime, endTime,
                 AuctionStatus.CANCELLED, 0, null, null, adminId, now
         );
+
+        completedAuctionResponse = new AuctionResponse(
+                1L, 1L, "BMW M5 2023",
+                new BigDecimal("1000000"), new BigDecimal("1200000"),
+                new BigDecimal("1200000"), new BigDecimal("1500000"),
+                new BigDecimal("10000"), startTime, endTime,
+                AuctionStatus.COMPLETED, 5, 3L, new BigDecimal("1200000"), adminId, now
+        );
     }
+
+    // ==================== CREATE AUCTION TESTS ====================
 
     @Nested
     @DisplayName("POST /api/admin/auctions - Создание аукциона")
     class CreateAuctionTests {
 
         @Test
-        @WithMockUser(roles = "ADMIN")
+        @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
         @DisplayName("Успешное создание аукциона с валидными данными")
         void createAuction_WithValidData_ShouldReturnCreated() throws Exception {
             when(adminAuctionService.createAuction(any(AuctionCreateRequest.class), eq(adminId)))
@@ -130,7 +134,7 @@ class AdminAuctionControllerTest {
         }
 
         @Test
-        @WithMockUser(roles = "ADMIN")
+        @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
         @DisplayName("Создание аукциона с невалидными данными - должно вернуть 400")
         void createAuction_WithInvalidData_ShouldReturnBadRequest() throws Exception {
             AuctionCreateRequest invalidRequest = new AuctionCreateRequest(
@@ -147,7 +151,7 @@ class AdminAuctionControllerTest {
         }
 
         @Test
-        @WithMockUser(roles = "USER")
+        @WithMockCustomUser(userId = 2L, username = "user", roles = {"USER"})
         @DisplayName("Создание аукциона пользователем без прав ADMIN - должно вернуть 403")
         void createAuction_ByNonAdmin_ShouldReturnForbidden() throws Exception {
             mockMvc.perform(post("/api/admin/auctions")
@@ -159,12 +163,14 @@ class AdminAuctionControllerTest {
         }
     }
 
+    // ==================== GET ALL AUCTIONS TESTS ====================
+
     @Nested
     @DisplayName("GET /api/admin/auctions - Получение всех аукционов")
     class GetAllAuctionsTests {
 
         @Test
-        @WithMockUser(roles = "ADMIN")
+        @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
         @DisplayName("Успешное получение списка аукционов")
         void getAllAuctions_ShouldReturnList() throws Exception {
             List<AuctionResponse> auctions = List.of(auctionResponse, activeAuctionResponse);
@@ -178,7 +184,7 @@ class AdminAuctionControllerTest {
         }
 
         @Test
-        @WithMockUser(roles = "USER")
+        @WithMockCustomUser(userId = 2L, username = "user", roles = {"USER"})
         @DisplayName("Получение списка аукционов пользователем без прав ADMIN - должно вернуть 403")
         void getAllAuctions_ByNonAdmin_ShouldReturnForbidden() throws Exception {
             mockMvc.perform(get("/api/admin/auctions"))
@@ -188,12 +194,14 @@ class AdminAuctionControllerTest {
         }
     }
 
+    // ==================== GET AUCTION BY ID TESTS ====================
+
     @Nested
     @DisplayName("GET /api/admin/auctions/{id} - Получение аукциона по ID")
     class GetAuctionByIdTests {
 
         @Test
-        @WithMockUser(roles = "ADMIN")
+        @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
         @DisplayName("Успешное получение существующего аукциона")
         void getAuction_ExistingId_ShouldReturnAuction() throws Exception {
             when(adminAuctionService.getAuction(1L)).thenReturn(auctionResponse);
@@ -206,7 +214,7 @@ class AdminAuctionControllerTest {
         }
 
         @Test
-        @WithMockUser(roles = "ADMIN")
+        @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
         @DisplayName("Получение несуществующего аукциона - должно вернуть 404")
         void getAuction_NonExistingId_ShouldReturnNotFound() throws Exception {
             when(adminAuctionService.getAuction(999L))
@@ -219,12 +227,14 @@ class AdminAuctionControllerTest {
         }
     }
 
+    // ==================== START AUCTION TESTS ====================
+
     @Nested
     @DisplayName("POST /api/admin/auctions/{id}/start - Запуск аукциона")
     class StartAuctionTests {
 
         @Test
-        @WithMockUser(roles = "ADMIN")
+        @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
         @DisplayName("Успешный запуск созданного аукциона")
         void startAuction_WhenCreated_ShouldReturnOk() throws Exception {
             when(adminAuctionService.startAuction(1L, adminId)).thenReturn(activeAuctionResponse);
@@ -237,7 +247,7 @@ class AdminAuctionControllerTest {
         }
 
         @Test
-        @WithMockUser(roles = "ADMIN")
+        @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
         @DisplayName("Запуск уже активного аукциона - должно вернуть 409")
         void startAuction_WhenAlreadyActive_ShouldReturnConflict() throws Exception {
             when(adminAuctionService.startAuction(1L, adminId))
@@ -250,12 +260,14 @@ class AdminAuctionControllerTest {
         }
     }
 
+    // ==================== CANCEL AUCTION TESTS ====================
+
     @Nested
     @DisplayName("POST /api/admin/auctions/{id}/cancel - Отмена аукциона")
     class CancelAuctionTests {
 
         @Test
-        @WithMockUser(roles = "ADMIN")
+        @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
         @DisplayName("Успешная отмена созданного аукциона")
         void cancelAuction_WhenCreated_ShouldReturnOk() throws Exception {
             when(adminAuctionService.cancelAuction(1L, adminId)).thenReturn(cancelledAuctionResponse);
@@ -268,11 +280,11 @@ class AdminAuctionControllerTest {
         }
 
         @Test
-        @WithMockUser(roles = "ADMIN")
+        @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
         @DisplayName("Отмена уже завершенного аукциона - должно вернуть 409")
         void cancelAuction_WhenCompleted_ShouldReturnConflict() throws Exception {
             when(adminAuctionService.cancelAuction(1L, adminId))
-                    .thenThrow(new IllegalStateException("Невозможно отменить аукцион"));
+                    .thenThrow(new IllegalStateException("Невозможно отменить аукцион в статусе COMPLETED"));
 
             mockMvc.perform(post("/api/admin/auctions/1/cancel"))
                     .andExpect(status().isConflict());
@@ -281,12 +293,44 @@ class AdminAuctionControllerTest {
         }
     }
 
+    // ==================== COMPLETE AUCTION TESTS ====================
+
+    @Nested
+    @DisplayName("POST /api/admin/auctions/{id}/complete - Принудительное завершение аукциона")
+    class CompleteAuctionTests {
+
+        @Test
+        @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
+        @DisplayName("Успешное принудительное завершение аукциона")
+        void completeAuction_ShouldReturnOk() throws Exception {
+            when(adminAuctionService.completeAuction(1L, adminId)).thenReturn(completedAuctionResponse);
+
+            mockMvc.perform(post("/api/admin/auctions/1/complete"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("COMPLETED"));
+
+            verify(adminAuctionService, times(1)).completeAuction(1L, adminId);
+        }
+
+        @Test
+        @WithMockCustomUser(userId = 2L, username = "user", roles = {"USER"})
+        @DisplayName("Принудительное завершение аукциона пользователем без прав ADMIN - должно вернуть 403")
+        void completeAuction_ByNonAdmin_ShouldReturnForbidden() throws Exception {
+            mockMvc.perform(post("/api/admin/auctions/1/complete"))
+                    .andExpect(status().isForbidden());
+
+            verify(adminAuctionService, never()).completeAuction(any(), any());
+        }
+    }
+
+    // ==================== GET AUCTIONS BY STATUS TESTS ====================
+
     @Nested
     @DisplayName("GET /api/admin/auctions/by-status - Получение аукционов по статусу")
     class GetAuctionsByStatusTests {
 
         @Test
-        @WithMockUser(roles = "ADMIN")
+        @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
         @DisplayName("Успешное получение аукционов по статусу")
         void getAuctionsByStatus_ValidStatus_ShouldReturnList() throws Exception {
             List<AuctionResponse> auctions = List.of(auctionResponse);
@@ -301,23 +345,40 @@ class AdminAuctionControllerTest {
         }
 
         @Test
-        @WithMockUser(roles = "ADMIN")
+        @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
         @DisplayName("XSS атака в статусе - должна возвращать 400")
         void getAuctionsByStatus_XssAttack_ShouldReturnBadRequest() throws Exception {
+            // XSS атака не дойдет до сервиса, так как будет отфильтрована валидацией в контроллере
             mockMvc.perform(get("/api/admin/auctions/by-status")
                             .param("status", "<script>alert('XSS')</script>"))
                     .andExpect(status().isBadRequest());
 
             verify(adminAuctionService, never()).getAuctionsByStatus(any());
         }
+
+        @Test
+        @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
+        @DisplayName("Неверный статус - должно вернуть 400")
+        void getAuctionsByStatus_InvalidStatus_ShouldReturnBadRequest() throws Exception {
+            when(adminAuctionService.getAuctionsByStatus("INVALID_STATUS"))
+                    .thenThrow(new IllegalArgumentException("Неверный статус аукциона: INVALID_STATUS"));
+
+            mockMvc.perform(get("/api/admin/auctions/by-status")
+                            .param("status", "INVALID_STATUS"))
+                    .andExpect(status().isBadRequest());
+
+            verify(adminAuctionService, times(1)).getAuctionsByStatus("INVALID_STATUS");
+        }
     }
+
+    // ==================== GET AUCTIONS BY VEHICLE ID TESTS ====================
 
     @Nested
     @DisplayName("GET /api/admin/auctions/vehicle/{vehicleId} - Получение аукционов по ID автомобиля")
     class GetAuctionsByVehicleIdTests {
 
         @Test
-        @WithMockUser(roles = "ADMIN")
+        @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
         @DisplayName("Успешное получение аукционов по ID автомобиля")
         void getAuctionsByVehicleId_ShouldReturnList() throws Exception {
             List<AuctionResponse> auctions = List.of(auctionResponse);
@@ -328,6 +389,19 @@ class AdminAuctionControllerTest {
                     .andExpect(jsonPath("$", hasSize(1)));
 
             verify(adminAuctionService, times(1)).getAuctionsByVehicleId(1L);
+        }
+
+        @Test
+        @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
+        @DisplayName("Автомобиль без аукционов - пустой список")
+        void getAuctionsByVehicleId_NoAuctions_ShouldReturnEmptyList() throws Exception {
+            when(adminAuctionService.getAuctionsByVehicleId(999L)).thenReturn(List.of());
+
+            mockMvc.perform(get("/api/admin/auctions/vehicle/999"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(0)));
+
+            verify(adminAuctionService, times(1)).getAuctionsByVehicleId(999L);
         }
     }
 }

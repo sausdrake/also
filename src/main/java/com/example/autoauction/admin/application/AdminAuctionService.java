@@ -298,14 +298,12 @@ public class AdminAuctionService {
 
     @Transactional(readOnly = true)
     public List<AuctionResponse> getAuctionsByStatus(String status) {
-        log.debug("=== ПОЛУЧЕНИЕ АУКЦИОНОВ ПО СТАТУСУ: {} ===", status);
         try {
             AuctionStatus auctionStatus = AuctionStatus.valueOf(status.toUpperCase());
             return auctionRepository.findByStatus(auctionStatus).stream()
                     .map(AuctionResponse::fromDomain)
                     .collect(Collectors.toList());
         } catch (IllegalArgumentException e) {
-            log.error("Неверный статус аукциона: {}", status);
             throw new IllegalArgumentException("Неверный статус аукциона: " + status);
         }
     }

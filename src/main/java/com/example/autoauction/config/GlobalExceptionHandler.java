@@ -2,6 +2,7 @@
 
 package com.example.autoauction.config;
 
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -193,6 +194,22 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(error);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingParams(MissingServletRequestParameterException e) {
+        log.warn("Отсутствует обязательный параметр: {}", e.getParameterName());
+
+        Map<String, Object> error = new HashMap<>();
+        error.put("timestamp", java.time.LocalDateTime.now().toString());
+        error.put("status", HttpStatus.BAD_REQUEST.value());
+        error.put("error", "Отсутствует обязательный параметр");
+        error.put("message", "Параметр '" + e.getParameterName() + "' обязателен для запроса");
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(error);
     }

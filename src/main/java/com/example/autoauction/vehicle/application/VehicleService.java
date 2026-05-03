@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -31,7 +32,8 @@ public class VehicleService {
         log.info("Диагностик: {} (ID: {}), VIN: {}", diagnosticName, diagnosticId, request.vin());
         log.debug("Детали запроса: brand={}, model={}, year={}, type={}",
                 request.brand(), request.model(), request.year(), request.type());
-
+        Objects.requireNonNull(diagnosticId, "diagnosticId не может быть null");
+        Objects.requireNonNull(diagnosticName, "diagnosticName не может быть null");
         // Проверяем уникальность VIN
         log.debug("Проверка уникальности VIN: {}", request.vin());
         if (vehicleRepository.existsByVin(request.vin())) {

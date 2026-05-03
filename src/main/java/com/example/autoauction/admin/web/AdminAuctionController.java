@@ -104,11 +104,7 @@ public class AdminAuctionController {
     }
 
     @GetMapping("/by-status")
-    @Operation(summary = "Получить аукционы по статусу")
-    public List<AuctionResponse> getAuctionsByStatus(
-            @Parameter(description = "Статус аукциона", required = true, example = "ACTIVE")
-            @RequestParam String status
-    ) {
+    public List<AuctionResponse> getAuctionsByStatus(@RequestParam String status) {
         if (status == null || status.trim().isEmpty()) {
             throw new IllegalArgumentException("Статус не может быть пустым");
         }

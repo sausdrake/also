@@ -3,6 +3,7 @@
 package com.example.autoauction.auction.application;
 
 import com.example.autoauction.auction.domain.Auction;
+import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.auction.web.dto.BidResponse;
 import com.example.autoauction.deposit.application.DepositService;
@@ -46,6 +47,24 @@ public class BidService {
 
         log.debug("Текущий статус аукциона: {}, текущая цена: {}, минимальный шаг: {}, время окончания: {}",
                 auction.getStatus(), auction.getCurrentPrice(), auction.getMinBidStep(), auction.getEndTime());
+        if (amount == null) {
+            throw new NullPointerException("Сумма ставки не может быть null");
+        }
+
+        log.info("Auction ID: {}, Bidder ID: {}, Amount: {}", auctionId, bidderId, amount);
+        // ПРОВЕРКА СТАТУСА АУКЦИОНА - ПЕРЕМЕСТИТЬ СЮДА (ДО ПРОВЕРКИ ДЕПОЗИТА)
+        if (auction.getStatus() != AuctionStatus.ACTIVE) {
+            log.warn("Попытка ставки на неактивный аукцион. Статус: {}", auction.getStatus());
+            throw new IllegalStateException(
+                    String.format("Невозможно сделать ставку на аукцион в статусе '%s'. Только активные аукционы принимают ставки",
+                            auction.getStatus())
+            );
+        }
+
+        // Проверяем, не истекло ли время
+        if (auction.getEndTime().isBefore(OffsetDateTime.now())) {
+            throw new IllegalStateException("Время аукциона истекло");
+        }
 
         // Проверяем, не является ли участник создателем аукциона
         if (bidderId.equals(auction.getCreatedBy())) {
