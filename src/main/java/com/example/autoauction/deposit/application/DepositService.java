@@ -23,11 +23,11 @@ public class DepositService {
         this.depositRepository = depositRepository;
         log.info("DepositService initialized");
     }
+
     @Transactional
     public DepositResponse createDeposit(Long userId, BigDecimal initialAmount) {
         log.info("Creating deposit for user: {} with amount: {}", userId, initialAmount);
 
-        // Если депозит уже существует, просто возвращаем его
         if (depositRepository.findByUserId(userId).isPresent()) {
             log.info("Deposit already exists for user: {}", userId);
             return getDepositByUserId(userId);
@@ -36,7 +36,6 @@ public class DepositService {
         Deposit deposit = new Deposit(userId, initialAmount);
         Deposit saved = depositRepository.save(deposit);
 
-        // Создаем транзакцию только если сумма > 0
         if (initialAmount.compareTo(BigDecimal.ZERO) > 0) {
             DepositTransaction transaction = new DepositTransaction(
                     saved.getId(),
@@ -114,6 +113,12 @@ public class DepositService {
         log.info("Freezing deposit for user: {}, auction: {}, startingPrice: {}",
                 userId, auctionId, startingPrice);
 
+        // Проверка на null и некорректные значения - теперь НЕ выбрасываем исключение
+        if (startingPrice == null || startingPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Invalid startingPrice: {}. Cannot freeze deposit. Skipping operation.", startingPrice);
+            return;  // Просто выходим, ничего не делаем
+        }
+
         Deposit deposit = depositRepository.findByUserId(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Депозит не найден для пользователя: " + userId));
 
@@ -137,6 +142,9 @@ public class DepositService {
         log.info("Deposit frozen. New available balance: {}", deposit.getAvailableBalance());
     }
 
+    /**
+     * Размораживает средства для указанного аукциона (по стартовой цене)
+     */
     @Transactional
     public void unfreezeForAuction(Long userId, Long auctionId, BigDecimal startingPrice) {
         log.info("Unfreezing deposit for user: {}, auction: {}, startingPrice: {}",
@@ -146,7 +154,7 @@ public class DepositService {
                 .orElseThrow(() -> new IllegalArgumentException("Депозит не найден для пользователя: " + userId));
 
         BigDecimal balanceBefore = deposit.getAvailableBalance();
-        deposit.unfreezeForAuction(auctionId, startingPrice);
+        deposit.unfreezeForAuction(auctionId, startingPrice, true);
 
         DepositTransaction transaction = new DepositTransaction(
                 deposit.getId(),
@@ -165,37 +173,43 @@ public class DepositService {
         log.info("Deposit unfrozen. New available balance: {}", deposit.getAvailableBalance());
     }
 
-    // Перегрузка для обратной совместимости (без startingPrice)
+    /**
+     * Размораживает средства для указанного аукциона (используя сохранённую сумму блокировки)
+     * Для обратной совместимости
+     */
     @Transactional
     public void unfreezeForAuction(Long userId, Long auctionId) {
-        log.info("Unfreezing deposit for user: {}, auction: {} (using default calculation)", userId, auctionId);
+        log.info("Unfreezing deposit for user: {}, auction: {} (using stored amount)", userId, auctionId);
 
         Deposit deposit = depositRepository.findByUserId(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Депозит не найден для пользователя: " + userId));
 
-        // Для простоты размораживаем все заблокированные средства
-        // В реальном приложении нужно знать сумму для разморозки
-        BigDecimal balanceBefore = deposit.getAvailableBalance();
-        BigDecimal frozenAmount = deposit.getBlockedAmount();
+        // Получаем сумму, заблокированную для этого аукциона
+        BigDecimal frozenAmount = deposit.getFrozenAmountForAuction(auctionId);
 
-        if (frozenAmount.compareTo(BigDecimal.ZERO) > 0) {
-            deposit.unfreezeForAuction(auctionId, frozenAmount);
-
-            DepositTransaction transaction = new DepositTransaction(
-                    deposit.getId(),
-                    userId,
-                    DepositTransaction.TransactionType.UNBLOCK,
-                    frozenAmount,
-                    balanceBefore,
-                    deposit.getAvailableBalance(),
-                    auctionId.toString(),
-                    "Разблокировка всех средств после аукциона #" + auctionId
-            );
-            transaction.setAuctionId(auctionId);
-            depositRepository.saveTransaction(transaction);
-            depositRepository.save(deposit);
-            log.info("All funds unfrozen for user {} on auction {}", userId, auctionId);
+        if (frozenAmount == null || frozenAmount.compareTo(BigDecimal.ZERO) == 0) {
+            log.warn("No frozen amount found for auction {}. Nothing to unfreeze.", auctionId);
+            return;
         }
+
+        BigDecimal balanceBefore = deposit.getAvailableBalance();
+        deposit.unfreezeForAuction(auctionId, frozenAmount);
+
+        DepositTransaction transaction = new DepositTransaction(
+                deposit.getId(),
+                userId,
+                DepositTransaction.TransactionType.UNBLOCK,
+                frozenAmount,
+                balanceBefore,
+                deposit.getAvailableBalance(),
+                auctionId.toString(),
+                "Разблокировка средств после аукциона #" + auctionId
+        );
+        transaction.setAuctionId(auctionId);
+        depositRepository.saveTransaction(transaction);
+
+        depositRepository.save(deposit);
+        log.info("Deposit unfrozen for auction {}. New available balance: {}", auctionId, deposit.getAvailableBalance());
     }
 
     @Transactional
@@ -218,7 +232,6 @@ public class DepositService {
                 .orElse(false);
     }
 
-    // Перегрузка для проверки без указания стартовой цены
     @Transactional(readOnly = true)
     public boolean canParticipateInAuction(Long userId) {
         return depositRepository.findByUserId(userId)

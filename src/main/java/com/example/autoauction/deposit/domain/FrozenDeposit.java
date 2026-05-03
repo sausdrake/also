@@ -29,7 +29,9 @@ public class FrozenDeposit {
     public FreezeReason getReason() { return reason; }
     public boolean isWinner() { return winner; }
     public OffsetDateTime getFrozenAt() { return frozenAt; }
-
+    public void setAmount(BigDecimal amount) {
+        this.amount = amount;
+    }
     public void markAsWinner() {
         this.winner = true;
     }
