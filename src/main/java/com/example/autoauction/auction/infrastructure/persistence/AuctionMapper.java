@@ -34,6 +34,7 @@ public class AuctionMapper {
         entity.setCreatedAt(domain.getCreatedAt());
         entity.setUpdatedAt(domain.getUpdatedAt());
         entity.setVersion(domain.getVersion());
+        entity.setExtensionCount(domain.getExtensionCount());
         return entity;
     }
 
@@ -63,7 +64,7 @@ public class AuctionMapper {
         auction.setCreatedAt(entity.getCreatedAt());
         auction.setUpdatedAt(entity.getUpdatedAt());
         auction.setVersion(entity.getVersion());
-
+        auction.setExtensionCount(entity.getExtensionCount());
         return auction;
     }
 }

@@ -41,7 +41,7 @@ public class JpaDepositTransactionEntity {
     @Column(name = "reference", length = 100)
     private String reference;
 
-    @Column(name = "description", columnDefinition = "TEXT")
+    @Column(name = "description", length = 10000)
     private String description;
 
     @Column(name = "created_at", nullable = false)

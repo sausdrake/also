@@ -1,5 +1,0 @@
-@startuml
-class com.example.autoauction.AutoauctionApplication {
-+ {static} void main(String[])
-}
-@enduml

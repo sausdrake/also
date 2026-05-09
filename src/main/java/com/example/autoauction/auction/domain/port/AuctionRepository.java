@@ -1,7 +1,10 @@
+// auction/domain/port/AuctionRepository.java
 package com.example.autoauction.auction.domain.port;
 
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
@@ -13,24 +16,33 @@ public interface AuctionRepository {
     List<Auction> findAll();
     void deleteById(Long id);
 
+    // НОВЫЙ МЕТОД с пагинацией
+    Page<Auction> findAllWithPagination(Pageable pageable);
+
     // Поиск по статусу
     List<Auction> findByStatus(AuctionStatus status);
+
+    // НОВЫЙ МЕТОД с пагинацией
+    Page<Auction> findByStatusWithPagination(AuctionStatus status, Pageable pageable);
 
     // Поиск по автомобилю
     List<Auction> findByVehicleId(Long vehicleId);
 
-    // Поиск последнего аукциона по автомобилю (для детальной информации)
+    // Поиск последнего аукциона по автомобилю
     Optional<Auction> findFirstByVehicleIdOrderByCreatedAtDesc(Long vehicleId);
 
     // Проверка существования аукциона с конкретным статусом
     boolean existsByVehicleIdAndStatus(Long vehicleId, AuctionStatus status);
 
-    // ОПТИМИЗИРОВАННЫЙ МЕТОД: проверка наличия любого из запрещённых статусов
+    // Проверка наличия любого из запрещённых статусов
     boolean existsByVehicleIdAndStatusIn(Long vehicleId, List<AuctionStatus> statuses);
 
-    // ПОЛЕЗНЫЙ МЕТОД: получение всех статусов автомобиля одним запросом
+    // Получение всех статусов автомобиля одним запросом
     List<AuctionStatus> findStatusesByVehicleId(Long vehicleId);
 
-    // НОВЫЙ МЕТОД: поиск с пессимистичной блокировкой для конкурентного доступа
+    // Поиск с пессимистичной блокировкой
     Optional<Auction> findByIdWithLock(Long id);
+
+    // НОВЫЙ МЕТОД для шедулера (оптимизированный)
+    List<Auction> findByStatusAndEndTimeBefore(AuctionStatus status, java.time.OffsetDateTime endTime);
 }

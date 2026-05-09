@@ -1,11 +1,15 @@
+// auction/infrastructure/persistence/JpaAuctionRepositoryAdapter.java
 package com.example.autoauction.auction.infrastructure.persistence;
 
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -34,15 +38,13 @@ public class JpaAuctionRepositoryAdapter implements AuctionRepository {
     @Override
     @Transactional(readOnly = true)
     public Optional<Auction> findById(Long id) {
-        return jpaRepository.findById(id)
-                .map(mapper::toDomain);
+        return jpaRepository.findById(id).map(mapper::toDomain);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<Auction> findByIdWithLock(Long id) {
-        return jpaRepository.findByIdWithLock(id)
-                .map(mapper::toDomain);
+        return jpaRepository.findByIdWithLock(id).map(mapper::toDomain);
     }
 
     @Override
@@ -55,10 +57,22 @@ public class JpaAuctionRepositoryAdapter implements AuctionRepository {
 
     @Override
     @Transactional(readOnly = true)
+    public Page<Auction> findAllWithPagination(Pageable pageable) {
+        return jpaRepository.findAll(pageable).map(mapper::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<Auction> findByStatus(AuctionStatus status) {
         return jpaRepository.findByStatus(status).stream()
                 .map(mapper::toDomain)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Auction> findByStatusWithPagination(AuctionStatus status, Pageable pageable) {
+        return jpaRepository.findByStatus(status, pageable).map(mapper::toDomain);
     }
 
     @Override
@@ -93,6 +107,14 @@ public class JpaAuctionRepositoryAdapter implements AuctionRepository {
     public List<AuctionStatus> findStatusesByVehicleId(Long vehicleId) {
         return jpaRepository.findByVehicleId(vehicleId).stream()
                 .map(JpaAuctionEntity::getStatus)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Auction> findByStatusAndEndTimeBefore(AuctionStatus status, OffsetDateTime endTime) {
+        return jpaRepository.findByStatusAndEndTimeBefore(status, endTime).stream()
+                .map(mapper::toDomain)
                 .collect(Collectors.toList());
     }
 

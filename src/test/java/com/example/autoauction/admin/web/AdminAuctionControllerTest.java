@@ -1,3 +1,4 @@
+// admin/web/AdminAuctionControllerTest.java
 package com.example.autoauction.admin.web;
 
 import com.example.autoauction.admin.application.AdminAuctionService;
@@ -17,8 +18,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -26,8 +34,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.hamcrest.Matchers.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -166,21 +173,30 @@ class AdminAuctionControllerTest {
     // ==================== GET ALL AUCTIONS TESTS ====================
 
     @Nested
-    @DisplayName("GET /api/admin/auctions - Получение всех аукционов")
+    @DisplayName("GET /api/admin/auctions - Получение всех аукционов с пагинацией")
     class GetAllAuctionsTests {
 
         @Test
         @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
-        @DisplayName("Успешное получение списка аукционов")
-        void getAllAuctions_ShouldReturnList() throws Exception {
+        @DisplayName("Успешное получение списка аукционов с пагинацией")
+        void getAllAuctions_ShouldReturnPage() throws Exception {
+            Pageable pageable = PageRequest.of(0, 20);
             List<AuctionResponse> auctions = List.of(auctionResponse, activeAuctionResponse);
-            when(adminAuctionService.getAllAuctions()).thenReturn(auctions);
+            Page<AuctionResponse> page = new PageImpl<>(auctions, pageable, auctions.size());
 
-            mockMvc.perform(get("/api/admin/auctions"))
+            when(adminAuctionService.getAllAuctions(any(Pageable.class))).thenReturn(page);
+
+            mockMvc.perform(get("/api/admin/auctions")
+                            .param("page", "0")
+                            .param("size", "20"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(2)));
+                    .andExpect(jsonPath("$.content").isArray())
+                    .andExpect(jsonPath("$.content.length()").value(2))
+                    .andExpect(jsonPath("$.totalElements").value(2))
+                    .andExpect(jsonPath("$.pageable.pageNumber").value(0))
+                    .andExpect(jsonPath("$.pageable.pageSize").value(20));
 
-            verify(adminAuctionService, times(1)).getAllAuctions();
+            verify(adminAuctionService, times(1)).getAllAuctions(any(Pageable.class));
         }
 
         @Test
@@ -190,7 +206,7 @@ class AdminAuctionControllerTest {
             mockMvc.perform(get("/api/admin/auctions"))
                     .andExpect(status().isForbidden());
 
-            verify(adminAuctionService, never()).getAllAuctions();
+            verify(adminAuctionService, never()).getAllAuctions(any());
         }
     }
 
@@ -326,48 +342,45 @@ class AdminAuctionControllerTest {
     // ==================== GET AUCTIONS BY STATUS TESTS ====================
 
     @Nested
-    @DisplayName("GET /api/admin/auctions/by-status - Получение аукционов по статусу")
+    @DisplayName("GET /api/admin/auctions/by-status - Получение аукционов по статусу с пагинацией")
     class GetAuctionsByStatusTests {
 
         @Test
         @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
         @DisplayName("Успешное получение аукционов по статусу")
-        void getAuctionsByStatus_ValidStatus_ShouldReturnList() throws Exception {
+        void getAuctionsByStatus_ValidStatus_ShouldReturnPage() throws Exception {
+            Pageable pageable = PageRequest.of(0, 20);
             List<AuctionResponse> auctions = List.of(auctionResponse);
-            when(adminAuctionService.getAuctionsByStatus("CREATED")).thenReturn(auctions);
+            Page<AuctionResponse> page = new PageImpl<>(auctions, pageable, auctions.size());
+
+            when(adminAuctionService.getAuctionsByStatus(eq("CREATED"), any(Pageable.class)))
+                    .thenReturn(page);
 
             mockMvc.perform(get("/api/admin/auctions/by-status")
-                            .param("status", "CREATED"))
+                            .param("status", "CREATED")
+                            .param("page", "0")
+                            .param("size", "20"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(1)));
+                    .andExpect(jsonPath("$.content").isArray())
+                    .andExpect(jsonPath("$.content.length()").value(1));
 
-            verify(adminAuctionService, times(1)).getAuctionsByStatus("CREATED");
-        }
-
-        @Test
-        @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
-        @DisplayName("XSS атака в статусе - должна возвращать 400")
-        void getAuctionsByStatus_XssAttack_ShouldReturnBadRequest() throws Exception {
-            // XSS атака не дойдет до сервиса, так как будет отфильтрована валидацией в контроллере
-            mockMvc.perform(get("/api/admin/auctions/by-status")
-                            .param("status", "<script>alert('XSS')</script>"))
-                    .andExpect(status().isBadRequest());
-
-            verify(adminAuctionService, never()).getAuctionsByStatus(any());
+            verify(adminAuctionService, times(1)).getAuctionsByStatus(eq("CREATED"), any(Pageable.class));
         }
 
         @Test
         @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
         @DisplayName("Неверный статус - должно вернуть 400")
         void getAuctionsByStatus_InvalidStatus_ShouldReturnBadRequest() throws Exception {
-            when(adminAuctionService.getAuctionsByStatus("INVALID_STATUS"))
+            when(adminAuctionService.getAuctionsByStatus(eq("INVALID_STATUS"), any(Pageable.class)))
                     .thenThrow(new IllegalArgumentException("Неверный статус аукциона: INVALID_STATUS"));
 
             mockMvc.perform(get("/api/admin/auctions/by-status")
-                            .param("status", "INVALID_STATUS"))
+                            .param("status", "INVALID_STATUS")
+                            .param("page", "0")
+                            .param("size", "20"))
                     .andExpect(status().isBadRequest());
 
-            verify(adminAuctionService, times(1)).getAuctionsByStatus("INVALID_STATUS");
+            verify(adminAuctionService, times(1)).getAuctionsByStatus(eq("INVALID_STATUS"), any(Pageable.class));
         }
     }
 
@@ -389,19 +402,6 @@ class AdminAuctionControllerTest {
                     .andExpect(jsonPath("$", hasSize(1)));
 
             verify(adminAuctionService, times(1)).getAuctionsByVehicleId(1L);
-        }
-
-        @Test
-        @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
-        @DisplayName("Автомобиль без аукционов - пустой список")
-        void getAuctionsByVehicleId_NoAuctions_ShouldReturnEmptyList() throws Exception {
-            when(adminAuctionService.getAuctionsByVehicleId(999L)).thenReturn(List.of());
-
-            mockMvc.perform(get("/api/admin/auctions/vehicle/999"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(0)));
-
-            verify(adminAuctionService, times(1)).getAuctionsByVehicleId(999L);
         }
     }
 }

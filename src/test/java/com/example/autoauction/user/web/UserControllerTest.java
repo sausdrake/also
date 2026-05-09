@@ -1,7 +1,9 @@
+// user/web/UserControllerTest.java
 package com.example.autoauction.user.web;
 
 import com.example.autoauction.admin.web.TestSecurityConfig;
 import com.example.autoauction.auth.infrastructure.security.JwtService;
+import com.example.autoauction.auth.infrastructure.security.WithMockCustomUser;
 import com.example.autoauction.user.application.UserService;
 import com.example.autoauction.user.domain.Role;
 import com.example.autoauction.user.domain.User;
@@ -14,7 +16,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Arrays;
@@ -38,7 +40,13 @@ class UserControllerTest {
     private UserService userService;
 
     @MockBean
-    private JwtService jwtService;  // Not used but required for context
+    private JwtService jwtService;
+
+    @MockBean
+    private com.example.autoauction.user.domain.port.RoleRepository roleRepository;
+
+    @MockBean
+    private PasswordEncoder passwordEncoder;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -64,10 +72,12 @@ class UserControllerTest {
                 "new@example.com",
                 "password123"
         );
+
+        when(passwordEncoder.encode(any(String.class))).thenReturn("encodedPassword");
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
+    @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
     void getUsers_ShouldReturnList() throws Exception {
         when(userService.listUsers()).thenReturn(Arrays.asList(testUser));
 
@@ -77,7 +87,7 @@ class UserControllerTest {
     }
 
     @Test
-    @WithMockUser
+    @WithMockCustomUser(userId = 1L, username = "testuser", roles = {"USER"})
     void getUser_ExistingId_ShouldReturnUser() throws Exception {
         when(userService.getUser(1L)).thenReturn(Optional.of(testUser));
 
@@ -87,7 +97,7 @@ class UserControllerTest {
     }
 
     @Test
-    @WithMockUser
+    @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
     void getUser_NonExistingId_ShouldReturnNotFound() throws Exception {
         when(userService.getUser(99L)).thenReturn(Optional.empty());
 
@@ -96,8 +106,9 @@ class UserControllerTest {
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
+    @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
     void createUser_ValidRequest_ShouldReturnCreated() throws Exception {
+        when(roleRepository.findByName("ROLE_USER")).thenReturn(Optional.of(new Role(1L, "ROLE_USER", "Обычный пользователь")));
         when(userService.createUser(any(User.class))).thenReturn(testUser);
 
         mockMvc.perform(post("/api/users")

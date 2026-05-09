@@ -1,5 +1,7 @@
+// admin/application/AdminAuctionService.java
 package com.example.autoauction.admin.application;
 
+import com.example.autoauction.auction.application.AuctionFinalizer;
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
@@ -10,11 +12,11 @@ import com.example.autoauction.vehicle.domain.VehicleStatus;
 import com.example.autoauction.vehicle.web.dto.VehicleResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -25,10 +27,13 @@ public class AdminAuctionService {
     private final AuctionRepository auctionRepository;
     private final VehicleService vehicleService;
     private final AuctionValidator auctionValidator;
+    private final AuctionFinalizer auctionFinalizer;
 
     public AdminAuctionService(AuctionRepository auctionRepository,
                                VehicleService vehicleService,
-                               AuctionValidator auctionValidator) {
+                               AuctionValidator auctionValidator,
+                               AuctionFinalizer auctionFinalizer) {
+        this.auctionFinalizer = auctionFinalizer;
         this.auctionRepository = auctionRepository;
         this.vehicleService = vehicleService;
         this.auctionValidator = auctionValidator;
@@ -40,19 +45,11 @@ public class AdminAuctionService {
         log.info("=== СОЗДАНИЕ АУКЦИОНА ===");
         log.info("Запрос от adminId: {}, vehicleId: {}", adminId, request.vehicleId());
 
-        // 1. Базовая валидация входных данных (проверка на null)
         auctionValidator.validateBasicRequest(request);
-
-        // 2. Проверяем, существует ли автомобиль и имеет ли статус APPROVED
         VehicleResponse vehicle = getValidatedVehicle(request.vehicleId());
-
-        // 3. Проверяем бизнес-правила (цены, шаг ставки, время) - ЭТО КЛЮЧЕВОЙ МОМЕНТ!
         auctionValidator.validateBusinessRules(request, vehicle);
-
-        // 4. Проверяем, нет ли уже существующего аукциона
         checkExistingAuctions(request.vehicleId());
 
-        // 5. Создаём и сохраняем аукцион
         return createAndSaveAuction(request, adminId, vehicle);
     }
 
@@ -98,83 +95,27 @@ public class AdminAuctionService {
             );
         }
     }
+
     @Transactional
     public AuctionResponse completeAuction(Long id, Long adminId) {
         log.info("=== ПРИНУДИТЕЛЬНОЕ ЗАВЕРШЕНИЕ АУКЦИОНА ===");
         log.info("ID аукциона: {}, Admin ID: {}", id, adminId);
 
-        // Загружаем аукцион с пессимистичной блокировкой
         Auction auction = auctionRepository.findByIdWithLock(id)
                 .orElseThrow(() -> {
                     log.error("Аукцион не найден: {}", id);
                     return new IllegalArgumentException("Аукцион с ID " + id + " не найден");
                 });
 
-        log.debug("Текущий статус аукциона: {}, текущая цена: {}, количество ставок: {}",
-                auction.getStatus(), auction.getCurrentPrice(), auction.getTotalBids());
-
-        // Проверяем, что аукцион активен
         if (auction.getStatus() != AuctionStatus.ACTIVE) {
-            log.warn("Невозможно завершить аукцион в статусе: {}", auction.getStatus());
             throw new IllegalStateException(
                     String.format("Невозможно завершить аукцион в статусе '%s'. Только активные аукционы могут быть завершены",
                             auction.getStatus())
             );
         }
 
-        // Проверяем, не истекло ли время окончания
-        OffsetDateTime now = OffsetDateTime.now();
-        if (auction.getEndTime().isAfter(now)) {
-            log.warn("Попытка принудительного завершения аукциона до истечения времени. End time: {}, Now: {}",
-                    auction.getEndTime(), now);
-            // Можно либо разрешить, либо выбросить предупреждение
-            // Разрешаем, но логируем
-        }
-
-        // Финализируем аукцион
-        finalizeAuction(auction);
-
-        // Сохраняем изменения
-        Auction saved = auctionRepository.save(auction);
-        log.info("Аукцион {} успешно завершен. Итоговый статус: {}, Победитель: {}, Выигрышная ставка: {}",
-                saved.getId(), saved.getStatus(), saved.getWinnerId(), saved.getWinningBid());
-
-        return AuctionResponse.fromDomain(saved);
-    }
-
-    /**
-     * Внутренний метод для финализации аукциона
-     */
-    private void finalizeAuction(Auction auction) {
-        // Проверяем, были ли ставки
-        if (auction.getTotalBids() == null || auction.getTotalBids() == 0) {
-            // Нет ставок - аукцион истек
-            auction.setStatus(AuctionStatus.EXPIRED);
-            auction.setWinnerId(null);
-            auction.setWinningBid(null);
-            log.info("Аукцион {} завершен без ставок", auction.getId());
-            return;
-        }
-
-        // Есть ставки - проверяем резервную цену
-        boolean reserveMet = auction.getReservePrice() == null ||
-                auction.getCurrentPrice().compareTo(auction.getReservePrice()) >= 0;
-
-        if (reserveMet) {
-            // Резервная цена достигнута - победитель текущий лидер
-            auction.setStatus(AuctionStatus.COMPLETED);
-            log.info("Аукцион {} завершен успешно. Победитель: {}, Выигрышная ставка: {}, Резервная цена: {}",
-                    auction.getId(), auction.getWinnerId(), auction.getWinningBid(), auction.getReservePrice());
-        } else {
-            // Резервная цена не достигнута - аукцион не состоялся
-            auction.setStatus(AuctionStatus.EXPIRED);
-            auction.setWinnerId(null);
-            auction.setWinningBid(null);
-            log.info("Аукцион {} завершен без продажи. Резервная цена {} не достигнута. Финальная цена: {}",
-                    auction.getId(), auction.getReservePrice(), auction.getCurrentPrice());
-        }
-
-        auction.setUpdatedAt(OffsetDateTime.now());
+        auctionFinalizer.finalizeAuction(auction);
+        return AuctionResponse.fromDomain(auction);
     }
 
     private VehicleResponse getValidatedVehicle(Long vehicleId) {
@@ -225,6 +166,15 @@ public class AdminAuctionService {
         return auction;
     }
 
+    // ============ ОБНОВЛЁННЫЕ МЕТОДЫ С ПАГИНАЦИЕЙ ============
+
+    @Transactional(readOnly = true)
+    public Page<AuctionResponse> getAllAuctions(Pageable pageable) {
+        log.debug("=== ПОЛУЧЕНИЕ ВСЕХ АУКЦИОНОВ С ПАГИНАЦИЕЙ ===");
+        return auctionRepository.findAllWithPagination(pageable).map(AuctionResponse::fromDomain);
+    }
+
+    // Старый метод для обратной совместимости (если нужен)
     @Transactional(readOnly = true)
     public List<AuctionResponse> getAllAuctions() {
         log.debug("=== ПОЛУЧЕНИЕ ВСЕХ АУКЦИОНОВ ===");
@@ -296,6 +246,19 @@ public class AdminAuctionService {
         return AuctionResponse.fromDomain(saved);
     }
 
+    // Обновлённый метод с пагинацией
+    @Transactional(readOnly = true)
+    public Page<AuctionResponse> getAuctionsByStatus(String status, Pageable pageable) {
+        try {
+            AuctionStatus auctionStatus = AuctionStatus.valueOf(status.toUpperCase());
+            return auctionRepository.findByStatusWithPagination(auctionStatus, pageable)
+                    .map(AuctionResponse::fromDomain);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Неверный статус аукциона: " + status);
+        }
+    }
+
+    // Старый метод для обратной совместимости
     @Transactional(readOnly = true)
     public List<AuctionResponse> getAuctionsByStatus(String status) {
         try {

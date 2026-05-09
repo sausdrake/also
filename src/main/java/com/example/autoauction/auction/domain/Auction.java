@@ -1,8 +1,11 @@
+// auction/domain/Auction.java
 package com.example.autoauction.auction.domain;
 
+import com.example.autoauction.config.AuctionExtensionProperties;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.Objects;
 
@@ -30,19 +33,33 @@ public class Auction {
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 
-    // Для optimistic locking
     private Long version;
 
+    private int extensionCount = 0;
+
+    private transient Clock clock;
+    private transient AuctionExtensionProperties extensionProperties;
+
+    // Конструктор для создания нового аукциона
     public Auction(Long vehicleId, BigDecimal startingPrice, BigDecimal reservePrice,
                    BigDecimal buyNowPrice, BigDecimal minBidStep,
                    OffsetDateTime startTime, OffsetDateTime endTime, Long createdBy) {
+        this(vehicleId, startingPrice, reservePrice, buyNowPrice, minBidStep,
+                startTime, endTime, createdBy, Clock.systemUTC());
+    }
 
+    // Конструктор с поддержкой Clock (для тестов)
+    public Auction(Long vehicleId, BigDecimal startingPrice, BigDecimal reservePrice,
+                   BigDecimal buyNowPrice, BigDecimal minBidStep,
+                   OffsetDateTime startTime, OffsetDateTime endTime, Long createdBy, Clock clock) {
         Objects.requireNonNull(vehicleId, "ID автомобиля не может быть null");
         Objects.requireNonNull(startingPrice, "Стартовая цена не может быть null");
         Objects.requireNonNull(minBidStep, "Шаг ставки не может быть null");
         Objects.requireNonNull(startTime, "Время начала не может быть null");
         Objects.requireNonNull(endTime, "Время окончания не может быть null");
         Objects.requireNonNull(createdBy, "ID создателя не может быть null");
+
+        this.clock = clock != null ? clock : Clock.systemUTC();
 
         validatePrices(startingPrice, reservePrice, buyNowPrice);
         validateTime(startTime, endTime);
@@ -58,9 +75,30 @@ public class Auction {
         this.createdBy = createdBy;
         this.status = AuctionStatus.CREATED;
         this.totalBids = 0;
-        this.createdAt = OffsetDateTime.now();
-        this.updatedAt = OffsetDateTime.now();
+        this.createdAt = now();
+        this.updatedAt = now();
         this.version = 0L;
+        this.extensionCount = 0;
+    }
+
+    private OffsetDateTime now() {
+        return OffsetDateTime.now(clock);
+    }
+
+    public void setExtensionProperties(AuctionExtensionProperties extensionProperties) {
+        this.extensionProperties = extensionProperties;
+    }
+
+    private AuctionExtensionProperties getExtensionProperties() {
+        if (extensionProperties == null) {
+            AuctionExtensionProperties props = new AuctionExtensionProperties();
+            props.setEnabled(true);
+            props.setThresholdSeconds(30);
+            props.setExtensionMinutes(5);
+            props.setMaxExtensions(0);
+            return props;
+        }
+        return extensionProperties;
     }
 
     private void validatePrices(BigDecimal startingPrice, BigDecimal reservePrice, BigDecimal buyNowPrice) {
@@ -102,7 +140,8 @@ public class Auction {
         }
     }
 
-    // Геттеры
+    // ==================== ГЕТТЕРЫ ====================
+
     public Long getId() { return id; }
     public Long getVehicleId() { return vehicleId; }
     public String getVehicleInfo() { return vehicleInfo; }
@@ -121,8 +160,10 @@ public class Auction {
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }
     public Long getVersion() { return version; }
+    public int getExtensionCount() { return extensionCount; }
 
-    // Сеттеры с валидацией
+    // ==================== СЕТТЕРЫ ====================
+
     public void setId(Long id) {
         Objects.requireNonNull(id, "ID не может быть null");
         this.id = id;
@@ -134,18 +175,18 @@ public class Auction {
             throw new IllegalArgumentException("Текущая цена должна быть больше 0");
         }
         this.currentPrice = currentPrice;
-        this.updatedAt = OffsetDateTime.now();
+        this.updatedAt = now();
     }
 
     public void setStatus(AuctionStatus status) {
         Objects.requireNonNull(status, "Статус не может быть null");
         this.status = status;
-        this.updatedAt = OffsetDateTime.now();
+        this.updatedAt = now();
     }
 
     public void setWinnerId(Long winnerId) {
         this.winnerId = winnerId;
-        this.updatedAt = OffsetDateTime.now();
+        this.updatedAt = now();
     }
 
     public void setWinningBid(BigDecimal winningBid) {
@@ -153,7 +194,7 @@ public class Auction {
             throw new IllegalArgumentException("Выигрышная ставка должна быть больше 0");
         }
         this.winningBid = winningBid;
-        this.updatedAt = OffsetDateTime.now();
+        this.updatedAt = now();
     }
 
     public void setTotalBids(Integer totalBids) {
@@ -162,12 +203,12 @@ public class Auction {
             throw new IllegalArgumentException("Количество ставок не может быть отрицательным");
         }
         this.totalBids = totalBids;
-        this.updatedAt = OffsetDateTime.now();
+        this.updatedAt = now();
     }
 
     public void setVehicleInfo(String vehicleInfo) {
         this.vehicleInfo = vehicleInfo;
-        this.updatedAt = OffsetDateTime.now();
+        this.updatedAt = now();
     }
 
     public void setCreatedAt(OffsetDateTime createdAt) {
@@ -184,10 +225,19 @@ public class Auction {
         this.version = version;
     }
 
-    // Бизнес-методы с улучшенной валидацией
+    public void setClock(Clock clock) {
+        this.clock = clock;
+    }
+
+    public void setExtensionCount(int extensionCount) {
+        this.extensionCount = extensionCount;
+    }
+
+    // ==================== БИЗНЕС-МЕТОДЫ ====================
+
     public void updateVehicleInfo(String vehicleInfo) {
         this.vehicleInfo = vehicleInfo;
-        this.updatedAt = OffsetDateTime.now();
+        this.updatedAt = now();
     }
 
     public void start() {
@@ -198,7 +248,7 @@ public class Auction {
             );
         }
         this.status = AuctionStatus.ACTIVE;
-        this.updatedAt = OffsetDateTime.now();
+        this.updatedAt = now();
     }
 
     public void cancel() {
@@ -209,14 +259,44 @@ public class Auction {
             );
         }
         this.status = AuctionStatus.CANCELLED;
-        this.updatedAt = OffsetDateTime.now();
+        this.updatedAt = now();
+    }
+
+    private boolean shouldExtendAuction(OffsetDateTime bidTime) {
+        AuctionExtensionProperties props = getExtensionProperties();
+        if (!props.isEnabled()) {
+            return false;
+        }
+
+        if (props.getMaxExtensions() > 0 && extensionCount >= props.getMaxExtensions()) {
+            log.debug("Auction {} reached max extensions limit ({})", this.id, props.getMaxExtensions());
+            return false;
+        }
+
+        long secondsUntilEnd = java.time.Duration.between(bidTime, this.endTime).getSeconds();
+        boolean shouldExtend = secondsUntilEnd <= props.getThresholdSeconds() && secondsUntilEnd > 0;
+
+        if (shouldExtend) {
+            log.debug("Auction {} should extend: {} seconds until end, threshold={}",
+                    this.id, secondsUntilEnd, props.getThresholdSeconds());
+        }
+
+        return shouldExtend;
+    }
+
+    private void extendAuction() {
+        AuctionExtensionProperties props = getExtensionProperties();
+        this.endTime = this.endTime.plusMinutes(props.getExtensionMinutes());
+        this.extensionCount++;
+        this.updatedAt = now();
+
+        log.info("Auction {} extended #{} by {} minutes. New end time: {}",
+                this.id, this.extensionCount, props.getExtensionMinutes(), this.endTime);
     }
 
     /**
-     * Добавляет ставку на аукцион
-     * @param amount Сумма ставки
-     * @param bidderId ID участника
-     * @param bidTime Время ставки (для проверки продления)
+     * Обычная ставка на аукционе. Buy Now не обрабатывается здесь -
+     * это отдельный эндпоинт.
      */
     public void addBid(BigDecimal amount, Long bidderId, OffsetDateTime bidTime) {
         Objects.requireNonNull(amount, "Сумма ставки не может быть null");
@@ -230,7 +310,6 @@ public class Auction {
             );
         }
 
-        // Проверяем, не истекло ли время (с учетом возможного продления)
         if (this.endTime.isBefore(bidTime)) {
             throw new IllegalStateException(
                     String.format("Время аукциона истекло. Время окончания: %s", this.endTime)
@@ -249,62 +328,28 @@ public class Auction {
             throw new IllegalArgumentException("Нельзя делать ставки на собственный аукцион");
         }
 
-        // Проверяем, нужно ли продлить аукцион (если ставка сделана в последние минуты)
-        boolean extended = false;
-        if (shouldExtendAuction(bidTime)) {
+        // Проверяем, нужно ли продлить аукцион
+        boolean extended = shouldExtendAuction(bidTime);
+        if (extended) {
             extendAuction();
-            extended = true;
         }
 
-        // Обработка ставки
-        if (this.buyNowPrice != null && amount.compareTo(this.buyNowPrice) >= 0) {
-            this.currentPrice = this.buyNowPrice;
-            this.winnerId = bidderId;
-            this.winningBid = this.buyNowPrice;
-            this.status = AuctionStatus.COMPLETED;
-        } else {
-            this.currentPrice = amount;
-            this.winnerId = bidderId;
-            this.winningBid = amount;
-        }
-
+        // Обычная ставка
+        this.currentPrice = amount;
+        this.winnerId = bidderId;
+        this.winningBid = amount;
         this.totalBids++;
-        this.updatedAt = OffsetDateTime.now();
+        this.updatedAt = now();
 
         if (extended) {
             log.debug("Auction {} extended due to late bid. New end time: {}", this.id, this.endTime);
         }
     }
 
-    /**
-     * Проверяет, нужно ли продлить аукцион
-     * @param bidTime Время ставки
-     * @return true если нужно продлить
-     */
-    private boolean shouldExtendAuction(OffsetDateTime bidTime) {
-        // Параметры продления (можно вынести в конфигурацию)
-        int EXTENSION_MINUTES = 5;      // На сколько минут продлевать
-        int LAST_MINUTES_THRESHOLD = 5; // За сколько минут до конца продлевать
-
-        long minutesUntilEnd = java.time.Duration.between(bidTime, this.endTime).toMinutes();
-        return minutesUntilEnd <= LAST_MINUTES_THRESHOLD && minutesUntilEnd > 0;
-    }
-
-    /**
-     * Продлевает аукцион
-     */
-    private void extendAuction() {
-        int EXTENSION_MINUTES = 5; // На сколько минут продлевать
-        this.endTime = this.endTime.plusMinutes(EXTENSION_MINUTES);
-        this.updatedAt = OffsetDateTime.now();
-    }
-
-    // Перегрузка метода для обратной совместимости
     public void addBid(BigDecimal amount, Long bidderId) {
-        addBid(amount, bidderId, OffsetDateTime.now());
+        addBid(amount, bidderId, now());
     }
 
-    // Вспомогательные методы
     public boolean isActive() {
         return this.status == AuctionStatus.ACTIVE;
     }
@@ -318,13 +363,13 @@ public class Auction {
 
     public boolean canBeStarted() {
         return this.status == AuctionStatus.CREATED &&
-                this.startTime.isAfter(OffsetDateTime.now());
+                this.startTime.isAfter(now());
     }
 
     @Override
     public String toString() {
-        return String.format("Auction{id=%d, vehicleId=%d, status=%s, currentPrice=%s, version=%d}",
-                id, vehicleId, status, currentPrice, version);
+        return String.format("Auction{id=%d, vehicleId=%d, status=%s, currentPrice=%s, version=%d, extensions=%d}",
+                id, vehicleId, status, currentPrice, version, extensionCount);
     }
 
     @Override

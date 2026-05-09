@@ -1,5 +1,3 @@
-// Обнови файл: config/DataInitializer.java
-
 package com.example.autoauction.config;
 
 import com.example.autoauction.user.domain.Role;
@@ -9,8 +7,8 @@ import com.example.autoauction.user.domain.port.UserRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
 import java.util.Set;
 
 @Component
@@ -29,20 +27,14 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     @Override
+    @Transactional
     public void run(String... args) {
-        // 1. Создаем базовые роли, если их нет
-        createRoleIfNotExists("ROLE_USER", "Обычный пользователь");
-        createRoleIfNotExists("ROLE_DIAGNOSTIC", "Диагностик");
-        createRoleIfNotExists("ROLE_ADMIN", "Администратор");
+        // 1. Сначала создаём ВСЕ роли
+        Role userRole = createRoleIfNotExists("ROLE_USER", "Обычный пользователь");
+        Role diagnosticRole = createRoleIfNotExists("ROLE_DIAGNOSTIC", "Диагностик");
+        Role adminRole = createRoleIfNotExists("ROLE_ADMIN", "Администратор");
 
-        // 2. Получаем роли для пользователей
-        Role userRole = roleRepository.findByName("ROLE_USER")
-                .orElseThrow(() -> new RuntimeException("ROLE_USER not found"));
-
-        Role adminRole = roleRepository.findByName("ROLE_ADMIN")
-                .orElseThrow(() -> new RuntimeException("ROLE_ADMIN not found"));
-
-        // 3. Создаем администратора, если его нет
+        // 2. Создаём администратора (только если нет)
         if (userRepository.findByUsername("admin").isEmpty()) {
             User admin = new User(
                     null,
@@ -50,13 +42,13 @@ public class DataInitializer implements CommandLineRunner {
                     "admin@example.com",
                     passwordEncoder.encode("admin123"),
                     true,
-                    Set.of(adminRole)  // ← Теперь с ролью ADMIN
+                    Set.of(adminRole)  // ← adminRole уже сохранён в БД
             );
             userRepository.save(admin);
             System.out.println("Admin user created with ADMIN role!");
         }
 
-        // 4. Создаем тестового диагностика (опционально)
+        // 3. Создаём диагностика
         if (userRepository.findByUsername("diagnostic").isEmpty()) {
             User diagnostic = new User(
                     null,
@@ -64,13 +56,13 @@ public class DataInitializer implements CommandLineRunner {
                     "diagnostic@example.com",
                     passwordEncoder.encode("diagnostic123"),
                     true,
-                    Set.of(createRoleIfNotExists("ROLE_DIAGNOSTIC", "Диагностик"))  // ← Создаем роль если нет
+                    Set.of(diagnosticRole)
             );
             userRepository.save(diagnostic);
             System.out.println("Diagnostic user created!");
         }
 
-        // 5. Создаем тестового обычного пользователя (опционально)
+        // 4. Создаём обычного пользователя
         if (userRepository.findByUsername("user").isEmpty()) {
             User regularUser = new User(
                     null,
@@ -78,7 +70,7 @@ public class DataInitializer implements CommandLineRunner {
                     "user@example.com",
                     passwordEncoder.encode("user123"),
                     true,
-                    Set.of(userRole)  // ← Только роль USER
+                    Set.of(userRole)
             );
             userRepository.save(regularUser);
             System.out.println("Regular user created!");
@@ -86,12 +78,7 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private Role createRoleIfNotExists(String roleName, String description) {
-        Optional<Role> existingRole = roleRepository.findByName(roleName);
-        if (existingRole.isPresent()) {
-            return existingRole.get();
-        }
-
-        Role newRole = new Role(null, roleName, description);
-        return roleRepository.save(newRole);
+        return roleRepository.findByName(roleName)
+                .orElseGet(() -> roleRepository.save(new Role(null, roleName, description)));
     }
 }

@@ -40,4 +40,19 @@ public class BidController {
         BidResponse response = bidService.placeBid(auctionId, request.amount(), bidderId);
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/{auctionId}/buy-now")
+    @Operation(summary = "Купить автомобиль по цене Buy Now (до начала аукциона)")
+    public ResponseEntity<BidResponse> buyNow(
+            @Parameter(description = "ID аукциона", required = true)
+            @PathVariable Long auctionId,
+            @Parameter(hidden = true)
+            @CurrentUser UserPrincipal currentUser
+    ) {
+        Long buyerId = currentUser.getUserId();
+        log.info("User {} buying auction {} via Buy Now", buyerId, auctionId);
+
+        BidResponse response = bidService.buyNow(auctionId, buyerId);
+        return ResponseEntity.ok(response);
+    }
 }

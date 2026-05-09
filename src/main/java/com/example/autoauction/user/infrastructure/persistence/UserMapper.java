@@ -8,12 +8,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
-public final class UserMapper {  // ← Добавляем public и final
+public final class UserMapper {
 
-    private UserMapper() {  // Приватный конструктор для utility class
-    }
+    private UserMapper() {}
 
-    public static User toDomain(JpaUserEntity entity) {  // ← public
+    public static User toDomain(JpaUserEntity entity) {
         if (entity == null) return null;
 
         Set<Role> roles = entity.getRoles().stream()
@@ -30,7 +29,7 @@ public final class UserMapper {  // ← Добавляем public и final
         );
     }
 
-    public static Role toDomain(JpaRoleEntity entity) {  // ← public
+    public static Role toDomain(JpaRoleEntity entity) {
         if (entity == null) return null;
 
         return new Role(
@@ -40,8 +39,7 @@ public final class UserMapper {  // ← Добавляем public и final
         );
     }
 
-    // Добавим метод для конвертации из домена в JPA (может пригодиться)
-    public static JpaUserEntity toEntity(User domain) {
+    public static JpaUserEntity toEntity(User domain, SpringDataRoleJpaRepository roleRepository) {
         if (domain == null) return null;
 
         JpaUserEntity entity = new JpaUserEntity(
@@ -52,18 +50,21 @@ public final class UserMapper {  // ← Добавляем public и final
         );
         entity.setId(domain.getId());
 
-        // Конвертируем роли
+        // Загружаем роли из БД, а не создаём новые transient объекты
         Set<JpaRoleEntity> roleEntities = domain.getRoles().stream()
-                .map(UserMapper::toEntity)
+                .map(role -> roleRepository.findByName(role.getName())
+                        .orElseThrow(() -> new IllegalStateException("Role not found: " + role.getName())))
                 .collect(Collectors.toSet());
         entity.setRoles(roleEntities);
 
         return entity;
     }
 
+    // Этот метод больше не нужен, но оставим для других мест, где может использоваться
     public static JpaRoleEntity toEntity(Role domain) {
         if (domain == null) return null;
 
+        // Создаём новую роль без ID (ID сгенерируется при сохранении)
         return new JpaRoleEntity(
                 domain.getName(),
                 domain.getDescription()

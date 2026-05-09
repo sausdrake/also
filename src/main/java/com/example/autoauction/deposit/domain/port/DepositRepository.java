@@ -1,7 +1,10 @@
+// deposit/domain/port/DepositRepository.java
 package com.example.autoauction.deposit.domain.port;
 
 import com.example.autoauction.deposit.domain.Deposit;
 import com.example.autoauction.deposit.domain.DepositTransaction;
+import com.example.autoauction.deposit.domain.FreezeReason;
+import com.example.autoauction.deposit.domain.FrozenDeposit;
 
 import java.util.List;
 import java.util.Optional;
@@ -19,4 +22,13 @@ public interface DepositRepository {
     List<DepositTransaction> findTransactionsByUserId(Long userId);
     List<DepositTransaction> findTransactionsByDepositId(Long depositId);
     List<DepositTransaction> findTransactionsByAuctionId(Long auctionId);
+
+    // НОВЫЕ МЕТОДЫ для работы с frozen deposits
+    void freezeForAuction(Long depositId, Long auctionId, java.math.BigDecimal amount, FreezeReason reason);
+    void unfreezeForAuction(Long depositId, Long auctionId);
+    void markFrozenAsWinner(Long depositId, Long auctionId);
+    List<FrozenDeposit> getFrozenDepositsByDepositId(Long depositId);
+    List<FrozenDeposit> getFrozenDepositsByAuctionId(Long auctionId);
+    boolean isFrozenForAuction(Long depositId, Long auctionId);
+    void clearFrozenForAuction(Long auctionId);
 }

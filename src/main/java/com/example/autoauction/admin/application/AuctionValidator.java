@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Objects;
@@ -17,7 +18,13 @@ public class AuctionValidator {
     private static final long MIN_AUCTION_DURATION_HOURS = 1;
     private static final long MAX_AUCTION_DURATION_DAYS = 30;
     private static final long MIN_HOURS_BEFORE_START = 1;
-    private static final BigDecimal MIN_BID_STEP_PERCENTAGE = new BigDecimal("0.01"); // 1%
+    private static final BigDecimal MIN_BID_STEP_PERCENTAGE = new BigDecimal("0.01");
+
+    private final Clock clock;
+
+    public AuctionValidator(Clock clock) {
+        this.clock = clock;
+    }
 
     public void validateBasicRequest(AuctionCreateRequest request) {
         log.debug("Базовая валидация запроса на создание аукциона");
@@ -36,19 +43,16 @@ public class AuctionValidator {
         validateBidStep(request);
         validateTime(request);
 
-        // Дополнительные проверки, связанные с автомобилем
         validateVehicleCompatibility(request, vehicle);
     }
 
     private void validatePrices(AuctionCreateRequest request) {
-        // Проверка стартовой цены
         if (request.startingPrice().compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException(
                     String.format("Стартовая цена должна быть больше 0. Получено: %s", request.startingPrice())
             );
         }
 
-        // Проверка резервной цены
         if (request.reservePrice() != null) {
             if (request.reservePrice().compareTo(BigDecimal.ZERO) <= 0) {
                 throw new IllegalArgumentException(
@@ -63,7 +67,6 @@ public class AuctionValidator {
             }
         }
 
-        // Проверка цены мгновенной покупки
         if (request.buyNowPrice() != null) {
             if (request.buyNowPrice().compareTo(BigDecimal.ZERO) <= 0) {
                 throw new IllegalArgumentException(
@@ -96,9 +99,8 @@ public class AuctionValidator {
     }
 
     private void validateTime(AuctionCreateRequest request) {
-        OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime now = OffsetDateTime.now(clock);
 
-        // Время начала не может быть в прошлом
         if (request.startTime().isBefore(now)) {
             throw new IllegalArgumentException(
                     String.format("Время начала аукциона (%s) не может быть в прошлом. Текущее время: %s",
@@ -106,7 +108,6 @@ public class AuctionValidator {
             );
         }
 
-        // Время окончания должно быть после времени начала
         if (!request.endTime().isAfter(request.startTime())) {
             throw new IllegalArgumentException(
                     String.format("Время окончания (%s) должно быть позже времени начала (%s)",
@@ -117,7 +118,6 @@ public class AuctionValidator {
         Duration duration = Duration.between(request.startTime(), request.endTime());
         long minutes = duration.toMinutes();
 
-        // Минимальная длительность аукциона
         if (minutes < MIN_AUCTION_DURATION_HOURS * 60) {
             throw new IllegalArgumentException(
                     String.format("Аукцион должен длиться минимум %d час(ов). Текущая длительность: %d минут",
@@ -125,7 +125,6 @@ public class AuctionValidator {
             );
         }
 
-        // Максимальная длительность
         if (minutes > MAX_AUCTION_DURATION_DAYS * 24 * 60) {
             throw new IllegalArgumentException(
                     String.format("Аукцион не может длиться больше %d дней. Текущая длительность: %d дней",
@@ -133,7 +132,6 @@ public class AuctionValidator {
             );
         }
 
-        // Аукцион нельзя создать меньше чем за N часов до начала
         Duration tillStart = Duration.between(now, request.startTime());
         if (tillStart.toHours() < MIN_HOURS_BEFORE_START) {
             throw new IllegalArgumentException(
@@ -146,8 +144,6 @@ public class AuctionValidator {
     }
 
     private void validateVehicleCompatibility(AuctionCreateRequest request, VehicleResponse vehicle) {
-        // Здесь можно добавить проверки совместимости автомобиля с аукционом
-        // Например, проверка возраста автомобиля, пробега и т.д.
         log.debug("Проверка совместимости автомобиля с аукционом");
     }
 }

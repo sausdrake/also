@@ -24,7 +24,7 @@ public class JpaVehicleEntity {
     @Column(nullable = false, length = 50)
     private String model;
 
-    @Column(name = "year", nullable = false)
+    @Column(name = "production_year", nullable = false)
     private Integer year;
 
     @Column(unique = true, nullable = false, length = 17)
@@ -52,7 +52,7 @@ public class JpaVehicleEntity {
     @Column(length = 30)
     private String transmission;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "description", length = 10000)
     private String description;
 
     @Enumerated(EnumType.STRING)
@@ -71,7 +71,7 @@ public class JpaVehicleEntity {
     @Column(name = "admin_name")
     private String adminName;
 
-    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    @Column(name = "rejection_reason", length = 10000)
     private String rejectionReason;
 
     @Column(name = "created_at", nullable = false)

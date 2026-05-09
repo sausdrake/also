@@ -19,7 +19,7 @@ public class JpaAuctionEntity {
     @Column(name = "vehicle_id", nullable = false)
     private Long vehicleId;
 
-    @Column(name = "vehicle_info", columnDefinition = "TEXT")
+    @Column(name = "vehicle_info", length = 10000)
     private String vehicleInfo;
 
     @Column(name = "starting_price", nullable = false, precision = 10, scale = 2)
@@ -64,6 +64,10 @@ public class JpaAuctionEntity {
 
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
+    @Column(name = "was_extended", nullable = false)
+    private boolean wasExtended = false;
+    @Column(name = "extension_count", nullable = false)
+    private int extensionCount = 0;
 
     @Version
     @Column(name = "version", nullable = false)
@@ -126,4 +130,8 @@ public class JpaAuctionEntity {
 
     public Long getVersion() { return version; }
     public void setVersion(Long version) { this.version = version; }
+    public boolean isWasExtended() { return wasExtended; }
+    public void setWasExtended(boolean wasExtended) { this.wasExtended = wasExtended; }
+    public int getExtensionCount() { return extensionCount; }
+    public void setExtensionCount(int extensionCount) { this.extensionCount = extensionCount; }
 }

@@ -1,21 +1,24 @@
-// Файл: auction/application/BidService.java
-
+// auction/application/BidService.java
 package com.example.autoauction.auction.application;
 
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
+import com.example.autoauction.auction.domain.port.AuctionParticipantRepository;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.auction.web.dto.BidResponse;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.deposit.domain.Deposit;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -23,36 +26,103 @@ public class BidService {
 
     private final AuctionRepository auctionRepository;
     private final DepositService depositService;
+    private final AuctionParticipantRepository participantRepository;
+    private final AuctionFinalizer auctionFinalizer;
 
-    // Кэш для отслеживания участников аукционов
-    private final ConcurrentHashMap<Long, ConcurrentHashMap<Long, Boolean>> auctionBidders = new ConcurrentHashMap<>();
-
-    public BidService(AuctionRepository auctionRepository, DepositService depositService) {
+    public BidService(AuctionRepository auctionRepository,
+                      DepositService depositService,
+                      AuctionParticipantRepository participantRepository,
+                      AuctionFinalizer auctionFinalizer) {
         this.auctionRepository = auctionRepository;
         this.depositService = depositService;
-        log.info("BidService initialized with deposit service integration");
+        this.participantRepository = participantRepository;
+        this.auctionFinalizer = auctionFinalizer;
+        log.info("BidService initialized with database-backed participant tracking");
     }
 
+    /**
+     * Buy Now - покупка автомобиля по фиксированной цене до начала аукциона
+     */
     @Transactional
-    public BidResponse placeBid(Long auctionId, BigDecimal amount, Long bidderId) {
-        log.info("=== СОЗДАНИЕ СТАВКИ ===");
-        log.info("Auction ID: {}, Bidder ID: {}, Amount: {}", auctionId, bidderId, amount);
+    public BidResponse buyNow(Long auctionId, Long buyerId) {
+        log.info("=== BUY NOW ===");
+        log.info("Auction ID: {}, Buyer ID: {}", auctionId, buyerId);
 
-        // Загружаем аукцион с пессимистичной блокировкой
         Auction auction = auctionRepository.findByIdWithLock(auctionId)
                 .orElseThrow(() -> {
                     log.error("Аукцион не найден: {}", auctionId);
                     return new IllegalArgumentException("Аукцион с ID " + auctionId + " не найден");
                 });
 
-        log.debug("Текущий статус аукциона: {}, текущая цена: {}, минимальный шаг: {}, время окончания: {}",
-                auction.getStatus(), auction.getCurrentPrice(), auction.getMinBidStep(), auction.getEndTime());
+        // Buy Now доступен только для CREATED статуса
+        if (auction.getStatus() != AuctionStatus.CREATED) {
+            log.warn("Buy Now попытка на аукционе в статусе: {}", auction.getStatus());
+            throw new IllegalStateException(
+                    String.format("Buy Now доступен только для аукционов в статусе CREATED. Текущий статус: %s",
+                            auction.getStatus())
+            );
+        }
+
+        if (auction.getBuyNowPrice() == null) {
+            throw new IllegalStateException("Buy Now не установлен для этого аукциона");
+        }
+
+        if (buyerId.equals(auction.getCreatedBy())) {
+            log.warn("Пользователь {} попытался купить свой автомобиль", buyerId);
+            throw new IllegalArgumentException("Нельзя купить собственный автомобиль");
+        }
+
+        // Проверка депозита (1% от стартовой цены)
+        BigDecimal requiredDeposit = Deposit.calculateRequiredDeposit(auction.getStartingPrice());
+        if (!depositService.canParticipateInAuction(buyerId, auction.getStartingPrice())) {
+            log.warn("User {} has insufficient deposit for Buy Now. Required: {}", buyerId, requiredDeposit);
+            throw new IllegalArgumentException(
+                    String.format("Недостаточно средств на депозите для Buy Now. Требуется: %s (1%% от стартовой цены %s)",
+                            requiredDeposit, auction.getStartingPrice())
+            );
+        }
+
+        // Заморозка депозита
+        depositService.freezeForAuction(buyerId, auctionId, auction.getStartingPrice());
+        log.info("Deposit frozen for user {} on auction {}", buyerId, auctionId);
+
+        // Регистрация участника
+        participantRepository.registerParticipant(auctionId, buyerId, requiredDeposit);
+
+        // Завершение аукциона по Buy Now
+        auctionFinalizer.finalizeWithBuyNow(auction, buyerId, auction.getBuyNowPrice());
+
+        log.info("Аукцион {} завершен по Buy Now. Покупатель: {}", auctionId, buyerId);
+        return BidResponse.fromDomain(auction, auction.getBuyNowPrice(), true, false);
+    }
+
+    /**
+     * Обычная ставка на активном аукционе
+     */
+    @Transactional
+    @Retryable(
+            value = {ObjectOptimisticLockingFailureException.class, OptimisticLockingFailureException.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 50, multiplier = 2, random = true)
+    )
+    public BidResponse placeBid(Long auctionId, BigDecimal amount, Long bidderId) {
+        log.info("=== СОЗДАНИЕ СТАВКИ ===");
+        log.info("Auction ID: {}, Bidder ID: {}, Amount: {}", auctionId, bidderId, amount);
+
         if (amount == null) {
             throw new NullPointerException("Сумма ставки не может быть null");
         }
 
-        log.info("Auction ID: {}, Bidder ID: {}, Amount: {}", auctionId, bidderId, amount);
-        // ПРОВЕРКА СТАТУСА АУКЦИОНА - ПЕРЕМЕСТИТЬ СЮДА (ДО ПРОВЕРКИ ДЕПОЗИТА)
+        Auction auction = auctionRepository.findByIdWithLock(auctionId)
+                .orElseThrow(() -> {
+                    log.error("Аукцион не найден: {}", auctionId);
+                    return new IllegalArgumentException("Аукцион с ID " + auctionId + " не найден");
+                });
+
+        log.debug("Текущий статус аукциона: {}, текущая цена: {}, минимальный шаг: {}, версия: {}",
+                auction.getStatus(), auction.getCurrentPrice(), auction.getMinBidStep(), auction.getVersion());
+
+        // Только активные аукционы принимают ставки
         if (auction.getStatus() != AuctionStatus.ACTIVE) {
             log.warn("Попытка ставки на неактивный аукцион. Статус: {}", auction.getStatus());
             throw new IllegalStateException(
@@ -61,22 +131,18 @@ public class BidService {
             );
         }
 
-        // Проверяем, не истекло ли время
         if (auction.getEndTime().isBefore(OffsetDateTime.now())) {
             throw new IllegalStateException("Время аукциона истекло");
         }
 
-        // Проверяем, не является ли участник создателем аукциона
         if (bidderId.equals(auction.getCreatedBy())) {
             log.warn("Попытка сделать ставку на свой аукцион от пользователя {}", bidderId);
             throw new IllegalArgumentException("Нельзя делать ставки на собственный аукцион");
         }
 
-        // Проверяем, есть ли уже ставки у пользователя на этот аукцион
-        boolean hasExistingBids = checkIfUserHasBids(auctionId, bidderId);
+        boolean isExistingParticipant = participantRepository.isParticipant(auctionId, bidderId);
 
-        // Если это первая ставка пользователя на этот аукцион - проверяем и замораживаем депозит
-        if (!hasExistingBids) {
+        if (!isExistingParticipant) {
             BigDecimal requiredDeposit = Deposit.calculateRequiredDeposit(auction.getStartingPrice());
 
             if (!depositService.canParticipateInAuction(bidderId, auction.getStartingPrice())) {
@@ -87,7 +153,6 @@ public class BidService {
                 );
             }
 
-            // Замораживаем депозит
             try {
                 depositService.freezeForAuction(bidderId, auctionId, auction.getStartingPrice());
                 log.info("Deposit frozen for user {} on auction {}", bidderId, auctionId);
@@ -96,48 +161,30 @@ public class BidService {
                         bidderId, auctionId, e.getMessage());
                 throw new IllegalArgumentException("Ошибка при заморозке депозита: " + e.getMessage());
             }
+
+            participantRepository.registerParticipant(auctionId, bidderId, requiredDeposit);
         }
 
-        boolean buyNowUsed = false;
         boolean auctionExtended = false;
         OffsetDateTime oldEndTime = auction.getEndTime();
 
         try {
-            // Вызываем бизнес-логику добавления ставки с текущим временем
             auction.addBid(amount, bidderId, OffsetDateTime.now());
 
-            // Проверяем, было ли продление
             if (auction.getEndTime().isAfter(oldEndTime)) {
                 auctionExtended = true;
                 log.info("Аукцион {} продлен! Новое время окончания: {}", auctionId, auction.getEndTime());
             }
 
-            // Проверяем, была ли использована цена мгновенной покупки
-            if (auction.getBuyNowPrice() != null && amount.compareTo(auction.getBuyNowPrice()) >= 0) {
-                buyNowUsed = true;
-                // Если ставка выиграла по buyNow - отмечаем пользователя как победителя
-                try {
-                    depositService.markAsWinner(bidderId, auctionId);
-                    log.info("User {} won auction {} via buy now", bidderId, auctionId);
-                } catch (Exception e) {
-                    log.error("Failed to mark user {} as winner: {}", bidderId, e.getMessage());
-                }
-                log.info("Аукцион завершен по цене мгновенной покупки! Победитель: {}", bidderId);
-            } else {
-                log.info("Ставка {} успешно принята, новая цена: {}, лидер: {}",
-                        amount, auction.getCurrentPrice(), bidderId);
-            }
-
-            // Регистрируем участника в кэше
-            registerBidder(auctionId, bidderId);
+            log.info("Ставка {} успешно принята, новая цена: {}, лидер: {}",
+                    amount, auction.getCurrentPrice(), bidderId);
 
         } catch (IllegalStateException | IllegalArgumentException e) {
             log.warn("Ошибка при создании ставки: {}", e.getMessage());
 
-            // Если ставка не прошла и это была первая ставка - размораживаем депозит
-            if (!hasExistingBids) {
+            if (!isExistingParticipant) {
                 try {
-                    depositService.unfreezeForAuction(bidderId, auctionId, auction.getStartingPrice());
+                    depositService.unfreezeForAuction(bidderId, auctionId);
                     log.info("Deposit unfrozen for user {} due to failed bid", bidderId);
                 } catch (Exception ex) {
                     log.warn("Failed to unfreeze deposit for user {}: {}", bidderId, ex.getMessage());
@@ -146,49 +193,17 @@ public class BidService {
             throw e;
         }
 
-        // Сохраняем изменения
         Auction saved = auctionRepository.save(auction);
         log.debug("Аукцион сохранен, версия: {}", saved.getVersion());
 
         log.info("Ставка успешно создана! Итоговый статус аукциона: {}, продление: {}",
                 saved.getStatus(), auctionExtended);
 
-        return BidResponse.fromDomain(saved, amount, buyNowUsed, auctionExtended);
+        return BidResponse.fromDomain(saved, amount, false, auctionExtended);
     }
 
-    /**
-     * Проверяет, делал ли пользователь уже ставки на этот аукцион
-     */
-    private boolean checkIfUserHasBids(Long auctionId, Long userId) {
-        ConcurrentHashMap<Long, Boolean> bidders = auctionBidders.get(auctionId);
-        return bidders != null && bidders.containsKey(userId);
-    }
-
-    /**
-     * Регистрирует участника аукциона
-     */
-    private void registerBidder(Long auctionId, Long userId) {
-        auctionBidders.computeIfAbsent(auctionId, k -> new ConcurrentHashMap<>())
-                .put(userId, true);
-        log.debug("User {} registered as bidder for auction {}", userId, auctionId);
-    }
-
-    /**
-     * Получить список всех участников аукциона
-     */
+    @Transactional(readOnly = true)
     public List<Long> getAuctionParticipants(Long auctionId) {
-        ConcurrentHashMap<Long, Boolean> bidders = auctionBidders.get(auctionId);
-        if (bidders == null) {
-            return List.of();
-        }
-        return List.copyOf(bidders.keySet());
-    }
-
-    /**
-     * Очистить участников аукциона (вызывается после завершения)
-     */
-    public void clearAuctionParticipants(Long auctionId) {
-        auctionBidders.remove(auctionId);
-        log.debug("Cleared participants for auction {}", auctionId);
+        return participantRepository.getParticipants(auctionId);
     }
 }
