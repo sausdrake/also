@@ -4,47 +4,71 @@ package com.example.autoauction.auction.infrastructure.persistence;
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
+import com.example.autoauction.config.AuctionExtensionProperties;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Repository
 @Transactional
 public class JpaAuctionRepositoryAdapter implements AuctionRepository {
 
     private final SpringDataAuctionJpaRepository jpaRepository;
     private final AuctionMapper mapper;
+    private final Clock clock;
+    private final AuctionExtensionProperties extensionProperties;
 
     public JpaAuctionRepositoryAdapter(
             SpringDataAuctionJpaRepository jpaRepository,
-            AuctionMapper mapper) {
+            AuctionMapper mapper,
+            Clock clock,
+            AuctionExtensionProperties extensionProperties) {
         this.jpaRepository = jpaRepository;
         this.mapper = mapper;
+        this.clock = clock;
+        this.extensionProperties = extensionProperties;
+        log.info("JpaAuctionRepositoryAdapter initialized with Clock and ExtensionProperties");
+    }
+
+    // Вспомогательный метод для внедрения зависимостей в доменный объект
+    private Auction enrichDomain(Auction auction) {
+        if (auction != null) {
+            auction.setClock(clock);
+            auction.setExtensionProperties(extensionProperties);
+        }
+        return auction;
     }
 
     @Override
     public Auction save(Auction auction) {
         JpaAuctionEntity entity = mapper.toEntity(auction);
         JpaAuctionEntity saved = jpaRepository.save(entity);
-        return mapper.toDomain(saved);
+        return enrichDomain(mapper.toDomain(saved));
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<Auction> findById(Long id) {
-        return jpaRepository.findById(id).map(mapper::toDomain);
+        return jpaRepository.findById(id)
+                .map(mapper::toDomain)
+                .map(this::enrichDomain);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<Auction> findByIdWithLock(Long id) {
-        return jpaRepository.findByIdWithLock(id).map(mapper::toDomain);
+        return jpaRepository.findByIdWithLock(id)
+                .map(mapper::toDomain)
+                .map(this::enrichDomain);
     }
 
     @Override
@@ -52,13 +76,16 @@ public class JpaAuctionRepositoryAdapter implements AuctionRepository {
     public List<Auction> findAll() {
         return jpaRepository.findAll().stream()
                 .map(mapper::toDomain)
+                .map(this::enrichDomain)
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<Auction> findAllWithPagination(Pageable pageable) {
-        return jpaRepository.findAll(pageable).map(mapper::toDomain);
+        return jpaRepository.findAll(pageable)
+                .map(mapper::toDomain)
+                .map(this::enrichDomain);
     }
 
     @Override
@@ -66,13 +93,16 @@ public class JpaAuctionRepositoryAdapter implements AuctionRepository {
     public List<Auction> findByStatus(AuctionStatus status) {
         return jpaRepository.findByStatus(status).stream()
                 .map(mapper::toDomain)
+                .map(this::enrichDomain)
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<Auction> findByStatusWithPagination(AuctionStatus status, Pageable pageable) {
-        return jpaRepository.findByStatus(status, pageable).map(mapper::toDomain);
+        return jpaRepository.findByStatus(status, pageable)
+                .map(mapper::toDomain)
+                .map(this::enrichDomain);
     }
 
     @Override
@@ -80,6 +110,7 @@ public class JpaAuctionRepositoryAdapter implements AuctionRepository {
     public List<Auction> findByVehicleId(Long vehicleId) {
         return jpaRepository.findByVehicleId(vehicleId).stream()
                 .map(mapper::toDomain)
+                .map(this::enrichDomain)
                 .collect(Collectors.toList());
     }
 
@@ -87,7 +118,8 @@ public class JpaAuctionRepositoryAdapter implements AuctionRepository {
     @Transactional(readOnly = true)
     public Optional<Auction> findFirstByVehicleIdOrderByCreatedAtDesc(Long vehicleId) {
         return jpaRepository.findFirstByVehicleIdOrderByCreatedAtDesc(vehicleId)
-                .map(mapper::toDomain);
+                .map(mapper::toDomain)
+                .map(this::enrichDomain);
     }
 
     @Override
@@ -115,11 +147,13 @@ public class JpaAuctionRepositoryAdapter implements AuctionRepository {
     public List<Auction> findByStatusAndEndTimeBefore(AuctionStatus status, OffsetDateTime endTime) {
         return jpaRepository.findByStatusAndEndTimeBefore(status, endTime).stream()
                 .map(mapper::toDomain)
+                .map(this::enrichDomain)
                 .collect(Collectors.toList());
     }
 
     @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
+        log.debug("Deleted auction with id: {}", id);
     }
 }

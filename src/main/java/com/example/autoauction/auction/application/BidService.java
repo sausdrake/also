@@ -28,15 +28,18 @@ public class BidService {
     private final DepositService depositService;
     private final AuctionParticipantRepository participantRepository;
     private final AuctionFinalizer auctionFinalizer;
+    private final RateLimitService rateLimitService;
 
     public BidService(AuctionRepository auctionRepository,
                       DepositService depositService,
                       AuctionParticipantRepository participantRepository,
-                      AuctionFinalizer auctionFinalizer) {
+                      AuctionFinalizer auctionFinalizer,
+                      RateLimitService rateLimitService) {
         this.auctionRepository = auctionRepository;
         this.depositService = depositService;
         this.participantRepository = participantRepository;
         this.auctionFinalizer = auctionFinalizer;
+        this.rateLimitService = rateLimitService;
         log.info("BidService initialized with database-backed participant tracking");
     }
 
@@ -48,13 +51,26 @@ public class BidService {
         log.info("=== BUY NOW ===");
         log.info("Auction ID: {}, Buyer ID: {}", auctionId, buyerId);
 
+        // Сначала валидация параметров, потом rate limiting
+        if (auctionId == null) {
+            throw new IllegalArgumentException("ID аукциона не может быть null");
+        }
+        if (buyerId == null) {
+            throw new IllegalArgumentException("ID покупателя не может быть null");
+        }
+
+        // Rate limiting после проверки параметров
+        if (rateLimitService != null && !rateLimitService.tryAcquire(buyerId)) {
+            log.warn("Rate limit exceeded for user: {}", buyerId);
+            throw new RateLimitException("Слишком много запросов. Пожалуйста, подождите.");
+        }
+
         Auction auction = auctionRepository.findByIdWithLock(auctionId)
                 .orElseThrow(() -> {
                     log.error("Аукцион не найден: {}", auctionId);
                     return new IllegalArgumentException("Аукцион с ID " + auctionId + " не найден");
                 });
 
-        // Buy Now доступен только для CREATED статуса
         if (auction.getStatus() != AuctionStatus.CREATED) {
             log.warn("Buy Now попытка на аукционе в статусе: {}", auction.getStatus());
             throw new IllegalStateException(
@@ -72,7 +88,6 @@ public class BidService {
             throw new IllegalArgumentException("Нельзя купить собственный автомобиль");
         }
 
-        // Проверка депозита (1% от стартовой цены)
         BigDecimal requiredDeposit = Deposit.calculateRequiredDeposit(auction.getStartingPrice());
         if (!depositService.canParticipateInAuction(buyerId, auction.getStartingPrice())) {
             log.warn("User {} has insufficient deposit for Buy Now. Required: {}", buyerId, requiredDeposit);
@@ -82,14 +97,11 @@ public class BidService {
             );
         }
 
-        // Заморозка депозита
         depositService.freezeForAuction(buyerId, auctionId, auction.getStartingPrice());
         log.info("Deposit frozen for user {} on auction {}", buyerId, auctionId);
 
-        // Регистрация участника
         participantRepository.registerParticipant(auctionId, buyerId, requiredDeposit);
 
-        // Завершение аукциона по Buy Now
         auctionFinalizer.finalizeWithBuyNow(auction, buyerId, auction.getBuyNowPrice());
 
         log.info("Аукцион {} завершен по Buy Now. Покупатель: {}", auctionId, buyerId);
@@ -109,8 +121,21 @@ public class BidService {
         log.info("=== СОЗДАНИЕ СТАВКИ ===");
         log.info("Auction ID: {}, Bidder ID: {}, Amount: {}", auctionId, bidderId, amount);
 
+        // Сначала валидация параметров (это должно быть ПЕРВЫМ!)
+        if (auctionId == null) {
+            throw new NullPointerException("ID аукциона не может быть null");
+        }
+        if (bidderId == null) {
+            throw new NullPointerException("ID участника не может быть null");
+        }
         if (amount == null) {
             throw new NullPointerException("Сумма ставки не может быть null");
+        }
+
+        // Rate limiting после проверки параметров
+        if (rateLimitService != null && !rateLimitService.tryAcquire(bidderId)) {
+            log.warn("Rate limit exceeded for user: {}", bidderId);
+            throw new RateLimitException("Слишком много ставок. Пожалуйста, подождите.");
         }
 
         Auction auction = auctionRepository.findByIdWithLock(auctionId)
@@ -122,7 +147,6 @@ public class BidService {
         log.debug("Текущий статус аукциона: {}, текущая цена: {}, минимальный шаг: {}, версия: {}",
                 auction.getStatus(), auction.getCurrentPrice(), auction.getMinBidStep(), auction.getVersion());
 
-        // Только активные аукционы принимают ставки
         if (auction.getStatus() != AuctionStatus.ACTIVE) {
             log.warn("Попытка ставки на неактивный аукцион. Статус: {}", auction.getStatus());
             throw new IllegalStateException(

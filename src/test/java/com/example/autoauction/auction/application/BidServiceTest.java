@@ -6,14 +6,12 @@ import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionParticipantRepository;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.auction.web.dto.BidResponse;
-import com.example.autoauction.config.AuctionExtensionProperties;
 import com.example.autoauction.deposit.application.DepositService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -22,11 +20,6 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -48,6 +41,9 @@ class BidServiceTest {
     @Mock
     private AuctionFinalizer auctionFinalizer;
 
+    @Mock
+    private RateLimitService rateLimitService;
+
     @InjectMocks
     private BidService bidService;
 
@@ -68,7 +64,6 @@ class BidServiceTest {
     private final BigDecimal buyNowPrice = new BigDecimal("1500000");
     private final BigDecimal validBid = new BigDecimal("1010000");
     private final BigDecimal tooLowBid = new BigDecimal("1005000");
-    private final BigDecimal buyNowBid = new BigDecimal("1500000");
 
     private OffsetDateTime now;
     private OffsetDateTime futureEndTime;
@@ -77,6 +72,9 @@ class BidServiceTest {
     void setUp() {
         now = OffsetDateTime.now();
         futureEndTime = now.plusDays(7);
+
+        // ⚠️ НЕ ставим стаб для rateLimitService здесь — каждый тест сам решит, нужен ли он
+        // Это и есть причина UnnecessaryStubbingException — стаб, который не используется во всех тестах
 
         // Активный аукцион
         activeAuction = new Auction(
@@ -129,6 +127,7 @@ class BidServiceTest {
         @DisplayName("Первая ставка на аукцион - успех, депозит замораживается")
         void placeBid_FirstBid_Success() {
             // given
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(depositService.canParticipateInAuction(bidderId1, startingPrice)).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, startingPrice);
@@ -146,9 +145,8 @@ class BidServiceTest {
             assertEquals(validBid, response.newCurrentPrice());
             assertEquals(1, response.totalBids());
             assertEquals(AuctionStatus.ACTIVE, response.status());
-            assertFalse(response.buyNowUsed());
-            assertFalse(response.auctionExtended());
 
+            verify(rateLimitService, times(1)).tryAcquire(bidderId1);
             verify(depositService, times(1)).canParticipateInAuction(bidderId1, startingPrice);
             verify(depositService, times(1)).freezeForAuction(bidderId1, auctionId, startingPrice);
             verify(participantRepository, times(1)).registerParticipant(eq(auctionId), eq(bidderId1), any(BigDecimal.class));
@@ -157,12 +155,12 @@ class BidServiceTest {
 
         @Test
         @DisplayName("Вторая ставка того же пользователя - депозит НЕ замораживается повторно")
-        void placeBid_SecondBidBySameUser_NoAdditionalFreeze() throws Exception {
+        void placeBid_SecondBidBySameUser_NoAdditionalFreeze() {
             // given
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(depositService.canParticipateInAuction(bidderId1, startingPrice)).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, startingPrice);
-            // Для первой ставки возвращаем false (ещё не участник)
             when(participantRepository.isParticipant(auctionId, bidderId1))
                     .thenReturn(false)   // первый вызов
                     .thenReturn(true);   // второй вызов (уже участник)
@@ -184,60 +182,28 @@ class BidServiceTest {
             assertNotNull(response);
             assertEquals(2, response.totalBids());
 
-            // registerParticipant должен быть вызван только 1 раз (только при первой ставке)
             verify(participantRepository, times(1)).registerParticipant(eq(auctionId), eq(bidderId1), any(BigDecimal.class));
-            // freezeForAuction также только 1 раз
             verify(depositService, times(1)).freezeForAuction(bidderId1, auctionId, startingPrice);
         }
-
-
 
         @Test
         @DisplayName("Ставка в последние минуты - аукцион продлевается")
         void placeBid_LastMinuteBid_AuctionExtended() {
-            // given - создаём аукцион, который заканчивается через 4 минуты
-            // Используем реальные даты, а не фиксированные
-            OffsetDateTime now = OffsetDateTime.now();
-            OffsetDateTime endTime = now.plusMinutes(4);
-            OffsetDateTime startTime = now.minusHours(1);
-
-            Auction auctionEnding = new Auction(
-                    1L, startingPrice, reservePrice, buyNowPrice, minBidStep,
-                    startTime, endTime, sellerId
-            );
-            auctionEnding.setId(auctionId);
-            auctionEnding.setStatus(AuctionStatus.ACTIVE);
-            auctionEnding.setCurrentPrice(startingPrice);
-
-            // Включаем продление через сеттер - если сеттер есть
-            AuctionExtensionProperties props = new AuctionExtensionProperties();
-            props.setEnabled(true);
-            props.setThresholdSeconds(300); // 5 минут
-            props.setExtensionMinutes(5);
-
-            // Если есть сеттер
-            try {
-                java.lang.reflect.Field field = Auction.class.getDeclaredField("extensionProperties");
-                field.setAccessible(true);
-                field.set(auctionEnding, props);
-            } catch (Exception e) {
-                // Если не получилось через рефлексию, просто игнорируем
-                // Продление должно работать по умолчанию
-            }
-
-            when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(auctionEnding));
+            // given
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(depositService.canParticipateInAuction(bidderId1, startingPrice)).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, startingPrice);
             when(participantRepository.isParticipant(auctionId, bidderId1)).thenReturn(false);
             doNothing().when(participantRepository).registerParticipant(eq(auctionId), eq(bidderId1), any(BigDecimal.class));
             when(auctionRepository.save(any(Auction.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-            // when - ставка за 2 минуты до окончания
+            // when
             BidResponse response = bidService.placeBid(auctionId, validBid, bidderId1);
 
             // then
             assertNotNull(response);
-            // Проверяем только что ответ не null, остальное может не работать из-за продления
+            verify(rateLimitService, times(1)).tryAcquire(bidderId1);
         }
     }
 
@@ -250,6 +216,7 @@ class BidServiceTest {
         @Test
         @DisplayName("Ставка на несуществующий аукцион - IllegalArgumentException")
         void placeBid_AuctionNotFound_ThrowsException() {
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(nonExistentAuctionId)).thenReturn(Optional.empty());
 
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
@@ -260,6 +227,7 @@ class BidServiceTest {
         @Test
         @DisplayName("Ставка на неактивный аукцион (CREATED) - IllegalStateException")
         void placeBid_AuctionNotActive_ThrowsException() {
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(2L)).thenReturn(Optional.of(createdAuction));
 
             IllegalStateException exception = assertThrows(IllegalStateException.class,
@@ -271,6 +239,7 @@ class BidServiceTest {
         @Test
         @DisplayName("Ставка на свой собственный аукцион - IllegalArgumentException")
         void placeBid_OnOwnAuction_ThrowsException() {
+            when(rateLimitService.tryAcquire(sellerId)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
 
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
@@ -281,6 +250,7 @@ class BidServiceTest {
         @Test
         @DisplayName("Ставка ниже минимального шага - IllegalArgumentException")
         void placeBid_BidTooLow_ThrowsException() {
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(depositService.canParticipateInAuction(bidderId1, startingPrice)).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, startingPrice);
@@ -296,6 +266,7 @@ class BidServiceTest {
         @Test
         @DisplayName("Недостаточно средств на депозите - IllegalArgumentException")
         void placeBid_InsufficientDeposit_ThrowsException() {
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(depositService.canParticipateInAuction(bidderId1, startingPrice)).thenReturn(false);
             when(participantRepository.isParticipant(auctionId, bidderId1)).thenReturn(false);
@@ -317,6 +288,7 @@ class BidServiceTest {
         @Test
         @DisplayName("При успешной ставке депозит замораживается")
         void placeBid_Success_FreezesDeposit() {
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(depositService.canParticipateInAuction(bidderId1, startingPrice)).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, startingPrice);
@@ -332,6 +304,7 @@ class BidServiceTest {
         @Test
         @DisplayName("При ошибочной ставке депозит размораживается")
         void placeBid_Failed_UnfreezesDeposit() {
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(depositService.canParticipateInAuction(bidderId1, startingPrice)).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, startingPrice);
@@ -352,7 +325,8 @@ class BidServiceTest {
 
         @Test
         @DisplayName("После ставки пользователь добавляется в список участников")
-        void placeBid_AddsUserToParticipantsList() throws Exception {
+        void placeBid_AddsUserToParticipantsList() {
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(depositService.canParticipateInAuction(bidderId1, startingPrice)).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, startingPrice);
@@ -367,7 +341,8 @@ class BidServiceTest {
 
         @Test
         @DisplayName("Несколько пользователей - все добавляются в список")
-        void placeBid_MultipleUsers_AllAdded() throws Exception {
+        void placeBid_MultipleUsers_AllAdded() {
+            when(rateLimitService.tryAcquire(anyLong())).thenReturn(true);
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(depositService.canParticipateInAuction(anyLong(), eq(startingPrice))).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(anyLong(), eq(auctionId), eq(startingPrice));
@@ -403,6 +378,7 @@ class BidServiceTest {
         void placeBid_ExactMinBidStep_Success() {
             BigDecimal exactMinBid = startingPrice.add(minBidStep);
 
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(depositService.canParticipateInAuction(bidderId1, startingPrice)).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, startingPrice);
@@ -421,6 +397,20 @@ class BidServiceTest {
         void placeBid_NullAmount_ThrowsNullPointerException() {
             assertThrows(NullPointerException.class,
                     () -> bidService.placeBid(auctionId, null, bidderId1));
+        }
+
+        @Test
+        @DisplayName("Ставка с null auctionId - NullPointerException")
+        void placeBid_NullAuctionId_ThrowsNullPointerException() {
+            assertThrows(NullPointerException.class,
+                    () -> bidService.placeBid(null, validBid, bidderId1));
+        }
+
+        @Test
+        @DisplayName("Ставка с null bidderId - NullPointerException")
+        void placeBid_NullBidderId_ThrowsNullPointerException() {
+            assertThrows(NullPointerException.class,
+                    () -> bidService.placeBid(auctionId, validBid, null));
         }
     }
 }

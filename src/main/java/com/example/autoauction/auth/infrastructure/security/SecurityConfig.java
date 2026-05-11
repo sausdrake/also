@@ -1,5 +1,3 @@
-// Обнови файл: auth/infrastructure/security/SecurityConfig.java
-
 package com.example.autoauction.auth.infrastructure.security;
 
 import org.springframework.context.annotation.Bean;
@@ -17,6 +15,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -41,6 +44,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
 
                 .exceptionHandling(exception -> exception
@@ -49,37 +53,32 @@ public class SecurityConfig {
                 )
 
                 .authorizeHttpRequests(auth -> auth
-                        // Публичные эндпоинты
                         .requestMatchers(
                                 new AntPathRequestMatcher("/api/auth/**"),
                                 new AntPathRequestMatcher("/swagger-ui/**"),
                                 new AntPathRequestMatcher("/swagger-ui.html"),
                                 new AntPathRequestMatcher("/api-docs/**"),
-                                new AntPathRequestMatcher("/h2-console/**")
+                                new AntPathRequestMatcher("/h2-console/**"),
+                                new AntPathRequestMatcher("/ws-auction/**")  // ✅ WebSocket endpoint
                         ).permitAll()
 
-                        // Админские эндпоинты - только ADMIN
                         .requestMatchers(
                                 new AntPathRequestMatcher("/api/admin/**")
                         ).hasRole("ADMIN")
 
-                        // Диагностик эндпоинты - только DIAGNOSTIC или ADMIN
                         .requestMatchers(
                                 new AntPathRequestMatcher("/api/diagnostic/**")
                         ).hasAnyRole("DIAGNOSTIC", "ADMIN")
 
-                        // ← НОВЫЙ БЛОК: Эндпоинты ставок и просмотра аукционов
                         .requestMatchers(
                                 new AntPathRequestMatcher("/api/auctions/**/bids"),
                                 new AntPathRequestMatcher("/api/auctions/**")
-                        ).authenticated()  // Доступно всем аутентифицированным пользователям
+                        ).authenticated()
 
-                        // Пользовательские эндпоинты - аутентифицированные пользователи
                         .requestMatchers(
                                 new AntPathRequestMatcher("/api/users/**")
                         ).authenticated()
 
-                        // Все остальные запросы требуют аутентификации
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
@@ -89,6 +88,29 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+
+        configuration.setAllowedOrigins(List.of(
+                "https://auction.kg",
+                "https://www.auction.kg",
+                "http://localhost:3000",
+                "http://localhost:5173",
+                "http://localhost:8080"
+        ));
+
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        source.registerCorsConfiguration("/ws-auction/**", configuration);
+        return source;
     }
 
     @Bean

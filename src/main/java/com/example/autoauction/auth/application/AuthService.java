@@ -74,14 +74,21 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        log.info("Registering new user: {}", request != null ? request.username() : "null");
+        // Безопасное логирование - без пароля
+        if (request == null) {
+            log.warn("Register request is null");
+            throw new IllegalArgumentException("Register request cannot be null");
+        }
+
+        log.info("Registering new user: {}", request.username());
+        log.debug("Email: {}", request.email());
+        // Пароль не логируем
 
         validateRegisterRequest(request);
 
         String sanitizedUsername = sanitizeInput(request.username());
         String sanitizedEmail = sanitizeInput(request.email());
 
-        // Синхронизация для предотвращения параллельной регистрации
         String lockKey = sanitizedUsername.intern();
         synchronized (lockKey) {
             if (userRepository.findByUsername(sanitizedUsername).isPresent()) {

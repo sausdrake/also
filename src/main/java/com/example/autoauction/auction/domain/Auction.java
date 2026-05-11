@@ -91,6 +91,9 @@ public class Auction {
 
     private AuctionExtensionProperties getExtensionProperties() {
         if (extensionProperties == null) {
+            // Если конфигурация не внедрена, используем значения из пропертей
+            // Создаём с дефолтными значениями (безопасно, но лучше внедрять)
+            log.warn("AuctionExtensionProperties not injected, using defaults for auction {}", this.id);
             AuctionExtensionProperties props = new AuctionExtensionProperties();
             props.setEnabled(true);
             props.setThresholdSeconds(30);
@@ -161,6 +164,7 @@ public class Auction {
     public OffsetDateTime getUpdatedAt() { return updatedAt; }
     public Long getVersion() { return version; }
     public int getExtensionCount() { return extensionCount; }
+
 
     // ==================== СЕТТЕРЫ ====================
 
