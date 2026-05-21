@@ -5,6 +5,7 @@ import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionParticipantRepository;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
+import com.example.autoauction.auction.web.AuctionWebSocketController;
 import com.example.autoauction.deposit.application.DepositService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,15 +23,18 @@ public class AuctionFinalizer {
     private final AuctionRepository auctionRepository;
     private final DepositService depositService;
     private final AuctionParticipantRepository participantRepository;
+    private final AuctionWebSocketController webSocketController;  // ✅ Добавлен
     private final Clock clock;
 
     public AuctionFinalizer(AuctionRepository auctionRepository,
                             DepositService depositService,
                             AuctionParticipantRepository participantRepository,
+                            AuctionWebSocketController webSocketController,  // ✅ Добавлен
                             Clock clock) {
         this.auctionRepository = auctionRepository;
         this.depositService = depositService;
         this.participantRepository = participantRepository;
+        this.webSocketController = webSocketController;
         this.clock = clock;
     }
 
@@ -60,6 +64,13 @@ public class AuctionFinalizer {
                 unfreezeDepositSafely(participantId, auction.getId());
             }
 
+            // ✅ Отправляем уведомление об истечении
+            try {
+                webSocketController.sendAuctionEnded(auction.getId(), null, null);
+            } catch (Exception e) {
+                log.warn("Failed to send WebSocket notification for auction {}: {}", auction.getId(), e.getMessage());
+            }
+
         } else {
             boolean reserveMet = auction.getReservePrice() == null ||
                     auction.getCurrentPrice().compareTo(auction.getReservePrice()) >= 0;
@@ -74,6 +85,12 @@ public class AuctionFinalizer {
 
                 if (winnerId != null) {
                     markWinnerSafely(winnerId, auction.getId());
+                    // ✅ Отправляем персональное уведомление победителю
+                    try {
+                        webSocketController.sendPersonalUpdate(winnerId, auction, "YOU_WON");
+                    } catch (Exception e) {
+                        log.warn("Failed to send personal WebSocket notification to user {}: {}", winnerId, e.getMessage());
+                    }
                 }
 
                 for (Long participantId : participants) {
@@ -82,12 +99,26 @@ public class AuctionFinalizer {
                     }
                 }
 
+                // ✅ Отправляем уведомление о завершении
+                try {
+                    webSocketController.sendAuctionEnded(auction.getId(), winnerId, winningBid);
+                } catch (Exception e) {
+                    log.warn("Failed to send WebSocket notification for auction {}: {}", auction.getId(), e.getMessage());
+                }
+
             } else {
                 finalStatus = AuctionStatus.EXPIRED;
                 log.info("Auction {} expired - reserve price not met", auction.getId());
 
                 for (Long participantId : participants) {
                     unfreezeDepositSafely(participantId, auction.getId());
+                }
+
+                // ✅ Отправляем уведомление об истечении
+                try {
+                    webSocketController.sendAuctionEnded(auction.getId(), null, null);
+                } catch (Exception e) {
+                    log.warn("Failed to send WebSocket notification for auction {}: {}", auction.getId(), e.getMessage());
                 }
             }
         }
@@ -99,6 +130,13 @@ public class AuctionFinalizer {
 
         auctionRepository.save(auction);
         participantRepository.clearParticipants(auction.getId());
+
+        // ✅ Отправляем финальное обновление
+        try {
+            webSocketController.sendAuctionUpdate(auction, "AUCTION_FINALIZED");
+        } catch (Exception e) {
+            log.warn("Failed to send final WebSocket update for auction {}: {}", auction.getId(), e.getMessage());
+        }
 
         log.info("Auction {} finalized with status: {}", auction.getId(), finalStatus);
         return true;
@@ -140,13 +178,24 @@ public class AuctionFinalizer {
 
         participantRepository.clearParticipants(auction.getId());
 
+        // ✅ Отправляем уведомление о Buy Now
+        try {
+            webSocketController.sendBuyNowNotification(auction.getId(), winnerId, buyNowAmount);
+            webSocketController.sendAuctionUpdate(auction, "BUY_NOW");
+        } catch (Exception e) {
+            log.warn("Failed to send Buy Now WebSocket notification for auction {}: {}", auction.getId(), e.getMessage());
+        }
+
         log.info("Auction {} completed via Buy Now. Winner: {}", auction.getId(), winnerId);
     }
 
     private void unfreezeDepositSafely(Long userId, Long auctionId) {
-        // Метод уже не выбрасывает исключения, так как DepositService обрабатывает их внутри
-        depositService.unfreezeForAuction(userId, auctionId);
-        log.debug("Deposit unfrozen for user {} on auction {}", userId, auctionId);
+        try {
+            depositService.unfreezeForAuction(userId, auctionId);
+            log.debug("Deposit unfrozen for user {} on auction {}", userId, auctionId);
+        } catch (Exception e) {
+            log.error("Failed to unfreeze deposit for user {} on auction {}: {}", userId, auctionId, e.getMessage());
+        }
     }
 
     private void markWinnerSafely(Long userId, Long auctionId) {

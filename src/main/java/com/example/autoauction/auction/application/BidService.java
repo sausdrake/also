@@ -1,10 +1,11 @@
-// auction/application/BidService.java
+// auction/application/BidService.java (добавлена интеграция с WebSocket)
 package com.example.autoauction.auction.application;
 
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionParticipantRepository;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
+import com.example.autoauction.auction.web.AuctionWebSocketController;
 import com.example.autoauction.auction.web.dto.BidResponse;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.deposit.domain.Deposit;
@@ -29,29 +30,28 @@ public class BidService {
     private final AuctionParticipantRepository participantRepository;
     private final AuctionFinalizer auctionFinalizer;
     private final RateLimitService rateLimitService;
+    private final AuctionWebSocketController webSocketController;  // ✅ Добавлен
 
     public BidService(AuctionRepository auctionRepository,
                       DepositService depositService,
                       AuctionParticipantRepository participantRepository,
                       AuctionFinalizer auctionFinalizer,
-                      RateLimitService rateLimitService) {
+                      RateLimitService rateLimitService,
+                      AuctionWebSocketController webSocketController) {  // ✅ Добавлен
         this.auctionRepository = auctionRepository;
         this.depositService = depositService;
         this.participantRepository = participantRepository;
         this.auctionFinalizer = auctionFinalizer;
         this.rateLimitService = rateLimitService;
-        log.info("BidService initialized with database-backed participant tracking");
+        this.webSocketController = webSocketController;
+        log.info("BidService initialized with WebSocket support");
     }
 
-    /**
-     * Buy Now - покупка автомобиля по фиксированной цене до начала аукциона
-     */
     @Transactional
     public BidResponse buyNow(Long auctionId, Long buyerId) {
         log.info("=== BUY NOW ===");
         log.info("Auction ID: {}, Buyer ID: {}", auctionId, buyerId);
 
-        // Сначала валидация параметров, потом rate limiting
         if (auctionId == null) {
             throw new IllegalArgumentException("ID аукциона не может быть null");
         }
@@ -59,7 +59,6 @@ public class BidService {
             throw new IllegalArgumentException("ID покупателя не может быть null");
         }
 
-        // Rate limiting после проверки параметров
         if (rateLimitService != null && !rateLimitService.tryAcquire(buyerId)) {
             log.warn("Rate limit exceeded for user: {}", buyerId);
             throw new RateLimitException("Слишком много запросов. Пожалуйста, подождите.");
@@ -104,13 +103,14 @@ public class BidService {
 
         auctionFinalizer.finalizeWithBuyNow(auction, buyerId, auction.getBuyNowPrice());
 
+        // ✅ Отправляем WebSocket уведомление о Buy Now
+        webSocketController.sendBuyNowNotification(auctionId, buyerId, auction.getBuyNowPrice());
+        webSocketController.sendAuctionUpdate(auction, "BUY_NOW");
+
         log.info("Аукцион {} завершен по Buy Now. Покупатель: {}", auctionId, buyerId);
         return BidResponse.fromDomain(auction, auction.getBuyNowPrice(), true, false);
     }
 
-    /**
-     * Обычная ставка на активном аукционе
-     */
     @Transactional
     @Retryable(
             value = {ObjectOptimisticLockingFailureException.class, OptimisticLockingFailureException.class},
@@ -121,7 +121,6 @@ public class BidService {
         log.info("=== СОЗДАНИЕ СТАВКИ ===");
         log.info("Auction ID: {}, Bidder ID: {}, Amount: {}", auctionId, bidderId, amount);
 
-        // Сначала валидация параметров (это должно быть ПЕРВЫМ!)
         if (auctionId == null) {
             throw new NullPointerException("ID аукциона не может быть null");
         }
@@ -132,7 +131,6 @@ public class BidService {
             throw new NullPointerException("Сумма ставки не может быть null");
         }
 
-        // Rate limiting после проверки параметров
         if (rateLimitService != null && !rateLimitService.tryAcquire(bidderId)) {
             log.warn("Rate limit exceeded for user: {}", bidderId);
             throw new RateLimitException("Слишком много ставок. Пожалуйста, подождите.");
@@ -165,6 +163,7 @@ public class BidService {
         }
 
         boolean isExistingParticipant = participantRepository.isParticipant(auctionId, bidderId);
+        boolean wasAuctionExtended = false;
 
         if (!isExistingParticipant) {
             BigDecimal requiredDeposit = Deposit.calculateRequiredDeposit(auction.getStartingPrice());
@@ -197,11 +196,18 @@ public class BidService {
 
             if (auction.getEndTime().isAfter(oldEndTime)) {
                 auctionExtended = true;
+                wasAuctionExtended = true;
                 log.info("Аукцион {} продлен! Новое время окончания: {}", auctionId, auction.getEndTime());
+
+                // ✅ Отправляем уведомление о продлении
+                webSocketController.sendAuctionExtended(auctionId, auction.getEndTime());
             }
 
             log.info("Ставка {} успешно принята, новая цена: {}, лидер: {}",
                     amount, auction.getCurrentPrice(), bidderId);
+
+            // ✅ Отправляем уведомление о новой ставке
+            webSocketController.sendAuctionUpdate(auction, "BID_PLACED");
 
         } catch (IllegalStateException | IllegalArgumentException e) {
             log.warn("Ошибка при создании ставки: {}", e.getMessage());

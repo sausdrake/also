@@ -21,27 +21,21 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
-        // Префикс для destination, на которые клиенты подписываются
         config.enableSimpleBroker("/topic", "/queue");
-
-        // Префикс для сообщений от клиента (где обработчик на бэкенде)
         config.setApplicationDestinationPrefixes("/app");
-
-        // Префикс для user-specific сообщений
         config.setUserDestinationPrefix("/user");
     }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
+        // SockJS endpoint для браузеров (с fallback)
         registry.addEndpoint("/ws-auction")
-                .setAllowedOrigins(
-                        "https://auction.kg",
-                        "https://www.auction.kg",
-                        "http://localhost:3000",
-                        "http://localhost:5173",
-                        "http://localhost:8080"
-                )
-                .withSockJS();  // Fallback для браузеров без WebSocket
+                .setAllowedOriginPatterns("*")
+                .withSockJS();
+
+        // Чистый WebSocket endpoint для Postman, wscat и прямых подключений
+        registry.addEndpoint("/ws")
+                .setAllowedOriginPatterns("*");
     }
 
     @Override

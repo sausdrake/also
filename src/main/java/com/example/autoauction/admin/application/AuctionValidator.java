@@ -17,7 +17,7 @@ public class AuctionValidator {
 
     private static final long MIN_AUCTION_DURATION_HOURS = 1;
     private static final long MAX_AUCTION_DURATION_DAYS = 30;
-    private static final long MIN_HOURS_BEFORE_START = 1;
+    private static final long MIN_HOURS_BEFORE_START = 0;
     private static final BigDecimal MIN_BID_STEP_PERCENTAGE = new BigDecimal("0.01");
 
     private final Clock clock;

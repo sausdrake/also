@@ -1,75 +1,1209 @@
-12-04-2026 00:00:19.645 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:01:19.684 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:02:19.697 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:03:19.704 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:04:19.715 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:05:19.730 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:06:19.746 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:07:19.757 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:08:19.777 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:09:19.787 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:10:19.804 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:11:19.815 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:12:19.823 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:13:19.834 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:14:19.843 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:15:19.863 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:16:19.878 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:17:19.895 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:18:19.916 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:19:19.937 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:20:19.945 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:21:19.954 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:22:19.969 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:23:19.985 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:24:19.995 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:25:20.017 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:26:20.033 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:27:20.044 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:28:20.053 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:29:20.064 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:30:20.070 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:31:20.089 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:32:20.107 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:33:20.121 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:34:20.131 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:35:20.150 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:36:20.163 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:37:20.178 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:38:20.189 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:39:20.208 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:40:20.218 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:41:20.226 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:42:20.239 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:43:20.248 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:44:20.257 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:45:20.276 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:46:20.300 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:47:20.307 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:48:20.329 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:49:20.338 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:50:20.356 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:51:20.361 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:51:30.669 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired CREATED auctions...
-12-04-2026 00:52:20.372 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:53:20.394 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:54:20.412 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:55:20.418 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:56:20.432 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:57:20.445 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:58:20.454 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 00:59:20.464 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 01:00:20.473 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 01:01:20.494 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 01:02:20.507 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 01:03:20.521 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 01:04:20.538 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 01:05:20.552 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 01:06:20.559 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 01:07:20.579 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 01:08:20.593 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 01:09:20.612 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 01:10:20.626 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 01:11:20.642 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 01:12:20.657 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
-12-04-2026 01:13:20.672 [scheduling-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:00:45.094 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:01:45.117 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:02:45.134 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:03:45.147 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:04:45.153 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:05:45.167 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:06:45.174 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:07:45.184 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:08:45.195 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:09:45.209 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:10:45.228 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:11:45.234 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:12:45.246 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:13:45.251 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:14:45.267 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:15:45.283 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:16:45.304 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:17:45.323 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:18:45.339 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:19:45.359 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:20:45.379 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:21:45.396 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:22:45.416 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:23:45.433 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:24:45.454 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:25:45.474 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:26:43.205 [MessageBroker-4] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired CREATED auctions...
+22-05-2026 00:26:45.492 [MessageBroker-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:27:42.736 [MessageBroker-5] INFO  o.s.w.s.c.WebSocketMessageBrokerStats - WebSocketSession[0 current WS(0)-HttpStream(0)-HttpPoll(0), 0 total, 0 closed abnormally (0 connect failure, 0 send limit, 0 transport error)], stompSubProtocol[processed CONNECT(0)-CONNECTED(0)-DISCONNECT(0)], stompBrokerRelay[null], inboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0], outboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0], sockJsScheduler[pool size = 8, active threads = 1, queued tasks = 3, completed tasks = 191]
+22-05-2026 00:27:45.507 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:28:45.514 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:29:45.525 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:30:45.545 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:31:45.563 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:32:45.583 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:33:45.592 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:34:45.601 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:35:45.609 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:36:45.620 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:37:45.635 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:38:45.654 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:39:45.674 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:40:45.690 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:41:45.707 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:42:45.716 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:43:45.721 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:44:45.731 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:45:45.741 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:46:45.752 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:47:45.771 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:48:45.787 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:49:45.794 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:50:45.802 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:51:45.820 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:52:45.835 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:53:45.860 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:54:45.873 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:55:45.893 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:56:45.913 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:57:42.741 [MessageBroker-3] INFO  o.s.w.s.c.WebSocketMessageBrokerStats - WebSocketSession[0 current WS(0)-HttpStream(0)-HttpPoll(0), 0 total, 0 closed abnormally (0 connect failure, 0 send limit, 0 transport error)], stompSubProtocol[processed CONNECT(0)-CONNECTED(0)-DISCONNECT(0)], stompBrokerRelay[null], inboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0], outboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0], sockJsScheduler[pool size = 8, active threads = 1, queued tasks = 3, completed tasks = 222]
+22-05-2026 00:57:45.929 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:58:45.948 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 00:59:45.968 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:00:45.984 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:01:45.996 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:02:46.010 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:03:46.029 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:04:46.045 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:05:46.061 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:06:46.078 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:07:46.083 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:08:46.094 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:09:46.108 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:10:46.129 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:11:46.146 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:12:46.158 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:13:46.178 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:14:46.187 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:15:46.201 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:16:46.208 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:17:46.220 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:18:46.238 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:19:46.250 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:20:46.262 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:21:46.280 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:22:46.292 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:23:46.305 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:24:46.314 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:25:46.327 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:26:35.268 [http-nio-8080-exec-1] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+22-05-2026 01:26:35.306 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/index.html
+22-05-2026 01:26:35.324 [http-nio-8080-exec-1] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:26:35.327 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/index.html
+22-05-2026 01:26:35.506 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/swagger-ui.css
+22-05-2026 01:26:35.509 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/index.css
+22-05-2026 01:26:35.509 [http-nio-8080-exec-2] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:26:35.512 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/swagger-ui.css
+22-05-2026 01:26:35.510 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/swagger-ui-bundle.js
+22-05-2026 01:26:35.518 [http-nio-8080-exec-4] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:26:35.512 [http-nio-8080-exec-3] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:26:35.526 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/index.css
+22-05-2026 01:26:35.513 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/swagger-ui-standalone-preset.js
+22-05-2026 01:26:35.513 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/swagger-initializer.js
+22-05-2026 01:26:35.531 [http-nio-8080-exec-5] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:26:35.520 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/swagger-ui-bundle.js
+22-05-2026 01:26:35.531 [http-nio-8080-exec-7] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:26:35.531 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/swagger-ui-standalone-preset.js
+22-05-2026 01:26:35.535 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/swagger-initializer.js
+22-05-2026 01:26:35.867 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api-docs/swagger-config
+22-05-2026 01:26:35.867 [http-nio-8080-exec-6] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:26:35.867 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api-docs/swagger-config
+22-05-2026 01:26:35.872 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/favicon-32x32.png
+22-05-2026 01:26:35.872 [http-nio-8080-exec-8] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:26:35.872 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/favicon-32x32.png
+22-05-2026 01:26:35.952 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api-docs
+22-05-2026 01:26:35.952 [http-nio-8080-exec-9] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:26:35.953 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api-docs
+22-05-2026 01:26:37.062 [http-nio-8080-exec-9] INFO  o.s.api.AbstractOpenApiResource - Init duration for springdoc-openapi is: 1091 ms
+22-05-2026 01:26:43.215 [MessageBroker-2] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired CREATED auctions...
+22-05-2026 01:26:46.339 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:27:08.309 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auth/login
+22-05-2026 01:27:08.310 [http-nio-8080-exec-10] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:27:08.310 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auth/login
+22-05-2026 01:27:08.384 [http-nio-8080-exec-10] INFO  c.e.a.auth.web.AuthController - Login attempt for username: admin
+22-05-2026 01:27:08.385 [http-nio-8080-exec-10] INFO  c.e.a.auth.application.AuthService - Authenticating user: admin
+22-05-2026 01:27:08.625 [http-nio-8080-exec-10] DEBUG o.s.s.a.d.DaoAuthenticationProvider - Authenticated user
+22-05-2026 01:27:08.718 [http-nio-8080-exec-10] INFO  c.e.a.auth.application.AuthService - User logged in successfully: admin
+22-05-2026 01:27:08.721 [http-nio-8080-exec-10] INFO  c.e.a.auth.web.AuthController - Login successful for username: admin
+22-05-2026 01:27:32.013 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/vehicles/approved
+22-05-2026 01:27:32.054 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/vehicles/approved
+22-05-2026 01:27:42.758 [MessageBroker-6] INFO  o.s.w.s.c.WebSocketMessageBrokerStats - WebSocketSession[0 current WS(0)-HttpStream(0)-HttpPoll(0), 0 total, 0 closed abnormally (0 connect failure, 0 send limit, 0 transport error)], stompSubProtocol[processed CONNECT(0)-CONNECTED(0)-DISCONNECT(0)], stompBrokerRelay[null], inboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0], outboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0], sockJsScheduler[pool size = 8, active threads = 1, queued tasks = 3, completed tasks = 254]
+22-05-2026 01:27:46.351 [MessageBroker-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:28:46.047 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/admin/auctions
+22-05-2026 01:28:46.062 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/admin/auctions
+22-05-2026 01:28:46.067 [http-nio-8080-exec-8] ERROR c.e.a.config.GlobalExceptionHandler - Внутренняя ошибка сервера
+org.springframework.http.converter.HttpMessageNotReadableException: JSON parse error: Cannot deserialize value of type `java.time.OffsetDateTime` from String "2026-05-2201:30:00+07:00": Failed to deserialize java.time.OffsetDateTime: (java.time.format.DateTimeParseException) Text '2026-05-2201:30:00+07:00' could not be parsed at index 10
+	at org.springframework.http.converter.json.AbstractJackson2HttpMessageConverter.readJavaType(AbstractJackson2HttpMessageConverter.java:406)
+	at org.springframework.http.converter.json.AbstractJackson2HttpMessageConverter.read(AbstractJackson2HttpMessageConverter.java:354)
+	at org.springframework.web.servlet.mvc.method.annotation.AbstractMessageConverterMethodArgumentResolver.readWithMessageConverters(AbstractMessageConverterMethodArgumentResolver.java:183)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestResponseBodyMethodProcessor.readWithMessageConverters(RequestResponseBodyMethodProcessor.java:163)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestResponseBodyMethodProcessor.resolveArgument(RequestResponseBodyMethodProcessor.java:136)
+	at org.springframework.web.method.support.HandlerMethodArgumentResolverComposite.resolveArgument(HandlerMethodArgumentResolverComposite.java:122)
+	at org.springframework.web.method.support.InvocableHandlerMethod.getMethodArgumentValues(InvocableHandlerMethod.java:179)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:146)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:118)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:884)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:797)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:87)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1081)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:974)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1011)
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:914)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:590)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:885)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:658)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:205)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.apache.tomcat.websocket.server.WsFilter.doFilter(WsFilter.java:51)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:110)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.springframework.security.web.FilterChainProxy.lambda$doFilterInternal$3(FilterChainProxy.java:231)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:365)
+	at org.springframework.security.web.access.intercept.AuthorizationFilter.doFilter(AuthorizationFilter.java:100)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.access.ExceptionTranslationFilter.doFilter(ExceptionTranslationFilter.java:126)
+	at org.springframework.security.web.access.ExceptionTranslationFilter.doFilter(ExceptionTranslationFilter.java:120)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.session.SessionManagementFilter.doFilter(SessionManagementFilter.java:131)
+	at org.springframework.security.web.session.SessionManagementFilter.doFilter(SessionManagementFilter.java:85)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.authentication.AnonymousAuthenticationFilter.doFilter(AnonymousAuthenticationFilter.java:100)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter.doFilter(SecurityContextHolderAwareRequestFilter.java:179)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.savedrequest.RequestCacheAwareFilter.doFilter(RequestCacheAwareFilter.java:63)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at com.example.autoauction.auth.infrastructure.security.JwtAuthenticationFilter.doFilterInternal(JwtAuthenticationFilter.java:78)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.authentication.logout.LogoutFilter.doFilter(LogoutFilter.java:107)
+	at org.springframework.security.web.authentication.logout.LogoutFilter.doFilter(LogoutFilter.java:93)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.web.filter.CorsFilter.doFilterInternal(CorsFilter.java:91)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.header.HeaderWriterFilter.doHeadersAfter(HeaderWriterFilter.java:90)
+	at org.springframework.security.web.header.HeaderWriterFilter.doFilterInternal(HeaderWriterFilter.java:75)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:82)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:69)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter.doFilterInternal(WebAsyncManagerIntegrationFilter.java:62)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.session.DisableEncodeUrlFilter.doFilterInternal(DisableEncodeUrlFilter.java:42)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.FilterChainProxy.doFilterInternal(FilterChainProxy.java:233)
+	at org.springframework.security.web.FilterChainProxy.doFilter(FilterChainProxy.java:191)
+	at org.springframework.web.filter.DelegatingFilterProxy.invokeDelegate(DelegatingFilterProxy.java:352)
+	at org.springframework.web.filter.DelegatingFilterProxy.doFilter(DelegatingFilterProxy.java:268)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:201)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.apache.catalina.core.StandardWrapperValve.invoke(StandardWrapperValve.java:167)
+	at org.apache.catalina.core.StandardContextValve.invoke(StandardContextValve.java:90)
+	at org.apache.catalina.authenticator.AuthenticatorBase.invoke(AuthenticatorBase.java:482)
+	at org.apache.catalina.core.StandardHostValve.invoke(StandardHostValve.java:115)
+	at org.apache.catalina.valves.ErrorReportValve.invoke(ErrorReportValve.java:93)
+	at org.apache.catalina.core.StandardEngineValve.invoke(StandardEngineValve.java:74)
+	at org.apache.catalina.connector.CoyoteAdapter.service(CoyoteAdapter.java:340)
+	at org.apache.coyote.http11.Http11Processor.service(Http11Processor.java:391)
+	at org.apache.coyote.AbstractProcessorLight.process(AbstractProcessorLight.java:63)
+	at org.apache.coyote.AbstractProtocol$ConnectionHandler.process(AbstractProtocol.java:896)
+	at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1744)
+	at org.apache.tomcat.util.net.SocketProcessorBase.run(SocketProcessorBase.java:52)
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1191)
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:659)
+	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:61)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+Caused by: com.fasterxml.jackson.databind.exc.InvalidFormatException: Cannot deserialize value of type `java.time.OffsetDateTime` from String "2026-05-2201:30:00+07:00": Failed to deserialize java.time.OffsetDateTime: (java.time.format.DateTimeParseException) Text '2026-05-2201:30:00+07:00' could not be parsed at index 10
+ at [Source: (org.springframework.util.StreamUtils$NonClosingInputStream); line: 7, column: 16] (through reference chain: com.example.autoauction.auction.web.dto.AuctionCreateRequest["startTime"])
+	at com.fasterxml.jackson.databind.exc.InvalidFormatException.from(InvalidFormatException.java:67)
+	at com.fasterxml.jackson.databind.DeserializationContext.weirdStringException(DeserializationContext.java:2002)
+	at com.fasterxml.jackson.databind.DeserializationContext.handleWeirdStringValue(DeserializationContext.java:1230)
+	at com.fasterxml.jackson.datatype.jsr310.deser.JSR310DeserializerBase._handleDateTimeException(JSR310DeserializerBase.java:176)
+	at com.fasterxml.jackson.datatype.jsr310.deser.InstantDeserializer._fromString(InstantDeserializer.java:301)
+	at com.fasterxml.jackson.datatype.jsr310.deser.InstantDeserializer.deserialize(InstantDeserializer.java:211)
+	at com.fasterxml.jackson.datatype.jsr310.deser.InstantDeserializer.deserialize(InstantDeserializer.java:52)
+	at com.fasterxml.jackson.databind.deser.SettableBeanProperty.deserialize(SettableBeanProperty.java:545)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializer._deserializeWithErrorWrapping(BeanDeserializer.java:570)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializer._deserializeUsingPropertyBased(BeanDeserializer.java:439)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializerBase.deserializeFromObjectUsingNonDefault(BeanDeserializerBase.java:1409)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializer.deserializeFromObject(BeanDeserializer.java:352)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializer.deserialize(BeanDeserializer.java:185)
+	at com.fasterxml.jackson.databind.deser.DefaultDeserializationContext.readRootValue(DefaultDeserializationContext.java:323)
+	at com.fasterxml.jackson.databind.ObjectReader._bindAndClose(ObjectReader.java:2105)
+	at com.fasterxml.jackson.databind.ObjectReader.readValue(ObjectReader.java:1481)
+	at org.springframework.http.converter.json.AbstractJackson2HttpMessageConverter.readJavaType(AbstractJackson2HttpMessageConverter.java:395)
+	... 98 common frames omitted
+Caused by: java.time.format.DateTimeParseException: Text '2026-05-2201:30:00+07:00' could not be parsed at index 10
+	at java.base/java.time.format.DateTimeFormatter.parseResolved0(DateTimeFormatter.java:2052)
+	at java.base/java.time.format.DateTimeFormatter.parse(DateTimeFormatter.java:1880)
+	at com.fasterxml.jackson.datatype.jsr310.deser.InstantDeserializer._fromString(InstantDeserializer.java:295)
+	... 110 common frames omitted
+22-05-2026 01:28:46.364 [MessageBroker-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:29:07.330 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/admin/auctions
+22-05-2026 01:29:07.341 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/admin/auctions
+22-05-2026 01:29:07.356 [http-nio-8080-exec-6] INFO  c.e.a.a.web.AdminAuctionController - Admin 14 creating auction for vehicle 1
+22-05-2026 01:29:07.356 [http-nio-8080-exec-6] INFO  c.e.a.a.a.AdminAuctionService - === СОЗДАНИЕ АУКЦИОНА ===
+22-05-2026 01:29:07.356 [http-nio-8080-exec-6] INFO  c.e.a.a.a.AdminAuctionService - Запрос от adminId: 14, vehicleId: 1
+22-05-2026 01:29:07.387 [http-nio-8080-exec-6] INFO  c.e.a.a.a.AdminAuctionService - Аукцион успешно создан! ID: 8, vehicleId: 1, статус: CREATED
+22-05-2026 01:29:46.374 [MessageBroker-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:30:19.380 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/all
+22-05-2026 01:30:19.406 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/all
+22-05-2026 01:30:46.390 [MessageBroker-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:30:56.246 [SpringApplicationShutdownHook] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientOutboundChannel removed SubProtocolWebSocketHandler[StompSubProtocolHandler[v10.stomp, v11.stomp, v12.stomp]]
+22-05-2026 01:30:56.247 [SpringApplicationShutdownHook] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientInboundChannel removed WebSocketAnnotationMethodMessageHandler[prefixes=[/app/]]
+22-05-2026 01:30:56.247 [SpringApplicationShutdownHook] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - Stopping...
+22-05-2026 01:30:56.247 [SpringApplicationShutdownHook] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - BrokerAvailabilityEvent[available=false, SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@635900ef]]
+22-05-2026 01:30:56.247 [SpringApplicationShutdownHook] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientInboundChannel removed SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@635900ef]
+22-05-2026 01:30:56.247 [SpringApplicationShutdownHook] DEBUG o.s.m.s.ExecutorSubscribableChannel - brokerChannel removed SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@635900ef]
+22-05-2026 01:30:56.247 [SpringApplicationShutdownHook] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - Stopped.
+22-05-2026 01:30:56.248 [SpringApplicationShutdownHook] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientInboundChannel removed UserDestinationMessageHandler[DefaultUserDestinationResolver[prefix=/user/]]
+22-05-2026 01:30:56.248 [SpringApplicationShutdownHook] DEBUG o.s.m.s.ExecutorSubscribableChannel - brokerChannel removed UserDestinationMessageHandler[DefaultUserDestinationResolver[prefix=/user/]]
+22-05-2026 01:30:56.278 [SpringApplicationShutdownHook] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Closing JPA EntityManagerFactory for persistence unit 'default'
+22-05-2026 01:30:56.282 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+22-05-2026 01:30:56.286 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
+22-05-2026 01:31:27.397 [main] INFO  c.e.a.AutoauctionApplication - Starting AutoauctionApplication using Java 17.0.18 with PID 39300 (D:\AutoAuction\target\classes started by Asus in D:\AutoAuction)
+22-05-2026 01:31:27.399 [main] INFO  c.e.a.AutoauctionApplication - No active profile set, falling back to 1 default profile: "default"
+22-05-2026 01:31:28.321 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+22-05-2026 01:31:28.445 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 113 ms. Found 10 JPA repository interfaces.
+22-05-2026 01:31:29.075 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port(s): 8080 (http)
+22-05-2026 01:31:29.085 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+22-05-2026 01:31:29.085 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.15]
+22-05-2026 01:31:29.190 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+22-05-2026 01:31:29.190 [main] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 1736 ms
+22-05-2026 01:31:29.637 [main] INFO  o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+22-05-2026 01:31:29.666 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+22-05-2026 01:31:29.851 [main] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@3e8b8f0
+22-05-2026 01:31:29.853 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+22-05-2026 01:31:29.891 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+22-05-2026 01:31:31.118 [main] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'default'
+22-05-2026 01:31:31.530 [main] INFO  o.s.d.j.r.query.QueryEnhancerFactory - Hibernate is in classpath; If applicable, HQL parser will be used.
+22-05-2026 01:31:31.851 [main] INFO  c.e.a.a.i.p.JpaAuctionRepositoryAdapter - JpaAuctionRepositoryAdapter initialized with Clock and ExtensionProperties
+22-05-2026 01:31:31.913 [main] INFO  c.e.a.v.application.VehicleService - VehicleService инициализирован
+22-05-2026 01:31:32.013 [main] INFO  c.e.a.d.i.p.JpaDepositRepositoryAdapter - JpaDepositRepositoryAdapter initialized
+22-05-2026 01:31:32.055 [main] INFO  c.e.a.d.application.DepositService - DepositService initialized
+22-05-2026 01:31:32.146 [main] INFO  c.e.a.a.a.AdminAuctionService - AdminAuctionService инициализирован
+22-05-2026 01:31:32.161 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - === Auction Extension Configuration ===
+22-05-2026 01:31:32.161 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - Enabled: true
+22-05-2026 01:31:32.162 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - Threshold seconds: 30
+22-05-2026 01:31:32.162 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - Extension minutes: 5
+22-05-2026 01:31:32.162 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - Max extensions: unlimited
+22-05-2026 01:31:32.162 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - =======================================
+22-05-2026 01:31:32.168 [main] INFO  c.e.a.auction.application.BidService - BidService initialized with WebSocket support
+22-05-2026 01:31:32.175 [main] INFO  c.e.a.a.i.s.AuctionCompletionScheduler - AuctionCompletionScheduler initialized
+22-05-2026 01:31:32.299 [main] INFO  c.e.a.deposit.web.DepositController - DepositController initialized
+22-05-2026 01:31:32.301 [main] INFO  c.e.a.user.application.UserService - UserService initialized. Ready to process business logic.
+22-05-2026 01:31:32.307 [main] INFO  c.e.a.user.web.UserController - UserController initialized and ready.
+22-05-2026 01:31:32.393 [main] WARN  o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+22-05-2026 01:31:32.499 [main] INFO  o.s.s.web.DefaultSecurityFilterChain - Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@b549c4a, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@72412c3d, org.springframework.security.web.context.SecurityContextHolderFilter@4e8036bb, org.springframework.security.web.header.HeaderWriterFilter@60666985, org.springframework.web.filter.CorsFilter@457f43a2, org.springframework.security.web.authentication.logout.LogoutFilter@2d2c794d, com.example.autoauction.auth.infrastructure.security.JwtAuthenticationFilter@4a7c8cb7, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@5113ab26, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@9da20f1, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@4016d5fe, org.springframework.security.web.session.SessionManagementFilter@2762bd70, org.springframework.security.web.access.ExceptionTranslationFilter@6903bec9, org.springframework.security.web.access.intercept.AuthorizationFilter@4f86cd50]
+22-05-2026 01:31:32.552 [main] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Patterns [/ws-auction/**, /ws] in 'stompWebSocketHandlerMapping'
+22-05-2026 01:31:32.602 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.AdminAuctionController:
+	
+22-05-2026 01:31:32.603 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.AdminVehicleController:
+	
+22-05-2026 01:31:32.603 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.AuctionWebSocketController:
+	
+22-05-2026 01:31:32.604 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.BidController:
+	
+22-05-2026 01:31:32.604 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.AuthController:
+	
+22-05-2026 01:31:32.604 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.c.HealthController:
+	
+22-05-2026 01:31:32.605 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.d.w.DepositController:
+	
+22-05-2026 01:31:32.605 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.u.w.UserController:
+	
+22-05-2026 01:31:32.605 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.v.w.DiagnosticVehicleController:
+	
+22-05-2026 01:31:32.607 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	o.s.b.a.w.s.e.BasicErrorController:
+	
+22-05-2026 01:31:32.612 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	o.s.w.a.OpenApiWebMvcResource:
+	
+22-05-2026 01:31:32.613 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	o.s.w.u.SwaggerWelcomeWebMvc:
+	
+22-05-2026 01:31:32.613 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	o.s.w.u.SwaggerConfigResource:
+	
+22-05-2026 01:31:32.949 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port(s): 8080 (http) with context path ''
+22-05-2026 01:31:32.951 [main] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientOutboundChannel added SubProtocolWebSocketHandler[StompSubProtocolHandler[v10.stomp, v11.stomp, v12.stomp]]
+22-05-2026 01:31:32.951 [main] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientInboundChannel added WebSocketAnnotationMethodMessageHandler[prefixes=[/app/]]
+22-05-2026 01:31:32.952 [main] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - Starting...
+22-05-2026 01:31:32.952 [main] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientInboundChannel added SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@6682e9b0]
+22-05-2026 01:31:32.952 [main] DEBUG o.s.m.s.ExecutorSubscribableChannel - brokerChannel added SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@6682e9b0]
+22-05-2026 01:31:32.954 [main] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - BrokerAvailabilityEvent[available=true, SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@6682e9b0]]
+22-05-2026 01:31:32.954 [main] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - Started.
+22-05-2026 01:31:32.954 [main] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientInboundChannel added UserDestinationMessageHandler[DefaultUserDestinationResolver[prefix=/user/]]
+22-05-2026 01:31:32.955 [main] DEBUG o.s.m.s.ExecutorSubscribableChannel - brokerChannel added UserDestinationMessageHandler[DefaultUserDestinationResolver[prefix=/user/]]
+22-05-2026 01:31:32.967 [main] INFO  c.e.a.AutoauctionApplication - Started AutoauctionApplication in 6.021 seconds (process running for 6.355)
+22-05-2026 01:31:32.974 [MessageBroker-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:31:32.974 [MessageBroker-2] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired CREATED auctions...
+22-05-2026 01:31:33.035 [MessageBroker-2] INFO  c.e.a.a.i.s.AuctionCompletionScheduler - Cancelled 1 expired CREATED auctions
+22-05-2026 01:32:32.574 [MessageBroker-3] INFO  o.s.w.s.c.WebSocketMessageBrokerStats - WebSocketSession[0 current WS(0)-HttpStream(0)-HttpPoll(0), 0 total, 0 closed abnormally (0 connect failure, 0 send limit, 0 transport error)], stompSubProtocol[processed CONNECT(0)-CONNECTED(0)-DISCONNECT(0)], stompBrokerRelay[null], inboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0], outboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0], sockJsScheduler[pool size = 6, active threads = 1, queued tasks = 3, completed tasks = 2]
+22-05-2026 01:32:33.071 [MessageBroker-4] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:32:35.145 [http-nio-8080-exec-1] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+22-05-2026 01:32:35.154 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/index.html
+22-05-2026 01:32:35.164 [http-nio-8080-exec-1] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:32:35.166 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/index.html
+22-05-2026 01:32:35.297 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/swagger-ui.css
+22-05-2026 01:32:35.301 [http-nio-8080-exec-5] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:32:35.301 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/index.css
+22-05-2026 01:32:35.301 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/swagger-ui.css
+22-05-2026 01:32:35.302 [http-nio-8080-exec-8] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:32:35.302 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/swagger-ui-bundle.js
+22-05-2026 01:32:35.303 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/index.css
+22-05-2026 01:32:35.306 [http-nio-8080-exec-3] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:32:35.304 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/swagger-ui-standalone-preset.js
+22-05-2026 01:32:35.304 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/swagger-initializer.js
+22-05-2026 01:32:35.309 [http-nio-8080-exec-6] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:32:35.306 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/swagger-ui-bundle.js
+22-05-2026 01:32:35.309 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/swagger-ui-standalone-preset.js
+22-05-2026 01:32:35.309 [http-nio-8080-exec-2] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:32:35.319 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/swagger-initializer.js
+22-05-2026 01:32:35.622 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api-docs/swagger-config
+22-05-2026 01:32:35.623 [http-nio-8080-exec-7] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:32:35.624 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api-docs/swagger-config
+22-05-2026 01:32:35.695 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api-docs
+22-05-2026 01:32:35.696 [http-nio-8080-exec-4] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:32:35.696 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api-docs
+22-05-2026 01:32:36.637 [http-nio-8080-exec-4] INFO  o.s.api.AbstractOpenApiResource - Init duration for springdoc-openapi is: 927 ms
+22-05-2026 01:33:14.585 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auth/login
+22-05-2026 01:33:14.586 [http-nio-8080-exec-10] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:33:14.587 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auth/login
+22-05-2026 01:33:14.664 [http-nio-8080-exec-10] INFO  c.e.a.auth.web.AuthController - Login attempt for username: diagnostic
+22-05-2026 01:33:14.666 [http-nio-8080-exec-10] INFO  c.e.a.auth.application.AuthService - Authenticating user: diagnostic
+22-05-2026 01:33:14.909 [http-nio-8080-exec-10] DEBUG o.s.s.a.d.DaoAuthenticationProvider - Authenticated user
+22-05-2026 01:33:14.984 [http-nio-8080-exec-10] INFO  c.e.a.auth.application.AuthService - User logged in successfully: diagnostic
+22-05-2026 01:33:14.988 [http-nio-8080-exec-10] INFO  c.e.a.auth.web.AuthController - Login successful for username: diagnostic
+22-05-2026 01:33:33.083 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:34:33.101 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:34:35.916 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/diagnostic/vehicles
+22-05-2026 01:34:35.944 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/diagnostic/vehicles
+22-05-2026 01:34:35.961 [http-nio-8080-exec-3] INFO  c.e.a.v.application.VehicleService - === СОЗДАНИЕ ЧЕРНОВИКА АВТОМОБИЛЯ ===
+22-05-2026 01:34:35.962 [http-nio-8080-exec-3] INFO  c.e.a.v.application.VehicleService - Диагностик: diagnostic (ID: 16), VIN: 67489584738492841
+22-05-2026 01:34:35.975 [http-nio-8080-exec-3] INFO  c.e.a.v.application.VehicleService - Автомобиль успешно создан! ID: 7, статус: DRAFT
+22-05-2026 01:35:01.605 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/diagnostic/vehicles/7/submit
+22-05-2026 01:35:01.633 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/diagnostic/vehicles/7/submit
+22-05-2026 01:35:01.637 [http-nio-8080-exec-2] INFO  c.e.a.v.application.VehicleService - === ОТПРАВКА НА ПРОВЕРКУ АВТОМОБИЛЯ ID: 7 ===
+22-05-2026 01:35:01.638 [http-nio-8080-exec-2] INFO  c.e.a.v.application.VehicleService - Диагностик ID: 16
+22-05-2026 01:35:01.644 [http-nio-8080-exec-2] INFO  c.e.a.v.application.VehicleService - Автомобиль отправлен на проверку, новый статус: PENDING_REVIEW
+22-05-2026 01:35:15.894 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/admin/vehicles/7/approve
+22-05-2026 01:35:15.922 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/admin/vehicles/7/approve
+22-05-2026 01:35:15.923 [http-nio-8080-exec-7] INFO  c.e.a.v.application.VehicleService - === ОДОБРЕНИЕ АВТОМОБИЛЯ ID: 7 ===
+22-05-2026 01:35:15.924 [http-nio-8080-exec-7] INFO  c.e.a.v.application.VehicleService - Администратор: admin (ID: 14)
+22-05-2026 01:35:15.927 [http-nio-8080-exec-7] INFO  c.e.a.v.application.VehicleService - Автомобиль одобрен, новый статус: APPROVED
+22-05-2026 01:35:33.120 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:36:33.137 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:36:42.480 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/admin/auctions
+22-05-2026 01:36:42.491 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/admin/auctions
+22-05-2026 01:36:42.520 [http-nio-8080-exec-10] WARN  c.e.a.config.GlobalExceptionHandler - Ошибка валидации: Validation failed for argument [0] in public org.springframework.http.ResponseEntity<com.example.autoauction.auction.web.dto.AuctionResponse> com.example.autoauction.admin.web.AdminAuctionController.createAuction(com.example.autoauction.auction.web.dto.AuctionCreateRequest,com.example.autoauction.auth.domain.UserPrincipal): [Field error in object 'auctionCreateRequest' on field 'buyNowPrice': rejected value [30000000]; codes [ValidAuctionPrices.auctionCreateRequest.buyNowPrice,ValidAuctionPrices.buyNowPrice,ValidAuctionPrices.java.math.BigDecimal,ValidAuctionPrices]; arguments [org.springframework.context.support.DefaultMessageSourceResolvable: codes [auctionCreateRequest.buyNowPrice,buyNowPrice]; arguments []; default message [buyNowPrice]]; default message [Цена мгновенной покупки (30000000) должна быть больше стартовой (30000000)]] 
+22-05-2026 01:36:57.652 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/admin/auctions
+22-05-2026 01:36:57.676 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/admin/auctions
+22-05-2026 01:36:57.678 [http-nio-8080-exec-8] INFO  c.e.a.a.web.AdminAuctionController - Admin 14 creating auction for vehicle 7
+22-05-2026 01:36:57.678 [http-nio-8080-exec-8] INFO  c.e.a.a.a.AdminAuctionService - === СОЗДАНИЕ АУКЦИОНА ===
+22-05-2026 01:36:57.679 [http-nio-8080-exec-8] INFO  c.e.a.a.a.AdminAuctionService - Запрос от adminId: 14, vehicleId: 7
+22-05-2026 01:36:57.686 [http-nio-8080-exec-8] WARN  c.e.a.config.GlobalExceptionHandler - Некорректный аргумент: Шаг ставки (100000) не может быть меньше 1% от стартовой цены (300000.00) -> статус 400 BAD_REQUEST
+22-05-2026 01:37:11.377 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/admin/auctions
+22-05-2026 01:37:11.393 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/admin/auctions
+22-05-2026 01:37:11.395 [http-nio-8080-exec-1] INFO  c.e.a.a.web.AdminAuctionController - Admin 14 creating auction for vehicle 7
+22-05-2026 01:37:11.396 [http-nio-8080-exec-1] INFO  c.e.a.a.a.AdminAuctionService - === СОЗДАНИЕ АУКЦИОНА ===
+22-05-2026 01:37:11.396 [http-nio-8080-exec-1] INFO  c.e.a.a.a.AdminAuctionService - Запрос от adminId: 14, vehicleId: 7
+22-05-2026 01:37:11.419 [http-nio-8080-exec-1] INFO  c.e.a.a.a.AdminAuctionService - Аукцион успешно создан! ID: 9, vehicleId: 7, статус: CREATED
+22-05-2026 01:37:33.148 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:37:50.450 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/all
+22-05-2026 01:37:50.476 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/all
+22-05-2026 01:38:33.160 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:38:44.325 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/all
+22-05-2026 01:38:44.340 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/all
+22-05-2026 01:39:01.730 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/all
+22-05-2026 01:39:01.741 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/all
+22-05-2026 01:39:16.197 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/by-status-legacy?status=active
+22-05-2026 01:39:16.213 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/by-status-legacy?status=active
+22-05-2026 01:39:30.482 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/index.html
+22-05-2026 01:39:30.483 [http-nio-8080-exec-2] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:39:30.483 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/index.html
+22-05-2026 01:39:30.550 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/swagger-ui.css
+22-05-2026 01:39:30.551 [http-nio-8080-exec-7] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:39:30.551 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/swagger-ui.css
+22-05-2026 01:39:30.556 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/index.css
+22-05-2026 01:39:30.557 [http-nio-8080-exec-4] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:39:30.559 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/index.css
+22-05-2026 01:39:30.564 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/swagger-ui-standalone-preset.js
+22-05-2026 01:39:30.567 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/swagger-initializer.js
+22-05-2026 01:39:30.565 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/swagger-ui-bundle.js
+22-05-2026 01:39:30.567 [http-nio-8080-exec-4] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:39:30.567 [http-nio-8080-exec-1] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:39:30.568 [http-nio-8080-exec-10] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:39:30.567 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/swagger-ui-standalone-preset.js
+22-05-2026 01:39:30.568 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/swagger-initializer.js
+22-05-2026 01:39:30.568 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/swagger-ui-bundle.js
+22-05-2026 01:39:30.820 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api-docs/swagger-config
+22-05-2026 01:39:30.821 [http-nio-8080-exec-5] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:39:30.821 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api-docs/swagger-config
+22-05-2026 01:39:30.823 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/favicon-32x32.png
+22-05-2026 01:39:30.824 [http-nio-8080-exec-9] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:39:30.824 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/favicon-32x32.png
+22-05-2026 01:39:30.855 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api-docs
+22-05-2026 01:39:30.856 [http-nio-8080-exec-6] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:39:30.856 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api-docs
+22-05-2026 01:39:30.857 [http-nio-8080-exec-6] DEBUG o.s.api.AbstractOpenApiResource - Fetching openApi document from cache
+22-05-2026 01:39:33.176 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:40:03.157 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auth/login
+22-05-2026 01:40:03.158 [http-nio-8080-exec-3] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:40:03.159 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auth/login
+22-05-2026 01:40:03.160 [http-nio-8080-exec-3] INFO  c.e.a.auth.web.AuthController - Login attempt for username: admin
+22-05-2026 01:40:03.161 [http-nio-8080-exec-3] INFO  c.e.a.auth.application.AuthService - Authenticating user: admin
+22-05-2026 01:40:03.279 [http-nio-8080-exec-3] DEBUG o.s.s.a.d.DaoAuthenticationProvider - Authenticated user
+22-05-2026 01:40:03.292 [http-nio-8080-exec-3] INFO  c.e.a.auth.application.AuthService - User logged in successfully: admin
+22-05-2026 01:40:03.295 [http-nio-8080-exec-3] INFO  c.e.a.auth.web.AuthController - Login successful for username: admin
+22-05-2026 01:40:33.195 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:41:00.929 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/all
+22-05-2026 01:41:00.952 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/all
+22-05-2026 01:41:19.360 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/admin/auctions/9/start
+22-05-2026 01:41:19.383 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/admin/auctions/9/start
+22-05-2026 01:41:19.385 [http-nio-8080-exec-1] INFO  c.e.a.a.web.AdminAuctionController - Admin 14 starting auction 9
+22-05-2026 01:41:19.389 [http-nio-8080-exec-1] INFO  c.e.a.a.a.AdminAuctionService - === ЗАПУСК АУКЦИОНА ===
+22-05-2026 01:41:19.389 [http-nio-8080-exec-1] INFO  c.e.a.a.a.AdminAuctionService - ID аукциона: 9, adminId: 14
+22-05-2026 01:41:19.405 [http-nio-8080-exec-1] INFO  c.e.a.a.a.AdminAuctionService - Аукцион запущен, новый статус: ACTIVE
+22-05-2026 01:41:33.215 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:42:33.224 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:43:33.234 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:44:33.253 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:45:33.259 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:46:30.652 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/admin/auctions/9/start
+22-05-2026 01:46:30.666 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/admin/auctions/9/start
+22-05-2026 01:46:30.667 [http-nio-8080-exec-5] INFO  c.e.a.a.web.AdminAuctionController - Admin 14 starting auction 9
+22-05-2026 01:46:30.668 [http-nio-8080-exec-5] INFO  c.e.a.a.a.AdminAuctionService - === ЗАПУСК АУКЦИОНА ===
+22-05-2026 01:46:30.668 [http-nio-8080-exec-5] INFO  c.e.a.a.a.AdminAuctionService - ID аукциона: 9, adminId: 14
+22-05-2026 01:46:30.674 [http-nio-8080-exec-5] WARN  c.e.a.config.GlobalExceptionHandler - Некорректное состояние: Аукцион уже запущен
+22-05-2026 01:46:33.270 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:46:57.281 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/by-status-legacy?status=active
+22-05-2026 01:46:57.293 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/by-status-legacy?status=active
+22-05-2026 01:47:33.288 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:48:33.296 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:48:55.586 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 01:48:55.587 [http-nio-8080-exec-3] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:48:55.588 [http-nio-8080-exec-3] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+22-05-2026 01:48:55.791 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing GET /favicon.ico
+22-05-2026 01:48:55.792 [http-nio-8080-exec-7] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:48:55.793 [http-nio-8080-exec-7] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+22-05-2026 01:49:33.301 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:50:01.186 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/auth/login
+22-05-2026 01:50:01.187 [http-nio-8080-exec-2] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:50:01.187 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/auth/login
+22-05-2026 01:50:01.190 [http-nio-8080-exec-2] ERROR c.e.a.config.GlobalExceptionHandler - Внутренняя ошибка сервера
+org.springframework.web.HttpRequestMethodNotSupportedException: Request method 'GET' is not supported
+	at org.springframework.web.servlet.mvc.method.RequestMappingInfoHandlerMapping.handleNoMatch(RequestMappingInfoHandlerMapping.java:265)
+	at org.springframework.web.servlet.handler.AbstractHandlerMethodMapping.lookupHandlerMethod(AbstractHandlerMethodMapping.java:441)
+	at org.springframework.web.servlet.handler.AbstractHandlerMethodMapping.getHandlerInternal(AbstractHandlerMethodMapping.java:382)
+	at org.springframework.web.servlet.mvc.method.RequestMappingInfoHandlerMapping.getHandlerInternal(RequestMappingInfoHandlerMapping.java:126)
+	at org.springframework.web.servlet.mvc.method.RequestMappingInfoHandlerMapping.getHandlerInternal(RequestMappingInfoHandlerMapping.java:68)
+	at org.springframework.web.servlet.handler.AbstractHandlerMapping.getHandler(AbstractHandlerMapping.java:505)
+	at org.springframework.web.servlet.DispatcherServlet.getHandler(DispatcherServlet.java:1275)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1057)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:974)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1011)
+	at org.springframework.web.servlet.FrameworkServlet.doGet(FrameworkServlet.java:903)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:564)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:885)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:658)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:205)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.apache.tomcat.websocket.server.WsFilter.doFilter(WsFilter.java:51)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:110)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.springframework.security.web.FilterChainProxy.lambda$doFilterInternal$3(FilterChainProxy.java:231)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:365)
+	at org.springframework.security.web.access.intercept.AuthorizationFilter.doFilter(AuthorizationFilter.java:100)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.access.ExceptionTranslationFilter.doFilter(ExceptionTranslationFilter.java:126)
+	at org.springframework.security.web.access.ExceptionTranslationFilter.doFilter(ExceptionTranslationFilter.java:120)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.session.SessionManagementFilter.doFilter(SessionManagementFilter.java:131)
+	at org.springframework.security.web.session.SessionManagementFilter.doFilter(SessionManagementFilter.java:85)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.authentication.AnonymousAuthenticationFilter.doFilter(AnonymousAuthenticationFilter.java:100)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter.doFilter(SecurityContextHolderAwareRequestFilter.java:179)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.savedrequest.RequestCacheAwareFilter.doFilter(RequestCacheAwareFilter.java:63)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at com.example.autoauction.auth.infrastructure.security.JwtAuthenticationFilter.doFilterInternal(JwtAuthenticationFilter.java:49)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.authentication.logout.LogoutFilter.doFilter(LogoutFilter.java:107)
+	at org.springframework.security.web.authentication.logout.LogoutFilter.doFilter(LogoutFilter.java:93)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.web.filter.CorsFilter.doFilterInternal(CorsFilter.java:91)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.header.HeaderWriterFilter.doHeadersAfter(HeaderWriterFilter.java:90)
+	at org.springframework.security.web.header.HeaderWriterFilter.doFilterInternal(HeaderWriterFilter.java:75)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:82)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:69)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter.doFilterInternal(WebAsyncManagerIntegrationFilter.java:62)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.session.DisableEncodeUrlFilter.doFilterInternal(DisableEncodeUrlFilter.java:42)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.FilterChainProxy.doFilterInternal(FilterChainProxy.java:233)
+	at org.springframework.security.web.FilterChainProxy.doFilter(FilterChainProxy.java:191)
+	at org.springframework.web.filter.DelegatingFilterProxy.invokeDelegate(DelegatingFilterProxy.java:352)
+	at org.springframework.web.filter.DelegatingFilterProxy.doFilter(DelegatingFilterProxy.java:268)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:201)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.apache.catalina.core.StandardWrapperValve.invoke(StandardWrapperValve.java:167)
+	at org.apache.catalina.core.StandardContextValve.invoke(StandardContextValve.java:90)
+	at org.apache.catalina.authenticator.AuthenticatorBase.invoke(AuthenticatorBase.java:482)
+	at org.apache.catalina.core.StandardHostValve.invoke(StandardHostValve.java:115)
+	at org.apache.catalina.valves.ErrorReportValve.invoke(ErrorReportValve.java:93)
+	at org.apache.catalina.core.StandardEngineValve.invoke(StandardEngineValve.java:74)
+	at org.apache.catalina.connector.CoyoteAdapter.service(CoyoteAdapter.java:340)
+	at org.apache.coyote.http11.Http11Processor.service(Http11Processor.java:391)
+	at org.apache.coyote.AbstractProcessorLight.process(AbstractProcessorLight.java:63)
+	at org.apache.coyote.AbstractProtocol$ConnectionHandler.process(AbstractProtocol.java:896)
+	at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1744)
+	at org.apache.tomcat.util.net.SocketProcessorBase.run(SocketProcessorBase.java:52)
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1191)
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:659)
+	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:61)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+22-05-2026 01:50:01.455 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /favicon.ico
+22-05-2026 01:50:01.456 [http-nio-8080-exec-4] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:50:01.456 [http-nio-8080-exec-4] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+22-05-2026 01:50:33.311 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:50:56.577 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0
+22-05-2026 01:50:56.579 [http-nio-8080-exec-10] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:50:56.579 [http-nio-8080-exec-10] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+22-05-2026 01:51:03.861 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auth/login
+22-05-2026 01:51:03.862 [http-nio-8080-exec-9] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:51:03.862 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auth/login
+22-05-2026 01:51:03.864 [http-nio-8080-exec-9] ERROR c.e.a.config.GlobalExceptionHandler - Внутренняя ошибка сервера
+org.springframework.http.converter.HttpMessageNotReadableException: Required request body is missing: public org.springframework.http.ResponseEntity<com.example.autoauction.auth.application.AuthService$AuthResponse> com.example.autoauction.auth.web.AuthController.login(com.example.autoauction.auth.web.AuthController$LoginRequest)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestResponseBodyMethodProcessor.readWithMessageConverters(RequestResponseBodyMethodProcessor.java:166)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestResponseBodyMethodProcessor.resolveArgument(RequestResponseBodyMethodProcessor.java:136)
+	at org.springframework.web.method.support.HandlerMethodArgumentResolverComposite.resolveArgument(HandlerMethodArgumentResolverComposite.java:122)
+	at org.springframework.web.method.support.InvocableHandlerMethod.getMethodArgumentValues(InvocableHandlerMethod.java:179)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:146)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:118)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:884)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:797)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:87)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1081)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:974)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1011)
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:914)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:590)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:885)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:658)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:205)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.apache.tomcat.websocket.server.WsFilter.doFilter(WsFilter.java:51)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:110)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.springframework.security.web.FilterChainProxy.lambda$doFilterInternal$3(FilterChainProxy.java:231)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:365)
+	at org.springframework.security.web.access.intercept.AuthorizationFilter.doFilter(AuthorizationFilter.java:100)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.access.ExceptionTranslationFilter.doFilter(ExceptionTranslationFilter.java:126)
+	at org.springframework.security.web.access.ExceptionTranslationFilter.doFilter(ExceptionTranslationFilter.java:120)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.session.SessionManagementFilter.doFilter(SessionManagementFilter.java:131)
+	at org.springframework.security.web.session.SessionManagementFilter.doFilter(SessionManagementFilter.java:85)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.authentication.AnonymousAuthenticationFilter.doFilter(AnonymousAuthenticationFilter.java:100)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter.doFilter(SecurityContextHolderAwareRequestFilter.java:179)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.savedrequest.RequestCacheAwareFilter.doFilter(RequestCacheAwareFilter.java:63)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at com.example.autoauction.auth.infrastructure.security.JwtAuthenticationFilter.doFilterInternal(JwtAuthenticationFilter.java:49)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.authentication.logout.LogoutFilter.doFilter(LogoutFilter.java:107)
+	at org.springframework.security.web.authentication.logout.LogoutFilter.doFilter(LogoutFilter.java:93)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.web.filter.CorsFilter.doFilterInternal(CorsFilter.java:91)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.header.HeaderWriterFilter.doHeadersAfter(HeaderWriterFilter.java:90)
+	at org.springframework.security.web.header.HeaderWriterFilter.doFilterInternal(HeaderWriterFilter.java:75)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:82)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:69)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter.doFilterInternal(WebAsyncManagerIntegrationFilter.java:62)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.session.DisableEncodeUrlFilter.doFilterInternal(DisableEncodeUrlFilter.java:42)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.FilterChainProxy.doFilterInternal(FilterChainProxy.java:233)
+	at org.springframework.security.web.FilterChainProxy.doFilter(FilterChainProxy.java:191)
+	at org.springframework.web.filter.DelegatingFilterProxy.invokeDelegate(DelegatingFilterProxy.java:352)
+	at org.springframework.web.filter.DelegatingFilterProxy.doFilter(DelegatingFilterProxy.java:268)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:201)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.apache.catalina.core.StandardWrapperValve.invoke(StandardWrapperValve.java:167)
+	at org.apache.catalina.core.StandardContextValve.invoke(StandardContextValve.java:90)
+	at org.apache.catalina.authenticator.AuthenticatorBase.invoke(AuthenticatorBase.java:482)
+	at org.apache.catalina.core.StandardHostValve.invoke(StandardHostValve.java:115)
+	at org.apache.catalina.valves.ErrorReportValve.invoke(ErrorReportValve.java:93)
+	at org.apache.catalina.core.StandardEngineValve.invoke(StandardEngineValve.java:74)
+	at org.apache.catalina.connector.CoyoteAdapter.service(CoyoteAdapter.java:340)
+	at org.apache.coyote.http11.Http11Processor.service(Http11Processor.java:391)
+	at org.apache.coyote.AbstractProcessorLight.process(AbstractProcessorLight.java:63)
+	at org.apache.coyote.AbstractProtocol$ConnectionHandler.process(AbstractProtocol.java:896)
+	at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1744)
+	at org.apache.tomcat.util.net.SocketProcessorBase.run(SocketProcessorBase.java:52)
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1191)
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:659)
+	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:61)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+22-05-2026 01:51:20.456 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auth/login
+22-05-2026 01:51:20.456 [http-nio-8080-exec-6] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:51:20.457 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auth/login
+22-05-2026 01:51:20.457 [http-nio-8080-exec-6] ERROR c.e.a.config.GlobalExceptionHandler - Внутренняя ошибка сервера
+org.springframework.http.converter.HttpMessageNotReadableException: Required request body is missing: public org.springframework.http.ResponseEntity<com.example.autoauction.auth.application.AuthService$AuthResponse> com.example.autoauction.auth.web.AuthController.login(com.example.autoauction.auth.web.AuthController$LoginRequest)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestResponseBodyMethodProcessor.readWithMessageConverters(RequestResponseBodyMethodProcessor.java:166)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestResponseBodyMethodProcessor.resolveArgument(RequestResponseBodyMethodProcessor.java:136)
+	at org.springframework.web.method.support.HandlerMethodArgumentResolverComposite.resolveArgument(HandlerMethodArgumentResolverComposite.java:122)
+	at org.springframework.web.method.support.InvocableHandlerMethod.getMethodArgumentValues(InvocableHandlerMethod.java:179)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:146)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:118)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:884)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:797)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:87)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1081)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:974)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1011)
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:914)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:590)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:885)
+	at jakarta.servlet.http.HttpServlet.service(HttpServlet.java:658)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:205)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.apache.tomcat.websocket.server.WsFilter.doFilter(WsFilter.java:51)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:110)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.springframework.security.web.FilterChainProxy.lambda$doFilterInternal$3(FilterChainProxy.java:231)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:365)
+	at org.springframework.security.web.access.intercept.AuthorizationFilter.doFilter(AuthorizationFilter.java:100)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.access.ExceptionTranslationFilter.doFilter(ExceptionTranslationFilter.java:126)
+	at org.springframework.security.web.access.ExceptionTranslationFilter.doFilter(ExceptionTranslationFilter.java:120)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.session.SessionManagementFilter.doFilter(SessionManagementFilter.java:131)
+	at org.springframework.security.web.session.SessionManagementFilter.doFilter(SessionManagementFilter.java:85)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.authentication.AnonymousAuthenticationFilter.doFilter(AnonymousAuthenticationFilter.java:100)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter.doFilter(SecurityContextHolderAwareRequestFilter.java:179)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.savedrequest.RequestCacheAwareFilter.doFilter(RequestCacheAwareFilter.java:63)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at com.example.autoauction.auth.infrastructure.security.JwtAuthenticationFilter.doFilterInternal(JwtAuthenticationFilter.java:49)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.authentication.logout.LogoutFilter.doFilter(LogoutFilter.java:107)
+	at org.springframework.security.web.authentication.logout.LogoutFilter.doFilter(LogoutFilter.java:93)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.web.filter.CorsFilter.doFilterInternal(CorsFilter.java:91)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.header.HeaderWriterFilter.doHeadersAfter(HeaderWriterFilter.java:90)
+	at org.springframework.security.web.header.HeaderWriterFilter.doFilterInternal(HeaderWriterFilter.java:75)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:82)
+	at org.springframework.security.web.context.SecurityContextHolderFilter.doFilter(SecurityContextHolderFilter.java:69)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter.doFilterInternal(WebAsyncManagerIntegrationFilter.java:62)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.session.DisableEncodeUrlFilter.doFilterInternal(DisableEncodeUrlFilter.java:42)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.springframework.security.web.FilterChainProxy$VirtualFilterChain.doFilter(FilterChainProxy.java:374)
+	at org.springframework.security.web.FilterChainProxy.doFilterInternal(FilterChainProxy.java:233)
+	at org.springframework.security.web.FilterChainProxy.doFilter(FilterChainProxy.java:191)
+	at org.springframework.web.filter.DelegatingFilterProxy.invokeDelegate(DelegatingFilterProxy.java:352)
+	at org.springframework.web.filter.DelegatingFilterProxy.doFilter(DelegatingFilterProxy.java:268)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:201)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:116)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:174)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:149)
+	at org.apache.catalina.core.StandardWrapperValve.invoke(StandardWrapperValve.java:167)
+	at org.apache.catalina.core.StandardContextValve.invoke(StandardContextValve.java:90)
+	at org.apache.catalina.authenticator.AuthenticatorBase.invoke(AuthenticatorBase.java:482)
+	at org.apache.catalina.core.StandardHostValve.invoke(StandardHostValve.java:115)
+	at org.apache.catalina.valves.ErrorReportValve.invoke(ErrorReportValve.java:93)
+	at org.apache.catalina.core.StandardEngineValve.invoke(StandardEngineValve.java:74)
+	at org.apache.catalina.connector.CoyoteAdapter.service(CoyoteAdapter.java:340)
+	at org.apache.coyote.http11.Http11Processor.service(Http11Processor.java:391)
+	at org.apache.coyote.AbstractProcessorLight.process(AbstractProcessorLight.java:63)
+	at org.apache.coyote.AbstractProtocol$ConnectionHandler.process(AbstractProtocol.java:896)
+	at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1744)
+	at org.apache.tomcat.util.net.SocketProcessorBase.run(SocketProcessorBase.java:52)
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1191)
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:659)
+	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:61)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+22-05-2026 01:51:33.322 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:52:21.911 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auth/login
+22-05-2026 01:52:21.912 [http-nio-8080-exec-3] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:52:21.912 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auth/login
+22-05-2026 01:52:21.913 [http-nio-8080-exec-3] INFO  c.e.a.auth.web.AuthController - Login attempt for username: admin
+22-05-2026 01:52:21.914 [http-nio-8080-exec-3] INFO  c.e.a.auth.application.AuthService - Authenticating user: admin
+22-05-2026 01:52:22.029 [http-nio-8080-exec-3] DEBUG o.s.s.a.d.DaoAuthenticationProvider - Authenticated user
+22-05-2026 01:52:22.040 [http-nio-8080-exec-3] INFO  c.e.a.auth.application.AuthService - User logged in successfully: admin
+22-05-2026 01:52:22.042 [http-nio-8080-exec-3] INFO  c.e.a.auth.web.AuthController - Login successful for username: admin
+22-05-2026 01:52:33.339 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:53:15.205 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0
+22-05-2026 01:53:15.206 [http-nio-8080-exec-8] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:53:15.206 [http-nio-8080-exec-8] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+22-05-2026 01:53:33.357 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:54:10.387 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0
+22-05-2026 01:54:10.388 [http-nio-8080-exec-4] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:54:10.389 [http-nio-8080-exec-4] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+22-05-2026 01:54:33.375 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:55:04.296 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0
+22-05-2026 01:55:04.297 [http-nio-8080-exec-10] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:55:04.297 [http-nio-8080-exec-10] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+22-05-2026 01:55:16.370 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/index.html
+22-05-2026 01:55:16.371 [http-nio-8080-exec-9] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:55:16.371 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/index.html
+22-05-2026 01:55:16.439 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/swagger-ui.css
+22-05-2026 01:55:16.440 [http-nio-8080-exec-6] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:55:16.440 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/swagger-ui.css
+22-05-2026 01:55:16.444 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/index.css
+22-05-2026 01:55:16.444 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/swagger-ui-standalone-preset.js
+22-05-2026 01:55:16.444 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/swagger-initializer.js
+22-05-2026 01:55:16.445 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/swagger-ui-bundle.js
+22-05-2026 01:55:16.445 [http-nio-8080-exec-7] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:55:16.449 [http-nio-8080-exec-8] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:55:16.447 [http-nio-8080-exec-3] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:55:16.448 [http-nio-8080-exec-2] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:55:16.449 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/index.css
+22-05-2026 01:55:16.449 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/swagger-ui-bundle.js
+22-05-2026 01:55:16.449 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/swagger-ui-standalone-preset.js
+22-05-2026 01:55:16.449 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/swagger-initializer.js
+22-05-2026 01:55:16.747 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api-docs/swagger-config
+22-05-2026 01:55:16.748 [http-nio-8080-exec-4] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:55:16.748 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api-docs/swagger-config
+22-05-2026 01:55:16.751 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/favicon-32x32.png
+22-05-2026 01:55:16.751 [http-nio-8080-exec-1] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:55:16.752 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/favicon-32x32.png
+22-05-2026 01:55:16.828 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api-docs
+22-05-2026 01:55:16.829 [http-nio-8080-exec-10] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:55:16.830 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api-docs
+22-05-2026 01:55:16.832 [http-nio-8080-exec-10] DEBUG o.s.api.AbstractOpenApiResource - Fetching openApi document from cache
+22-05-2026 01:55:16.834 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/favicon-32x32.png
+22-05-2026 01:55:16.836 [http-nio-8080-exec-5] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:55:16.838 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/favicon-32x32.png
+22-05-2026 01:55:33.393 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:55:42.673 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auth/login
+22-05-2026 01:55:42.674 [http-nio-8080-exec-9] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 01:55:42.674 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auth/login
+22-05-2026 01:55:42.675 [http-nio-8080-exec-9] INFO  c.e.a.auth.web.AuthController - Login attempt for username: admin
+22-05-2026 01:55:42.683 [http-nio-8080-exec-9] INFO  c.e.a.auth.application.AuthService - Authenticating user: admin
+22-05-2026 01:55:42.805 [http-nio-8080-exec-9] DEBUG o.s.s.a.d.DaoAuthenticationProvider - Authenticated user
+22-05-2026 01:55:42.817 [http-nio-8080-exec-9] INFO  c.e.a.auth.application.AuthService - User logged in successfully: admin
+22-05-2026 01:55:42.820 [http-nio-8080-exec-9] INFO  c.e.a.auth.web.AuthController - Login successful for username: admin
+22-05-2026 01:56:22.510 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/by-status-legacy?status=active
+22-05-2026 01:56:22.524 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/by-status-legacy?status=active
+22-05-2026 01:56:33.399 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:57:33.413 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:58:33.419 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 01:59:33.429 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:00:33.447 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:01:33.468 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:02:32.583 [MessageBroker-1] INFO  o.s.w.s.c.WebSocketMessageBrokerStats - WebSocketSession[0 current WS(0)-HttpStream(0)-HttpPoll(0), 0 total, 0 closed abnormally (0 connect failure, 0 send limit, 0 transport error)], stompSubProtocol[processed CONNECT(0)-CONNECTED(0)-DISCONNECT(0)], stompBrokerRelay[null], inboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0], outboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0], sockJsScheduler[pool size = 8, active threads = 1, queued tasks = 3, completed tasks = 33]
+22-05-2026 02:02:33.483 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:03:33.491 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:03:48.358 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing OPTIONS /auth/login
+22-05-2026 02:03:48.363 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing POST /auth/login
+22-05-2026 02:03:48.365 [http-nio-8080-exec-10] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:03:48.366 [http-nio-8080-exec-10] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+22-05-2026 02:04:12.635 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing POST /auth/login
+22-05-2026 02:04:12.636 [http-nio-8080-exec-5] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:04:12.637 [http-nio-8080-exec-5] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+22-05-2026 02:04:33.506 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:05:33.514 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:06:12.703 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing POST /auth/login
+22-05-2026 02:06:12.704 [http-nio-8080-exec-6] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:06:12.704 [http-nio-8080-exec-6] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+22-05-2026 02:06:24.397 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing POST /auth/login
+22-05-2026 02:06:24.398 [http-nio-8080-exec-7] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:06:24.398 [http-nio-8080-exec-7] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+22-05-2026 02:06:33.529 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:06:41.397 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing POST /auth/login
+22-05-2026 02:06:41.398 [http-nio-8080-exec-2] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:06:41.399 [http-nio-8080-exec-2] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+22-05-2026 02:07:33.543 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:08:30.442 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing OPTIONS /api/auth/login
+22-05-2026 02:08:30.448 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auth/login
+22-05-2026 02:08:30.448 [http-nio-8080-exec-4] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:08:30.449 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auth/login
+22-05-2026 02:08:30.450 [http-nio-8080-exec-4] INFO  c.e.a.auth.web.AuthController - Login attempt for username: admin
+22-05-2026 02:08:30.451 [http-nio-8080-exec-4] INFO  c.e.a.auth.application.AuthService - Authenticating user: admin
+22-05-2026 02:08:30.569 [http-nio-8080-exec-4] DEBUG o.s.s.a.d.DaoAuthenticationProvider - Authenticated user
+22-05-2026 02:08:30.583 [http-nio-8080-exec-4] INFO  c.e.a.auth.application.AuthService - User logged in successfully: admin
+22-05-2026 02:08:30.586 [http-nio-8080-exec-4] INFO  c.e.a.auth.web.AuthController - Login successful for username: admin
+22-05-2026 02:08:30.817 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing OPTIONS /api/admin/auctions?page=0&size=20
+22-05-2026 02:08:30.824 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing OPTIONS /api/admin/auctions?page=0&size=20
+22-05-2026 02:08:30.833 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:08:30.846 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:08:30.869 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:08:30.880 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:08:33.556 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:08:54.025 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:08:54.044 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:08:54.056 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:08:54.070 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:09:14.338 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:09:14.355 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:09:14.368 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:09:14.382 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:09:32.037 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auth/login
+22-05-2026 02:09:32.039 [http-nio-8080-exec-8] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:09:32.039 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auth/login
+22-05-2026 02:09:32.040 [http-nio-8080-exec-8] INFO  c.e.a.auth.web.AuthController - Login attempt for username: Темирлан
+22-05-2026 02:09:32.041 [http-nio-8080-exec-8] INFO  c.e.a.auth.application.AuthService - Authenticating user: Темирлан
+22-05-2026 02:09:32.153 [http-nio-8080-exec-8] DEBUG o.s.s.a.d.DaoAuthenticationProvider - Authenticated user
+22-05-2026 02:09:32.164 [http-nio-8080-exec-8] INFO  c.e.a.auth.application.AuthService - User logged in successfully: Темирлан
+22-05-2026 02:09:32.167 [http-nio-8080-exec-8] INFO  c.e.a.auth.web.AuthController - Login successful for username: Темирлан
+22-05-2026 02:09:32.405 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:09:32.414 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:09:32.423 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:09:32.436 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:09:33.559 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:10:33.565 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:10:52.996 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:10:53.020 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:10:53.035 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:10:53.048 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:10:53.062 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:10:53.076 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:10:53.085 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:10:53.096 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:11:01.160 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:11:01.178 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:11:01.187 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:11:01.199 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:11:08.690 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing OPTIONS /api/admin/auctions/9
+22-05-2026 02:11:08.693 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing OPTIONS /api/admin/auctions/9
+22-05-2026 02:11:08.701 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 02:11:08.714 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/9
+22-05-2026 02:11:08.725 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 02:11:08.739 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/9
+22-05-2026 02:11:22.878 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing OPTIONS /api/auctions/9/bids
+22-05-2026 02:11:22.882 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auctions/9/bids
+22-05-2026 02:11:22.889 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auctions/9/bids
+22-05-2026 02:11:22.894 [http-nio-8080-exec-7] INFO  c.e.a.auction.web.BidController - User 20 placing bid on auction 9
+22-05-2026 02:11:22.908 [http-nio-8080-exec-7] INFO  c.e.a.auction.application.BidService - === СОЗДАНИЕ СТАВКИ ===
+22-05-2026 02:11:22.909 [http-nio-8080-exec-7] INFO  c.e.a.auction.application.BidService - Auction ID: 9, Bidder ID: 20, Amount: 30300000
+22-05-2026 02:11:22.929 [http-nio-8080-exec-7] DEBUG c.e.a.auction.application.BidService - Текущий статус аукциона: ACTIVE, текущая цена: 30000000.00, минимальный шаг: 300000.00, версия: 1
+22-05-2026 02:11:22.945 [http-nio-8080-exec-7] INFO  c.e.a.d.application.DepositService - Freezing deposit for user: 20, auction: 9
+22-05-2026 02:11:22.966 [http-nio-8080-exec-7] INFO  c.e.a.d.application.DepositService - Deposit frozen. New available balance: 999570000.00
+22-05-2026 02:11:22.966 [http-nio-8080-exec-7] INFO  c.e.a.auction.application.BidService - Deposit frozen for user 20 on auction 9
+22-05-2026 02:11:22.971 [http-nio-8080-exec-7] INFO  c.e.a.auction.application.BidService - Ставка 30300000 успешно принята, новая цена: 30300000, лидер: 20
+22-05-2026 02:11:22.973 [http-nio-8080-exec-7] DEBUG c.e.a.a.w.AuctionWebSocketController - Sending WebSocket update for auction 9: type=BID_PLACED, price=30300000
+22-05-2026 02:11:22.979 [http-nio-8080-exec-7] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing MESSAGE destination=/topic/auction/9 session=null payload={"auctionId":9,"vehicleId":7,"vehicleInfo":"porshe 911 turbo s 2023 (VIN: 674895...(truncated)
+22-05-2026 02:11:22.982 [http-nio-8080-exec-7] DEBUG c.e.a.auction.application.BidService - Аукцион сохранен, версия: 1
+22-05-2026 02:11:22.983 [http-nio-8080-exec-7] INFO  c.e.a.auction.application.BidService - Ставка успешно создана! Итоговый статус аукциона: ACTIVE, продление: false
+22-05-2026 02:11:27.936 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 02:11:27.947 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/9
+22-05-2026 02:11:27.954 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 02:11:27.968 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/9
+22-05-2026 02:11:33.574 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:11:36.678 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auctions/9/bids
+22-05-2026 02:11:36.686 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auctions/9/bids
+22-05-2026 02:11:36.687 [http-nio-8080-exec-3] INFO  c.e.a.auction.web.BidController - User 20 placing bid on auction 9
+22-05-2026 02:11:36.687 [http-nio-8080-exec-3] INFO  c.e.a.auction.application.BidService - === СОЗДАНИЕ СТАВКИ ===
+22-05-2026 02:11:36.688 [http-nio-8080-exec-3] INFO  c.e.a.auction.application.BidService - Auction ID: 9, Bidder ID: 20, Amount: 30600000
+22-05-2026 02:11:36.690 [http-nio-8080-exec-3] DEBUG c.e.a.auction.application.BidService - Текущий статус аукциона: ACTIVE, текущая цена: 30300000.00, минимальный шаг: 300000.00, версия: 2
+22-05-2026 02:11:36.693 [http-nio-8080-exec-3] INFO  c.e.a.auction.application.BidService - Ставка 30600000 успешно принята, новая цена: 30600000, лидер: 20
+22-05-2026 02:11:36.693 [http-nio-8080-exec-3] DEBUG c.e.a.a.w.AuctionWebSocketController - Sending WebSocket update for auction 9: type=BID_PLACED, price=30600000
+22-05-2026 02:11:36.694 [http-nio-8080-exec-3] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing MESSAGE destination=/topic/auction/9 session=null payload={"auctionId":9,"vehicleId":7,"vehicleInfo":"porshe 911 turbo s 2023 (VIN: 674895...(truncated)
+22-05-2026 02:11:36.694 [http-nio-8080-exec-3] DEBUG c.e.a.auction.application.BidService - Аукцион сохранен, версия: 2
+22-05-2026 02:11:36.694 [http-nio-8080-exec-3] INFO  c.e.a.auction.application.BidService - Ставка успешно создана! Итоговый статус аукциона: ACTIVE, продление: false
+22-05-2026 02:11:38.393 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auctions/9/bids
+22-05-2026 02:11:38.399 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auctions/9/bids
+22-05-2026 02:11:38.401 [http-nio-8080-exec-8] INFO  c.e.a.auction.web.BidController - User 20 placing bid on auction 9
+22-05-2026 02:11:38.402 [http-nio-8080-exec-8] INFO  c.e.a.auction.application.BidService - === СОЗДАНИЕ СТАВКИ ===
+22-05-2026 02:11:38.402 [http-nio-8080-exec-8] INFO  c.e.a.auction.application.BidService - Auction ID: 9, Bidder ID: 20, Amount: 30900000
+22-05-2026 02:11:38.404 [http-nio-8080-exec-8] DEBUG c.e.a.auction.application.BidService - Текущий статус аукциона: ACTIVE, текущая цена: 30600000.00, минимальный шаг: 300000.00, версия: 3
+22-05-2026 02:11:38.406 [http-nio-8080-exec-8] INFO  c.e.a.auction.application.BidService - Ставка 30900000 успешно принята, новая цена: 30900000, лидер: 20
+22-05-2026 02:11:38.406 [http-nio-8080-exec-8] DEBUG c.e.a.a.w.AuctionWebSocketController - Sending WebSocket update for auction 9: type=BID_PLACED, price=30900000
+22-05-2026 02:11:38.406 [http-nio-8080-exec-8] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing MESSAGE destination=/topic/auction/9 session=null payload={"auctionId":9,"vehicleId":7,"vehicleInfo":"porshe 911 turbo s 2023 (VIN: 674895...(truncated)
+22-05-2026 02:11:38.407 [http-nio-8080-exec-8] DEBUG c.e.a.auction.application.BidService - Аукцион сохранен, версия: 3
+22-05-2026 02:11:38.407 [http-nio-8080-exec-8] INFO  c.e.a.auction.application.BidService - Ставка успешно создана! Итоговый статус аукциона: ACTIVE, продление: false
+22-05-2026 02:11:55.159 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auctions/9/bids
+22-05-2026 02:11:55.167 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auctions/9/bids
+22-05-2026 02:11:55.169 [http-nio-8080-exec-4] INFO  c.e.a.auction.web.BidController - User 20 placing bid on auction 9
+22-05-2026 02:11:55.169 [http-nio-8080-exec-4] INFO  c.e.a.auction.application.BidService - === СОЗДАНИЕ СТАВКИ ===
+22-05-2026 02:11:55.169 [http-nio-8080-exec-4] INFO  c.e.a.auction.application.BidService - Auction ID: 9, Bidder ID: 20, Amount: 31200000
+22-05-2026 02:11:55.172 [http-nio-8080-exec-4] DEBUG c.e.a.auction.application.BidService - Текущий статус аукциона: ACTIVE, текущая цена: 30900000.00, минимальный шаг: 300000.00, версия: 4
+22-05-2026 02:11:55.174 [http-nio-8080-exec-4] INFO  c.e.a.auction.application.BidService - Ставка 31200000 успешно принята, новая цена: 31200000, лидер: 20
+22-05-2026 02:11:55.174 [http-nio-8080-exec-4] DEBUG c.e.a.a.w.AuctionWebSocketController - Sending WebSocket update for auction 9: type=BID_PLACED, price=31200000
+22-05-2026 02:11:55.174 [http-nio-8080-exec-4] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing MESSAGE destination=/topic/auction/9 session=null payload={"auctionId":9,"vehicleId":7,"vehicleInfo":"porshe 911 turbo s 2023 (VIN: 674895...(truncated)
+22-05-2026 02:11:55.175 [http-nio-8080-exec-4] DEBUG c.e.a.auction.application.BidService - Аукцион сохранен, версия: 4
+22-05-2026 02:11:55.175 [http-nio-8080-exec-4] INFO  c.e.a.auction.application.BidService - Ставка успешно создана! Итоговый статус аукциона: ACTIVE, продление: false
+22-05-2026 02:12:15.258 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:12:15.272 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:12:15.282 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:12:15.299 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:12:33.582 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:12:34.076 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auth/login
+22-05-2026 02:12:34.077 [http-nio-8080-exec-5] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:12:34.077 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auth/login
+22-05-2026 02:12:34.078 [http-nio-8080-exec-5] INFO  c.e.a.auth.web.AuthController - Login attempt for username: user
+22-05-2026 02:12:34.078 [http-nio-8080-exec-5] INFO  c.e.a.auth.application.AuthService - Authenticating user: user
+22-05-2026 02:12:34.198 [http-nio-8080-exec-5] DEBUG o.s.s.a.d.DaoAuthenticationProvider - Authenticated user
+22-05-2026 02:12:34.209 [http-nio-8080-exec-5] INFO  c.e.a.auth.application.AuthService - User logged in successfully: user
+22-05-2026 02:12:34.210 [http-nio-8080-exec-5] INFO  c.e.a.auth.web.AuthController - Login successful for username: user
+22-05-2026 02:12:34.426 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:12:34.435 [http-nio-8080-exec-9] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 02:12:34.439 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:12:34.449 [http-nio-8080-exec-7] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 02:12:40.241 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:12:40.252 [http-nio-8080-exec-6] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 02:12:40.254 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:12:40.263 [http-nio-8080-exec-2] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 02:13:11.522 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auth/login
+22-05-2026 02:13:11.523 [http-nio-8080-exec-3] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:13:11.523 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auth/login
+22-05-2026 02:13:11.525 [http-nio-8080-exec-3] INFO  c.e.a.auth.web.AuthController - Login attempt for username: admin
+22-05-2026 02:13:11.525 [http-nio-8080-exec-3] INFO  c.e.a.auth.application.AuthService - Authenticating user: admin
+22-05-2026 02:13:11.638 [http-nio-8080-exec-3] DEBUG o.s.s.a.d.DaoAuthenticationProvider - Authenticated user
+22-05-2026 02:13:11.648 [http-nio-8080-exec-3] INFO  c.e.a.auth.application.AuthService - User logged in successfully: admin
+22-05-2026 02:13:11.650 [http-nio-8080-exec-3] INFO  c.e.a.auth.web.AuthController - Login successful for username: admin
+22-05-2026 02:13:11.880 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:13:11.887 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:13:11.894 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:13:11.903 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:13:14.482 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 02:13:14.494 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/9
+22-05-2026 02:13:14.545 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 02:13:14.569 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/9
+22-05-2026 02:13:18.918 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auctions/9/bids
+22-05-2026 02:13:18.926 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auctions/9/bids
+22-05-2026 02:13:18.928 [http-nio-8080-exec-5] INFO  c.e.a.auction.web.BidController - User 14 placing bid on auction 9
+22-05-2026 02:13:18.928 [http-nio-8080-exec-5] INFO  c.e.a.auction.application.BidService - === СОЗДАНИЕ СТАВКИ ===
+22-05-2026 02:13:18.929 [http-nio-8080-exec-5] INFO  c.e.a.auction.application.BidService - Auction ID: 9, Bidder ID: 14, Amount: 31500000
+22-05-2026 02:13:18.931 [http-nio-8080-exec-5] DEBUG c.e.a.auction.application.BidService - Текущий статус аукциона: ACTIVE, текущая цена: 31200000.00, минимальный шаг: 300000.00, версия: 5
+22-05-2026 02:13:18.931 [http-nio-8080-exec-5] WARN  c.e.a.auction.application.BidService - Попытка сделать ставку на свой аукцион от пользователя 14
+22-05-2026 02:13:18.932 [http-nio-8080-exec-5] WARN  c.e.a.config.GlobalExceptionHandler - Некорректный аргумент: Нельзя делать ставки на собственный аукцион -> статус 400 BAD_REQUEST
+22-05-2026 02:13:24.247 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:13:24.258 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:13:24.265 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:13:24.274 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:13:33.598 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:13:41.904 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/users
+22-05-2026 02:13:41.917 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/users
+22-05-2026 02:14:33.613 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:15:33.622 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:16:33.628 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:17:33.646 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:18:33.658 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:19:33.668 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:20:33.674 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:21:33.677 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:22:33.688 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:23:33.702 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:24:33.715 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:25:06.029 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779391505977
+22-05-2026 02:25:06.036 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779391505979
+22-05-2026 02:25:06.043 [http-nio-8080-exec-4] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:25:06.052 [http-nio-8080-exec-1] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:25:06.056 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779391505977
+22-05-2026 02:25:06.070 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779391505979
+22-05-2026 02:25:06.073 [http-nio-8080-exec-1] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:25:06.073 [http-nio-8080-exec-4] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:25:06.077 [http-nio-8080-exec-4] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779391505977
+22-05-2026 02:25:06.077 [http-nio-8080-exec-1] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779391505979
+22-05-2026 02:25:26.712 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auth/login
+22-05-2026 02:25:26.713 [http-nio-8080-exec-10] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:25:26.713 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auth/login
+22-05-2026 02:25:26.715 [http-nio-8080-exec-10] INFO  c.e.a.auth.web.AuthController - Login attempt for username: admin
+22-05-2026 02:25:26.716 [http-nio-8080-exec-10] INFO  c.e.a.auth.application.AuthService - Authenticating user: admin
+22-05-2026 02:25:26.830 [http-nio-8080-exec-10] DEBUG o.s.s.a.d.DaoAuthenticationProvider - Authenticated user
+22-05-2026 02:25:26.839 [http-nio-8080-exec-10] INFO  c.e.a.auth.application.AuthService - User logged in successfully: admin
+22-05-2026 02:25:26.842 [http-nio-8080-exec-10] INFO  c.e.a.auth.web.AuthController - Login successful for username: admin
+22-05-2026 02:25:27.103 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:25:27.112 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:25:27.119 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:25:27.127 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:25:31.744 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 02:25:31.753 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/9
+22-05-2026 02:25:31.757 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779391531734
+22-05-2026 02:25:31.758 [http-nio-8080-exec-6] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:25:31.758 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779391531734
+22-05-2026 02:25:31.759 [http-nio-8080-exec-6] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:25:31.759 [http-nio-8080-exec-6] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779391531734
+22-05-2026 02:25:31.759 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 02:25:31.762 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779391531734
+22-05-2026 02:25:31.763 [http-nio-8080-exec-3] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:25:31.764 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779391531734
+22-05-2026 02:25:31.765 [http-nio-8080-exec-3] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:25:31.766 [http-nio-8080-exec-3] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779391531734
+22-05-2026 02:25:31.772 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/9
+22-05-2026 02:25:31.773 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/649/x0kpw0be/websocket
+22-05-2026 02:25:31.774 [http-nio-8080-exec-8] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:25:31.775 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/649/x0kpw0be/websocket
+22-05-2026 02:25:31.775 [http-nio-8080-exec-8] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:25:31.777 [http-nio-8080-exec-8] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/649/x0kpw0be/websocket
+22-05-2026 02:25:31.841 [http-nio-8080-exec-8] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=x0kpw0be]
+22-05-2026 02:25:31.846 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/046/vqdocaeg/websocket
+22-05-2026 02:25:31.847 [http-nio-8080-exec-4] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:25:31.847 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/046/vqdocaeg/websocket
+22-05-2026 02:25:31.848 [http-nio-8080-exec-4] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:25:31.848 [http-nio-8080-exec-4] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/046/vqdocaeg/websocket
+22-05-2026 02:25:31.849 [http-nio-8080-exec-4] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=vqdocaeg]
+22-05-2026 02:25:31.862 [clientInboundChannel-2] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing CONNECT session=vqdocaeg
+22-05-2026 02:25:31.871 [clientInboundChannel-5] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing SUBSCRIBE /topic/auction/9 id=sub-0 session=vqdocaeg
+22-05-2026 02:25:33.728 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:25:50.241 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auth/login
+22-05-2026 02:25:50.243 [http-nio-8080-exec-10] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:25:50.244 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auth/login
+22-05-2026 02:25:50.245 [http-nio-8080-exec-10] INFO  c.e.a.auth.web.AuthController - Login attempt for username: Темирлан
+22-05-2026 02:25:50.246 [http-nio-8080-exec-10] INFO  c.e.a.auth.application.AuthService - Authenticating user: Темирлан
+22-05-2026 02:25:50.357 [http-nio-8080-exec-10] DEBUG o.s.s.a.d.DaoAuthenticationProvider - Authenticated user
+22-05-2026 02:25:50.366 [http-nio-8080-exec-10] INFO  c.e.a.auth.application.AuthService - User logged in successfully: Темирлан
+22-05-2026 02:25:50.368 [http-nio-8080-exec-10] INFO  c.e.a.auth.web.AuthController - Login successful for username: Темирлан
+22-05-2026 02:25:50.653 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:25:50.665 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:25:50.672 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:25:50.689 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:25:53.876 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 02:25:53.895 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/9
+22-05-2026 02:25:53.900 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 02:25:53.907 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/9
+22-05-2026 02:25:53.911 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779391553881
+22-05-2026 02:25:53.912 [http-nio-8080-exec-3] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:25:53.913 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779391553881
+22-05-2026 02:25:53.913 [http-nio-8080-exec-3] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:25:53.913 [http-nio-8080-exec-3] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779391553881
+22-05-2026 02:25:53.915 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779391553881
+22-05-2026 02:25:53.916 [http-nio-8080-exec-2] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:25:53.920 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779391553881
+22-05-2026 02:25:53.921 [http-nio-8080-exec-2] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:25:53.922 [http-nio-8080-exec-2] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779391553881
+22-05-2026 02:25:53.935 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/962/q4m3qpli/websocket
+22-05-2026 02:25:53.936 [http-nio-8080-exec-8] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:25:53.936 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/962/q4m3qpli/websocket
+22-05-2026 02:25:53.937 [http-nio-8080-exec-8] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:25:53.937 [http-nio-8080-exec-8] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/962/q4m3qpli/websocket
+22-05-2026 02:25:53.938 [http-nio-8080-exec-8] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=q4m3qpli]
+22-05-2026 02:25:53.963 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/343/wvvvzje0/websocket
+22-05-2026 02:25:53.964 [http-nio-8080-exec-4] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:25:53.964 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/343/wvvvzje0/websocket
+22-05-2026 02:25:53.965 [http-nio-8080-exec-4] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:25:53.965 [http-nio-8080-exec-4] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/343/wvvvzje0/websocket
+22-05-2026 02:25:53.967 [http-nio-8080-exec-4] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=wvvvzje0]
+22-05-2026 02:25:53.972 [clientInboundChannel-8] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing CONNECT session=wvvvzje0
+22-05-2026 02:25:53.976 [clientInboundChannel-11] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing SUBSCRIBE /topic/auction/9 id=sub-0 session=wvvvzje0
+22-05-2026 02:25:56.162 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auctions/9/bids
+22-05-2026 02:25:56.170 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auctions/9/bids
+22-05-2026 02:25:56.171 [http-nio-8080-exec-5] INFO  c.e.a.auction.web.BidController - User 20 placing bid on auction 9
+22-05-2026 02:25:56.172 [http-nio-8080-exec-5] INFO  c.e.a.auction.application.BidService - === СОЗДАНИЕ СТАВКИ ===
+22-05-2026 02:25:56.172 [http-nio-8080-exec-5] INFO  c.e.a.auction.application.BidService - Auction ID: 9, Bidder ID: 20, Amount: 31500000
+22-05-2026 02:25:56.173 [http-nio-8080-exec-5] DEBUG c.e.a.auction.application.BidService - Текущий статус аукциона: ACTIVE, текущая цена: 31200000.00, минимальный шаг: 300000.00, версия: 5
+22-05-2026 02:25:56.175 [http-nio-8080-exec-5] INFO  c.e.a.auction.application.BidService - Ставка 31500000 успешно принята, новая цена: 31500000, лидер: 20
+22-05-2026 02:25:56.176 [http-nio-8080-exec-5] DEBUG c.e.a.a.w.AuctionWebSocketController - Sending WebSocket update for auction 9: type=BID_PLACED, price=31500000
+22-05-2026 02:25:56.176 [http-nio-8080-exec-5] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing MESSAGE destination=/topic/auction/9 session=null payload={"auctionId":9,"vehicleId":7,"vehicleInfo":"porshe 911 turbo s 2023 (VIN: 674895...(truncated)
+22-05-2026 02:25:56.176 [http-nio-8080-exec-5] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Broadcasting to 2 sessions.
+22-05-2026 02:25:56.178 [http-nio-8080-exec-5] DEBUG c.e.a.auction.application.BidService - Аукцион сохранен, версия: 5
+22-05-2026 02:25:56.178 [http-nio-8080-exec-5] INFO  c.e.a.auction.application.BidService - Ставка успешно создана! Итоговый статус аукциона: ACTIVE, продление: false
+22-05-2026 02:26:03.390 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auctions/9/bids
+22-05-2026 02:26:03.398 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auctions/9/bids
+22-05-2026 02:26:03.399 [http-nio-8080-exec-9] INFO  c.e.a.auction.web.BidController - User 20 placing bid on auction 9
+22-05-2026 02:26:03.399 [http-nio-8080-exec-9] INFO  c.e.a.auction.application.BidService - === СОЗДАНИЕ СТАВКИ ===
+22-05-2026 02:26:03.399 [http-nio-8080-exec-9] INFO  c.e.a.auction.application.BidService - Auction ID: 9, Bidder ID: 20, Amount: 31800000
+22-05-2026 02:26:03.401 [http-nio-8080-exec-9] DEBUG c.e.a.auction.application.BidService - Текущий статус аукциона: ACTIVE, текущая цена: 31500000.00, минимальный шаг: 300000.00, версия: 6
+22-05-2026 02:26:03.403 [http-nio-8080-exec-9] INFO  c.e.a.auction.application.BidService - Ставка 31800000 успешно принята, новая цена: 31800000, лидер: 20
+22-05-2026 02:26:03.403 [http-nio-8080-exec-9] DEBUG c.e.a.a.w.AuctionWebSocketController - Sending WebSocket update for auction 9: type=BID_PLACED, price=31800000
+22-05-2026 02:26:03.404 [http-nio-8080-exec-9] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing MESSAGE destination=/topic/auction/9 session=null payload={"auctionId":9,"vehicleId":7,"vehicleInfo":"porshe 911 turbo s 2023 (VIN: 674895...(truncated)
+22-05-2026 02:26:03.404 [http-nio-8080-exec-9] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Broadcasting to 2 sessions.
+22-05-2026 02:26:03.405 [http-nio-8080-exec-9] DEBUG c.e.a.auction.application.BidService - Аукцион сохранен, версия: 6
+22-05-2026 02:26:03.405 [http-nio-8080-exec-9] INFO  c.e.a.auction.application.BidService - Ставка успешно создана! Итоговый статус аукциона: ACTIVE, продление: false
+22-05-2026 02:26:33.745 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:27:33.758 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
