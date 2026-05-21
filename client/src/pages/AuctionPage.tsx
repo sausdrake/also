@@ -60,9 +60,9 @@ export const AuctionPage = () => {
 
   const fetchAuction = async (token: string) => {
     try {
-      const response = await axios.get(`http://localhost:8080/api/admin/auctions/${id}`, {
+      const response = await axios.get(`http://localhost:8080/api/public/auctions/${id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
-      });
+    });
       setAuction(response.data);
       const minBid = response.data.currentPrice + response.data.minBidStep;
       setBidAmount(minBid.toString());

@@ -1207,3 +1207,828 @@ org.springframework.http.converter.HttpMessageNotReadableException: Required req
 22-05-2026 02:26:03.405 [http-nio-8080-exec-9] INFO  c.e.a.auction.application.BidService - Ставка успешно создана! Итоговый статус аукциона: ACTIVE, продление: false
 22-05-2026 02:26:33.745 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
 22-05-2026 02:27:33.758 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:28:33.763 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:29:33.773 [MessageBroker-4] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:30:33.782 [MessageBroker-2] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:31:33.048 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired CREATED auctions...
+22-05-2026 02:31:33.786 [MessageBroker-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:32:32.591 [MessageBroker-1] INFO  o.s.w.s.c.WebSocketMessageBrokerStats - WebSocketSession[4 current WS(4)-HttpStream(0)-HttpPoll(0), 4 total, 0 closed abnormally (0 connect failure, 0 send limit, 0 transport error)], stompSubProtocol[processed CONNECT(2)-CONNECTED(2)-DISCONNECT(0)], stompBrokerRelay[null], inboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 12], outboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 6], sockJsScheduler[pool size = 8, active threads = 1, queued tasks = 8, completed tasks = 211]
+22-05-2026 02:32:33.797 [MessageBroker-2] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:33:33.802 [MessageBroker-2] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:34:33.819 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:35:33.828 [MessageBroker-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:36:33.838 [MessageBroker-2] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:37:33.852 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:38:33.868 [MessageBroker-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:39:33.881 [MessageBroker-4] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:40:33.891 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:41:33.905 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:42:33.917 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:43:33.927 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:44:33.939 [MessageBroker-3] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:45:33.950 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:46:33.968 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:47:33.973 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:48:33.984 [MessageBroker-3] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:49:33.996 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:50:34.010 [MessageBroker-4] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:51:34.020 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:52:34.029 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:53:34.046 [MessageBroker-4] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:53:49.205 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auth/login
+22-05-2026 02:53:49.207 [http-nio-8080-exec-8] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:53:49.207 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auth/login
+22-05-2026 02:53:49.208 [http-nio-8080-exec-8] INFO  c.e.a.auth.web.AuthController - Login attempt for username: admin
+22-05-2026 02:53:49.209 [http-nio-8080-exec-8] INFO  c.e.a.auth.application.AuthService - Authenticating user: admin
+22-05-2026 02:53:49.328 [http-nio-8080-exec-8] DEBUG o.s.s.a.d.DaoAuthenticationProvider - Authenticated user
+22-05-2026 02:53:49.340 [http-nio-8080-exec-8] INFO  c.e.a.auth.application.AuthService - User logged in successfully: admin
+22-05-2026 02:53:49.343 [http-nio-8080-exec-8] INFO  c.e.a.auth.web.AuthController - Login successful for username: admin
+22-05-2026 02:53:49.570 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:53:49.582 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:53:49.590 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:53:49.598 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:54:02.566 [http-nio-8080-exec-5] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=vqdocaeg] closed with CloseStatus[code=1000, reason=null]
+22-05-2026 02:54:02.567 [http-nio-8080-exec-10] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=x0kpw0be] closed with CloseStatus[code=1000, reason=null]
+22-05-2026 02:54:02.567 [http-nio-8080-exec-5] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session vqdocaeg
+22-05-2026 02:54:02.567 [http-nio-8080-exec-10] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session x0kpw0be
+22-05-2026 02:54:02.571 [clientInboundChannel-15] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=vqdocaeg
+22-05-2026 02:54:02.571 [clientInboundChannel-16] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=x0kpw0be
+22-05-2026 02:54:02.573 [clientOutboundChannel-7] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - No session for GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT_ACK, simpDisconnectMessage=GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT, stompCommand=DISCONNECT, simpSessionAttributes={org.springframework.messaging.simp.SimpAttributes.COMPLETED=true}, simpSessionId=x0kpw0be}], simpSessionId=x0kpw0be}]
+22-05-2026 02:54:02.574 [clientOutboundChannel-8] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - No session for GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT_ACK, simpDisconnectMessage=GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT, stompCommand=DISCONNECT, simpSessionAttributes={org.springframework.messaging.simp.SimpAttributes.COMPLETED=true}, simpSessionId=vqdocaeg}], simpSessionId=vqdocaeg}]
+22-05-2026 02:54:02.713 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 02:54:02.723 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/9
+22-05-2026 02:54:02.729 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 02:54:02.740 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/9
+22-05-2026 02:54:02.741 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779393242718
+22-05-2026 02:54:02.742 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779393242719
+22-05-2026 02:54:02.745 [http-nio-8080-exec-6] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:54:02.745 [http-nio-8080-exec-7] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:54:02.745 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779393242718
+22-05-2026 02:54:02.745 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779393242719
+22-05-2026 02:54:02.746 [http-nio-8080-exec-6] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:54:02.747 [http-nio-8080-exec-7] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:54:02.747 [http-nio-8080-exec-6] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779393242718
+22-05-2026 02:54:02.747 [http-nio-8080-exec-7] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779393242719
+22-05-2026 02:54:02.767 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/723/ofdgwlbe/websocket
+22-05-2026 02:54:02.768 [http-nio-8080-exec-2] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:54:02.768 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/723/ofdgwlbe/websocket
+22-05-2026 02:54:02.769 [http-nio-8080-exec-2] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:54:02.769 [http-nio-8080-exec-2] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/723/ofdgwlbe/websocket
+22-05-2026 02:54:02.771 [http-nio-8080-exec-2] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=ofdgwlbe]
+22-05-2026 02:54:02.797 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/965/fwngrml1/websocket
+22-05-2026 02:54:02.797 [http-nio-8080-exec-8] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:54:02.797 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/965/fwngrml1/websocket
+22-05-2026 02:54:02.798 [http-nio-8080-exec-8] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:54:02.798 [http-nio-8080-exec-8] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/965/fwngrml1/websocket
+22-05-2026 02:54:02.799 [http-nio-8080-exec-8] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=fwngrml1]
+22-05-2026 02:54:02.802 [clientInboundChannel-20] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing CONNECT session=fwngrml1
+22-05-2026 02:54:02.804 [http-nio-8080-exec-4] INFO  o.s.w.s.m.SubProtocolWebSocketHandler - No messages received after 1688864 ms. Closing WebSocketServerSockJsSession[id=q4m3qpli].
+22-05-2026 02:54:02.805 [http-nio-8080-exec-4] DEBUG o.s.w.s.s.t.s.WebSocketServerSockJsSession - Closing SockJS session q4m3qpli with CloseStatus[code=4500, reason=Failed to send message within the configured send limit]
+22-05-2026 02:54:02.805 [http-nio-8080-exec-4] DEBUG o.s.w.s.a.NativeWebSocketSession - Closing StandardWebSocketSession[id=0454ebe7-2432-8164-3ec7-ca3d58b394e9, uri=ws://localhost:8080/ws-auction/962/q4m3qpli/websocket]
+22-05-2026 02:54:02.806 [http-nio-8080-exec-4] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=q4m3qpli] closed with CloseStatus[code=4500, reason=Failed to send message within the configured send limit]
+22-05-2026 02:54:02.806 [http-nio-8080-exec-4] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session q4m3qpli
+22-05-2026 02:54:02.807 [clientInboundChannel-23] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=q4m3qpli
+22-05-2026 02:54:02.808 [clientOutboundChannel-10] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - No session for GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT_ACK, simpDisconnectMessage=GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT, stompCommand=DISCONNECT, simpSessionAttributes={org.springframework.messaging.simp.SimpAttributes.COMPLETED=true}, simpSessionId=q4m3qpli}], simpSessionId=q4m3qpli}]
+22-05-2026 02:54:02.808 [clientInboundChannel-26] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing SUBSCRIBE /topic/auction/9 id=sub-0 session=fwngrml1
+22-05-2026 02:54:03.568 [http-nio-8080-exec-10] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=wvvvzje0] closed with CloseStatus[code=1000, reason=null]
+22-05-2026 02:54:03.568 [http-nio-8080-exec-10] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session wvvvzje0
+22-05-2026 02:54:03.569 [clientInboundChannel-17] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=wvvvzje0
+22-05-2026 02:54:03.570 [clientOutboundChannel-11] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - No session for GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT_ACK, simpDisconnectMessage=GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT, stompCommand=DISCONNECT, simpSessionAttributes={org.springframework.messaging.simp.SimpAttributes.COMPLETED=true}, simpSessionId=wvvvzje0}], simpSessionId=wvvvzje0}]
+22-05-2026 02:54:03.693 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 02:54:03.703 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/9
+22-05-2026 02:54:03.708 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 02:54:03.716 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779393243697
+22-05-2026 02:54:03.717 [http-nio-8080-exec-3] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:54:03.717 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779393243697
+22-05-2026 02:54:03.718 [http-nio-8080-exec-3] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:54:03.718 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/9
+22-05-2026 02:54:03.718 [http-nio-8080-exec-3] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779393243697
+22-05-2026 02:54:03.724 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779393243697
+22-05-2026 02:54:03.725 [http-nio-8080-exec-7] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:54:03.725 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779393243697
+22-05-2026 02:54:03.726 [http-nio-8080-exec-7] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:54:03.726 [http-nio-8080-exec-7] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779393243697
+22-05-2026 02:54:03.741 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/403/ozranduv/websocket
+22-05-2026 02:54:03.742 [http-nio-8080-exec-6] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:54:03.742 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/403/ozranduv/websocket
+22-05-2026 02:54:03.743 [http-nio-8080-exec-6] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:54:03.744 [http-nio-8080-exec-6] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/403/ozranduv/websocket
+22-05-2026 02:54:03.746 [http-nio-8080-exec-6] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=ozranduv]
+22-05-2026 02:54:03.781 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/731/xi5rtmbm/websocket
+22-05-2026 02:54:03.782 [http-nio-8080-exec-2] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:54:03.782 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/731/xi5rtmbm/websocket
+22-05-2026 02:54:03.782 [http-nio-8080-exec-2] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:54:03.782 [http-nio-8080-exec-2] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/731/xi5rtmbm/websocket
+22-05-2026 02:54:03.783 [http-nio-8080-exec-2] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=xi5rtmbm]
+22-05-2026 02:54:03.786 [clientInboundChannel-14] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing CONNECT session=xi5rtmbm
+22-05-2026 02:54:03.788 [clientInboundChannel-19] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing SUBSCRIBE /topic/auction/9 id=sub-0 session=xi5rtmbm
+22-05-2026 02:54:11.782 [MessageBroker-5] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Closed 4 sessions: [wvvvzje0, x0kpw0be, q4m3qpli, vqdocaeg]
+22-05-2026 02:54:34.060 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:55:34.065 [MessageBroker-4] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:55:43.053 [http-nio-8080-exec-7] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=fwngrml1] closed with CloseStatus[code=1000, reason=null]
+22-05-2026 02:55:43.053 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session fwngrml1
+22-05-2026 02:55:43.053 [http-nio-8080-exec-9] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=ofdgwlbe] closed with CloseStatus[code=1000, reason=null]
+22-05-2026 02:55:43.058 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session ofdgwlbe
+22-05-2026 02:55:43.059 [clientInboundChannel-30] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=fwngrml1
+22-05-2026 02:55:43.060 [clientInboundChannel-33] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=ofdgwlbe
+22-05-2026 02:55:43.060 [clientOutboundChannel-13] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - No session for GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT_ACK, simpDisconnectMessage=GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT, stompCommand=DISCONNECT, simpSessionAttributes={org.springframework.messaging.simp.SimpAttributes.COMPLETED=true}, simpSessionId=fwngrml1}], simpSessionId=fwngrml1}]
+22-05-2026 02:55:43.065 [clientOutboundChannel-14] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - No session for GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT_ACK, simpDisconnectMessage=GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT, stompCommand=DISCONNECT, simpSessionAttributes={org.springframework.messaging.simp.SimpAttributes.COMPLETED=true}, simpSessionId=ofdgwlbe}], simpSessionId=ofdgwlbe}]
+22-05-2026 02:55:43.076 [http-nio-8080-exec-6] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=ozranduv] closed with CloseStatus[code=1000, reason=null]
+22-05-2026 02:55:43.077 [http-nio-8080-exec-6] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session ozranduv
+22-05-2026 02:55:43.076 [http-nio-8080-exec-2] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=xi5rtmbm] closed with CloseStatus[code=1000, reason=null]
+22-05-2026 02:55:43.080 [http-nio-8080-exec-2] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session xi5rtmbm
+22-05-2026 02:55:43.081 [clientInboundChannel-36] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=ozranduv
+22-05-2026 02:55:43.084 [clientInboundChannel-39] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=xi5rtmbm
+22-05-2026 02:55:43.084 [clientOutboundChannel-15] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - No session for GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT_ACK, simpDisconnectMessage=GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT, stompCommand=DISCONNECT, simpSessionAttributes={org.springframework.messaging.simp.SimpAttributes.COMPLETED=true}, simpSessionId=ozranduv}], simpSessionId=ozranduv}]
+22-05-2026 02:55:43.085 [clientOutboundChannel-16] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - No session for GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT_ACK, simpDisconnectMessage=GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT, stompCommand=DISCONNECT, simpSessionAttributes={org.springframework.messaging.simp.SimpAttributes.COMPLETED=true}, simpSessionId=xi5rtmbm}], simpSessionId=xi5rtmbm}]
+22-05-2026 02:55:43.785 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 02:55:43.813 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/9
+22-05-2026 02:55:43.822 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 02:55:43.833 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/9
+22-05-2026 02:55:43.869 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779393343817
+22-05-2026 02:55:43.885 [http-nio-8080-exec-3] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:55:43.888 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779393343817
+22-05-2026 02:55:43.890 [http-nio-8080-exec-3] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:55:43.894 [http-nio-8080-exec-3] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779393343817
+22-05-2026 02:55:43.896 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 02:55:43.898 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779393343881
+22-05-2026 02:55:43.899 [http-nio-8080-exec-3] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:55:43.900 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779393343881
+22-05-2026 02:55:43.901 [http-nio-8080-exec-3] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:55:43.902 [http-nio-8080-exec-3] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779393343881
+22-05-2026 02:55:43.903 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779393343817
+22-05-2026 02:55:43.906 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779393343882
+22-05-2026 02:55:43.907 [http-nio-8080-exec-3] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:55:43.909 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779393343817
+22-05-2026 02:55:43.907 [http-nio-8080-exec-7] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:55:43.910 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779393343882
+22-05-2026 02:55:43.911 [http-nio-8080-exec-3] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:55:43.911 [http-nio-8080-exec-3] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779393343817
+22-05-2026 02:55:43.911 [http-nio-8080-exec-7] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:55:43.912 [http-nio-8080-exec-7] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779393343882
+22-05-2026 02:55:43.914 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/9
+22-05-2026 02:55:43.920 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/421/hw34gwnu/websocket
+22-05-2026 02:55:43.921 [http-nio-8080-exec-9] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:55:43.923 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/421/hw34gwnu/websocket
+22-05-2026 02:55:43.924 [http-nio-8080-exec-9] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:55:43.924 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 02:55:43.924 [http-nio-8080-exec-9] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/421/hw34gwnu/websocket
+22-05-2026 02:55:43.926 [http-nio-8080-exec-9] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=hw34gwnu]
+22-05-2026 02:55:43.933 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/admin/auctions/9
+22-05-2026 02:55:43.943 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/065/we2nc5h1/websocket
+22-05-2026 02:55:43.944 [http-nio-8080-exec-2] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:55:43.944 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/065/we2nc5h1/websocket
+22-05-2026 02:55:43.945 [http-nio-8080-exec-2] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:55:43.945 [http-nio-8080-exec-2] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/065/we2nc5h1/websocket
+22-05-2026 02:55:43.947 [http-nio-8080-exec-2] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=we2nc5h1]
+22-05-2026 02:55:43.969 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/508/hpoh43ju/websocket
+22-05-2026 02:55:43.970 [http-nio-8080-exec-8] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:55:43.970 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/508/hpoh43ju/websocket
+22-05-2026 02:55:43.971 [http-nio-8080-exec-8] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:55:43.971 [http-nio-8080-exec-8] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/508/hpoh43ju/websocket
+22-05-2026 02:55:43.972 [http-nio-8080-exec-8] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=hpoh43ju]
+22-05-2026 02:55:43.978 [clientInboundChannel-42] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing CONNECT session=hpoh43ju
+22-05-2026 02:55:43.981 [clientInboundChannel-29] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing SUBSCRIBE /topic/auction/9 id=sub-0 session=hpoh43ju
+22-05-2026 02:55:43.987 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/248/mztbrh5z/websocket
+22-05-2026 02:55:43.988 [http-nio-8080-exec-10] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:55:43.988 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/248/mztbrh5z/websocket
+22-05-2026 02:55:43.988 [http-nio-8080-exec-10] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@46700301
+22-05-2026 02:55:43.989 [http-nio-8080-exec-10] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/248/mztbrh5z/websocket
+22-05-2026 02:55:43.990 [http-nio-8080-exec-10] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=mztbrh5z]
+22-05-2026 02:55:43.994 [clientInboundChannel-30] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing CONNECT session=mztbrh5z
+22-05-2026 02:55:43.997 [clientInboundChannel-35] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing SUBSCRIBE /topic/auction/9 id=sub-0 session=mztbrh5z
+22-05-2026 02:55:46.017 [http-nio-8080-exec-5] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=hw34gwnu] closed with CloseStatus[code=1000, reason=null]
+22-05-2026 02:55:46.017 [http-nio-8080-exec-9] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=hpoh43ju] closed with CloseStatus[code=1000, reason=null]
+22-05-2026 02:55:46.018 [http-nio-8080-exec-5] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session hw34gwnu
+22-05-2026 02:55:46.018 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session hpoh43ju
+22-05-2026 02:55:46.019 [clientInboundChannel-37] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=hw34gwnu
+22-05-2026 02:55:46.021 [clientInboundChannel-39] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=hpoh43ju
+22-05-2026 02:55:46.023 [clientOutboundChannel-19] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - No session for GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT_ACK, simpDisconnectMessage=GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT, stompCommand=DISCONNECT, simpSessionAttributes={org.springframework.messaging.simp.SimpAttributes.COMPLETED=true}, simpSessionId=hw34gwnu}], simpSessionId=hw34gwnu}]
+22-05-2026 02:55:46.023 [clientOutboundChannel-20] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - No session for GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT_ACK, simpDisconnectMessage=GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT, stompCommand=DISCONNECT, simpSessionAttributes={org.springframework.messaging.simp.SimpAttributes.COMPLETED=true}, simpSessionId=hpoh43ju}], simpSessionId=hpoh43ju}]
+22-05-2026 02:55:51.788 [MessageBroker-1] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Closed 6 sessions: [hw34gwnu, ofdgwlbe, fwngrml1, xi5rtmbm, hpoh43ju, ozranduv]
+22-05-2026 02:56:21.378 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing OPTIONS /api/auth/register
+22-05-2026 02:56:21.381 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auth/register
+22-05-2026 02:56:21.382 [http-nio-8080-exec-2] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:56:21.382 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auth/register
+22-05-2026 02:56:21.405 [http-nio-8080-exec-2] INFO  c.e.a.auth.web.AuthController - Registration request for username: Аликович
+22-05-2026 02:56:21.406 [http-nio-8080-exec-2] INFO  c.e.a.auth.application.AuthService - Registering new user: Аликович
+22-05-2026 02:56:21.528 [http-nio-8080-exec-2] INFO  c.e.a.auth.application.AuthService - User created successfully with ID: 21
+22-05-2026 02:56:21.529 [http-nio-8080-exec-2] INFO  c.e.a.d.application.DepositService - Creating deposit for user: 21 with amount: 0
+22-05-2026 02:56:21.537 [http-nio-8080-exec-2] INFO  c.e.a.d.application.DepositService - Deposit created successfully for user: 21, balance: 0
+22-05-2026 02:56:21.537 [http-nio-8080-exec-2] INFO  c.e.a.auth.application.AuthService - Deposit automatically created for user: 21
+22-05-2026 02:56:21.551 [http-nio-8080-exec-2] INFO  c.e.a.auth.web.AuthController - User registered successfully: Аликович
+22-05-2026 02:56:34.082 [MessageBroker-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:56:35.860 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auth/login
+22-05-2026 02:56:35.861 [http-nio-8080-exec-8] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 02:56:35.861 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auth/login
+22-05-2026 02:56:35.862 [http-nio-8080-exec-8] INFO  c.e.a.auth.web.AuthController - Login attempt for username: Аликович
+22-05-2026 02:56:35.863 [http-nio-8080-exec-8] INFO  c.e.a.auth.application.AuthService - Authenticating user: Аликович
+22-05-2026 02:56:35.974 [http-nio-8080-exec-8] DEBUG o.s.s.a.d.DaoAuthenticationProvider - Authenticated user
+22-05-2026 02:56:35.983 [http-nio-8080-exec-8] INFO  c.e.a.auth.application.AuthService - User logged in successfully: Аликович
+22-05-2026 02:56:35.985 [http-nio-8080-exec-8] INFO  c.e.a.auth.web.AuthController - Login successful for username: Аликович
+22-05-2026 02:56:36.187 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:56:36.197 [http-nio-8080-exec-1] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 02:56:36.243 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:56:36.252 [http-nio-8080-exec-4] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 02:56:42.131 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:56:42.144 [http-nio-8080-exec-10] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 02:56:42.146 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 02:56:42.155 [http-nio-8080-exec-3] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 02:57:34.100 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:58:34.117 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 02:59:34.126 [MessageBroker-3] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 03:00:00.009 [MessageBroker-2] INFO  c.e.a.a.i.s.TokenCleanupScheduler - Starting cleanup of expired refresh tokens
+22-05-2026 03:00:00.024 [MessageBroker-2] INFO  c.e.a.a.i.s.TokenCleanupScheduler - Expired refresh tokens cleaned up successfully
+22-05-2026 03:00:34.134 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 03:01:34.156 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 03:02:32.605 [MessageBroker-3] INFO  o.s.w.s.c.WebSocketMessageBrokerStats - WebSocketSession[2 current WS(2)-HttpStream(0)-HttpPoll(0), 12 total, 1 closed abnormally (1 connect failure, 0 send limit, 0 transport error)], stompSubProtocol[processed CONNECT(6)-CONNECTED(6)-DISCONNECT(0)], stompBrokerRelay[null], inboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 66], outboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 20], sockJsScheduler[pool size = 8, active threads = 1, queued tasks = 6, completed tasks = 857]
+22-05-2026 03:02:34.200 [MessageBroker-5] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 03:03:34.362 [MessageBroker-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 03:04:23.637 [SpringApplicationShutdownHook] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientOutboundChannel removed SubProtocolWebSocketHandler[StompSubProtocolHandler[v10.stomp, v11.stomp, v12.stomp]]
+22-05-2026 03:04:23.638 [SpringApplicationShutdownHook] DEBUG o.s.w.s.s.t.s.WebSocketServerSockJsSession - Closing SockJS session mztbrh5z with CloseStatus[code=1001, reason=null]
+22-05-2026 03:04:23.638 [SpringApplicationShutdownHook] DEBUG o.s.w.s.a.NativeWebSocketSession - Closing StandardWebSocketSession[id=74864104-b979-0822-4f9b-d14b476a7213, uri=ws://localhost:8080/ws-auction/248/mztbrh5z/websocket]
+22-05-2026 03:04:23.639 [SpringApplicationShutdownHook] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=mztbrh5z] closed with CloseStatus[code=1001, reason=null]
+22-05-2026 03:04:23.639 [SpringApplicationShutdownHook] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session mztbrh5z
+22-05-2026 03:04:23.639 [SpringApplicationShutdownHook] DEBUG o.s.w.s.s.t.s.WebSocketServerSockJsSession - Closing SockJS session we2nc5h1 with CloseStatus[code=1001, reason=null]
+22-05-2026 03:04:23.640 [clientInboundChannel-46] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=mztbrh5z
+22-05-2026 03:04:23.640 [SpringApplicationShutdownHook] DEBUG o.s.w.s.a.NativeWebSocketSession - Closing StandardWebSocketSession[id=8b65250d-9693-1db4-392e-4d41918c6d13, uri=ws://localhost:8080/ws-auction/065/we2nc5h1/websocket]
+22-05-2026 03:04:23.640 [SpringApplicationShutdownHook] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=we2nc5h1] closed with CloseStatus[code=1001, reason=null]
+22-05-2026 03:04:23.640 [SpringApplicationShutdownHook] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session we2nc5h1
+22-05-2026 03:04:23.641 [SpringApplicationShutdownHook] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientInboundChannel removed WebSocketAnnotationMethodMessageHandler[prefixes=[/app/]]
+22-05-2026 03:04:23.641 [clientInboundChannel-49] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=we2nc5h1
+22-05-2026 03:04:23.641 [SpringApplicationShutdownHook] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - Stopping...
+22-05-2026 03:04:23.641 [SpringApplicationShutdownHook] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - BrokerAvailabilityEvent[available=false, SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@6682e9b0]]
+22-05-2026 03:04:23.641 [SpringApplicationShutdownHook] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientInboundChannel removed SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@6682e9b0]
+22-05-2026 03:04:23.642 [SpringApplicationShutdownHook] DEBUG o.s.m.s.ExecutorSubscribableChannel - brokerChannel removed SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@6682e9b0]
+22-05-2026 03:04:23.642 [SpringApplicationShutdownHook] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - Stopped.
+22-05-2026 03:04:23.642 [SpringApplicationShutdownHook] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientInboundChannel removed UserDestinationMessageHandler[DefaultUserDestinationResolver[prefix=/user/]]
+22-05-2026 03:04:23.642 [SpringApplicationShutdownHook] DEBUG o.s.m.s.ExecutorSubscribableChannel - brokerChannel removed UserDestinationMessageHandler[DefaultUserDestinationResolver[prefix=/user/]]
+22-05-2026 03:04:23.720 [SpringApplicationShutdownHook] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Closing JPA EntityManagerFactory for persistence unit 'default'
+22-05-2026 03:04:23.726 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+22-05-2026 03:04:23.739 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
+22-05-2026 03:22:55.242 [main] INFO  c.e.a.AutoauctionApplication - Starting AutoauctionApplication using Java 17.0.18 with PID 38188 (D:\AutoAuction\target\classes started by Asus in D:\AutoAuction)
+22-05-2026 03:22:55.244 [main] INFO  c.e.a.AutoauctionApplication - No active profile set, falling back to 1 default profile: "default"
+22-05-2026 03:22:56.264 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+22-05-2026 03:22:56.386 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 110 ms. Found 10 JPA repository interfaces.
+22-05-2026 03:22:57.014 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port(s): 8080 (http)
+22-05-2026 03:22:57.026 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+22-05-2026 03:22:57.026 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.15]
+22-05-2026 03:22:57.136 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+22-05-2026 03:22:57.137 [main] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 1835 ms
+22-05-2026 03:22:57.592 [main] INFO  o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+22-05-2026 03:22:57.621 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+22-05-2026 03:22:57.920 [main] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@3c488b34
+22-05-2026 03:22:57.922 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+22-05-2026 03:22:57.965 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+22-05-2026 03:22:59.226 [main] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'default'
+22-05-2026 03:22:59.652 [main] INFO  o.s.d.j.r.query.QueryEnhancerFactory - Hibernate is in classpath; If applicable, HQL parser will be used.
+22-05-2026 03:23:00.021 [main] INFO  c.e.a.a.i.p.JpaAuctionRepositoryAdapter - JpaAuctionRepositoryAdapter initialized with Clock and ExtensionProperties
+22-05-2026 03:23:00.082 [main] INFO  c.e.a.v.application.VehicleService - VehicleService инициализирован
+22-05-2026 03:23:00.190 [main] INFO  c.e.a.d.i.p.JpaDepositRepositoryAdapter - JpaDepositRepositoryAdapter initialized
+22-05-2026 03:23:00.233 [main] INFO  c.e.a.d.application.DepositService - DepositService initialized
+22-05-2026 03:23:00.320 [main] INFO  c.e.a.a.a.AdminAuctionService - AdminAuctionService инициализирован
+22-05-2026 03:23:00.335 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - === Auction Extension Configuration ===
+22-05-2026 03:23:00.336 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - Enabled: true
+22-05-2026 03:23:00.336 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - Threshold seconds: 30
+22-05-2026 03:23:00.336 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - Extension minutes: 5
+22-05-2026 03:23:00.336 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - Max extensions: unlimited
+22-05-2026 03:23:00.336 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - =======================================
+22-05-2026 03:23:00.343 [main] INFO  c.e.a.auction.application.BidService - BidService initialized with WebSocket support
+22-05-2026 03:23:00.350 [main] INFO  c.e.a.a.i.s.AuctionCompletionScheduler - AuctionCompletionScheduler initialized
+22-05-2026 03:23:00.477 [main] INFO  c.e.a.deposit.web.DepositController - DepositController initialized
+22-05-2026 03:23:00.478 [main] INFO  c.e.a.user.application.UserService - UserService initialized. Ready to process business logic.
+22-05-2026 03:23:00.483 [main] INFO  c.e.a.user.web.UserController - UserController initialized and ready.
+22-05-2026 03:23:00.582 [main] WARN  o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+22-05-2026 03:23:00.705 [main] INFO  o.s.s.web.DefaultSecurityFilterChain - Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@19f007c4, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@73790bb5, org.springframework.security.web.context.SecurityContextHolderFilter@6afd0ef8, org.springframework.security.web.header.HeaderWriterFilter@6cf71064, org.springframework.web.filter.CorsFilter@3d3709d0, org.springframework.security.web.authentication.logout.LogoutFilter@124b1369, com.example.autoauction.auth.infrastructure.security.JwtAuthenticationFilter@4e9d203e, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@1a8042a5, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@444958a4, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@4ed761dc, org.springframework.security.web.session.SessionManagementFilter@4a52178, org.springframework.security.web.access.ExceptionTranslationFilter@4c24063c, org.springframework.security.web.access.intercept.AuthorizationFilter@5d46f4a3]
+22-05-2026 03:23:00.780 [main] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Patterns [/ws-auction/**, /ws] in 'stompWebSocketHandlerMapping'
+22-05-2026 03:23:00.840 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.AdminAuctionController:
+	
+22-05-2026 03:23:00.841 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.AdminVehicleController:
+	
+22-05-2026 03:23:00.842 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.AuctionWebSocketController:
+	
+22-05-2026 03:23:00.842 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.BidController:
+	
+22-05-2026 03:23:00.843 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.PublicAuctionController:
+	
+22-05-2026 03:23:00.843 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.AuthController:
+	
+22-05-2026 03:23:00.843 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.c.HealthController:
+	
+22-05-2026 03:23:00.844 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.d.w.DepositController:
+	
+22-05-2026 03:23:00.844 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.u.w.UserController:
+	
+22-05-2026 03:23:00.844 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.v.w.DiagnosticVehicleController:
+	
+22-05-2026 03:23:00.847 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	o.s.b.a.w.s.e.BasicErrorController:
+	
+22-05-2026 03:23:00.854 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	o.s.w.a.OpenApiWebMvcResource:
+	
+22-05-2026 03:23:00.855 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	o.s.w.u.SwaggerWelcomeWebMvc:
+	
+22-05-2026 03:23:00.857 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	o.s.w.u.SwaggerConfigResource:
+	
+22-05-2026 03:23:01.205 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port(s): 8080 (http) with context path ''
+22-05-2026 03:23:01.207 [main] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientOutboundChannel added SubProtocolWebSocketHandler[StompSubProtocolHandler[v10.stomp, v11.stomp, v12.stomp]]
+22-05-2026 03:23:01.207 [main] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientInboundChannel added WebSocketAnnotationMethodMessageHandler[prefixes=[/app/]]
+22-05-2026 03:23:01.208 [main] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - Starting...
+22-05-2026 03:23:01.209 [main] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientInboundChannel added SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@4e64e44c]
+22-05-2026 03:23:01.209 [main] DEBUG o.s.m.s.ExecutorSubscribableChannel - brokerChannel added SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@4e64e44c]
+22-05-2026 03:23:01.211 [main] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - BrokerAvailabilityEvent[available=true, SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@4e64e44c]]
+22-05-2026 03:23:01.211 [main] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - Started.
+22-05-2026 03:23:01.211 [main] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientInboundChannel added UserDestinationMessageHandler[DefaultUserDestinationResolver[prefix=/user/]]
+22-05-2026 03:23:01.212 [main] DEBUG o.s.m.s.ExecutorSubscribableChannel - brokerChannel added UserDestinationMessageHandler[DefaultUserDestinationResolver[prefix=/user/]]
+22-05-2026 03:23:01.226 [main] INFO  c.e.a.AutoauctionApplication - Started AutoauctionApplication in 6.407 seconds (process running for 6.735)
+22-05-2026 03:23:01.233 [MessageBroker-2] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 03:23:01.233 [MessageBroker-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired CREATED auctions...
+22-05-2026 03:23:09.086 [http-nio-8080-exec-2] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+22-05-2026 03:23:09.097 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779394989048
+22-05-2026 03:23:09.097 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779394989049
+22-05-2026 03:23:09.097 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing OPTIONS /api/admin/auctions/9
+22-05-2026 03:23:09.097 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing OPTIONS /api/admin/auctions/9
+22-05-2026 03:23:09.127 [http-nio-8080-exec-6] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:23:09.127 [http-nio-8080-exec-2] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:23:09.130 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779394989048
+22-05-2026 03:23:09.130 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779394989049
+22-05-2026 03:23:09.131 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 03:23:09.140 [http-nio-8080-exec-6] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:23:09.140 [http-nio-8080-exec-2] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:23:09.149 [http-nio-8080-exec-2] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779394989049
+22-05-2026 03:23:09.149 [http-nio-8080-exec-6] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779394989048
+22-05-2026 03:23:09.247 [http-nio-8080-exec-3] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 03:23:09.257 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/845/tsyoewg3/websocket
+22-05-2026 03:23:09.258 [http-nio-8080-exec-5] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:23:09.258 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/845/tsyoewg3/websocket
+22-05-2026 03:23:09.259 [http-nio-8080-exec-5] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:23:09.261 [http-nio-8080-exec-5] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/845/tsyoewg3/websocket
+22-05-2026 03:23:09.266 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 03:23:09.285 [http-nio-8080-exec-7] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 03:23:09.317 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/699/uafvvgpz/websocket
+22-05-2026 03:23:09.319 [http-nio-8080-exec-9] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:23:09.320 [http-nio-8080-exec-5] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=tsyoewg3]
+22-05-2026 03:23:09.320 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/699/uafvvgpz/websocket
+22-05-2026 03:23:09.320 [http-nio-8080-exec-9] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:23:09.321 [http-nio-8080-exec-9] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/699/uafvvgpz/websocket
+22-05-2026 03:23:09.323 [http-nio-8080-exec-9] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=uafvvgpz]
+22-05-2026 03:23:09.342 [clientInboundChannel-2] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing CONNECT session=tsyoewg3
+22-05-2026 03:23:09.349 [clientInboundChannel-5] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing SUBSCRIBE /topic/auction/9 id=sub-0 session=tsyoewg3
+22-05-2026 03:23:11.048 [http-nio-8080-exec-1] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=uafvvgpz] closed with CloseStatus[code=1000, reason=null]
+22-05-2026 03:23:11.048 [http-nio-8080-exec-10] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=tsyoewg3] closed with CloseStatus[code=1000, reason=null]
+22-05-2026 03:23:11.049 [http-nio-8080-exec-10] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session tsyoewg3
+22-05-2026 03:23:11.049 [http-nio-8080-exec-1] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session uafvvgpz
+22-05-2026 03:23:11.052 [clientInboundChannel-10] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=uafvvgpz
+22-05-2026 03:23:11.052 [clientInboundChannel-9] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=tsyoewg3
+22-05-2026 03:23:11.053 [clientOutboundChannel-2] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - No session for GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT_ACK, simpDisconnectMessage=GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT, stompCommand=DISCONNECT, simpSessionAttributes={org.springframework.messaging.simp.SimpAttributes.COMPLETED=true}, simpSessionId=uafvvgpz}], simpSessionId=uafvvgpz}]
+22-05-2026 03:23:11.053 [clientOutboundChannel-3] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - No session for GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT_ACK, simpDisconnectMessage=GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT, stompCommand=DISCONNECT, simpSessionAttributes={org.springframework.messaging.simp.SimpAttributes.COMPLETED=true}, simpSessionId=tsyoewg3}], simpSessionId=tsyoewg3}]
+22-05-2026 03:23:11.199 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 03:23:11.235 [http-nio-8080-exec-4] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 03:23:11.245 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions/9
+22-05-2026 03:23:11.254 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779394991226
+22-05-2026 03:23:11.260 [http-nio-8080-exec-6] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:23:11.263 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779394991227
+22-05-2026 03:23:11.266 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779394991226
+22-05-2026 03:23:11.267 [http-nio-8080-exec-3] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:23:11.268 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779394991227
+22-05-2026 03:23:11.268 [http-nio-8080-exec-6] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:23:11.269 [http-nio-8080-exec-3] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:23:11.269 [http-nio-8080-exec-6] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779394991226
+22-05-2026 03:23:11.269 [http-nio-8080-exec-3] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779394991227
+22-05-2026 03:23:11.271 [http-nio-8080-exec-2] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 03:23:11.281 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/191/1xfoyjpi/websocket
+22-05-2026 03:23:11.283 [http-nio-8080-exec-7] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:23:11.284 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/191/1xfoyjpi/websocket
+22-05-2026 03:23:11.286 [http-nio-8080-exec-7] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:23:11.287 [http-nio-8080-exec-7] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/191/1xfoyjpi/websocket
+22-05-2026 03:23:11.289 [http-nio-8080-exec-7] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=1xfoyjpi]
+22-05-2026 03:23:11.305 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/963/czrtvxf2/websocket
+22-05-2026 03:23:11.306 [http-nio-8080-exec-9] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:23:11.306 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/963/czrtvxf2/websocket
+22-05-2026 03:23:11.306 [http-nio-8080-exec-9] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:23:11.307 [http-nio-8080-exec-9] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/963/czrtvxf2/websocket
+22-05-2026 03:23:11.308 [http-nio-8080-exec-9] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=czrtvxf2]
+22-05-2026 03:23:11.312 [clientInboundChannel-14] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing CONNECT session=czrtvxf2
+22-05-2026 03:23:11.315 [clientInboundChannel-1] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing SUBSCRIBE /topic/auction/9 id=sub-0 session=czrtvxf2
+22-05-2026 03:23:12.506 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing OPTIONS /api/admin/auctions?page=0&size=20
+22-05-2026 03:23:12.507 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing OPTIONS /api/admin/auctions?page=0&size=20
+22-05-2026 03:23:12.518 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 03:23:12.532 [http-nio-8080-exec-4] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 03:23:12.534 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 03:23:12.548 [http-nio-8080-exec-6] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 03:23:13.602 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 03:23:13.615 [http-nio-8080-exec-3] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 03:23:13.618 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 03:23:13.637 [http-nio-8080-exec-2] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 03:23:19.267 [MessageBroker-4] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Closed 2 sessions: [tsyoewg3, uafvvgpz]
+22-05-2026 03:23:33.372 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing OPTIONS /api/auth/login
+22-05-2026 03:23:33.377 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auth/login
+22-05-2026 03:23:33.378 [http-nio-8080-exec-9] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:23:33.379 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auth/login
+22-05-2026 03:23:33.474 [http-nio-8080-exec-9] INFO  c.e.a.auth.web.AuthController - Login attempt for username: Аликович
+22-05-2026 03:23:33.475 [http-nio-8080-exec-9] INFO  c.e.a.auth.application.AuthService - Authenticating user: Аликович
+22-05-2026 03:23:33.698 [http-nio-8080-exec-9] DEBUG o.s.s.a.d.DaoAuthenticationProvider - Authenticated user
+22-05-2026 03:23:33.751 [http-nio-8080-exec-9] INFO  c.e.a.auth.application.AuthService - User logged in successfully: Аликович
+22-05-2026 03:23:33.754 [http-nio-8080-exec-9] INFO  c.e.a.auth.web.AuthController - Login successful for username: Аликович
+22-05-2026 03:23:33.986 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 03:23:33.996 [http-nio-8080-exec-5] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 03:23:34.001 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 03:23:34.018 [http-nio-8080-exec-8] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 03:23:36.455 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 03:23:36.472 [http-nio-8080-exec-10] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 03:23:36.476 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 03:23:36.496 [http-nio-8080-exec-1] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 03:23:36.991 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 03:23:37.007 [http-nio-8080-exec-4] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 03:23:37.011 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 03:23:37.026 [http-nio-8080-exec-6] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 03:23:37.194 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 03:23:37.212 [http-nio-8080-exec-3] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 03:23:37.216 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 03:23:37.231 [http-nio-8080-exec-2] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 03:23:37.380 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 03:23:37.395 [http-nio-8080-exec-7] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 03:23:37.398 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 03:23:37.413 [http-nio-8080-exec-9] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 03:23:37.702 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 03:23:37.713 [http-nio-8080-exec-5] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 03:23:37.716 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/admin/auctions?page=0&size=20
+22-05-2026 03:23:37.732 [http-nio-8080-exec-8] WARN  c.e.a.a.i.s.JwtAccessDeniedHandler - Access denied: Access Denied
+22-05-2026 03:23:58.177 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing OPTIONS /api/public/auctions?page=0&size=20
+22-05-2026 03:23:58.177 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing OPTIONS /api/public/auctions?page=0&size=20
+22-05-2026 03:23:58.183 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions?page=0&size=20
+22-05-2026 03:23:58.194 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions?page=0&size=20
+22-05-2026 03:23:58.250 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions?page=0&size=20
+22-05-2026 03:23:58.267 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions?page=0&size=20
+22-05-2026 03:24:00.803 [MessageBroker-5] INFO  o.s.w.s.c.WebSocketMessageBrokerStats - WebSocketSession[2 current WS(2)-HttpStream(0)-HttpPoll(0), 4 total, 0 closed abnormally (0 connect failure, 0 send limit, 0 transport error)], stompSubProtocol[processed CONNECT(2)-CONNECTED(2)-DISCONNECT(0)], stompBrokerRelay[null], inboundChannel[pool size = 16, active threads = 0, queued tasks = 0, completed tasks = 18], outboundChannel[pool size = 4, active threads = 0, queued tasks = 0, completed tasks = 4], sockJsScheduler[pool size = 8, active threads = 1, queued tasks = 6, completed tasks = 15]
+22-05-2026 03:24:01.322 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 03:25:01.331 [MessageBroker-3] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 03:26:01.338 [MessageBroker-8] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 03:26:08.170 [clientInboundChannel-18] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT receipt=close-1 session=czrtvxf2
+22-05-2026 03:26:08.172 [http-nio-8080-exec-5] INFO  o.s.w.s.m.SubProtocolWebSocketHandler - No messages received after 176880 ms. Closing WebSocketServerSockJsSession[id=1xfoyjpi].
+22-05-2026 03:26:08.172 [http-nio-8080-exec-5] DEBUG o.s.w.s.s.t.s.WebSocketServerSockJsSession - Closing SockJS session 1xfoyjpi with CloseStatus[code=4500, reason=Failed to send message within the configured send limit]
+22-05-2026 03:26:08.173 [http-nio-8080-exec-5] DEBUG o.s.w.s.a.NativeWebSocketSession - Closing StandardWebSocketSession[id=13d7920c-970d-e4ec-07f9-95422b11eaa3, uri=ws://localhost:8080/ws-auction/191/1xfoyjpi/websocket]
+22-05-2026 03:26:08.174 [http-nio-8080-exec-5] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=1xfoyjpi] closed with CloseStatus[code=4500, reason=Failed to send message within the configured send limit]
+22-05-2026 03:26:08.174 [http-nio-8080-exec-5] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session 1xfoyjpi
+22-05-2026 03:26:08.175 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing OPTIONS /api/public/auctions/9
+22-05-2026 03:26:08.175 [clientInboundChannel-21] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=1xfoyjpi
+22-05-2026 03:26:08.175 [http-nio-8080-exec-5] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=czrtvxf2] closed with CloseStatus[code=1000, reason=null]
+22-05-2026 03:26:08.175 [http-nio-8080-exec-5] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session czrtvxf2
+22-05-2026 03:26:08.175 [clientOutboundChannel-6] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - No session for GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT_ACK, simpDisconnectMessage=GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT, stompCommand=DISCONNECT, simpSessionAttributes={org.springframework.messaging.simp.SimpAttributes.COMPLETED=true}, simpSessionId=1xfoyjpi}], simpSessionId=1xfoyjpi}]
+22-05-2026 03:26:08.176 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779395168171
+22-05-2026 03:26:08.176 [clientInboundChannel-24] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=czrtvxf2
+22-05-2026 03:26:08.176 [http-nio-8080-exec-1] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:26:08.176 [clientOutboundChannel-7] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - No session for GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT_ACK, simpDisconnectMessage=GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT, stompCommand=DISCONNECT, simpSessionAttributes={org.springframework.messaging.simp.SimpAttributes.COMPLETED=true}, simpSessionId=czrtvxf2}], simpSessionId=czrtvxf2}]
+22-05-2026 03:26:08.177 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779395168171
+22-05-2026 03:26:08.177 [http-nio-8080-exec-1] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:26:08.178 [http-nio-8080-exec-1] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779395168171
+22-05-2026 03:26:08.179 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions/9
+22-05-2026 03:26:08.185 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/741/hihohdth/websocket
+22-05-2026 03:26:08.185 [http-nio-8080-exec-6] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:26:08.186 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/741/hihohdth/websocket
+22-05-2026 03:26:08.186 [http-nio-8080-exec-6] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:26:08.187 [http-nio-8080-exec-6] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/741/hihohdth/websocket
+22-05-2026 03:26:08.189 [http-nio-8080-exec-6] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=hihohdth]
+22-05-2026 03:26:08.190 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions/9
+22-05-2026 03:26:08.192 [clientInboundChannel-27] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing CONNECT session=hihohdth
+22-05-2026 03:26:08.195 [clientInboundChannel-30] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing SUBSCRIBE /topic/auction/9 id=sub-0 session=hihohdth
+22-05-2026 03:26:14.271 [MessageBroker-3] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Closed 2 sessions: [1xfoyjpi, czrtvxf2]
+22-05-2026 03:26:20.218 [SpringApplicationShutdownHook] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientOutboundChannel removed SubProtocolWebSocketHandler[StompSubProtocolHandler[v10.stomp, v11.stomp, v12.stomp]]
+22-05-2026 03:26:20.218 [SpringApplicationShutdownHook] DEBUG o.s.w.s.s.t.s.WebSocketServerSockJsSession - Closing SockJS session hihohdth with CloseStatus[code=1001, reason=null]
+22-05-2026 03:26:20.219 [SpringApplicationShutdownHook] DEBUG o.s.w.s.a.NativeWebSocketSession - Closing StandardWebSocketSession[id=96434362-cca1-3eae-711c-d2a4286f58b2, uri=ws://localhost:8080/ws-auction/741/hihohdth/websocket]
+22-05-2026 03:26:20.219 [SpringApplicationShutdownHook] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=hihohdth] closed with CloseStatus[code=1001, reason=null]
+22-05-2026 03:26:20.220 [SpringApplicationShutdownHook] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session hihohdth
+22-05-2026 03:26:20.220 [clientInboundChannel-17] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=hihohdth
+22-05-2026 03:26:20.220 [SpringApplicationShutdownHook] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientInboundChannel removed WebSocketAnnotationMethodMessageHandler[prefixes=[/app/]]
+22-05-2026 03:26:20.220 [SpringApplicationShutdownHook] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - Stopping...
+22-05-2026 03:26:20.220 [SpringApplicationShutdownHook] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - BrokerAvailabilityEvent[available=false, SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@4e64e44c]]
+22-05-2026 03:26:20.221 [SpringApplicationShutdownHook] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientInboundChannel removed SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@4e64e44c]
+22-05-2026 03:26:20.221 [SpringApplicationShutdownHook] DEBUG o.s.m.s.ExecutorSubscribableChannel - brokerChannel removed SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@4e64e44c]
+22-05-2026 03:26:20.221 [SpringApplicationShutdownHook] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - Stopped.
+22-05-2026 03:26:20.221 [SpringApplicationShutdownHook] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientInboundChannel removed UserDestinationMessageHandler[DefaultUserDestinationResolver[prefix=/user/]]
+22-05-2026 03:26:20.221 [SpringApplicationShutdownHook] DEBUG o.s.m.s.ExecutorSubscribableChannel - brokerChannel removed UserDestinationMessageHandler[DefaultUserDestinationResolver[prefix=/user/]]
+22-05-2026 03:26:20.252 [SpringApplicationShutdownHook] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Closing JPA EntityManagerFactory for persistence unit 'default'
+22-05-2026 03:26:20.255 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+22-05-2026 03:26:20.259 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
+22-05-2026 03:26:35.670 [main] INFO  c.e.a.AutoauctionApplication - Starting AutoauctionApplication using Java 17.0.18 with PID 39708 (D:\AutoAuction\target\classes started by Asus in D:\AutoAuction)
+22-05-2026 03:26:35.672 [main] INFO  c.e.a.AutoauctionApplication - No active profile set, falling back to 1 default profile: "default"
+22-05-2026 03:26:36.657 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+22-05-2026 03:26:36.783 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 114 ms. Found 10 JPA repository interfaces.
+22-05-2026 03:26:37.396 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port(s): 8080 (http)
+22-05-2026 03:26:37.406 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+22-05-2026 03:26:37.406 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.15]
+22-05-2026 03:26:37.518 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+22-05-2026 03:26:37.518 [main] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 1783 ms
+22-05-2026 03:26:37.980 [main] INFO  o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+22-05-2026 03:26:38.007 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+22-05-2026 03:26:38.202 [main] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@3c488b34
+22-05-2026 03:26:38.204 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+22-05-2026 03:26:38.241 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+22-05-2026 03:26:39.456 [main] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'default'
+22-05-2026 03:26:39.882 [main] INFO  o.s.d.j.r.query.QueryEnhancerFactory - Hibernate is in classpath; If applicable, HQL parser will be used.
+22-05-2026 03:26:40.203 [main] INFO  c.e.a.a.i.p.JpaAuctionRepositoryAdapter - JpaAuctionRepositoryAdapter initialized with Clock and ExtensionProperties
+22-05-2026 03:26:40.264 [main] INFO  c.e.a.v.application.VehicleService - VehicleService инициализирован
+22-05-2026 03:26:40.362 [main] INFO  c.e.a.d.i.p.JpaDepositRepositoryAdapter - JpaDepositRepositoryAdapter initialized
+22-05-2026 03:26:40.405 [main] INFO  c.e.a.d.application.DepositService - DepositService initialized
+22-05-2026 03:26:40.493 [main] INFO  c.e.a.a.a.AdminAuctionService - AdminAuctionService инициализирован
+22-05-2026 03:26:40.509 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - === Auction Extension Configuration ===
+22-05-2026 03:26:40.510 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - Enabled: true
+22-05-2026 03:26:40.510 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - Threshold seconds: 30
+22-05-2026 03:26:40.510 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - Extension minutes: 5
+22-05-2026 03:26:40.510 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - Max extensions: unlimited
+22-05-2026 03:26:40.511 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - =======================================
+22-05-2026 03:26:40.517 [main] INFO  c.e.a.auction.application.BidService - BidService initialized with WebSocket support
+22-05-2026 03:26:40.524 [main] INFO  c.e.a.a.i.s.AuctionCompletionScheduler - AuctionCompletionScheduler initialized
+22-05-2026 03:26:40.650 [main] INFO  c.e.a.deposit.web.DepositController - DepositController initialized
+22-05-2026 03:26:40.652 [main] INFO  c.e.a.user.application.UserService - UserService initialized. Ready to process business logic.
+22-05-2026 03:26:40.657 [main] INFO  c.e.a.user.web.UserController - UserController initialized and ready.
+22-05-2026 03:26:40.742 [main] WARN  o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+22-05-2026 03:26:40.849 [main] INFO  o.s.s.web.DefaultSecurityFilterChain - Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@19f007c4, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@73790bb5, org.springframework.security.web.context.SecurityContextHolderFilter@6afd0ef8, org.springframework.security.web.header.HeaderWriterFilter@6cf71064, org.springframework.web.filter.CorsFilter@3d3709d0, org.springframework.security.web.authentication.logout.LogoutFilter@124b1369, com.example.autoauction.auth.infrastructure.security.JwtAuthenticationFilter@4e9d203e, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@1a8042a5, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@444958a4, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@4ed761dc, org.springframework.security.web.session.SessionManagementFilter@4a52178, org.springframework.security.web.access.ExceptionTranslationFilter@4c24063c, org.springframework.security.web.access.intercept.AuthorizationFilter@5d46f4a3]
+22-05-2026 03:26:40.903 [main] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Patterns [/ws-auction/**, /ws] in 'stompWebSocketHandlerMapping'
+22-05-2026 03:26:40.957 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.AdminAuctionController:
+	
+22-05-2026 03:26:40.958 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.AdminVehicleController:
+	
+22-05-2026 03:26:40.958 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.AuctionWebSocketController:
+	
+22-05-2026 03:26:40.958 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.BidController:
+	
+22-05-2026 03:26:40.959 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.PublicAuctionController:
+	
+22-05-2026 03:26:40.959 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.AuthController:
+	
+22-05-2026 03:26:40.959 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.c.HealthController:
+	
+22-05-2026 03:26:40.960 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.d.w.DepositController:
+	
+22-05-2026 03:26:40.960 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.u.w.UserController:
+	
+22-05-2026 03:26:40.960 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.v.w.DiagnosticVehicleController:
+	
+22-05-2026 03:26:40.962 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	o.s.b.a.w.s.e.BasicErrorController:
+	
+22-05-2026 03:26:40.969 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	o.s.w.a.OpenApiWebMvcResource:
+	
+22-05-2026 03:26:40.969 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	o.s.w.u.SwaggerWelcomeWebMvc:
+	
+22-05-2026 03:26:40.970 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	o.s.w.u.SwaggerConfigResource:
+	
+22-05-2026 03:26:41.331 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port(s): 8080 (http) with context path ''
+22-05-2026 03:26:41.333 [main] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientOutboundChannel added SubProtocolWebSocketHandler[StompSubProtocolHandler[v10.stomp, v11.stomp, v12.stomp]]
+22-05-2026 03:26:41.334 [main] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientInboundChannel added WebSocketAnnotationMethodMessageHandler[prefixes=[/app/]]
+22-05-2026 03:26:41.334 [main] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - Starting...
+22-05-2026 03:26:41.335 [main] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientInboundChannel added SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@4e64e44c]
+22-05-2026 03:26:41.335 [main] DEBUG o.s.m.s.ExecutorSubscribableChannel - brokerChannel added SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@4e64e44c]
+22-05-2026 03:26:41.337 [main] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - BrokerAvailabilityEvent[available=true, SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@4e64e44c]]
+22-05-2026 03:26:41.338 [main] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - Started.
+22-05-2026 03:26:41.338 [main] DEBUG o.s.m.s.ExecutorSubscribableChannel - clientInboundChannel added UserDestinationMessageHandler[DefaultUserDestinationResolver[prefix=/user/]]
+22-05-2026 03:26:41.338 [main] DEBUG o.s.m.s.ExecutorSubscribableChannel - brokerChannel added UserDestinationMessageHandler[DefaultUserDestinationResolver[prefix=/user/]]
+22-05-2026 03:26:41.351 [main] INFO  c.e.a.AutoauctionApplication - Started AutoauctionApplication in 6.094 seconds (process running for 6.418)
+22-05-2026 03:26:41.360 [MessageBroker-2] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired CREATED auctions...
+22-05-2026 03:26:41.360 [MessageBroker-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 03:27:40.927 [MessageBroker-3] INFO  o.s.w.s.c.WebSocketMessageBrokerStats - WebSocketSession[0 current WS(0)-HttpStream(0)-HttpPoll(0), 0 total, 0 closed abnormally (0 connect failure, 0 send limit, 0 transport error)], stompSubProtocol[processed CONNECT(0)-CONNECTED(0)-DISCONNECT(0)], stompBrokerRelay[null], inboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0], outboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0], sockJsScheduler[pool size = 6, active threads = 1, queued tasks = 3, completed tasks = 2]
+22-05-2026 03:27:41.453 [MessageBroker-4] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 03:28:38.886 [http-nio-8080-exec-3] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+22-05-2026 03:28:38.898 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions/9
+22-05-2026 03:28:38.898 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779395318813
+22-05-2026 03:28:38.898 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779395318814
+22-05-2026 03:28:38.923 [http-nio-8080-exec-7] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:28:38.923 [http-nio-8080-exec-3] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:28:38.925 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779395318814
+22-05-2026 03:28:38.925 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779395318813
+22-05-2026 03:28:38.936 [http-nio-8080-exec-7] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:28:38.936 [http-nio-8080-exec-3] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:28:38.944 [http-nio-8080-exec-3] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779395318813
+22-05-2026 03:28:38.944 [http-nio-8080-exec-7] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779395318814
+22-05-2026 03:28:38.956 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/641/4y13zw0b/websocket
+22-05-2026 03:28:38.957 [http-nio-8080-exec-6] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:28:38.958 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/641/4y13zw0b/websocket
+22-05-2026 03:28:38.959 [http-nio-8080-exec-6] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:28:38.960 [http-nio-8080-exec-6] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/641/4y13zw0b/websocket
+22-05-2026 03:28:39.007 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/684/yapisgil/websocket
+22-05-2026 03:28:39.009 [http-nio-8080-exec-2] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:28:39.009 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/684/yapisgil/websocket
+22-05-2026 03:28:39.010 [http-nio-8080-exec-2] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:28:39.011 [http-nio-8080-exec-2] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/684/yapisgil/websocket
+22-05-2026 03:28:39.014 [http-nio-8080-exec-6] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=4y13zw0b]
+22-05-2026 03:28:39.014 [http-nio-8080-exec-2] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=yapisgil]
+22-05-2026 03:28:39.024 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions/9
+22-05-2026 03:28:39.042 [clientInboundChannel-2] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing CONNECT session=yapisgil
+22-05-2026 03:28:39.050 [clientInboundChannel-5] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing SUBSCRIBE /topic/auction/9 id=sub-0 session=yapisgil
+22-05-2026 03:28:39.122 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions/9
+22-05-2026 03:28:39.136 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions/9
+22-05-2026 03:28:39.704 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions?page=0&size=20
+22-05-2026 03:28:39.733 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions?page=0&size=20
+22-05-2026 03:28:39.780 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions?page=0&size=20
+22-05-2026 03:28:39.798 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions?page=0&size=20
+22-05-2026 03:28:41.461 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 03:28:44.364 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions?page=0&size=20
+22-05-2026 03:28:44.375 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions?page=0&size=20
+22-05-2026 03:28:44.385 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions?page=0&size=20
+22-05-2026 03:28:44.403 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions?page=0&size=20
+22-05-2026 03:28:45.202 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions/9
+22-05-2026 03:28:45.207 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779395325175
+22-05-2026 03:28:45.209 [http-nio-8080-exec-6] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:28:45.210 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779395325175
+22-05-2026 03:28:45.211 [http-nio-8080-exec-6] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:28:45.212 [http-nio-8080-exec-6] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779395325175
+22-05-2026 03:28:45.214 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779395325175
+22-05-2026 03:28:45.215 [http-nio-8080-exec-2] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:28:45.216 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779395325175
+22-05-2026 03:28:45.217 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions/9
+22-05-2026 03:28:45.217 [http-nio-8080-exec-2] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:28:45.218 [http-nio-8080-exec-2] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779395325175
+22-05-2026 03:28:45.226 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions/9
+22-05-2026 03:28:45.240 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/932/5ljokgml/websocket
+22-05-2026 03:28:45.240 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions/9
+22-05-2026 03:28:45.241 [http-nio-8080-exec-1] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:28:45.241 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/932/5ljokgml/websocket
+22-05-2026 03:28:45.242 [http-nio-8080-exec-1] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:28:45.245 [http-nio-8080-exec-1] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/932/5ljokgml/websocket
+22-05-2026 03:28:45.249 [http-nio-8080-exec-1] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=5ljokgml]
+22-05-2026 03:28:45.264 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/540/nvkkucyr/websocket
+22-05-2026 03:28:45.264 [http-nio-8080-exec-4] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:28:45.265 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/540/nvkkucyr/websocket
+22-05-2026 03:28:45.265 [http-nio-8080-exec-4] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:28:45.266 [http-nio-8080-exec-4] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/540/nvkkucyr/websocket
+22-05-2026 03:28:45.267 [http-nio-8080-exec-4] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=nvkkucyr]
+22-05-2026 03:28:45.272 [clientInboundChannel-8] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing CONNECT session=nvkkucyr
+22-05-2026 03:28:45.275 [clientInboundChannel-11] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing SUBSCRIBE /topic/auction/9 id=sub-0 session=nvkkucyr
+22-05-2026 03:28:48.001 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing OPTIONS /api/auctions/9/bids
+22-05-2026 03:28:48.005 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auctions/9/bids
+22-05-2026 03:28:48.016 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auctions/9/bids
+22-05-2026 03:28:48.086 [http-nio-8080-exec-7] INFO  c.e.a.auction.web.BidController - User 21 placing bid on auction 9
+22-05-2026 03:28:48.096 [http-nio-8080-exec-7] INFO  c.e.a.auction.application.BidService - === СОЗДАНИЕ СТАВКИ ===
+22-05-2026 03:28:48.098 [http-nio-8080-exec-7] INFO  c.e.a.auction.application.BidService - Auction ID: 9, Bidder ID: 21, Amount: 32100000
+22-05-2026 03:28:48.118 [http-nio-8080-exec-7] DEBUG c.e.a.auction.application.BidService - Текущий статус аукциона: ACTIVE, текущая цена: 31800000.00, минимальный шаг: 300000.00, версия: 7
+22-05-2026 03:28:48.133 [http-nio-8080-exec-7] WARN  c.e.a.auction.application.BidService - User 21 has insufficient deposit. Required: 300000.00
+22-05-2026 03:28:48.136 [http-nio-8080-exec-7] WARN  c.e.a.config.GlobalExceptionHandler - Некорректный аргумент: Недостаточно средств на депозите. Требуется: 300000.00 (1% от стартовой цены 30000000.00) -> статус 400 BAD_REQUEST
+22-05-2026 03:28:52.180 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auctions/9/bids
+22-05-2026 03:28:52.190 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auctions/9/bids
+22-05-2026 03:28:52.191 [http-nio-8080-exec-6] INFO  c.e.a.auction.web.BidController - User 21 placing bid on auction 9
+22-05-2026 03:28:52.192 [http-nio-8080-exec-6] INFO  c.e.a.auction.application.BidService - === СОЗДАНИЕ СТАВКИ ===
+22-05-2026 03:28:52.192 [http-nio-8080-exec-6] INFO  c.e.a.auction.application.BidService - Auction ID: 9, Bidder ID: 21, Amount: 32100000
+22-05-2026 03:28:52.195 [http-nio-8080-exec-6] DEBUG c.e.a.auction.application.BidService - Текущий статус аукциона: ACTIVE, текущая цена: 31800000.00, минимальный шаг: 300000.00, версия: 7
+22-05-2026 03:28:52.201 [http-nio-8080-exec-6] WARN  c.e.a.auction.application.BidService - User 21 has insufficient deposit. Required: 300000.00
+22-05-2026 03:28:52.202 [http-nio-8080-exec-6] WARN  c.e.a.config.GlobalExceptionHandler - Некорректный аргумент: Недостаточно средств на депозите. Требуется: 300000.00 (1% от стартовой цены 30000000.00) -> статус 400 BAD_REQUEST
+22-05-2026 03:28:56.612 [http-nio-8080-exec-2] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=5ljokgml] closed with CloseStatus[code=1000, reason=null]
+22-05-2026 03:28:56.612 [http-nio-8080-exec-3] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=nvkkucyr] closed with CloseStatus[code=1000, reason=null]
+22-05-2026 03:28:56.613 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session nvkkucyr
+22-05-2026 03:28:56.613 [http-nio-8080-exec-2] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session 5ljokgml
+22-05-2026 03:28:56.614 [clientInboundChannel-16] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=nvkkucyr
+22-05-2026 03:28:56.615 [clientInboundChannel-15] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=5ljokgml
+22-05-2026 03:28:56.616 [clientOutboundChannel-4] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - No session for GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT_ACK, simpDisconnectMessage=GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT, stompCommand=DISCONNECT, simpSessionAttributes={org.springframework.messaging.simp.SimpAttributes.COMPLETED=true}, simpSessionId=nvkkucyr}], simpSessionId=nvkkucyr}]
+22-05-2026 03:28:56.616 [clientOutboundChannel-3] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - No session for GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT_ACK, simpDisconnectMessage=GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT, stompCommand=DISCONNECT, simpSessionAttributes={org.springframework.messaging.simp.SimpAttributes.COMPLETED=true}, simpSessionId=5ljokgml}], simpSessionId=5ljokgml}]
+22-05-2026 03:28:56.765 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions?page=0&size=20
+22-05-2026 03:28:56.788 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions?page=0&size=20
+22-05-2026 03:28:56.800 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions?page=0&size=20
+22-05-2026 03:28:56.816 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions?page=0&size=20
+22-05-2026 03:29:03.970 [MessageBroker-5] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Closed 2 sessions: [5ljokgml, nvkkucyr]
+22-05-2026 03:29:41.468 [MessageBroker-3] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 03:30:41.481 [MessageBroker-3] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 03:30:41.487 [MessageBroker-3] INFO  c.e.a.a.i.s.AuctionCompletionScheduler - Auction 9 (vehicle 7) has ended
+22-05-2026 03:30:41.487 [MessageBroker-3] INFO  c.e.a.a.application.AuctionFinalizer - Finalizing auction 9 (vehicle 7)
+22-05-2026 03:30:41.492 [MessageBroker-3] INFO  c.e.a.a.application.AuctionFinalizer - Auction 9 expired - reserve price not met
+22-05-2026 03:30:41.493 [MessageBroker-3] INFO  c.e.a.d.application.DepositService - Unfreezing deposit for user: 20, auction: 9
+22-05-2026 03:30:41.583 [MessageBroker-3] INFO  c.e.a.d.application.DepositService - Deposit unfrozen for auction 9. New available balance: 999870000.00
+22-05-2026 03:30:41.583 [MessageBroker-3] DEBUG c.e.a.a.application.AuctionFinalizer - Deposit unfrozen for user 20 on auction 9
+22-05-2026 03:30:41.587 [MessageBroker-3] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing MESSAGE destination=/topic/auction/9 session=null payload={"auctionId":9,"vehicleId":null,"vehicleInfo":null,"currentPrice":null,"winningB...(truncated)
+22-05-2026 03:30:41.589 [MessageBroker-3] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Broadcasting to 1 sessions.
+22-05-2026 03:30:41.591 [MessageBroker-3] INFO  c.e.a.a.w.AuctionWebSocketController - Auction 9 ended notification sent. Winner: null, Winning bid: null
+22-05-2026 03:30:41.608 [MessageBroker-3] DEBUG c.e.a.a.w.AuctionWebSocketController - Sending WebSocket update for auction 9: type=AUCTION_FINALIZED, price=31800000.00
+22-05-2026 03:30:41.608 [MessageBroker-3] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing MESSAGE destination=/topic/auction/9 session=null payload={"auctionId":9,"vehicleId":7,"vehicleInfo":"porshe 911 turbo s 2023 (VIN: 674895...(truncated)
+22-05-2026 03:30:41.608 [MessageBroker-3] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Broadcasting to 1 sessions.
+22-05-2026 03:30:41.609 [MessageBroker-3] INFO  c.e.a.a.application.AuctionFinalizer - Auction 9 finalized with status: EXPIRED
+22-05-2026 03:30:41.609 [MessageBroker-3] INFO  c.e.a.a.i.s.AuctionCompletionScheduler - Finalized 1 expired auctions
+22-05-2026 03:30:41.619 [clientInboundChannel-18] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT receipt=close-1 session=yapisgil
+22-05-2026 03:30:41.621 [http-nio-8080-exec-7] INFO  o.s.w.s.m.SubProtocolWebSocketHandler - No messages received after 122599 ms. Closing WebSocketServerSockJsSession[id=4y13zw0b].
+22-05-2026 03:30:41.621 [http-nio-8080-exec-7] DEBUG o.s.w.s.s.t.s.WebSocketServerSockJsSession - Closing SockJS session 4y13zw0b with CloseStatus[code=4500, reason=Failed to send message within the configured send limit]
+22-05-2026 03:30:41.622 [http-nio-8080-exec-7] DEBUG o.s.w.s.a.NativeWebSocketSession - Closing StandardWebSocketSession[id=ea92477e-bc9f-7018-55db-87eb08944cec, uri=ws://localhost:8080/ws-auction/641/4y13zw0b/websocket]
+22-05-2026 03:30:41.623 [http-nio-8080-exec-7] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=4y13zw0b] closed with CloseStatus[code=4500, reason=Failed to send message within the configured send limit]
+22-05-2026 03:30:41.623 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session 4y13zw0b
+22-05-2026 03:30:41.625 [http-nio-8080-exec-7] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=yapisgil] closed with CloseStatus[code=1000, reason=null]
+22-05-2026 03:30:41.625 [clientInboundChannel-21] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=4y13zw0b
+22-05-2026 03:30:41.625 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session yapisgil
+22-05-2026 03:30:41.626 [clientOutboundChannel-8] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - No session for GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT_ACK, simpDisconnectMessage=GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT, stompCommand=DISCONNECT, simpSessionAttributes={org.springframework.messaging.simp.SimpAttributes.COMPLETED=true}, simpSessionId=4y13zw0b}], simpSessionId=4y13zw0b}]
+22-05-2026 03:30:41.627 [clientInboundChannel-24] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=yapisgil
+22-05-2026 03:30:41.627 [clientOutboundChannel-9] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - No session for GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT_ACK, simpDisconnectMessage=GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT, stompCommand=DISCONNECT, simpSessionAttributes={org.springframework.messaging.simp.SimpAttributes.COMPLETED=true}, simpSessionId=yapisgil}], simpSessionId=yapisgil}]
+22-05-2026 03:30:48.970 [MessageBroker-2] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Closed 2 sessions: [4y13zw0b, yapisgil]
+22-05-2026 03:31:41.649 [MessageBroker-4] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 03:32:20.171 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions/9
+22-05-2026 03:32:20.177 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779395540173
+22-05-2026 03:32:20.178 [http-nio-8080-exec-3] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:32:20.179 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779395540173
+22-05-2026 03:32:20.179 [http-nio-8080-exec-3] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:32:20.180 [http-nio-8080-exec-3] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779395540173
+22-05-2026 03:32:20.183 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779395540173
+22-05-2026 03:32:20.184 [http-nio-8080-exec-5] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:32:20.185 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779395540173
+22-05-2026 03:32:20.185 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions/9
+22-05-2026 03:32:20.185 [http-nio-8080-exec-5] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:32:20.186 [http-nio-8080-exec-5] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779395540173
+22-05-2026 03:32:20.190 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/810/h0veuu0z/websocket
+22-05-2026 03:32:20.192 [http-nio-8080-exec-1] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:32:20.194 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/810/h0veuu0z/websocket
+22-05-2026 03:32:20.194 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions/9
+22-05-2026 03:32:20.195 [http-nio-8080-exec-1] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:32:20.195 [http-nio-8080-exec-1] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/810/h0veuu0z/websocket
+22-05-2026 03:32:20.197 [http-nio-8080-exec-1] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=h0veuu0z]
+22-05-2026 03:32:20.206 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions/9
+22-05-2026 03:32:20.214 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/127/ckgvv4yz/websocket
+22-05-2026 03:32:20.214 [http-nio-8080-exec-4] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:32:20.215 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/127/ckgvv4yz/websocket
+22-05-2026 03:32:20.217 [http-nio-8080-exec-4] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:32:20.218 [http-nio-8080-exec-4] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/127/ckgvv4yz/websocket
+22-05-2026 03:32:20.220 [http-nio-8080-exec-4] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=ckgvv4yz]
+22-05-2026 03:32:20.224 [clientInboundChannel-27] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing CONNECT session=ckgvv4yz
+22-05-2026 03:32:20.227 [clientInboundChannel-30] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing SUBSCRIBE /topic/auction/9 id=sub-0 session=ckgvv4yz
+22-05-2026 03:32:41.660 [MessageBroker-6] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 03:33:09.502 [http-nio-8080-exec-6] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=h0veuu0z] closed with CloseStatus[code=1000, reason=null]
+22-05-2026 03:33:09.502 [http-nio-8080-exec-7] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - WebSocketServerSockJsSession[id=ckgvv4yz] closed with CloseStatus[code=1000, reason=null]
+22-05-2026 03:33:09.502 [http-nio-8080-exec-6] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session h0veuu0z
+22-05-2026 03:33:09.502 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - Clearing session ckgvv4yz
+22-05-2026 03:33:09.506 [clientInboundChannel-36] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=ckgvv4yz
+22-05-2026 03:33:09.506 [clientInboundChannel-33] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing DISCONNECT session=h0veuu0z
+22-05-2026 03:33:09.507 [clientOutboundChannel-11] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - No session for GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT_ACK, simpDisconnectMessage=GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT, stompCommand=DISCONNECT, simpSessionAttributes={org.springframework.messaging.simp.SimpAttributes.COMPLETED=true}, simpSessionId=ckgvv4yz}], simpSessionId=ckgvv4yz}]
+22-05-2026 03:33:09.507 [clientOutboundChannel-12] DEBUG o.s.w.s.m.SubProtocolWebSocketHandler - No session for GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT_ACK, simpDisconnectMessage=GenericMessage [payload=byte[0], headers={simpMessageType=DISCONNECT, stompCommand=DISCONNECT, simpSessionAttributes={org.springframework.messaging.simp.SimpAttributes.COMPLETED=true}, simpSessionId=h0veuu0z}], simpSessionId=h0veuu0z}]
+22-05-2026 03:33:10.124 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions?page=0&size=20
+22-05-2026 03:33:10.138 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions?page=0&size=20
+22-05-2026 03:33:10.159 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions/9
+22-05-2026 03:33:10.166 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions?page=0&size=20
+22-05-2026 03:33:10.192 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions/9
+22-05-2026 03:33:10.198 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions?page=0&size=20
+22-05-2026 03:33:10.201 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779395590155
+22-05-2026 03:33:10.203 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/info?t=1779395590156
+22-05-2026 03:33:10.204 [http-nio-8080-exec-5] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:33:10.204 [http-nio-8080-exec-1] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:33:10.204 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779395590155
+22-05-2026 03:33:10.204 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/info?t=1779395590156
+22-05-2026 03:33:10.205 [http-nio-8080-exec-5] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:33:10.205 [http-nio-8080-exec-1] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:33:10.205 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions/9
+22-05-2026 03:33:10.205 [http-nio-8080-exec-5] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779395590155
+22-05-2026 03:33:10.205 [http-nio-8080-exec-1] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/info?t=1779395590156
+22-05-2026 03:33:10.222 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions/9
+22-05-2026 03:33:10.235 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/776/uaatdsa1/websocket
+22-05-2026 03:33:10.236 [http-nio-8080-exec-10] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:33:10.237 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/776/uaatdsa1/websocket
+22-05-2026 03:33:10.238 [http-nio-8080-exec-10] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:33:10.238 [http-nio-8080-exec-10] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/776/uaatdsa1/websocket
+22-05-2026 03:33:10.241 [http-nio-8080-exec-10] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=uaatdsa1]
+22-05-2026 03:33:10.262 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /ws-auction/480/sel5bgyc/websocket
+22-05-2026 03:33:10.263 [http-nio-8080-exec-9] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:33:10.263 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured GET /ws-auction/480/sel5bgyc/websocket
+22-05-2026 03:33:10.264 [http-nio-8080-exec-9] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@7c142018
+22-05-2026 03:33:10.264 [http-nio-8080-exec-9] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Processing transport request: GET http://localhost:8080/ws-auction/480/sel5bgyc/websocket
+22-05-2026 03:33:10.266 [http-nio-8080-exec-9] DEBUG o.s.w.s.h.LoggingWebSocketHandlerDecorator - New WebSocketServerSockJsSession[id=sel5bgyc]
+22-05-2026 03:33:10.270 [clientInboundChannel-39] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing CONNECT session=sel5bgyc
+22-05-2026 03:33:10.273 [clientInboundChannel-26] DEBUG o.s.m.s.b.SimpleBrokerMessageHandler - Processing SUBSCRIBE /topic/auction/9 id=sub-0 session=sel5bgyc
+22-05-2026 03:33:18.970 [MessageBroker-4] DEBUG o.s.w.s.s.t.h.DefaultSockJsService - Closed 2 sessions: [ckgvv4yz, h0veuu0z]
+22-05-2026 03:33:31.721 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/auth/login
+22-05-2026 03:33:31.722 [http-nio-8080-exec-3] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+22-05-2026 03:33:31.723 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/auth/login
+22-05-2026 03:33:31.730 [http-nio-8080-exec-3] INFO  c.e.a.auth.web.AuthController - Login attempt for username: diagnostic
+22-05-2026 03:33:31.731 [http-nio-8080-exec-3] INFO  c.e.a.auth.application.AuthService - Authenticating user: diagnostic
+22-05-2026 03:33:31.956 [http-nio-8080-exec-3] DEBUG o.s.s.a.d.DaoAuthenticationProvider - Authenticated user
+22-05-2026 03:33:31.979 [http-nio-8080-exec-3] INFO  c.e.a.auth.application.AuthService - User logged in successfully: diagnostic
+22-05-2026 03:33:31.980 [http-nio-8080-exec-3] INFO  c.e.a.auth.web.AuthController - Login successful for username: diagnostic
+22-05-2026 03:33:32.203 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions?page=0&size=20
+22-05-2026 03:33:32.231 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions?page=0&size=20
+22-05-2026 03:33:32.242 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/public/auctions?page=0&size=20
+22-05-2026 03:33:32.253 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/public/auctions?page=0&size=20
+22-05-2026 03:33:41.665 [MessageBroker-1] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 03:33:43.747 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing OPTIONS /api/diagnostic/vehicles/my
+22-05-2026 03:33:43.749 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing OPTIONS /api/diagnostic/vehicles/my
+22-05-2026 03:33:43.761 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/diagnostic/vehicles/my
+22-05-2026 03:33:43.773 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/diagnostic/vehicles/my
+22-05-2026 03:33:43.792 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/diagnostic/vehicles/my
+22-05-2026 03:33:43.804 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/diagnostic/vehicles/my
+22-05-2026 03:34:41.680 [MessageBroker-3] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
+22-05-2026 03:35:41.689 [MessageBroker-7] DEBUG c.e.a.a.i.s.AuctionCompletionScheduler - Checking for expired auctions...
