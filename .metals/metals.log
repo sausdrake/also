@@ -7668,3 +7668,12 @@ INFO: Unsupported notification method: $/setTrace
 2026.05.22 03:03:38 INFO  time: compiled autoauction-test in 14s
 мая 22, 2026 3:03:45 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
 WARNING: Unmatched cancel notification for request id 42
+мая 22, 2026 3:03:59 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 59
+2026.05.22 03:04:04 INFO  compiling autoauction (1 java source)
+2026.05.22 03:04:09 INFO  time: compiled autoauction in 4.46s
+2026.05.22 03:38:36 INFO  Shutting down server
+2026.05.22 03:38:36 INFO  Memory monitor stopped
+2026.05.22 03:38:36 INFO  shutting down Metals
+2026.05.22 03:38:36 INFO  Shut down connection with build server.
+2026.05.22 03:38:37 INFO  Exiting server

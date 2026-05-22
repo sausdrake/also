@@ -6,6 +6,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -23,6 +24,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)  // ← ВКЛЮЧАЕМ @PreAuthorize
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
@@ -46,40 +48,59 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
-
-                .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint(authenticationEntryPoint)
-                        .accessDeniedHandler(accessDeniedHandler)
+                .authorizeHttpRequests(auth -> auth
+                        // Админ эндпоинты
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        // Диагностик эндпоинты
+                        .requestMatchers("/api/diagnostic/**").hasAnyRole("DIAGNOSTIC", "ADMIN")
+                        .requestMatchers("/api/diagnostic-work/**").hasAnyRole("DIAGNOSTIC", "ADMIN")
+                        // Публичные эндпоинты
+                        .requestMatchers("/api/auth/**", "/api/public/**", "/ws/**", "/ws-auction/**").permitAll()
+                        // Остальные требуют аутентификации
+                        .anyRequest().authenticated()
                 )
 
                 .authorizeHttpRequests(auth -> auth
+                        // Публичные эндпоинты
                         .requestMatchers(
                                 new AntPathRequestMatcher("/api/auth/**"),
                                 new AntPathRequestMatcher("/api/public/**"),
                                 new AntPathRequestMatcher("/swagger-ui/**"),
+                                new AntPathRequestMatcher("/swagger-ui.html"),
                                 new AntPathRequestMatcher("/api-docs/**"),
-                                new AntPathRequestMatcher("/ws-auction/**"),
-                                new AntPathRequestMatcher("/ws/**"),      // ← ДОБАВИТЬ
-                                new AntPathRequestMatcher("/ws")          // ← ДОБАВИТЬ
+                                new AntPathRequestMatcher("/h2-console/**"),
+                                new AntPathRequestMatcher("/ws/**"),
+                                new AntPathRequestMatcher("/ws-auction/**")
                         ).permitAll()
 
+                        // Админ эндпоинты
                         .requestMatchers(
                                 new AntPathRequestMatcher("/api/admin/**")
                         ).hasRole("ADMIN")
 
+                        // Диагностик эндпоинты
                         .requestMatchers(
-                                new AntPathRequestMatcher("/api/diagnostic/**")
+                                new AntPathRequestMatcher("/api/diagnostic/**"),
+                                new AntPathRequestMatcher("/api/diagnostic-work/**")
                         ).hasAnyRole("DIAGNOSTIC", "ADMIN")
 
+                        // Заявки на диагностику (только авторизованные)
+                        .requestMatchers(
+                                new AntPathRequestMatcher("/api/diagnostic-requests/**")
+                        ).authenticated()
+
+                        // Аукционы и ставки
                         .requestMatchers(
                                 new AntPathRequestMatcher("/api/auctions/**/bids"),
                                 new AntPathRequestMatcher("/api/auctions/**")
                         ).authenticated()
 
+                        // Пользователи
                         .requestMatchers(
                                 new AntPathRequestMatcher("/api/users/**")
                         ).authenticated()
 
+                        // Все остальные запросы требуют аутентификации
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session

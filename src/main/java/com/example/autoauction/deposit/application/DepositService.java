@@ -239,6 +239,87 @@ public class DepositService {
             throw e;
         }
     }
+    /**
+     * Заморозить депозит для заявки на диагностику
+     */
+    @Transactional
+    public void freezeForDiagnosticRequest(Long userId, Long requestId, BigDecimal amount) {
+        log.info("Freezing deposit for user: {}, request: {}, amount: {}", userId, requestId, amount);
+
+        Deposit deposit = depositRepository.findByUserId(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Депозит не найден"));
+
+        // Добавить проверку достаточности средств
+        if (deposit.getAvailableBalance().compareTo(amount) < 0) {
+            throw new IllegalStateException(
+                    String.format("Недостаточно средств. Доступно: %s, требуется: %s",
+                            deposit.getAvailableBalance(), amount)
+            );
+        }
+
+        // Замораживаем средства
+        deposit.freezeForAuction(amount);
+        depositRepository.save(deposit);
+
+        // Сохраняем информацию о заморозке (используем auctionId как requestId)
+        depositRepository.freezeForAuction(deposit.getId(), requestId, amount, FreezeReason.DIAGNOSTIC_REQUEST);
+
+        // Записываем транзакцию
+        DepositTransaction transaction = new DepositTransaction(
+                deposit.getId(),
+                userId,
+                DepositTransaction.TransactionType.BLOCK,
+                amount,
+                deposit.getAvailableBalance().add(amount),
+                deposit.getAvailableBalance(),
+                "DIAGNOSTIC_" + requestId,
+                "Блокировка средств для заявки на диагностику #" + requestId
+        );
+        transaction.setAuctionId(requestId);
+        depositRepository.saveTransaction(transaction);
+    }
+
+    /**
+     * Разморозить депозит после завершения заявки (если отчёт не одобрен)
+     */
+    @Transactional
+    public void unfreezeForDiagnosticRequest(Long userId, Long requestId) {
+        log.info("Unfreezing deposit for user: {}, request: {}", userId, requestId);
+
+        Deposit deposit = depositRepository.findByUserId(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Депозит не найден для пользователя: " + userId));
+
+        List<FrozenDeposit> frozen = depositRepository.getFrozenDepositsByDepositId(deposit.getId());
+        FrozenDeposit target = frozen.stream()
+                .filter(f -> f.getAuctionId().equals(requestId))
+                .findFirst()
+                .orElse(null);
+
+        if (target == null) {
+            log.warn("No frozen amount found for request {}, user {}", requestId, userId);
+            return;
+        }
+
+        BigDecimal frozenAmount = target.getAmount();
+        BigDecimal balanceBefore = deposit.getAvailableBalance();
+
+        deposit.unfreezeForAuction(frozenAmount);
+        depositRepository.unfreezeForAuction(deposit.getId(), requestId);
+
+        DepositTransaction transaction = new DepositTransaction(
+                deposit.getId(),
+                userId,
+                DepositTransaction.TransactionType.UNBLOCK,
+                frozenAmount,
+                balanceBefore,
+                deposit.getAvailableBalance(),
+                "DIAGNOSTIC_" + requestId,
+                "Разблокировка средств после заявки на диагностику #" + requestId
+        );
+        depositRepository.saveTransaction(transaction);
+
+        depositRepository.save(deposit);
+    }
 
     @Transactional(readOnly = true)
     public boolean canParticipateInAuction(Long userId, BigDecimal startingPrice) {
