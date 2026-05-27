@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.example.autoauction.diagnostic.application.DiagnosticRequestServiceTest
--------------------------------------------------------------------------------
-Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.504 s - in com.example.autoauction.diagnostic.application.DiagnosticRequestServiceTest

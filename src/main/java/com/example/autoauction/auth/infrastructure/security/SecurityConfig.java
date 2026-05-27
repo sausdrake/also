@@ -24,7 +24,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity(prePostEnabled = true)  // ← ВКЛЮЧАЕМ @PreAuthorize
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
@@ -48,18 +48,10 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
-                .authorizeHttpRequests(auth -> auth
-                        // Админ эндпоинты
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        // Диагностик эндпоинты
-                        .requestMatchers("/api/diagnostic/**").hasAnyRole("DIAGNOSTIC", "ADMIN")
-                        .requestMatchers("/api/diagnostic-work/**").hasAnyRole("DIAGNOSTIC", "ADMIN")
-                        // Публичные эндпоинты
-                        .requestMatchers("/api/auth/**", "/api/public/**", "/ws/**", "/ws-auction/**").permitAll()
-                        // Остальные требуют аутентификации
-                        .anyRequest().authenticated()
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler)
                 )
-
                 .authorizeHttpRequests(auth -> auth
                         // Публичные эндпоинты
                         .requestMatchers(
@@ -69,43 +61,30 @@ public class SecurityConfig {
                                 new AntPathRequestMatcher("/swagger-ui.html"),
                                 new AntPathRequestMatcher("/api-docs/**"),
                                 new AntPathRequestMatcher("/h2-console/**"),
-                                new AntPathRequestMatcher("/ws/**"),
-                                new AntPathRequestMatcher("/ws-auction/**")
+                                new AntPathRequestMatcher("/ws-auction/**"),
+                                new AntPathRequestMatcher("/ws/**")
                         ).permitAll()
 
                         // Админ эндпоинты
-                        .requestMatchers(
-                                new AntPathRequestMatcher("/api/admin/**")
-                        ).hasRole("ADMIN")
+                        .requestMatchers(new AntPathRequestMatcher("/api/admin/**")).hasRole("ADMIN")
 
                         // Диагностик эндпоинты
-                        .requestMatchers(
-                                new AntPathRequestMatcher("/api/diagnostic/**"),
-                                new AntPathRequestMatcher("/api/diagnostic-work/**")
-                        ).hasAnyRole("DIAGNOSTIC", "ADMIN")
-
-                        // Заявки на диагностику (только авторизованные)
-                        .requestMatchers(
-                                new AntPathRequestMatcher("/api/diagnostic-requests/**")
-                        ).authenticated()
+                        .requestMatchers(new AntPathRequestMatcher("/api/diagnostic/**")).hasAnyRole("DIAGNOSTIC", "ADMIN")
 
                         // Аукционы и ставки
-                        .requestMatchers(
-                                new AntPathRequestMatcher("/api/auctions/**/bids"),
-                                new AntPathRequestMatcher("/api/auctions/**")
-                        ).authenticated()
+                        .requestMatchers(new AntPathRequestMatcher("/api/auctions/**/bids")).authenticated()
+                        .requestMatchers(new AntPathRequestMatcher("/api/auctions/**")).authenticated()
+
+                        // Депозиты
+                        .requestMatchers(new AntPathRequestMatcher("/api/deposits/**")).authenticated()
 
                         // Пользователи
-                        .requestMatchers(
-                                new AntPathRequestMatcher("/api/users/**")
-                        ).authenticated()
+                        .requestMatchers(new AntPathRequestMatcher("/api/users/**")).authenticated()
 
-                        // Все остальные запросы требуют аутентификации
+                        // Остальные
                         .anyRequest().authenticated()
                 )
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 

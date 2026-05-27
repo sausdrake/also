@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # База данных PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: autoauction-postgres
+    environment:
+      POSTGRES_DB: auto_auction
+      POSTGRES_USER: auto_auction_user
+      POSTGRES_PASSWORD: auto_auction_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auto_auction_user -d auto_auction"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - autoauction-network
+
+  # Приложение Spring Boot
+  app:
+    build: .
+    container_name: autoauction-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auto_auction
+      SPRING_DATASOURCE_USERNAME: auto_auction_user
+      SPRING_DATASOURCE_PASSWORD: auto_auction_password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "8080:8080"
+    networks:
+      - autoauction-network
+
+volumes:
+  postgres_data:
+
+networks:
+  autoauction-network:
+    driver: bridge
