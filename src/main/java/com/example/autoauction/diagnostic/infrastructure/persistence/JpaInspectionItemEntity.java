@@ -21,6 +21,9 @@ public class JpaInspectionItemEntity {
     @Column(length = 1000)
     private String description;
 
+    @Column(name = "field_type", length = 50)
+    private String fieldType = "TEXT";
+
     @Column(name = "has_photo", nullable = false)
     private boolean hasPhoto = false;
 

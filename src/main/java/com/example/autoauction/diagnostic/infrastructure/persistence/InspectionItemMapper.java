@@ -14,6 +14,7 @@ public class InspectionItemMapper {
         entity.setGroupId(domain.getGroupId());
         entity.setTitle(domain.getTitle());
         entity.setDescription(domain.getDescription());
+        entity.setFieldType(domain.getFieldType() != null ? domain.getFieldType() : "TEXT");
         entity.setHasPhoto(domain.isHasPhoto());
         entity.setHasVideo(domain.isHasVideo());
         entity.setHasRating(domain.isHasRating());
@@ -31,6 +32,7 @@ public class InspectionItemMapper {
         domain.setGroupId(entity.getGroupId());
         domain.setTitle(entity.getTitle());
         domain.setDescription(entity.getDescription());
+        domain.setFieldType(entity.getFieldType() != null ? entity.getFieldType() : "TEXT");
         domain.setHasPhoto(entity.isHasPhoto());
         domain.setHasVideo(entity.isHasVideo());
         domain.setHasRating(entity.isHasRating());

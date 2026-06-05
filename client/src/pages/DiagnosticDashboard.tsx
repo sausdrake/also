@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { formatDate } from '../utils/formatDate';
@@ -19,6 +19,7 @@ interface Item {
   id: number;
   title: string;
   description?: string;
+  fieldType: string;
   isRequired: boolean;
   hasRating: boolean;
   hasPhoto: boolean;
@@ -47,13 +48,119 @@ interface Answer {
   isSkipped: boolean;
 }
 
+// Backend COMPLETED = UI SUBMITTED
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  PENDING:     { label: 'Ожидает',    color: 'bg-yellow-100 text-yellow-700' },
-  IN_PROGRESS: { label: 'В работе',   color: 'bg-blue-100 text-blue-700' },
-  COMPLETED:   { label: 'На проверке',color: 'bg-purple-100 text-purple-700' },
-  APPROVED:    { label: 'Одобрена',   color: 'bg-green-100 text-green-700' },
-  REJECTED:    { label: 'Отклонена',  color: 'bg-red-100 text-red-700' },
+  PENDING:     { label: 'Ожидает',             color: 'bg-yellow-100 text-yellow-700' },
+  IN_PROGRESS: { label: 'В работе',            color: 'bg-blue-100 text-blue-700' },
+  COMPLETED:   { label: 'Отправлен на проверку', color: 'bg-purple-100 text-purple-700' },
+  APPROVED:    { label: 'Одобрен',             color: 'bg-green-100 text-green-700' },
+  REJECTED:    { label: 'Отклонён',            color: 'bg-red-100 text-red-700' },
+  DRAFT:       { label: 'Черновик',            color: 'bg-gray-100 text-gray-600' },
 };
+
+// Can the diagnostic still edit this report?
+const isEditable = (status: string) => status === 'IN_PROGRESS' || status === 'REJECTED';
+
+// ─── Field renderer for the report form ───
+function FieldInput({ item, ans, onChange, hasError }: {
+  item: Item;
+  ans: Answer;
+  onChange: (field: keyof Answer, value: any) => void;
+  hasError: boolean;
+}) {
+  const ft = item.fieldType || (item.hasRating ? 'NUMBER' : item.hasPhoto ? 'PHOTO' : 'TEXTAREA');
+  const options = ft === 'SELECT' && item.description
+    ? item.description.split('\n').filter(o => o.trim())
+    : [];
+
+  switch (ft) {
+    case 'NUMBER':
+      return (
+        <div>
+          <p className="text-xs text-gray-500 mb-1">Оценка (1–5)</p>
+          <div className="flex gap-1.5">
+            {[1, 2, 3, 4, 5].map(star => (
+              <button key={star} type="button"
+                onClick={() => onChange('rating', ans.rating === star ? null : star)}
+                className={`w-9 h-9 rounded-lg text-sm font-semibold transition-colors ${
+                  ans.rating != null && ans.rating >= star
+                    ? 'bg-yellow-400 text-white'
+                    : 'bg-gray-100 text-gray-500 hover:bg-yellow-100'
+                }`}>
+                {star}
+              </button>
+            ))}
+            {ans.rating && (
+              <span className="self-center text-xs text-gray-400 ml-1">
+                {['', 'Плохо', 'Удовлетворительно', 'Нормально', 'Хорошо', 'Отлично'][ans.rating]}
+              </span>
+            )}
+          </div>
+        </div>
+      );
+
+    case 'CHECKBOX':
+      return (
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input type="checkbox"
+            checked={ans.comment === 'true'}
+            onChange={e => onChange('comment', e.target.checked ? 'true' : 'false')}
+            className="w-4 h-4" />
+          <span className="text-sm text-gray-700">{item.title}</span>
+        </label>
+      );
+
+    case 'SELECT':
+      return (
+        <div>
+          <select
+            value={ans.comment || ''}
+            onChange={e => onChange('comment', e.target.value)}
+            className={`w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none ${hasError ? 'border-red-400' : 'border-gray-200'}`}>
+            <option value="">— Выберите вариант —</option>
+            {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+          </select>
+        </div>
+      );
+
+    case 'TEXT':
+      return (
+        <input
+          type="text"
+          value={ans.comment}
+          onChange={e => onChange('comment', e.target.value)}
+          placeholder={item.isRequired ? 'Ответ (обязателен)' : 'Ответ'}
+          className={`w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none ${hasError ? 'border-red-400' : 'border-gray-200'}`}
+        />
+      );
+
+    case 'PHOTO':
+      return (
+        <div>
+          <p className="text-xs text-gray-500 mb-1">Ссылка на фото (URL)</p>
+          <input
+            type="url"
+            value={ans.photoUrls?.[0] || ''}
+            onChange={e => onChange('photoUrls', e.target.value ? [e.target.value] : [])}
+            placeholder="https://..."
+            className={`w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none ${hasError ? 'border-red-400' : 'border-gray-200'}`}
+          />
+        </div>
+      );
+
+    case 'TEXTAREA':
+    default:
+      return (
+        <textarea
+          value={ans.comment}
+          onChange={e => onChange('comment', e.target.value)}
+          placeholder={item.isRequired ? 'Комментарий (обязателен)' : 'Комментарий'}
+          rows={2}
+          className={`w-full border rounded-lg px-3 py-2 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none ${hasError ? 'border-red-400' : 'border-gray-200'}`}
+        />
+      );
+  }
+}
 
 // ─── Форма заполнения отчёта ───
 function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => void }) {
@@ -67,10 +174,8 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
   useEffect(() => {
     api.get(`/diagnostic/work/${requestId}`).then(r => {
       setData(r.data);
-      // Открываем все группы по умолчанию
       const groups: Group[] = r.data?.template?.groups ?? [];
       setOpenGroups(new Set(groups.map((g: Group) => g.id)));
-      // Загружаем существующие ответы
       const initial: Record<number, Answer> = {};
       (r.data.existingAnswers || []).forEach((a: any) => {
         initial[a.inspectionItemId] = {
@@ -111,15 +216,18 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
       for (const item of group.items) {
         if (item.isRequired) {
           const ans = answers[item.id];
-          const hasRating = !item.hasRating || (ans?.rating != null && ans.rating > 0);
-          const hasComment = ans?.comment?.trim().length > 0;
-          if (!hasRating && !hasComment) errors.add(item.id);
+          const ft = item.fieldType || 'TEXTAREA';
+          let filled = false;
+          if (ft === 'NUMBER') filled = ans?.rating != null && ans.rating > 0;
+          else if (ft === 'PHOTO') filled = (ans?.photoUrls?.length ?? 0) > 0;
+          else if (ft === 'CHECKBOX') filled = ans?.comment === 'true' || ans?.comment === 'false';
+          else filled = ans?.comment?.trim().length > 0;
+          if (!filled) errors.add(item.id);
         }
       }
     }
     setValidationErrors(errors);
     if (errors.size > 0) {
-      // Открываем группы с ошибками
       const errGroups = new Set<number>();
       for (const group of template.groups) {
         if (group.items.some(i => errors.has(i.id))) errGroups.add(group.id);
@@ -138,7 +246,7 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
     try {
       const answerList = Object.values(answers);
       await api.post(`/diagnostic/work/${requestId}/answers`, { answers: answerList, submit: isSubmit });
-      setMsg(isSubmit ? '✅ Отчёт отправлен на проверку!' : '💾 Черновик сохранён');
+      setMsg(isSubmit ? 'Отчёт отправлен на проверку!' : 'Черновик сохранён');
       if (isSubmit) setTimeout(onDone, 1500);
     } catch (e: any) {
       setMsg(e.response?.data?.message || 'Ошибка сохранения');
@@ -155,17 +263,23 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
 
   const template: Template = data.template;
   const groups: Group[] = template?.groups ?? [];
+  const status: string = data.status || 'IN_PROGRESS';
+  const editable = isEditable(status);
+
   const totalRequired = groups.flatMap(g => g.items).filter(i => i.isRequired).length;
   const filledRequired = groups.flatMap(g => g.items).filter(i => {
     if (!i.isRequired) return false;
     const ans = answers[i.id];
-    return (ans?.rating != null && ans.rating > 0) || ans?.comment?.trim().length > 0;
+    const ft = i.fieldType || 'TEXTAREA';
+    if (ft === 'NUMBER') return ans?.rating != null && ans.rating > 0;
+    if (ft === 'PHOTO') return (ans?.photoUrls?.length ?? 0) > 0;
+    return ans?.comment?.trim().length > 0;
   }).length;
   const progress = totalRequired > 0 ? Math.round((filledRequired / totalRequired) * 100) : 100;
 
   return (
     <div className="space-y-4">
-      {/* Заголовок */}
+      {/* Header */}
       <div className="bg-white border rounded-xl p-4 shadow-sm">
         <div className="flex justify-between items-start">
           <div>
@@ -178,12 +292,17 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
 
         {!template && (
           <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-            ⚠️ Нет активного шаблона анкеты. Обратитесь к администратору для создания шаблона.
+            Нет активного шаблона анкеты. Обратитесь к администратору.
           </div>
         )}
 
-        {/* Прогресс */}
-        {template && (
+        {!editable && (
+          <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600">
+            Редактирование недоступно — статус: <strong>{STATUS_LABELS[status]?.label || status}</strong>
+          </div>
+        )}
+
+        {template && editable && (
           <div className="mt-3">
             <div className="flex justify-between text-xs text-gray-500 mb-1">
               <span>Обязательные пункты: {filledRequired}/{totalRequired}</span>
@@ -200,12 +319,16 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
       </div>
 
       {msg && (
-        <div className={`p-3 rounded-xl text-sm ${msg.includes('✅') ? 'bg-green-50 text-green-700 border border-green-200' : msg.includes('💾') ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+        <div className={`p-3 rounded-xl text-sm ${
+          msg.includes('отправлен') ? 'bg-green-50 text-green-700 border border-green-200'
+          : msg.includes('сохранён') ? 'bg-blue-50 text-blue-700 border border-blue-200'
+          : 'bg-red-50 text-red-700 border border-red-200'
+        }`}>
           {msg}
         </div>
       )}
 
-      {/* Группы шаблона */}
+      {/* Sections */}
       {groups.map(group => (
         <div key={group.id} className="bg-white border rounded-xl overflow-hidden shadow-sm">
           <button
@@ -215,7 +338,7 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
             <span className="font-medium">{group.name}</span>
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-400">
-                {group.items.filter(i => answers[i.id]?.rating || answers[i.id]?.comment).length}/{group.items.length}
+                {group.items.filter(i => answers[i.id]?.rating != null || answers[i.id]?.comment || (answers[i.id]?.photoUrls?.length ?? 0) > 0).length}/{group.items.length}
               </span>
               <span className="text-gray-400 text-xs">{openGroups.has(group.id) ? '▲' : '▼'}</span>
             </div>
@@ -224,57 +347,44 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
           {openGroups.has(group.id) && (
             <div className="divide-y">
               {group.items.length === 0 && (
-                <p className="px-4 py-3 text-sm text-gray-400">В этой группе нет пунктов</p>
+                <p className="px-4 py-3 text-sm text-gray-400">В этом разделе нет полей</p>
               )}
               {group.items.map(item => {
-                const ans = answers[item.id] ?? { itemId: item.id, rating: null, comment: '', photoUrls: [], videoUrls: [], isSkipped: false };
+                const ans = answers[item.id] ?? {
+                  itemId: item.id, rating: null, comment: '',
+                  photoUrls: [], videoUrls: [], isSkipped: false,
+                };
                 const hasError = validationErrors.has(item.id);
                 return (
-                  <div key={item.id} className={`p-4 space-y-3 ${hasError ? 'bg-red-50' : ''}`}>
-                    <div>
-                      <p className="font-medium text-sm">
-                        {item.title}
-                        {item.isRequired && <span className="text-red-500 ml-1">*</span>}
-                      </p>
-                      {item.description && <p className="text-xs text-gray-400 mt-0.5">{item.description}</p>}
-                    </div>
-
-                    {/* Оценка 1-5 */}
-                    {item.hasRating && (
+                  <div key={item.id} className={`p-4 space-y-2 ${hasError ? 'bg-red-50' : ''}`}>
+                    {(item.fieldType || 'TEXTAREA') !== 'CHECKBOX' && (
                       <div>
-                        <p className="text-xs text-gray-500 mb-1">Оценка</p>
-                        <div className="flex gap-1.5">
-                          {[1, 2, 3, 4, 5].map(star => (
-                            <button
-                              key={star}
-                              onClick={() => setAnswer(item.id, 'rating', ans.rating === star ? null : star)}
-                              className={`w-9 h-9 rounded-lg text-sm font-semibold transition-colors ${
-                                ans.rating != null && ans.rating >= star
-                                  ? 'bg-yellow-400 text-white'
-                                  : 'bg-gray-100 text-gray-500 hover:bg-yellow-100'
-                              }`}
-                            >
-                              {star}
-                            </button>
-                          ))}
-                          {ans.rating && (
-                            <span className="self-center text-xs text-gray-400 ml-1">
-                              {ans.rating === 1 ? 'Плохо' : ans.rating === 2 ? 'Удовлетворительно' : ans.rating === 3 ? 'Нормально' : ans.rating === 4 ? 'Хорошо' : 'Отлично'}
-                            </span>
-                          )}
-                        </div>
+                        <p className="font-medium text-sm">
+                          {item.title}
+                          {item.isRequired && <span className="text-red-500 ml-1">*</span>}
+                        </p>
+                        {item.description && (item.fieldType || 'TEXTAREA') !== 'SELECT' && (
+                          <p className="text-xs text-gray-400 mt-0.5">{item.description}</p>
+                        )}
                       </div>
                     )}
-
-                    {/* Комментарий */}
-                    <textarea
-                      value={ans.comment}
-                      onChange={e => setAnswer(item.id, 'comment', e.target.value)}
-                      placeholder={item.isRequired ? 'Комментарий (обязателен для обязательных пунктов)' : 'Комментарий'}
-                      rows={2}
-                      className={`w-full border rounded-lg px-3 py-2 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none ${hasError ? 'border-red-400' : 'border-gray-200'}`}
-                    />
-                    {hasError && <p className="text-xs text-red-500">Заполните оценку или комментарий</p>}
+                    {editable ? (
+                      <FieldInput
+                        item={item}
+                        ans={ans}
+                        onChange={(field, value) => setAnswer(item.id, field, value)}
+                        hasError={hasError}
+                      />
+                    ) : (
+                      <div className="text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2 border">
+                        {item.fieldType === 'NUMBER' && ans.rating ? `Оценка: ${ans.rating}/5` : null}
+                        {(item.fieldType === 'PHOTO') && ans.photoUrls?.length ? (
+                          <a href={ans.photoUrls[0]} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Фото</a>
+                        ) : null}
+                        {(!item.fieldType || ['TEXT', 'TEXTAREA', 'SELECT', 'CHECKBOX'].includes(item.fieldType)) && (ans.comment || '—')}
+                      </div>
+                    )}
+                    {hasError && <p className="text-xs text-red-500">Обязательное поле</p>}
                   </div>
                 );
               })}
@@ -283,22 +393,24 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
         </div>
       ))}
 
-      {/* Кнопки */}
-      {template && (
+      {/* Action buttons */}
+      {template && editable && (
         <div className="flex gap-3 pb-4">
           <button
             onClick={() => submit(false)}
             disabled={submitting}
             className="px-5 py-2.5 border rounded-xl text-sm hover:bg-gray-50 disabled:opacity-50"
           >
-            💾 Сохранить черновик
+            Сохранить черновик
           </button>
           <button
             onClick={() => submit(true)}
-            disabled={submitting}
+            disabled={submitting || progress < 100}
             className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm hover:bg-blue-700 disabled:opacity-50"
+            title={progress < 100 ? 'Заполните все обязательные поля' : ''}
           >
-            ✅ Отправить на проверку
+            Отправить на проверку
+            {progress < 100 && <span className="ml-1 text-xs opacity-75">({progress}%)</span>}
           </button>
         </div>
       )}
@@ -306,11 +418,12 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
   );
 }
 
-// ─── Доступные заявки ───
+// ─── Available requests tab ───
 function AvailableTab() {
   const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState('');
+  const [search, setSearch] = useState('');
 
   const load = () => {
     api.get('/diagnostic/work/pending')
@@ -323,31 +436,50 @@ function AvailableTab() {
   const takeWork = async (id: number) => {
     try {
       await api.post(`/diagnostic/work/${id}/assign`);
-      setMsg(`✅ Заявка #${id} взята в работу`);
+      setMsg(`Заявка #${id} взята в работу`);
       load();
     } catch (e: any) {
       setMsg(e.response?.data?.message || 'Ошибка');
     }
   };
 
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return requests;
+    return requests.filter(r =>
+      r.vin?.toLowerCase().includes(q) ||
+      `${r.brand} ${r.model}`.toLowerCase().includes(q)
+    );
+  }, [requests, search]);
+
   if (loading) return <div className="py-8 text-center text-gray-400">Загрузка...</div>;
 
   return (
     <div className="space-y-4">
       {msg && <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-xl p-3 text-sm">{msg}</div>}
-      <p className="text-sm text-gray-500">Заявки на диагностику от пользователей, ожидающие диагноста</p>
-      {requests.length === 0 ? (
+      <div className="flex justify-between items-center gap-3">
+        <p className="text-sm text-gray-500">Заявки, ожидающие диагноста</p>
+        <div className="w-64">
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Поиск по VIN, авто..."
+              className="pl-8 pr-3 py-2 border rounded-lg text-sm w-full focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+          </div>
+        </div>
+      </div>
+      {filtered.length === 0 ? (
         <div className="bg-white border rounded-xl p-10 text-center text-gray-400">
           <p className="text-3xl mb-2">📋</p>
-          <p>Нет доступных заявок</p>
+          <p>{requests.length === 0 ? 'Нет доступных заявок' : 'Ничего не найдено'}</p>
         </div>
       ) : (
         <div className="grid gap-3">
-          {requests.map(r => (
+          {filtered.map(r => (
             <div key={r.id} className="bg-white border rounded-xl p-4 flex justify-between items-start hover:shadow-sm transition-shadow">
               <div>
                 <p className="font-semibold">{r.brand} {r.model} {r.year}</p>
-                <p className="text-sm text-gray-500 mt-0.5">VIN: {r.vin}</p>
+                <p className="text-sm text-gray-500 mt-0.5">VIN: <span className="font-mono">{r.vin}</span></p>
                 <p className="text-xs text-gray-400 mt-1">Создана: {formatDate(r.createdAt)}</p>
               </div>
               <button
@@ -364,11 +496,13 @@ function AvailableTab() {
   );
 }
 
-// ─── Мои отчёты ───
+// ─── My reports tab ───
 function MyReportsTab() {
   const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeReport, setActiveReport] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [search, setSearch] = useState('');
 
   const load = () => {
     api.get('/diagnostic/work/my?size=50')
@@ -377,6 +511,27 @@ function MyReportsTab() {
       .finally(() => setLoading(false));
   };
   useEffect(load, []);
+
+  const rework = async (id: number) => {
+    try {
+      await api.post(`/diagnostic/work/${id}/rework`);
+      load();
+    } catch (e: any) {
+      alert(e.response?.data?.message || 'Ошибка');
+    }
+  };
+
+  const filtered = useMemo(() => {
+    let list = statusFilter === 'ALL' ? requests : requests.filter(r => r.status === statusFilter);
+    const q = search.trim().toLowerCase();
+    if (q) list = list.filter(r =>
+      r.vin?.toLowerCase().includes(q) ||
+      `${r.brand} ${r.model}`.toLowerCase().includes(q)
+    );
+    return list;
+  }, [requests, statusFilter, search]);
+
+  const statusOptions = ['ALL', 'IN_PROGRESS', 'COMPLETED', 'APPROVED', 'REJECTED'];
 
   if (activeReport != null) {
     return (
@@ -391,27 +546,61 @@ function MyReportsTab() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500">Ваши активные заявки и история</p>
-      {requests.length === 0 ? (
+      {/* Filters and search */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex gap-2 flex-wrap">
+          {statusOptions.map(s => {
+            const meta = STATUS_LABELS[s];
+            return (
+              <button key={s} onClick={() => setStatusFilter(s)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}>
+                {s === 'ALL' ? 'Все' : (
+                  <span className={`px-1.5 py-0.5 rounded text-xs ${meta?.color || 'bg-gray-100 text-gray-600'}`}>
+                    {meta?.label || s}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <div className="sm:ml-auto sm:w-64">
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="VIN, авто..."
+              className="pl-8 pr-3 py-2 border rounded-lg text-sm w-full focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+          </div>
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
         <div className="bg-white border rounded-xl p-10 text-center text-gray-400">
           <p className="text-3xl mb-2">📝</p>
-          <p>Нет заявок в работе. Возьмите заявку на вкладке «Доступные».</p>
+          <p>{requests.length === 0 ? 'Нет заявок. Возьмите заявку во вкладке «Доступные».' : 'Ничего не найдено'}</p>
         </div>
       ) : (
         <div className="grid gap-3">
-          {requests.map(r => {
+          {filtered.map(r => {
             const s = STATUS_LABELS[r.status] ?? { label: r.status, color: 'bg-gray-100 text-gray-600' };
+            const editable = isEditable(r.status);
             return (
-              <div key={r.id} className="bg-white border rounded-xl p-4 flex justify-between items-center hover:shadow-sm transition-shadow">
-                <div>
-                  <p className="font-semibold">{r.brand} {r.model} {r.year}</p>
-                  <p className="text-sm text-gray-500 mt-0.5">VIN: {r.vin}</p>
-                  <p className="text-xs text-gray-400 mt-1">{formatDate(r.createdAt)}</p>
+              <div key={r.id} className="bg-white border rounded-xl p-4 hover:shadow-sm transition-shadow">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-semibold">{r.brand} {r.model} {r.year}</p>
+                    <p className="text-sm text-gray-500 mt-0.5">VIN: <span className="font-mono">{r.vin}</span></p>
+                    <p className="text-xs text-gray-400 mt-1">{formatDate(r.createdAt)}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 ml-3">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${s.color}`}>
+                      {s.label}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 shrink-0 ml-3">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${s.color}`}>
-                    {s.label}
-                  </span>
+                {/* Actions */}
+                <div className="flex gap-2 mt-3">
                   {r.status === 'IN_PROGRESS' && (
                     <button
                       onClick={() => setActiveReport(r.id)}
@@ -419,6 +608,22 @@ function MyReportsTab() {
                     >
                       Заполнить
                     </button>
+                  )}
+                  {r.status === 'REJECTED' && (
+                    <>
+                      <button
+                        onClick={() => rework(r.id)}
+                        className="bg-orange-500 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-orange-600"
+                      >
+                        Исправить
+                      </button>
+                    </>
+                  )}
+                  {r.status === 'COMPLETED' && (
+                    <span className="text-xs text-gray-400 self-center">Ожидает проверки администратора</span>
+                  )}
+                  {r.status === 'APPROVED' && (
+                    <span className="text-xs text-green-600 self-center font-medium">Отчёт одобрен — доступен для аукциона</span>
                   )}
                 </div>
               </div>

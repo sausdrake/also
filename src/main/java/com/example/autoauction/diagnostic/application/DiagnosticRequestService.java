@@ -142,10 +142,12 @@ public class DiagnosticRequestService {
             throw new SecurityException("Вы не назначены на эту заявку");
         }
 
-        // Получаем шаблон по типу автомобиля (пока используем дефолтный)
+        // Получаем шаблон с группами и пунктами
         InspectionTemplate template = templateRepository.findActiveTemplates(Pageable.ofSize(1))
                 .stream().findFirst()
                 .orElseThrow(() -> new IllegalStateException("Нет активных шаблонов анкет"));
+        template = templateRepository.findFullTemplateById(template.getId())
+                .orElseThrow(() -> new IllegalStateException("Ошибка загрузки шаблона"));
 
         // Получаем уже сохранённые ответы (если есть)
         List<InspectionAnswer> existingAnswers = answerRepository.findByDiagnosticRequestId(requestId);

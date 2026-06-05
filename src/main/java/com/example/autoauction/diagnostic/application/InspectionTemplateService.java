@@ -107,9 +107,10 @@ public class InspectionTemplateService {
         item.setGroupId(groupId);
         item.setTitle(dto.getTitle());
         item.setDescription(dto.getDescription());
-        item.setHasPhoto(dto.isHasPhoto());
+        item.setFieldType(dto.getFieldType() != null ? dto.getFieldType() : "TEXT");
+        item.setHasPhoto("PHOTO".equals(dto.getFieldType()) || dto.isHasPhoto());
         item.setHasVideo(dto.isHasVideo());
-        item.setHasRating(dto.isHasRating());
+        item.setHasRating("NUMBER".equals(dto.getFieldType()) || dto.isHasRating());
         item.setRequired(dto.isRequired());
         item.setSortOrder(dto.getSortOrder());
 
@@ -122,9 +123,10 @@ public class InspectionTemplateService {
                 .orElseThrow(() -> new IllegalArgumentException("Пункт не найден: " + itemId));
         item.setTitle(dto.getTitle());
         item.setDescription(dto.getDescription());
-        item.setHasPhoto(dto.isHasPhoto());
+        item.setFieldType(dto.getFieldType() != null ? dto.getFieldType() : "TEXT");
+        item.setHasPhoto("PHOTO".equals(dto.getFieldType()) || dto.isHasPhoto());
         item.setHasVideo(dto.isHasVideo());
-        item.setHasRating(dto.isHasRating());
+        item.setHasRating("NUMBER".equals(dto.getFieldType()) || dto.isHasRating());
         item.setRequired(dto.isRequired());
         if (dto.getSortOrder() != null) item.setSortOrder(dto.getSortOrder());
         return templateRepository.saveItem(item);

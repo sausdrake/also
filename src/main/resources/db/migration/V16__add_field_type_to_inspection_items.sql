@@ -1,0 +1,1 @@
+ALTER TABLE inspection_items ADD COLUMN IF NOT EXISTS field_type VARCHAR(50) DEFAULT 'TEXT';
