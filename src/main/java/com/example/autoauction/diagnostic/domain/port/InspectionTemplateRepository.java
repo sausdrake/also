@@ -21,12 +21,14 @@ public interface InspectionTemplateRepository {
 
     // Группы
     InspectionGroup saveGroup(InspectionGroup group);
+    Optional<InspectionGroup> findGroupById(Long id);
     List<InspectionGroup> findGroupsByTemplateId(Long templateId);
     void deleteGroup(Long id);
     void deleteGroupsByTemplateId(Long templateId);
 
     // Пункты
     InspectionItem saveItem(InspectionItem item);
+    Optional<InspectionItem> findItemById(Long id);
     List<InspectionItem> findItemsByGroupId(Long groupId);
     void deleteItem(Long id);
     void deleteItemsByGroupId(Long groupId);

@@ -42,9 +42,21 @@ public interface SpringDataAuctionJpaRepository extends JpaRepository<JpaAuction
     List<JpaAuctionEntity> findByStatusAndEndTimeBefore(@Param("status") AuctionStatus status,
                                                         @Param("endTime") OffsetDateTime endTime);
 
-    // НОВЫЙ МЕТОД для массовой отмены
     @Modifying
     @Query("UPDATE JpaAuctionEntity a SET a.status = 'CANCELLED', a.updatedAt = :now " +
             "WHERE a.status = 'CREATED' AND a.startTime < :now")
     int cancelExpiredCreatedAuctions(@Param("now") OffsetDateTime now);
+
+    // Подтверждённые CREATED-аукционы, у которых startTime <= now
+    @Query("SELECT a FROM JpaAuctionEntity a WHERE a.status = 'CREATED' " +
+            "AND a.confirmedStart = true AND a.startTime <= :now")
+    List<JpaAuctionEntity> findConfirmedReadyToStart(@Param("now") OffsetDateTime now);
+
+    // CREATED-аукционы без подтверждения, у которых startTime - confirmHours <= now
+    @Query("SELECT a FROM JpaAuctionEntity a WHERE a.status = 'CREATED' " +
+            "AND a.confirmedStart = false AND a.startTime <= :deadline")
+    List<JpaAuctionEntity> findUnconfirmedPastDeadline(@Param("deadline") OffsetDateTime deadline);
+
+    @Query("SELECT a.status FROM JpaAuctionEntity a WHERE a.vehicleId = :vehicleId")
+    List<AuctionStatus> findStatusesByVehicleId(@Param("vehicleId") Long vehicleId);
 }

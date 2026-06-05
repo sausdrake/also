@@ -352,11 +352,61 @@ public class DepositService {
 
     @Transactional(readOnly = true)
     public List<DepositTransactionResponse> getTransactionsByUserId(Long userId) {
-        log.debug("Getting transactions for user: {}", userId);
-
-        List<DepositTransaction> transactions = depositRepository.findTransactionsByUserId(userId);
-        return transactions.stream()
+        return depositRepository.findTransactionsByUserId(userId).stream()
                 .map(DepositTransactionResponse::fromDomain)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<DepositTransactionResponse> getTransactionsFiltered(
+            Long userId,
+            DepositTransaction.TransactionType type,
+            java.time.OffsetDateTime from,
+            java.time.OffsetDateTime to) {
+        return depositRepository.findTransactionsByUserIdFiltered(userId, type, from, to).stream()
+                .map(DepositTransactionResponse::fromDomain)
+                .collect(Collectors.toList());
+    }
+
+    static final BigDecimal MAX_ADJUST_AMOUNT = new BigDecimal("99999999");
+
+    @Transactional
+    public DepositResponse adminAdjust(Long targetUserId, BigDecimal amount, String comment) {
+        if (comment == null || comment.isBlank()) {
+            throw new IllegalArgumentException("Комментарий к корректировке обязателен");
+        }
+        if (amount == null) {
+            throw new IllegalArgumentException("Сумма корректировки не может быть null");
+        }
+        if (amount.compareTo(BigDecimal.ZERO) == 0) {
+            throw new IllegalArgumentException("Сумма корректировки не может быть нулевой");
+        }
+        if (amount.abs().compareTo(MAX_ADJUST_AMOUNT) > 0) {
+            throw new IllegalArgumentException(
+                    "Сумма корректировки не может превышать " + MAX_ADJUST_AMOUNT);
+        }
+
+        Deposit deposit = depositRepository.findByUserId(targetUserId)
+                .orElseThrow(() -> new IllegalArgumentException("Депозит не найден для пользователя: " + targetUserId));
+
+        BigDecimal balanceBefore = deposit.getBalance();
+
+        if (amount.compareTo(BigDecimal.ZERO) > 0) {
+            deposit.deposit(amount);
+        } else {
+            // Отрицательная корректировка — списание. withdraw проверяет availableBalance.
+            deposit.withdraw(amount.negate());
+        }
+
+        DepositTransaction tx = new DepositTransaction(
+                deposit.getId(), targetUserId,
+                DepositTransaction.TransactionType.ADMIN_ADJUSTMENT,
+                amount, balanceBefore, deposit.getBalance(),
+                "ADMIN_ADJUSTMENT", comment
+        );
+        depositRepository.saveTransaction(tx);
+        Deposit saved = depositRepository.save(deposit);
+        log.info("Admin adjusted deposit for user {}: amount={}, comment={}", targetUserId, amount, comment);
+        return DepositResponse.fromDomain(saved);
     }
 }

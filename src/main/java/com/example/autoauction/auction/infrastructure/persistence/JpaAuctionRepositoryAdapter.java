@@ -156,4 +156,31 @@ public class JpaAuctionRepositoryAdapter implements AuctionRepository {
         jpaRepository.deleteById(id);
         log.debug("Deleted auction with id: {}", id);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Auction> findConfirmedAuctionsReadyToStart(OffsetDateTime now) {
+        return jpaRepository.findConfirmedReadyToStart(now).stream()
+                .map(mapper::toDomain)
+                .map(this::enrichDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Auction> findUnconfirmedAuctionsPastDeadline(OffsetDateTime now) {
+        return jpaRepository.findUnconfirmedPastDeadline(now).stream()
+                .map(mapper::toDomain)
+                .map(this::enrichDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Auction> findAllById(List<Long> ids) {
+        return jpaRepository.findAllById(ids).stream()
+                .map(mapper::toDomain)
+                .map(this::enrichDomain)
+                .collect(Collectors.toList());
+    }
 }

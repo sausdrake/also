@@ -22,7 +22,7 @@ export const useWebSocket = (auctionId: number) => {
   useEffect(() => {
     if (!auctionId) return;
 
-    const socket = new SockJS('http://localhost:8080/ws-auction');
+    const socket = new SockJS(`${import.meta.env.VITE_API_URL || 'http://localhost:8081'}/ws-auction`);
     const client = new Client({
       webSocketFactory: () => socket as any,
       debug: () => {},

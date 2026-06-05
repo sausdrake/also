@@ -19,6 +19,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
+import static org.assertj.core.api.Assertions.assertThat;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
@@ -270,7 +272,7 @@ class AuthServiceTest {
             UserDetails userDetails = mock(UserDetails.class);
             when(userDetails.getUsername()).thenReturn(username);
             when(userDetailsService.loadUserByUsername(username)).thenReturn(userDetails);
-            when(jwtService.generateToken(userDetails)).thenReturn(accessToken);
+            when(jwtService.generateToken(any(java.util.Map.class), eq(userDetails))).thenReturn(accessToken);
             when(jwtService.generateRefreshToken(userDetails)).thenReturn(refreshTokenString);
             when(refreshTokenRepository.save(any(RefreshToken.class))).thenReturn(mock(RefreshToken.class));
 
@@ -307,7 +309,7 @@ class AuthServiceTest {
                     .thenReturn(authentication);
             when(userDetailsService.loadUserByUsername("admin")).thenReturn(userDetails);
             when(userRepository.findByUsername("admin")).thenReturn(Optional.of(adminUser));
-            when(jwtService.generateToken(userDetails)).thenReturn(accessToken);
+            when(jwtService.generateToken(any(java.util.Map.class), eq(userDetails))).thenReturn(accessToken);
             when(jwtService.generateRefreshToken(userDetails)).thenReturn(refreshTokenString);
             when(refreshTokenRepository.save(any(RefreshToken.class))).thenReturn(refreshToken);
 
@@ -399,6 +401,64 @@ class AuthServiceTest {
 
             assertThrows(BadCredentialsException.class,
                     () -> authService.authenticate(request));
+        }
+    }
+
+    // ==================== ТЕСТЫ ЗАЩИТЫ ОТ DUPLICATE REFRESH TOKEN ====================
+
+    @Nested
+    @DisplayName("Дублирующийся refresh token — защита и retry")
+    class DuplicateRefreshTokenTests {
+
+        @Test
+        @DisplayName("При DataIntegrityViolationException на save — выполняется retry с новым токеном")
+        void generateAndSaveRefreshToken_OnDuplicateConstraint_Retries() {
+            // Симулируем: рефреш-токен при первой попытке сохранения — дубль
+            Authentication auth = mock(Authentication.class);
+            when(auth.isAuthenticated()).thenReturn(true);
+            when(authenticationManager.authenticate(any())).thenReturn(auth);
+            when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+            when(userDetailsService.loadUserByUsername(username)).thenReturn(mock(UserDetails.class));
+            when(jwtService.generateToken(any())).thenReturn(accessToken);
+            when(jwtService.getRefreshExpiration()).thenReturn(604_800_000L);
+
+            // Первый вызов generateRefreshToken → "duplicate_token"
+            // Второй вызов (retry) → "unique_retry_token"
+            when(jwtService.generateRefreshToken(any()))
+                    .thenReturn("duplicate_token")
+                    .thenReturn("unique_retry_token");
+
+            // Первый save() бросает DataIntegrityViolationException, второй — успех
+            when(refreshTokenRepository.save(argThat(t -> t != null && "duplicate_token".equals(t.getToken()))))
+                    .thenThrow(new DataIntegrityViolationException("duplicate key"));
+            when(refreshTokenRepository.save(argThat(t -> t != null && "unique_retry_token".equals(t.getToken()))))
+                    .thenAnswer(i -> i.getArgument(0));
+
+            AuthService.AuthResponse response = authService.authenticate(
+                    new AuthService.LoginRequest(username, password));
+
+            assertThat(response).isNotNull();
+            // После retry должен вернуться уникальный токен
+            assertThat(response.refreshToken()).isEqualTo("unique_retry_token");
+        }
+
+        @Test
+        @DisplayName("Refresh-токен сохраняется один раз при нормальном потоке")
+        void generateAndSaveRefreshToken_NormalFlow_SavesOnce() {
+            Authentication auth = mock(Authentication.class);
+            when(auth.isAuthenticated()).thenReturn(true);
+            when(authenticationManager.authenticate(any())).thenReturn(auth);
+            when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+            when(userDetailsService.loadUserByUsername(username)).thenReturn(mock(UserDetails.class));
+            when(jwtService.generateToken(any())).thenReturn(accessToken);
+            when(jwtService.generateRefreshToken(any())).thenReturn(refreshTokenString);
+            when(jwtService.getRefreshExpiration()).thenReturn(604_800_000L);
+            when(refreshTokenRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            authService.authenticate(new AuthService.LoginRequest(username, password));
+
+            // save() должен вызываться ровно один раз (без retry)
+            verify(refreshTokenRepository, times(1)).save(any());
         }
     }
 
@@ -535,23 +595,21 @@ class AuthServiceTest {
     class ExtendedLogoutTests {
 
         @Test
-        @DisplayName("Повторный выход с тем же токеном")
-        void logout_WithAlreadyUsedToken_ShouldThrowException() {
-            RefreshToken usedToken = new RefreshToken(
+        @DisplayName("Повторный выход с уже отозванным токеном — idempotent, не бросает исключение")
+        void logout_WithAlreadyRevokedToken_IsIdempotent() {
+            // ИСПРАВЛЕНО: logout теперь idempotent — повторный вызов не бросает исключение
+            RefreshToken revokedToken = new RefreshToken(
                     1L, refreshTokenString, user,
                     Instant.now().plusSeconds(3600), true, Instant.now()
             );
 
             AuthService.LogoutRequest request = new AuthService.LogoutRequest(refreshTokenString);
+            when(refreshTokenRepository.findByToken(refreshTokenString)).thenReturn(Optional.of(revokedToken));
 
-            when(refreshTokenRepository.findByToken(refreshTokenString)).thenReturn(Optional.of(usedToken));
+            assertDoesNotThrow(() -> authService.logout(request));
 
-            RuntimeException exception = assertThrows(RuntimeException.class,
-                    () -> authService.logout(request));
-
-            // Исправлено: сообщение может быть "Invalid refresh token" или "Refresh token already used"
-            assertTrue(exception.getMessage().contains("Invalid refresh token") ||
-                    exception.getMessage().contains("already used"));
+            // revokeAllUserTokens не должен вызываться повторно
+            verify(refreshTokenRepository, never()).revokeAllUserTokens(any());
         }
 
         @Test
@@ -727,7 +785,7 @@ class AuthServiceTest {
             UserDetails userDetails = mock(UserDetails.class);
             when(userDetails.getUsername()).thenReturn(username);
             when(userDetailsService.loadUserByUsername(username)).thenReturn(userDetails);
-            when(jwtService.generateToken(userDetails)).thenReturn(accessToken);
+            when(jwtService.generateToken(any(java.util.Map.class), eq(userDetails))).thenReturn(accessToken);
             when(jwtService.generateRefreshToken(userDetails)).thenReturn(refreshTokenString);
             when(refreshTokenRepository.save(any(RefreshToken.class))).thenReturn(mock(RefreshToken.class));
 

@@ -1,12 +1,12 @@
 package com.example.autoauction.auction.web.dto;
 
+import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-@Slf4j
+
 @Schema(description = "Ответ с данными аукциона")
 public record AuctionResponse(
 
@@ -56,9 +56,24 @@ public record AuctionResponse(
         Long createdBy,
 
         @Schema(description = "Дата создания")
-        OffsetDateTime createdAt
+        OffsetDateTime createdAt,
+
+        @Schema(description = "Запуск подтверждён администратором")
+        boolean confirmedStart,
+
+        @Schema(description = "URL главного фото")
+        String mainPhotoUrl,
+
+        @Schema(description = "URL дополнительных фото/видео — JSON-строка")
+        String additionalPhotoUrls,
+
+        @Schema(description = "URL видео")
+        String videoUrl,
+
+        @Schema(description = "Количество продлений аукциона")
+        int extensionCount
 ) {
-    public static AuctionResponse fromDomain(com.example.autoauction.auction.domain.Auction auction) {
+    public static AuctionResponse fromDomain(Auction auction) {
         return new AuctionResponse(
                 auction.getId(),
                 auction.getVehicleId(),
@@ -75,7 +90,12 @@ public record AuctionResponse(
                 auction.getWinnerId(),
                 auction.getWinningBid(),
                 auction.getCreatedBy(),
-                auction.getCreatedAt()
+                auction.getCreatedAt(),
+                auction.isConfirmedStart(),
+                auction.getMainPhotoUrl(),
+                auction.getAdditionalPhotoUrls(),
+                auction.getVideoUrl(),
+                auction.getExtensionCount()
         );
     }
 }

@@ -24,15 +24,12 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Slf4j
 @RestController
 @RequestMapping("/api/users")
 @Tag(name = "Пользователи", description = "API для управления пользователями")
 public class UserController {
-    private static final Logger log = LoggerFactory.getLogger(UserController.class);
 
     private final UserService userService;
     private final RoleRepository roleRepository;

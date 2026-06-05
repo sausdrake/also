@@ -37,6 +37,12 @@ public class Auction {
 
     private int extensionCount = 0;
 
+    private String mainPhotoUrl;
+    private String additionalPhotoUrls; // JSON-строка ["url1","url2"]
+    private String videoUrl;
+    private boolean confirmedStart = false;
+    private OffsetDateTime confirmationDeadline;
+
     private transient Clock clock;
     private transient AuctionExtensionProperties extensionProperties;
 
@@ -164,7 +170,11 @@ public class Auction {
     public OffsetDateTime getUpdatedAt() { return updatedAt; }
     public Long getVersion() { return version; }
     public int getExtensionCount() { return extensionCount; }
-
+    public String getMainPhotoUrl() { return mainPhotoUrl; }
+    public String getAdditionalPhotoUrls() { return additionalPhotoUrls; }
+    public String getVideoUrl() { return videoUrl; }
+    public boolean isConfirmedStart() { return confirmedStart; }
+    public OffsetDateTime getConfirmationDeadline() { return confirmationDeadline; }
 
     // ==================== СЕТТЕРЫ ====================
 
@@ -237,10 +247,26 @@ public class Auction {
         this.extensionCount = extensionCount;
     }
 
+    public void setMainPhotoUrl(String mainPhotoUrl) { this.mainPhotoUrl = mainPhotoUrl; }
+    public void setAdditionalPhotoUrls(String additionalPhotoUrls) { this.additionalPhotoUrls = additionalPhotoUrls; }
+    public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }
+    public void setConfirmedStart(boolean confirmedStart) { this.confirmedStart = confirmedStart; }
+    public void setConfirmationDeadline(OffsetDateTime confirmationDeadline) { this.confirmationDeadline = confirmationDeadline; }
+
     // ==================== БИЗНЕС-МЕТОДЫ ====================
 
     public void updateVehicleInfo(String vehicleInfo) {
         this.vehicleInfo = vehicleInfo;
+        this.updatedAt = now();
+    }
+
+    public void confirmStart(int confirmHours) {
+        if (this.status != AuctionStatus.CREATED) {
+            throw new IllegalStateException(
+                    String.format("Нельзя подтвердить запуск аукциона в статусе '%s'", this.status));
+        }
+        this.confirmedStart = true;
+        this.confirmationDeadline = this.startTime.minusHours(confirmHours);
         this.updatedAt = now();
     }
 

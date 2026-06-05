@@ -25,11 +25,15 @@ public interface SpringDataDiagnosticRequestJpaRepository extends JpaRepository<
 
     Optional<JpaDiagnosticRequestEntity> findByIdAndUserId(Long id, Long userId);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("UPDATE JpaDiagnosticRequestEntity d SET d.assignedTo = :diagnosticId, d.status = 'IN_PROGRESS' WHERE d.id = :requestId AND d.status = 'PENDING'")
     int assignToDiagnostic(@Param("requestId") Long requestId, @Param("diagnosticId") Long diagnosticId);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("UPDATE JpaDiagnosticRequestEntity d SET d.status = 'COMPLETED', d.updatedAt = :now WHERE d.id = :requestId AND d.assignedTo = :diagnosticId")
     int markAsCompleted(@Param("requestId") Long requestId, @Param("diagnosticId") Long diagnosticId, @Param("now") OffsetDateTime now);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE JpaDiagnosticRequestEntity d SET d.status = 'IN_PROGRESS', d.rejectedReason = NULL, d.updatedAt = :now WHERE d.id = :requestId AND d.assignedTo = :diagnosticId AND d.status = 'REJECTED'")
+    int resetForRework(@Param("requestId") Long requestId, @Param("diagnosticId") Long diagnosticId, @Param("now") OffsetDateTime now);
 }

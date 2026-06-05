@@ -35,6 +35,11 @@ public class AuctionMapper {
         entity.setUpdatedAt(domain.getUpdatedAt());
         entity.setVersion(domain.getVersion());
         entity.setExtensionCount(domain.getExtensionCount());
+        entity.setMainPhotoUrl(domain.getMainPhotoUrl());
+        entity.setAdditionalPhotoUrls(domain.getAdditionalPhotoUrls());
+        entity.setVideoUrl(domain.getVideoUrl());
+        entity.setConfirmedStart(domain.isConfirmedStart());
+        entity.setConfirmationDeadline(domain.getConfirmationDeadline());
         return entity;
     }
 
@@ -65,6 +70,11 @@ public class AuctionMapper {
         auction.setUpdatedAt(entity.getUpdatedAt());
         auction.setVersion(entity.getVersion());
         auction.setExtensionCount(entity.getExtensionCount());
+        auction.setMainPhotoUrl(entity.getMainPhotoUrl());
+        auction.setAdditionalPhotoUrls(entity.getAdditionalPhotoUrls());
+        auction.setVideoUrl(entity.getVideoUrl());
+        auction.setConfirmedStart(entity.isConfirmedStart());
+        auction.setConfirmationDeadline(entity.getConfirmationDeadline());
         return auction;
     }
 }

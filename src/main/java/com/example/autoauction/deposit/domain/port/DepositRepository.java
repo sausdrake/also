@@ -20,6 +20,11 @@ public interface DepositRepository {
     // Транзакции
     DepositTransaction saveTransaction(DepositTransaction transaction);
     List<DepositTransaction> findTransactionsByUserId(Long userId);
+    List<DepositTransaction> findTransactionsByUserIdFiltered(
+            Long userId,
+            DepositTransaction.TransactionType type,
+            java.time.OffsetDateTime from,
+            java.time.OffsetDateTime to);
     List<DepositTransaction> findTransactionsByDepositId(Long depositId);
     List<DepositTransaction> findTransactionsByAuctionId(Long auctionId);
 

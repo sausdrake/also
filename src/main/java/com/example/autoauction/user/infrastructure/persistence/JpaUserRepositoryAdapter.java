@@ -110,4 +110,20 @@ public class JpaUserRepositoryAdapter implements UserRepository {
     public boolean existsByEmail(String email) {
         return jpaRepository.existsByEmail(email);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<User> findByActive(boolean active) {
+        return jpaRepository.findByActive(active).stream()
+                .map(this::toDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<User> findByRoleName(String roleName) {
+        return jpaRepository.findByRoleName(roleName).stream()
+                .map(this::toDomain)
+                .collect(Collectors.toList());
+    }
 }

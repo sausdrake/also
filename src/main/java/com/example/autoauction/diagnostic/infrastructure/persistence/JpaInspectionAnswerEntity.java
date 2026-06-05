@@ -1,9 +1,9 @@
 package com.example.autoauction.diagnostic.infrastructure.persistence;
 
-import io.hypersistence.utils.hibernate.type.array.ListArrayType;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.*;
 import lombok.Data;
-import org.hibernate.annotations.Type;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +12,10 @@ import java.util.List;
 @Table(name = "inspection_answers")
 @Data
 public class JpaInspectionAnswerEntity {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final TypeReference<List<String>> LIST_TYPE = new TypeReference<>() {};
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -27,13 +31,12 @@ public class JpaInspectionAnswerEntity {
     @Column(length = 2000)
     private String comment;
 
-    @Type(ListArrayType.class)
-    @Column(name = "photo_urls", columnDefinition = "text[]")
-    private List<String> photoUrls = new ArrayList<>();
+    // Хранится как JSON-строка — совместимо с H2 и PostgreSQL (text)
+    @Column(name = "photo_urls", columnDefinition = "text")
+    private String photoUrlsJson;
 
-    @Type(ListArrayType.class)
-    @Column(name = "video_urls", columnDefinition = "text[]")
-    private List<String> videoUrls = new ArrayList<>();
+    @Column(name = "video_urls", columnDefinition = "text")
+    private String videoUrlsJson;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
@@ -41,12 +44,50 @@ public class JpaInspectionAnswerEntity {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
+    @Transient
+    public List<String> getPhotoUrls() {
+        return parseJson(photoUrlsJson);
+    }
+
+    @Transient
+    public void setPhotoUrls(List<String> urls) {
+        this.photoUrlsJson = toJson(urls);
+    }
+
+    @Transient
+    public List<String> getVideoUrls() {
+        return parseJson(videoUrlsJson);
+    }
+
+    @Transient
+    public void setVideoUrls(List<String> urls) {
+        this.videoUrlsJson = toJson(urls);
+    }
+
+    private static List<String> parseJson(String json) {
+        if (json == null || json.isBlank()) return new ArrayList<>();
+        try {
+            return MAPPER.readValue(json, LIST_TYPE);
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
+    }
+
+    private static String toJson(List<String> list) {
+        if (list == null || list.isEmpty()) return "[]";
+        try {
+            return MAPPER.writeValueAsString(list);
+        } catch (Exception e) {
+            return "[]";
+        }
+    }
+
     @PrePersist
     protected void onCreate() {
         createdAt = OffsetDateTime.now();
         updatedAt = OffsetDateTime.now();
-        if (photoUrls == null) photoUrls = new ArrayList<>();
-        if (videoUrls == null) videoUrls = new ArrayList<>();
+        if (photoUrlsJson == null) photoUrlsJson = "[]";
+        if (videoUrlsJson == null) videoUrlsJson = "[]";
     }
 
     @PreUpdate

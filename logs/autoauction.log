@@ -1,0 +1,306 @@
+06-06-2026 04:03:47.200 [main] INFO  c.e.a.AutoauctionApplication - Starting AutoauctionApplication using Java 17.0.18 with PID 1548 (D:\AutoAuction\target\classes started by Asus in D:\AutoAuction)
+06-06-2026 04:03:47.208 [main] INFO  c.e.a.AutoauctionApplication - No active profile set, falling back to 1 default profile: "default"
+06-06-2026 04:03:48.128 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+06-06-2026 04:03:48.229 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 94 ms. Found 16 JPA repository interfaces.
+06-06-2026 04:03:48.844 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port(s): 8081 (http)
+06-06-2026 04:03:48.854 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+06-06-2026 04:03:48.855 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.15]
+06-06-2026 04:03:48.944 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+06-06-2026 04:03:48.945 [main] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 1672 ms
+06-06-2026 04:03:49.256 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+06-06-2026 04:03:49.439 [main] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@2f86f9cf
+06-06-2026 04:03:49.440 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+06-06-2026 04:03:49.496 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+06-06-2026 04:03:49.668 [main] INFO  o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+06-06-2026 04:03:50.796 [main] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'default'
+06-06-2026 04:03:51.022 [main] INFO  o.s.d.j.r.query.QueryEnhancerFactory - Hibernate is in classpath; If applicable, HQL parser will be used.
+06-06-2026 04:03:51.336 [main] DEBUG c.e.a.a.i.s.JwtAuthenticationFilter - Filter 'jwtAuthenticationFilter' configured for use
+06-06-2026 04:03:51.448 [main] INFO  c.e.a.a.i.p.JpaAuctionRepositoryAdapter - JpaAuctionRepositoryAdapter initialized with Clock and ExtensionProperties
+06-06-2026 04:03:51.498 [main] INFO  c.e.a.v.application.VehicleService - VehicleService инициализирован
+06-06-2026 04:03:51.622 [main] INFO  c.e.a.d.i.p.JpaDepositRepositoryAdapter - JpaDepositRepositoryAdapter initialized
+06-06-2026 04:03:51.663 [main] INFO  c.e.a.d.application.DepositService - DepositService initialized
+06-06-2026 04:03:51.788 [main] INFO  c.e.a.a.a.AdminAuctionService - AdminAuctionService инициализирован
+06-06-2026 04:03:51.808 [main] INFO  c.e.a.user.application.UserService - UserService initialized.
+06-06-2026 04:03:52.001 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - === Auction Extension Configuration ===
+06-06-2026 04:03:52.002 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - Enabled: true
+06-06-2026 04:03:52.002 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - Threshold seconds: 30
+06-06-2026 04:03:52.002 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - Extension minutes: 5
+06-06-2026 04:03:52.002 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - Max extensions: unlimited
+06-06-2026 04:03:52.003 [main] INFO  c.e.a.a.a.AuctionExtensionValidator - =======================================
+06-06-2026 04:03:52.012 [main] INFO  c.e.a.auction.application.BidService - BidService initialized with WebSocket support
+06-06-2026 04:03:52.017 [main] INFO  c.e.a.a.i.s.AuctionCompletionScheduler - AuctionCompletionScheduler initialized
+06-06-2026 04:03:52.132 [main] INFO  c.e.a.deposit.web.DepositController - DepositController initialized
+06-06-2026 04:03:52.190 [main] INFO  c.e.a.user.web.UserController - UserController initialized and ready.
+06-06-2026 04:03:52.286 [main] WARN  o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+06-06-2026 04:03:52.444 [main] DEBUG o.s.w.s.s.s.WebSocketHandlerMapping - Patterns [/ws-auction/**, /ws] in 'stompWebSocketHandlerMapping'
+06-06-2026 04:03:52.493 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.AdminAuctionController:
+	
+06-06-2026 04:03:52.494 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.AdminUserController:
+	
+06-06-2026 04:03:52.495 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.AdminVehicleController:
+	
+06-06-2026 04:03:52.495 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.DashboardController:
+	
+06-06-2026 04:03:52.496 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.SystemSettingsController:
+	
+06-06-2026 04:03:52.496 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.AuctionWebSocketController:
+	
+06-06-2026 04:03:52.496 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.BidController:
+	
+06-06-2026 04:03:52.496 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.PublicAuctionController:
+	
+06-06-2026 04:03:52.497 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.a.w.AuthController:
+	
+06-06-2026 04:03:52.497 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.c.m.MediaController:
+	
+06-06-2026 04:03:52.497 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.c.HealthController:
+	
+06-06-2026 04:03:52.498 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.d.w.DepositController:
+	
+06-06-2026 04:03:52.498 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.d.w.AdminDiagnosticController:
+	
+06-06-2026 04:03:52.499 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.d.w.DiagnosticRequestController:
+	
+06-06-2026 04:03:52.499 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.d.w.DiagnosticWorkController:
+	
+06-06-2026 04:03:52.499 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.d.w.PublicReportController:
+	
+06-06-2026 04:03:52.500 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.n.w.NotificationController:
+	
+06-06-2026 04:03:52.500 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.u.w.UserController:
+	
+06-06-2026 04:03:52.501 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	c.e.a.v.w.DiagnosticVehicleController:
+	
+06-06-2026 04:03:52.503 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	o.s.b.a.w.s.e.BasicErrorController:
+	
+06-06-2026 04:03:52.510 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	o.s.w.a.OpenApiWebMvcResource:
+	
+06-06-2026 04:03:52.511 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	o.s.w.u.SwaggerWelcomeWebMvc:
+	
+06-06-2026 04:03:52.511 [main] DEBUG o.s.w.s.m.WebSocketAnnotationMethodMessageHandler - 
+	o.s.w.u.SwaggerConfigResource:
+	
+06-06-2026 04:03:52.857 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port(s): 8081 (http) with context path ''
+06-06-2026 04:03:52.859 [main] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - Starting...
+06-06-2026 04:03:52.860 [main] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - BrokerAvailabilityEvent[available=true, SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@65accb85]]
+06-06-2026 04:03:52.861 [main] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - Started.
+06-06-2026 04:03:52.872 [main] INFO  c.e.a.AutoauctionApplication - Started AutoauctionApplication in 6.014 seconds (process running for 6.308)
+06-06-2026 04:04:52.481 [MessageBroker-1] INFO  o.s.w.s.c.WebSocketMessageBrokerStats - WebSocketSession[0 current WS(0)-HttpStream(0)-HttpPoll(0), 0 total, 0 closed abnormally (0 connect failure, 0 send limit, 0 transport error)], stompSubProtocol[processed CONNECT(0)-CONNECTED(0)-DISCONNECT(0)], stompBrokerRelay[null], inboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0], outboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0], sockJsScheduler[pool size = 8, active threads = 1, queued tasks = 5, completed tasks = 4]
+06-06-2026 04:05:01.646 [http-nio-8081-exec-1] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+06-06-2026 04:05:07.046 [http-nio-8081-exec-8] INFO  c.e.a.auth.web.AuthController - Logout request received
+06-06-2026 04:05:07.047 [http-nio-8081-exec-8] INFO  c.e.a.auth.application.AuthService - Logging out user
+06-06-2026 04:05:07.099 [http-nio-8081-exec-8] INFO  c.e.a.a.i.p.JpaRefreshTokenRepositoryAdapter - Revoked all refresh tokens for user: diagnostic
+06-06-2026 04:05:07.100 [http-nio-8081-exec-8] INFO  c.e.a.auth.application.AuthService - User logged out successfully: diagnostic
+06-06-2026 04:05:09.749 [http-nio-8081-exec-5] INFO  c.e.a.auth.web.AuthController - Login attempt for username: admin
+06-06-2026 04:05:09.750 [http-nio-8081-exec-5] INFO  c.e.a.auth.application.AuthService - Authenticating user: admin
+06-06-2026 04:05:09.916 [http-nio-8081-exec-5] DEBUG c.e.a.auth.application.AuthService - Authentication successful for user: admin
+06-06-2026 04:05:09.969 [http-nio-8081-exec-5] DEBUG c.e.a.auth.application.AuthService - Refresh token saved for user: admin
+06-06-2026 04:05:09.969 [http-nio-8081-exec-5] INFO  c.e.a.auth.application.AuthService - User logged in successfully: admin
+06-06-2026 04:05:09.971 [http-nio-8081-exec-5] INFO  c.e.a.auth.web.AuthController - Login successful for username: admin
+06-06-2026 04:05:17.530 [http-nio-8081-exec-1] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:05:17.554 [http-nio-8081-exec-7] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:05:20.490 [http-nio-8081-exec-6] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/my - diagnostic: 14
+06-06-2026 04:05:20.510 [http-nio-8081-exec-2] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/my - diagnostic: 14
+06-06-2026 04:05:21.243 [http-nio-8081-exec-8] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:05:21.264 [http-nio-8081-exec-3] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:06:14.392 [http-nio-8081-exec-3] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:06:14.421 [http-nio-8081-exec-5] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:06:14.422 [http-nio-8081-exec-7] DEBUG c.e.a.auth.web.AuthController - Refresh token request received
+06-06-2026 04:06:14.423 [http-nio-8081-exec-7] DEBUG c.e.a.auth.application.AuthService - Refreshing token
+06-06-2026 04:06:14.440 [http-nio-8081-exec-7] INFO  c.e.a.a.i.p.JpaRefreshTokenRepositoryAdapter - Revoked all refresh tokens for user: admin
+06-06-2026 04:06:14.454 [http-nio-8081-exec-7] DEBUG c.e.a.auth.application.AuthService - Refresh token saved for user: admin
+06-06-2026 04:06:14.454 [http-nio-8081-exec-7] INFO  c.e.a.auth.application.AuthService - Tokens refreshed successfully for user: admin
+06-06-2026 04:06:14.498 [http-nio-8081-exec-2] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:06:14.514 [http-nio-8081-exec-9] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:07:55.373 [http-nio-8081-exec-8] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:07:55.392 [http-nio-8081-exec-3] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:07:57.481 [http-nio-8081-exec-4] INFO  c.e.a.auth.web.AuthController - Logout request received
+06-06-2026 04:07:57.482 [http-nio-8081-exec-4] INFO  c.e.a.auth.application.AuthService - Logging out user
+06-06-2026 04:07:57.493 [http-nio-8081-exec-4] INFO  c.e.a.auth.application.AuthService - Refresh token already revoked for user: admin (idempotent logout)
+06-06-2026 04:08:02.894 [http-nio-8081-exec-10] INFO  c.e.a.auth.web.AuthController - Login attempt for username: diagnostic
+06-06-2026 04:08:02.895 [http-nio-8081-exec-10] INFO  c.e.a.auth.application.AuthService - Authenticating user: diagnostic
+06-06-2026 04:08:02.975 [http-nio-8081-exec-10] DEBUG c.e.a.auth.application.AuthService - Authentication successful for user: diagnostic
+06-06-2026 04:08:02.982 [http-nio-8081-exec-10] DEBUG c.e.a.auth.application.AuthService - Refresh token saved for user: diagnostic
+06-06-2026 04:08:02.982 [http-nio-8081-exec-10] INFO  c.e.a.auth.application.AuthService - User logged in successfully: diagnostic
+06-06-2026 04:08:02.984 [http-nio-8081-exec-10] INFO  c.e.a.auth.web.AuthController - Login successful for username: diagnostic
+06-06-2026 04:08:03.044 [http-nio-8081-exec-7] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:08:03.063 [http-nio-8081-exec-2] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:08:04.324 [http-nio-8081-exec-9] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/my - diagnostic: 16
+06-06-2026 04:08:04.348 [http-nio-8081-exec-8] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/my - diagnostic: 16
+06-06-2026 04:08:05.806 [http-nio-8081-exec-1] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/1 - diagnostic: 16
+06-06-2026 04:08:05.830 [http-nio-8081-exec-4] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/1 - diagnostic: 16
+06-06-2026 04:08:08.871 [http-nio-8081-exec-10] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:08:08.890 [http-nio-8081-exec-5] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:08:09.468 [http-nio-8081-exec-7] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/my - diagnostic: 16
+06-06-2026 04:08:09.495 [http-nio-8081-exec-2] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/my - diagnostic: 16
+06-06-2026 04:08:11.040 [http-nio-8081-exec-3] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/3 - diagnostic: 16
+06-06-2026 04:08:11.056 [http-nio-8081-exec-6] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/3 - diagnostic: 16
+06-06-2026 04:08:13.527 [http-nio-8081-exec-4] INFO  c.e.a.d.web.DiagnosticWorkController - POST /api/diagnostic/work/3/answers - diagnostic: 16, submit: true
+06-06-2026 04:08:13.528 [http-nio-8081-exec-4] INFO  c.e.a.d.a.DiagnosticRequestService - Saving inspection answers for request: 3, diagnostic: 16
+06-06-2026 04:08:13.531 [http-nio-8081-exec-4] INFO  c.e.a.d.i.p.InspectionAnswerRepositoryAdapter - Deleted answers for requestId=3
+06-06-2026 04:08:13.532 [http-nio-8081-exec-4] INFO  c.e.a.d.i.p.InspectionAnswerRepositoryAdapter - Saved 0 answers for requestId=null
+06-06-2026 04:08:13.538 [http-nio-8081-exec-4] INFO  c.e.a.d.i.p.DiagnosticRequestRepositoryAdapter - Marked request 3 as completed by diagnostic 16
+06-06-2026 04:08:13.538 [http-nio-8081-exec-4] INFO  c.e.a.d.a.DiagnosticRequestService - Request 3 marked as completed
+06-06-2026 04:08:15.049 [http-nio-8081-exec-10] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/my - diagnostic: 16
+06-06-2026 04:08:19.341 [http-nio-8081-exec-5] INFO  c.e.a.auth.web.AuthController - Logout request received
+06-06-2026 04:08:19.343 [http-nio-8081-exec-5] INFO  c.e.a.auth.application.AuthService - Logging out user
+06-06-2026 04:08:19.351 [http-nio-8081-exec-5] INFO  c.e.a.a.i.p.JpaRefreshTokenRepositoryAdapter - Revoked all refresh tokens for user: diagnostic
+06-06-2026 04:08:19.352 [http-nio-8081-exec-5] INFO  c.e.a.auth.application.AuthService - User logged out successfully: diagnostic
+06-06-2026 04:08:21.836 [http-nio-8081-exec-7] INFO  c.e.a.auth.web.AuthController - Login attempt for username: admin
+06-06-2026 04:08:21.838 [http-nio-8081-exec-7] INFO  c.e.a.auth.application.AuthService - Authenticating user: admin
+06-06-2026 04:08:21.916 [http-nio-8081-exec-7] DEBUG c.e.a.auth.application.AuthService - Authentication successful for user: admin
+06-06-2026 04:08:21.923 [http-nio-8081-exec-7] DEBUG c.e.a.auth.application.AuthService - Refresh token saved for user: admin
+06-06-2026 04:08:21.923 [http-nio-8081-exec-7] INFO  c.e.a.auth.application.AuthService - User logged in successfully: admin
+06-06-2026 04:08:21.925 [http-nio-8081-exec-7] INFO  c.e.a.auth.web.AuthController - Login successful for username: admin
+06-06-2026 04:08:56.352 [http-nio-8081-exec-7] INFO  c.e.a.d.i.p.DiagnosticRequestRepositoryAdapter - Saved diagnostic request: id=3, userId=23, vin=46583758395847593
+06-06-2026 04:08:56.353 [http-nio-8081-exec-7] INFO  c.e.a.d.application.DepositService - Unfreezing deposit for user: 23, request: 3
+06-06-2026 04:08:56.395 [http-nio-8081-exec-7] INFO  c.e.a.v.application.VehicleService - Vehicle created from diagnostic request 3: id=11, vin=46583758395847593
+06-06-2026 04:08:56.395 [http-nio-8081-exec-7] INFO  c.e.a.d.a.DiagnosticRequestService - Report 3 approved by admin 14
+06-06-2026 04:08:58.824 [http-nio-8081-exec-9] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:08:58.833 [http-nio-8081-exec-1] DEBUG c.e.a.auth.web.AuthController - Refresh token request received
+06-06-2026 04:08:58.834 [http-nio-8081-exec-1] DEBUG c.e.a.auth.application.AuthService - Refreshing token
+06-06-2026 04:08:58.837 [http-nio-8081-exec-6] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:08:58.851 [http-nio-8081-exec-1] INFO  c.e.a.a.i.p.JpaRefreshTokenRepositoryAdapter - Revoked all refresh tokens for user: admin
+06-06-2026 04:08:58.861 [http-nio-8081-exec-1] DEBUG c.e.a.auth.application.AuthService - Refresh token saved for user: admin
+06-06-2026 04:08:58.861 [http-nio-8081-exec-1] INFO  c.e.a.auth.application.AuthService - Tokens refreshed successfully for user: admin
+06-06-2026 04:08:58.901 [http-nio-8081-exec-4] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:08:58.916 [http-nio-8081-exec-10] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:10:49.726 [http-nio-8081-exec-1] INFO  c.e.a.auth.web.AuthController - Logout request received
+06-06-2026 04:10:49.728 [http-nio-8081-exec-1] INFO  c.e.a.auth.application.AuthService - Logging out user
+06-06-2026 04:10:49.733 [http-nio-8081-exec-1] INFO  c.e.a.auth.application.AuthService - Refresh token already revoked for user: admin (idempotent logout)
+06-06-2026 04:10:53.379 [http-nio-8081-exec-4] INFO  c.e.a.auth.web.AuthController - Login attempt for username: sausdrake00
+06-06-2026 04:10:53.380 [http-nio-8081-exec-4] INFO  c.e.a.auth.application.AuthService - Authenticating user: sausdrake00
+06-06-2026 04:10:53.459 [http-nio-8081-exec-4] DEBUG c.e.a.auth.application.AuthService - Authentication successful for user: sausdrake00
+06-06-2026 04:10:53.483 [http-nio-8081-exec-4] DEBUG c.e.a.auth.application.AuthService - Refresh token saved for user: sausdrake00
+06-06-2026 04:10:53.484 [http-nio-8081-exec-4] INFO  c.e.a.auth.application.AuthService - User logged in successfully: sausdrake00
+06-06-2026 04:10:53.485 [http-nio-8081-exec-4] INFO  c.e.a.auth.web.AuthController - Login successful for username: sausdrake00
+06-06-2026 04:11:00.260 [http-nio-8081-exec-6] INFO  c.e.a.d.w.DiagnosticRequestController - GET /api/diagnostic-requests/my - user: 23
+06-06-2026 04:11:00.279 [http-nio-8081-exec-1] INFO  c.e.a.d.w.DiagnosticRequestController - GET /api/diagnostic-requests/my - user: 23
+06-06-2026 04:11:20.301 [http-nio-8081-exec-10] INFO  c.e.a.d.w.DiagnosticRequestController - POST /api/diagnostic-requests - user: 23
+06-06-2026 04:11:20.302 [http-nio-8081-exec-10] INFO  c.e.a.d.a.DiagnosticRequestService - Creating diagnostic request for user: 23, vin: 37485847859438572
+06-06-2026 04:11:20.309 [http-nio-8081-exec-10] INFO  c.e.a.d.i.p.DiagnosticRequestRepositoryAdapter - Saved diagnostic request: id=4, userId=23, vin=37485847859438572
+06-06-2026 04:11:20.309 [http-nio-8081-exec-10] INFO  c.e.a.d.application.DepositService - Freezing deposit for user: 23, request: 4, amount: 10000
+06-06-2026 04:11:20.319 [http-nio-8081-exec-10] INFO  c.e.a.d.a.DiagnosticRequestService - Created diagnostic request: id=4, userId=23
+06-06-2026 04:11:20.337 [http-nio-8081-exec-5] INFO  c.e.a.d.w.DiagnosticRequestController - GET /api/diagnostic-requests/my - user: 23
+06-06-2026 04:17:07.546 [http-nio-8081-exec-1] INFO  c.e.a.auth.web.AuthController - Logout request received
+06-06-2026 04:17:07.548 [http-nio-8081-exec-1] INFO  c.e.a.auth.application.AuthService - Logging out user
+06-06-2026 04:17:07.553 [http-nio-8081-exec-1] INFO  c.e.a.a.i.p.JpaRefreshTokenRepositoryAdapter - Revoked all refresh tokens for user: sausdrake00
+06-06-2026 04:17:07.554 [http-nio-8081-exec-1] INFO  c.e.a.auth.application.AuthService - User logged out successfully: sausdrake00
+06-06-2026 04:17:09.694 [http-nio-8081-exec-4] INFO  c.e.a.auth.web.AuthController - Login attempt for username: admin
+06-06-2026 04:17:09.695 [http-nio-8081-exec-4] INFO  c.e.a.auth.application.AuthService - Authenticating user: admin
+06-06-2026 04:17:09.775 [http-nio-8081-exec-4] DEBUG c.e.a.auth.application.AuthService - Authentication successful for user: admin
+06-06-2026 04:17:09.781 [http-nio-8081-exec-4] DEBUG c.e.a.auth.application.AuthService - Refresh token saved for user: admin
+06-06-2026 04:17:09.781 [http-nio-8081-exec-4] INFO  c.e.a.auth.application.AuthService - User logged in successfully: admin
+06-06-2026 04:17:09.783 [http-nio-8081-exec-4] INFO  c.e.a.auth.web.AuthController - Login successful for username: admin
+06-06-2026 04:17:30.359 [http-nio-8081-exec-10] INFO  c.e.a.auth.web.AuthController - Logout request received
+06-06-2026 04:17:30.361 [http-nio-8081-exec-10] INFO  c.e.a.auth.application.AuthService - Logging out user
+06-06-2026 04:17:30.396 [http-nio-8081-exec-10] INFO  c.e.a.a.i.p.JpaRefreshTokenRepositoryAdapter - Revoked all refresh tokens for user: admin
+06-06-2026 04:17:30.398 [http-nio-8081-exec-10] INFO  c.e.a.auth.application.AuthService - User logged out successfully: admin
+06-06-2026 04:17:33.063 [http-nio-8081-exec-5] INFO  c.e.a.auth.web.AuthController - Login attempt for username: diagnostic
+06-06-2026 04:17:33.064 [http-nio-8081-exec-5] INFO  c.e.a.auth.application.AuthService - Authenticating user: diagnostic
+06-06-2026 04:17:33.142 [http-nio-8081-exec-5] DEBUG c.e.a.auth.application.AuthService - Authentication successful for user: diagnostic
+06-06-2026 04:17:33.148 [http-nio-8081-exec-5] DEBUG c.e.a.auth.application.AuthService - Refresh token saved for user: diagnostic
+06-06-2026 04:17:33.149 [http-nio-8081-exec-5] INFO  c.e.a.auth.application.AuthService - User logged in successfully: diagnostic
+06-06-2026 04:17:33.151 [http-nio-8081-exec-5] INFO  c.e.a.auth.web.AuthController - Login successful for username: diagnostic
+06-06-2026 04:17:33.190 [http-nio-8081-exec-9] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:17:33.209 [http-nio-8081-exec-2] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:17:34.938 [http-nio-8081-exec-3] INFO  c.e.a.d.web.DiagnosticWorkController - POST /api/diagnostic/work/4/assign - diagnostic: 16
+06-06-2026 04:17:34.938 [http-nio-8081-exec-3] INFO  c.e.a.d.a.DiagnosticRequestService - Assigning request 4 to diagnostic 16
+06-06-2026 04:17:34.942 [http-nio-8081-exec-3] INFO  c.e.a.d.i.p.DiagnosticRequestRepositoryAdapter - Assigned request 4 to diagnostic 16
+06-06-2026 04:17:34.956 [http-nio-8081-exec-6] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:17:36.476 [http-nio-8081-exec-1] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/my - diagnostic: 16
+06-06-2026 04:17:36.495 [http-nio-8081-exec-4] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/my - diagnostic: 16
+06-06-2026 04:17:42.186 [http-nio-8081-exec-7] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/4 - diagnostic: 16
+06-06-2026 04:17:42.196 [http-nio-8081-exec-9] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/4 - diagnostic: 16
+06-06-2026 04:17:46.257 [http-nio-8081-exec-2] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:17:46.267 [http-nio-8081-exec-8] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:17:46.751 [http-nio-8081-exec-3] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/my - diagnostic: 16
+06-06-2026 04:17:46.769 [http-nio-8081-exec-6] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/my - diagnostic: 16
+06-06-2026 04:17:48.349 [http-nio-8081-exec-1] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/4 - diagnostic: 16
+06-06-2026 04:17:48.360 [http-nio-8081-exec-4] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/4 - diagnostic: 16
+06-06-2026 04:18:17.844 [http-nio-8081-exec-8] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:18:17.854 [http-nio-8081-exec-3] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:18:38.426 [http-nio-8081-exec-1] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:18:38.436 [http-nio-8081-exec-4] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:20:28.423 [http-nio-8081-exec-8] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/my - diagnostic: 16
+06-06-2026 04:20:28.435 [http-nio-8081-exec-6] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/diagnostic/work/my - diagnostic: 16
+06-06-2026 04:20:32.491 [http-nio-8081-exec-1] INFO  c.e.a.auth.web.AuthController - Logout request received
+06-06-2026 04:20:32.493 [http-nio-8081-exec-1] INFO  c.e.a.auth.application.AuthService - Logging out user
+06-06-2026 04:20:32.502 [http-nio-8081-exec-1] INFO  c.e.a.a.i.p.JpaRefreshTokenRepositoryAdapter - Revoked all refresh tokens for user: diagnostic
+06-06-2026 04:20:32.503 [http-nio-8081-exec-1] INFO  c.e.a.auth.application.AuthService - User logged out successfully: diagnostic
+06-06-2026 04:20:34.886 [http-nio-8081-exec-4] INFO  c.e.a.auth.web.AuthController - Login attempt for username: admin
+06-06-2026 04:20:34.887 [http-nio-8081-exec-4] INFO  c.e.a.auth.application.AuthService - Authenticating user: admin
+06-06-2026 04:20:34.966 [http-nio-8081-exec-4] DEBUG c.e.a.auth.application.AuthService - Authentication successful for user: admin
+06-06-2026 04:20:34.973 [http-nio-8081-exec-4] DEBUG c.e.a.auth.application.AuthService - Refresh token saved for user: admin
+06-06-2026 04:20:34.973 [http-nio-8081-exec-4] INFO  c.e.a.auth.application.AuthService - User logged in successfully: admin
+06-06-2026 04:20:34.975 [http-nio-8081-exec-4] INFO  c.e.a.auth.web.AuthController - Login successful for username: admin
+06-06-2026 04:21:15.450 [http-nio-8081-exec-1] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:21:15.462 [http-nio-8081-exec-5] DEBUG c.e.a.auth.web.AuthController - Refresh token request received
+06-06-2026 04:21:15.463 [http-nio-8081-exec-5] DEBUG c.e.a.auth.application.AuthService - Refreshing token
+06-06-2026 04:21:15.463 [http-nio-8081-exec-10] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:21:15.509 [http-nio-8081-exec-5] INFO  c.e.a.a.i.p.JpaRefreshTokenRepositoryAdapter - Revoked all refresh tokens for user: admin
+06-06-2026 04:21:15.516 [http-nio-8081-exec-5] DEBUG c.e.a.auth.application.AuthService - Refresh token saved for user: admin
+06-06-2026 04:21:15.517 [http-nio-8081-exec-5] INFO  c.e.a.auth.application.AuthService - Tokens refreshed successfully for user: admin
+06-06-2026 04:21:15.548 [http-nio-8081-exec-7] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:21:15.564 [http-nio-8081-exec-9] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:23:00.780 [http-nio-8081-exec-4] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:23:00.793 [http-nio-8081-exec-7] DEBUG c.e.a.auth.web.AuthController - Refresh token request received
+06-06-2026 04:23:00.796 [http-nio-8081-exec-7] DEBUG c.e.a.auth.application.AuthService - Refreshing token
+06-06-2026 04:23:00.796 [http-nio-8081-exec-5] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:23:00.811 [http-nio-8081-exec-7] INFO  c.e.a.a.i.p.JpaRefreshTokenRepositoryAdapter - Revoked all refresh tokens for user: admin
+06-06-2026 04:23:00.819 [http-nio-8081-exec-7] DEBUG c.e.a.auth.application.AuthService - Refresh token saved for user: admin
+06-06-2026 04:23:00.819 [http-nio-8081-exec-7] INFO  c.e.a.auth.application.AuthService - Tokens refreshed successfully for user: admin
+06-06-2026 04:23:00.856 [http-nio-8081-exec-9] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:23:00.871 [http-nio-8081-exec-2] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:25:26.050 [http-nio-8081-exec-8] INFO  c.e.a.a.a.SystemSettingsService - System setting 'commission_percent' updated to '3'
+06-06-2026 04:25:26.051 [http-nio-8081-exec-8] INFO  c.e.a.a.a.SystemSettingsService - System setting 'default_bid_step_percent' updated to '1'
+06-06-2026 04:25:26.052 [http-nio-8081-exec-8] INFO  c.e.a.a.a.SystemSettingsService - System setting 'deposit_percent' updated to '1'
+06-06-2026 04:25:30.681 [http-nio-8081-exec-10] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:25:30.699 [http-nio-8081-exec-9] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:25:30.703 [http-nio-8081-exec-2] DEBUG c.e.a.auth.web.AuthController - Refresh token request received
+06-06-2026 04:25:30.704 [http-nio-8081-exec-2] DEBUG c.e.a.auth.application.AuthService - Refreshing token
+06-06-2026 04:25:30.715 [http-nio-8081-exec-2] INFO  c.e.a.a.i.p.JpaRefreshTokenRepositoryAdapter - Revoked all refresh tokens for user: admin
+06-06-2026 04:25:30.721 [http-nio-8081-exec-2] DEBUG c.e.a.auth.application.AuthService - Refresh token saved for user: admin
+06-06-2026 04:25:30.722 [http-nio-8081-exec-2] INFO  c.e.a.auth.application.AuthService - Tokens refreshed successfully for user: admin
+06-06-2026 04:25:30.749 [http-nio-8081-exec-8] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:25:30.762 [http-nio-8081-exec-6] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:34:52.487 [MessageBroker-1] INFO  o.s.w.s.c.WebSocketMessageBrokerStats - WebSocketSession[0 current WS(0)-HttpStream(0)-HttpPoll(0), 0 total, 0 closed abnormally (0 connect failure, 0 send limit, 0 transport error)], stompSubProtocol[processed CONNECT(0)-CONNECTED(0)-DISCONNECT(0)], stompBrokerRelay[null], inboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0], outboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0], sockJsScheduler[pool size = 8, active threads = 1, queued tasks = 5, completed tasks = 98]
+06-06-2026 04:35:18.455 [http-nio-8081-exec-10] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:35:18.469 [http-nio-8081-exec-5] INFO  c.e.a.d.web.DiagnosticWorkController - GET /api/v1/diagnostic/work/pending
+06-06-2026 04:35:21.131 [http-nio-8081-exec-8] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:35:21.148 [http-nio-8081-exec-3] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:35:21.154 [http-nio-8081-exec-4] DEBUG c.e.a.auth.web.AuthController - Refresh token request received
+06-06-2026 04:35:21.156 [http-nio-8081-exec-4] DEBUG c.e.a.auth.application.AuthService - Refreshing token
+06-06-2026 04:35:21.191 [http-nio-8081-exec-4] INFO  c.e.a.a.i.p.JpaRefreshTokenRepositoryAdapter - Revoked all refresh tokens for user: admin
+06-06-2026 04:35:21.197 [http-nio-8081-exec-4] DEBUG c.e.a.auth.application.AuthService - Refresh token saved for user: admin
+06-06-2026 04:35:21.197 [http-nio-8081-exec-4] INFO  c.e.a.auth.application.AuthService - Tokens refreshed successfully for user: admin
+06-06-2026 04:35:21.217 [http-nio-8081-exec-1] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:35:21.226 [http-nio-8081-exec-10] ERROR c.e.a.a.i.s.JwtAuthenticationEntryPoint - Authentication failed: Full authentication is required to access this resource
+06-06-2026 04:41:08.768 [SpringApplicationShutdownHook] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - Stopping...
+06-06-2026 04:41:08.768 [SpringApplicationShutdownHook] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - BrokerAvailabilityEvent[available=false, SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@65accb85]]
+06-06-2026 04:41:08.769 [SpringApplicationShutdownHook] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - Stopped.
+06-06-2026 04:41:08.805 [SpringApplicationShutdownHook] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Closing JPA EntityManagerFactory for persistence unit 'default'
+06-06-2026 04:41:08.808 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+06-06-2026 04:41:08.812 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.

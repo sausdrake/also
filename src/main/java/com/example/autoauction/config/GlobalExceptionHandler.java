@@ -2,6 +2,7 @@
 
 package com.example.autoauction.config;
 
+import com.example.autoauction.deposit.domain.InsufficientFundsException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -141,6 +142,19 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.CONFLICT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(error);
+    }
+
+    @ExceptionHandler(InsufficientFundsException.class)
+    public ResponseEntity<Map<String, Object>> handleInsufficientFunds(InsufficientFundsException e) {
+        log.warn("Insufficient funds: available={}, required={}", e.getAvailable(), e.getRequired());
+        Map<String, Object> error = new HashMap<>();
+        error.put("timestamp", java.time.LocalDateTime.now().toString());
+        error.put("status", 422);
+        error.put("error", "Insufficient Funds");
+        error.put("message", e.getMessage());
+        error.put("available", e.getAvailable());
+        error.put("required", e.getRequired());
+        return ResponseEntity.unprocessableEntity().contentType(MediaType.APPLICATION_JSON).body(error);
     }
 
     @ExceptionHandler(SecurityException.class)

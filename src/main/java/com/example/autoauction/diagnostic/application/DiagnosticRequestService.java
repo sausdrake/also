@@ -2,6 +2,7 @@ package com.example.autoauction.diagnostic.application;
 
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
+import com.example.autoauction.vehicle.application.VehicleService;
 import com.example.autoauction.diagnostic.domain.InspectionAnswer;
 import com.example.autoauction.diagnostic.domain.InspectionTemplate;
 import com.example.autoauction.diagnostic.domain.port.DiagnosticRequestRepository;
@@ -37,8 +38,9 @@ public class DiagnosticRequestService {
     private final InspectionAnswerRepository answerRepository;
     private final DepositService depositService;
     private final UserRepository userRepository;
+    private final VehicleService vehicleService;
 
-    private static final BigDecimal DEPOSIT_PERCENT = new BigDecimal("0.01"); // 1%
+    private static final BigDecimal DEPOSIT_PERCENT = new BigDecimal("0.01");
 
     /**
      * Пользователь создаёт заявку на диагностику
@@ -136,7 +138,7 @@ public class DiagnosticRequestService {
                 .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена: " + requestId));
 
         // Проверяем, что диагност назначен на эту заявку
-        if (!request.getAssignedTo().equals(diagnosticId)) {
+        if (request.getAssignedTo() == null || !request.getAssignedTo().equals(diagnosticId)) {
             throw new SecurityException("Вы не назначены на эту заявку");
         }
 
@@ -210,6 +212,145 @@ public class DiagnosticRequestService {
     public Page<DiagnosticRequestResponse> getDiagnosticRequests(Long diagnosticId, Pageable pageable) {
         return requestRepository.findByAssignedTo(diagnosticId, pageable)
                 .map(DiagnosticRequestResponse::fromDomain);
+    }
+
+    /**
+     * Пользователь отзывает заявку (только если PENDING)
+     */
+    @Transactional
+    public void cancelRequest(Long requestId, Long userId) {
+        DiagnosticRequest request = requestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена: " + requestId));
+
+        if (!request.getUserId().equals(userId)) {
+            throw new SecurityException("Нет доступа к этой заявке");
+        }
+        if (request.getStatus() != DiagnosticRequest.DiagnosticRequestStatus.PENDING) {
+            throw new IllegalStateException("Можно отозвать только заявку в статусе PENDING. Текущий статус: " + request.getStatus());
+        }
+
+        depositService.unfreezeForDiagnosticRequest(userId, requestId);
+
+        request.setStatus(DiagnosticRequest.DiagnosticRequestStatus.REJECTED);
+        request.setRejectedReason("Отозвана пользователем");
+        request.setUpdatedAt(OffsetDateTime.now());
+        requestRepository.save(request);
+        log.info("Request {} cancelled by user {}", requestId, userId);
+    }
+
+    /**
+     * Получить все заявки (все статусы) — для администратора
+     */
+    @Transactional(readOnly = true)
+    public Page<DiagnosticRequestResponse> getAllRequests(Pageable pageable) {
+        return requestRepository.findAll(pageable)
+                .map(r -> {
+                    DiagnosticRequestResponse response = DiagnosticRequestResponse.fromDomain(r);
+                    if (r.getAssignedTo() != null) {
+                        userRepository.findById(r.getAssignedTo())
+                                .ifPresent(u -> response.setDiagnosticName(u.getUsername()));
+                    }
+                    userRepository.findById(r.getUserId())
+                            .ifPresent(u -> response.setUserName(u.getUsername()));
+                    return response;
+                });
+    }
+
+    /**
+     * Диагност исправляет отклонённый отчёт — сбрасывает статус обратно в IN_PROGRESS
+     */
+    @Transactional
+    public DiagnosticRequestResponse resetForRework(Long requestId, Long diagnosticId) {
+        DiagnosticRequest request = requestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена: " + requestId));
+
+        if (request.getAssignedTo() == null || !request.getAssignedTo().equals(diagnosticId)) {
+            throw new SecurityException("Вы не назначены на эту заявку");
+        }
+        if (request.getStatus() != DiagnosticRequest.DiagnosticRequestStatus.REJECTED) {
+            throw new IllegalStateException("Исправить можно только отклонённый отчёт. Текущий статус: " + request.getStatus());
+        }
+
+        boolean ok = requestRepository.resetForRework(requestId, diagnosticId);
+        if (!ok) {
+            throw new IllegalStateException("Не удалось сбросить статус заявки");
+        }
+
+        DiagnosticRequest updated = requestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена после обновления: " + requestId));
+        log.info("Request {} reset for rework by diagnostic {}", requestId, diagnosticId);
+        return DiagnosticRequestResponse.fromDomain(updated);
+    }
+
+    /**
+     * Получить отчёты на проверке (статус COMPLETED) — для администратора
+     */
+    @Transactional(readOnly = true)
+    public Page<DiagnosticRequestResponse> getCompletedReports(Pageable pageable) {
+        return requestRepository.findByStatus(DiagnosticRequest.DiagnosticRequestStatus.COMPLETED, pageable)
+                .map(DiagnosticRequestResponse::fromDomain);
+    }
+
+    /**
+     * Администратор одобряет отчёт
+     */
+    @Transactional
+    public DiagnosticRequestResponse approveReport(Long requestId, Long adminId) {
+        DiagnosticRequest request = requestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена: " + requestId));
+
+        if (request.getStatus() != DiagnosticRequest.DiagnosticRequestStatus.COMPLETED) {
+            throw new IllegalStateException("Можно одобрить только отчёт со статусом COMPLETED. Текущий: " + request.getStatus());
+        }
+
+        request.setStatus(DiagnosticRequest.DiagnosticRequestStatus.APPROVED);
+        request.setUpdatedAt(OffsetDateTime.now());
+        DiagnosticRequest saved = requestRepository.save(request);
+
+        // Разморозить депозит заявителя после одобрения
+        depositService.unfreezeForDiagnosticRequest(request.getUserId(), requestId);
+
+        // Автоматически создать Vehicle из данных заявки
+        String diagnosticUsername = userRepository.findById(request.getAssignedTo() != null ? request.getAssignedTo() : request.getUserId())
+                .map(u -> u.getUsername()).orElse("unknown");
+        String adminUsername = userRepository.findById(adminId).map(u -> u.getUsername()).orElse("admin");
+        try {
+            vehicleService.createFromDiagnosticRequest(
+                    requestId,
+                    request.getBrand(), request.getModel(), request.getYear(), request.getVin(),
+                    request.getUserId(), diagnosticUsername,
+                    adminId, adminUsername
+            );
+        } catch (Exception e) {
+            log.warn("Could not auto-create vehicle for request {}: {}", requestId, e.getMessage());
+        }
+
+        log.info("Report {} approved by admin {}", requestId, adminId);
+        return DiagnosticRequestResponse.fromDomain(saved);
+    }
+
+    /**
+     * Администратор отклоняет отчёт с причиной
+     */
+    @Transactional
+    public DiagnosticRequestResponse rejectReport(Long requestId, Long adminId, String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("Причина отклонения обязательна");
+        }
+        DiagnosticRequest request = requestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена: " + requestId));
+
+        if (request.getStatus() != DiagnosticRequest.DiagnosticRequestStatus.COMPLETED) {
+            throw new IllegalStateException("Можно отклонить только отчёт со статусом COMPLETED. Текущий: " + request.getStatus());
+        }
+
+        request.setStatus(DiagnosticRequest.DiagnosticRequestStatus.REJECTED);
+        request.setRejectedReason(reason);
+        request.setUpdatedAt(OffsetDateTime.now());
+        DiagnosticRequest saved = requestRepository.save(request);
+
+        log.info("Report {} rejected by admin {} with reason: {}", requestId, adminId, reason);
+        return DiagnosticRequestResponse.fromDomain(saved);
     }
 
     /**

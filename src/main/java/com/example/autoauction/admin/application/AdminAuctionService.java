@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -28,15 +29,18 @@ public class AdminAuctionService {
     private final VehicleService vehicleService;
     private final AuctionValidator auctionValidator;
     private final AuctionFinalizer auctionFinalizer;
+    private final SystemSettingsService settingsService;
 
     public AdminAuctionService(AuctionRepository auctionRepository,
                                VehicleService vehicleService,
                                AuctionValidator auctionValidator,
-                               AuctionFinalizer auctionFinalizer) {
+                               AuctionFinalizer auctionFinalizer,
+                               SystemSettingsService settingsService) {
         this.auctionFinalizer = auctionFinalizer;
         this.auctionRepository = auctionRepository;
         this.vehicleService = vehicleService;
         this.auctionValidator = auctionValidator;
+        this.settingsService = settingsService;
         log.info("AdminAuctionService инициализирован");
     }
 
@@ -269,6 +273,26 @@ public class AdminAuctionService {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Неверный статус аукциона: " + status);
         }
+    }
+
+    @Transactional
+    public AuctionResponse confirmAuctionStart(Long id) {
+        int confirmHours = settingsService.getInt("auction_confirm_hours", 2);
+        Auction auction = auctionRepository.findByIdWithLock(id)
+                .orElseThrow(() -> new IllegalArgumentException("Аукцион с ID " + id + " не найден"));
+        auction.confirmStart(confirmHours);
+        return AuctionResponse.fromDomain(auctionRepository.save(auction));
+    }
+
+    @Transactional
+    public List<AuctionResponse> confirmAuctionStartBulk(List<Long> ids) {
+        int confirmHours = settingsService.getInt("auction_confirm_hours", 2);
+        return auctionRepository.findAllById(ids).stream()
+                .map(auction -> {
+                    auction.confirmStart(confirmHours);
+                    return AuctionResponse.fromDomain(auctionRepository.save(auction));
+                })
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)

@@ -20,6 +20,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -31,6 +32,9 @@ public class SecurityConfig {
     private final UserDetailsService userDetailsService;
     private final JwtAuthenticationEntryPoint authenticationEntryPoint;
     private final JwtAccessDeniedHandler accessDeniedHandler;
+
+    @org.springframework.beans.factory.annotation.Value("${allowed.origins:http://localhost:5173}")
+    private String allowedOrigins;
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthFilter,
@@ -53,35 +57,49 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        // Публичные эндпоинты
+                        // Публичные — без авторизации
                         .requestMatchers(
                                 new AntPathRequestMatcher("/api/auth/**"),
                                 new AntPathRequestMatcher("/api/public/**"),
+                                new AntPathRequestMatcher("/api/v1/public/**"),
                                 new AntPathRequestMatcher("/swagger-ui/**"),
                                 new AntPathRequestMatcher("/swagger-ui.html"),
                                 new AntPathRequestMatcher("/api-docs/**"),
                                 new AntPathRequestMatcher("/h2-console/**"),
                                 new AntPathRequestMatcher("/ws-auction/**"),
-                                new AntPathRequestMatcher("/ws/**")
+                                new AntPathRequestMatcher("/ws/**"),
+                                new AntPathRequestMatcher("/uploads/**")
                         ).permitAll()
 
-                        // Админ эндпоинты
+                        // Админ (legacy + v1)
                         .requestMatchers(new AntPathRequestMatcher("/api/admin/**")).hasRole("ADMIN")
+                        .requestMatchers(new AntPathRequestMatcher("/api/v1/admin/**")).hasRole("ADMIN")
 
-                        // Диагностик эндпоинты
+                        // Диагностик: работа (только DIAGNOSTIC/ADMIN)
+                        .requestMatchers(new AntPathRequestMatcher("/api/v1/diagnostic/work/**")).hasAnyRole("DIAGNOSTIC", "ADMIN")
+
+                        // Диагностик: заявки — любой авторизованный (роль проверяется в @PreAuthorize)
+                        .requestMatchers(new AntPathRequestMatcher("/api/v1/diagnostic/**")).authenticated()
+
+                        // Диагностик legacy
                         .requestMatchers(new AntPathRequestMatcher("/api/diagnostic/**")).hasAnyRole("DIAGNOSTIC", "ADMIN")
 
-                        // Аукционы и ставки
-                        .requestMatchers(new AntPathRequestMatcher("/api/auctions/**/bids")).authenticated()
+                        // Аукционы (legacy + v1)
                         .requestMatchers(new AntPathRequestMatcher("/api/auctions/**")).authenticated()
+                        .requestMatchers(new AntPathRequestMatcher("/api/v1/auctions/**")).authenticated()
 
-                        // Депозиты
+                        // Депозиты (legacy + v1)
                         .requestMatchers(new AntPathRequestMatcher("/api/deposits/**")).authenticated()
+                        .requestMatchers(new AntPathRequestMatcher("/api/v1/deposits/**")).authenticated()
+
+                        // Уведомления, медиа
+                        .requestMatchers(new AntPathRequestMatcher("/api/notifications/**")).authenticated()
+                        .requestMatchers(new AntPathRequestMatcher("/api/v1/notifications/**")).authenticated()
+                        .requestMatchers(new AntPathRequestMatcher("/api/media/**")).authenticated()
 
                         // Пользователи
                         .requestMatchers(new AntPathRequestMatcher("/api/users/**")).authenticated()
 
-                        // Остальные
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -95,15 +113,10 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(List.of(
-                "https://auction.kg",
-                "https://www.auction.kg",
-                "http://localhost:3000",
-                "http://localhost:5173",
-                "http://localhost:8080"
-        ));
+        List<String> origins = Arrays.asList(allowedOrigins.split(","));
+        configuration.setAllowedOrigins(origins);
 
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);

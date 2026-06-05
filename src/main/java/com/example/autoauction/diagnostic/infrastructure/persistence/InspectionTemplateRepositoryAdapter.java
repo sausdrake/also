@@ -79,6 +79,12 @@ public class InspectionTemplateRepositoryAdapter implements InspectionTemplateRe
     // ==================== Группы ====================
 
     @Override
+    @Transactional(readOnly = true)
+    public Optional<InspectionGroup> findGroupById(Long id) {
+        return groupJpaRepository.findById(id).map(groupMapper::toDomain);
+    }
+
+    @Override
     public InspectionGroup saveGroup(InspectionGroup group) {
         JpaInspectionGroupEntity entity = groupMapper.toEntity(group);
         JpaInspectionGroupEntity saved = groupJpaRepository.save(entity);
@@ -107,6 +113,12 @@ public class InspectionTemplateRepositoryAdapter implements InspectionTemplateRe
     }
 
     // ==================== Пункты ====================
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<InspectionItem> findItemById(Long id) {
+        return itemJpaRepository.findById(id).map(itemMapper::toDomain);
+    }
 
     @Override
     public InspectionItem saveItem(InspectionItem item) {

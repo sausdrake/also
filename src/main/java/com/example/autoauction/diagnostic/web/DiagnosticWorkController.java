@@ -21,10 +21,10 @@ import java.util.List;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/diagnostic-work")
+@RequestMapping("/api/v1/diagnostic/work")
 @RequiredArgsConstructor
 @Tag(name = "Работа диагноста", description = "Управление заявками для диагноста")
-@PreAuthorize("hasRole('DIAGNOSTIC')")
+@PreAuthorize("hasAnyRole('DIAGNOSTIC', 'ADMIN')")
 public class DiagnosticWorkController {
 
     private final DiagnosticRequestService requestService;
@@ -34,11 +34,8 @@ public class DiagnosticWorkController {
      */
     @GetMapping("/pending")
     @Operation(summary = "Получить доступные заявки")
-    @PreAuthorize("hasRole('DIAGNOSTIC')")
-    public ResponseEntity<List<DiagnosticRequestResponse>> getPendingRequests(
-            @CurrentUser UserPrincipal currentUser) {
-        log.info("GET /api/diagnostic/work/pending");
-
+    public ResponseEntity<List<DiagnosticRequestResponse>> getPendingRequests() {
+        log.info("GET /api/v1/diagnostic/work/pending");
         return ResponseEntity.ok(requestService.getPendingRequests());
     }
 
@@ -84,6 +81,19 @@ public class DiagnosticWorkController {
                 requestId, currentUser.getUserId(), request.isSubmit());
         requestService.saveInspectionAnswers(requestId, currentUser.getUserId(), request);
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Исправить отклонённый отчёт (сбросить в IN_PROGRESS)
+     */
+    @PostMapping("/{requestId}/rework")
+    @Operation(summary = "Исправить отклонённый отчёт")
+    public ResponseEntity<DiagnosticRequestResponse> resetForRework(
+            @PathVariable Long requestId,
+            @CurrentUser UserPrincipal currentUser
+    ) {
+        log.info("POST /api/diagnostic/work/{}/rework - diagnostic: {}", requestId, currentUser.getUserId());
+        return ResponseEntity.ok(requestService.resetForRework(requestId, currentUser.getUserId()));
     }
 
     /**

@@ -351,6 +351,104 @@ class DepositServiceTest {
         }
     }
 
+    // ==================== ADMIN ADJUST TESTS ====================
+
+    @Nested
+    @DisplayName("Административная корректировка депозита")
+    class AdminAdjustTests {
+
+        @Test
+        @DisplayName("Положительная корректировка — пополняет баланс")
+        void adminAdjust_Positive_IncreasesBalance() {
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            BigDecimal topUp = new BigDecimal("5000");
+            depositService.adminAdjust(userId, topUp, "тест пополнение");
+
+            ArgumentCaptor<Deposit> cap = ArgumentCaptor.forClass(Deposit.class);
+            verify(depositRepository).save(cap.capture());
+            assertEquals(0, cap.getValue().getBalance().compareTo(depositAmount.add(topUp)));
+        }
+
+        @Test
+        @DisplayName("Отрицательная корректировка — списывает с баланса")
+        void adminAdjust_Negative_DecreasesBalance() {
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            BigDecimal deduction = new BigDecimal("-10000");
+            depositService.adminAdjust(userId, deduction, "возврат за ошибку");
+
+            ArgumentCaptor<Deposit> cap = ArgumentCaptor.forClass(Deposit.class);
+            verify(depositRepository).save(cap.capture());
+            assertEquals(0, cap.getValue().getBalance()
+                    .compareTo(depositAmount.add(deduction)));
+        }
+
+        @Test
+        @DisplayName("Отрицательная корректировка больше доступного баланса — исключение")
+        void adminAdjust_NegativeExceedsBalance_Throws() {
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
+
+            BigDecimal tooMuch = new BigDecimal("-999999");
+            assertThrows(IllegalStateException.class,
+                    () -> depositService.adminAdjust(userId, tooMuch, "удаление"));
+        }
+
+        @Test
+        @DisplayName("Нулевая корректировка — IllegalArgumentException")
+        void adminAdjust_ZeroAmount_Throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> depositService.adminAdjust(userId, BigDecimal.ZERO, "ноль"));
+        }
+
+        @Test
+        @DisplayName("Null сумма — IllegalArgumentException")
+        void adminAdjust_NullAmount_Throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> depositService.adminAdjust(userId, null, "комментарий"));
+        }
+
+        @Test
+        @DisplayName("Пустой комментарий — IllegalArgumentException")
+        void adminAdjust_BlankComment_Throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> depositService.adminAdjust(userId, new BigDecimal("1000"), "  "));
+        }
+
+        @Test
+        @DisplayName("Null комментарий — IllegalArgumentException")
+        void adminAdjust_NullComment_Throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> depositService.adminAdjust(userId, new BigDecimal("1000"), null));
+        }
+
+        @Test
+        @DisplayName("Превышение MAX_ADJUST_AMOUNT — IllegalArgumentException")
+        void adminAdjust_ExceedsMaxAmount_Throws() {
+            BigDecimal over = DepositService.MAX_ADJUST_AMOUNT.add(BigDecimal.ONE);
+            assertThrows(IllegalArgumentException.class,
+                    () -> depositService.adminAdjust(userId, over, "слишком много"));
+        }
+
+        @Test
+        @DisplayName("Транзакция типа ADMIN_ADJUSTMENT записывается")
+        void adminAdjust_SavesAdjustmentTransaction() {
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            depositService.adminAdjust(userId, new BigDecimal("1000"), "тест");
+
+            ArgumentCaptor<DepositTransaction> txCap = ArgumentCaptor.forClass(DepositTransaction.class);
+            verify(depositRepository).saveTransaction(txCap.capture());
+            assertEquals(DepositTransaction.TransactionType.ADMIN_ADJUSTMENT, txCap.getValue().getType());
+        }
+    }
+
     // ==================== CONCURRENCY TESTS ====================
 
     @Nested

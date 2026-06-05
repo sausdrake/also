@@ -1,11 +1,9 @@
-// auction/infrastructure/scheduler/AuctionCompletionSchedulerOptimizedTest.java
 package com.example.autoauction.auction.infrastructure.scheduler;
 
 import com.example.autoauction.auction.application.AuctionFinalizer;
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
-import com.example.autoauction.auction.infrastructure.persistence.SpringDataAuctionJpaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,7 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("Тесты оптимизированного шедулера аукционов")
+@DisplayName("Тесты шедулера аукционов")
 class AuctionCompletionSchedulerOptimizedTest {
 
     @Mock
@@ -30,9 +28,6 @@ class AuctionCompletionSchedulerOptimizedTest {
 
     @Mock
     private AuctionFinalizer auctionFinalizer;
-
-    @Mock
-    private SpringDataAuctionJpaRepository jpaRepository;
 
     @InjectMocks
     private AuctionCompletionScheduler scheduler;
@@ -51,7 +46,7 @@ class AuctionCompletionSchedulerOptimizedTest {
                 new BigDecimal("1500000"),
                 new BigDecimal("10000"),
                 now.minusDays(2),
-                now.minusHours(1), // истек
+                now.minusHours(1),
                 1L
         );
         expiredAuction.setId(1L);
@@ -59,36 +54,65 @@ class AuctionCompletionSchedulerOptimizedTest {
     }
 
     @Test
-    @DisplayName("Шедулер использует оптимизированный запрос для поиска истекших аукционов")
-    void completeExpiredAuctions_ShouldUseOptimizedQuery() {
-        // given
+    @DisplayName("Шедулер находит и завершает истёкшие ACTIVE-аукционы")
+    void completeExpiredAuctions_ShouldFinalizeExpired() {
         when(auctionRepository.findByStatusAndEndTimeBefore(eq(AuctionStatus.ACTIVE), any(OffsetDateTime.class)))
                 .thenReturn(List.of(expiredAuction));
         when(auctionFinalizer.finalizeAuction(expiredAuction)).thenReturn(true);
 
-        // when
         scheduler.completeExpiredAuctions();
 
-        // then
-        verify(auctionRepository, times(1))
-                .findByStatusAndEndTimeBefore(eq(AuctionStatus.ACTIVE), any(OffsetDateTime.class));
-        verify(auctionFinalizer, times(1)).finalizeAuction(expiredAuction);
-        // НЕ используем старый метод
+        verify(auctionRepository).findByStatusAndEndTimeBefore(eq(AuctionStatus.ACTIVE), any(OffsetDateTime.class));
+        verify(auctionFinalizer).finalizeAuction(expiredAuction);
         verify(auctionRepository, never()).findByStatus(AuctionStatus.ACTIVE);
     }
 
     @Test
-    @DisplayName("Шедулер использует массовое обновление для отмены просроченных CREATED аукционов")
-    void cancelExpiredCreatedAuctions_ShouldUseMassUpdate() {
-        // given
-        when(jpaRepository.cancelExpiredCreatedAuctions(any(OffsetDateTime.class))).thenReturn(5);
+    @DisplayName("Шедулер отменяет CREATED-аукционы без подтверждения по истечении дедлайна")
+    void cancelUnconfirmedAuctions_ShouldCancelOverdue() {
+        Auction unconfirmed = new Auction(
+                2L,
+                new BigDecimal("500000"),
+                null, null,
+                new BigDecimal("5000"),
+                now.plusMinutes(30),
+                now.plusHours(3),
+                1L
+        );
+        unconfirmed.setId(2L);
 
-        // when
-        scheduler.cancelExpiredCreatedAuctions();
+        when(auctionRepository.findUnconfirmedAuctionsPastDeadline(any(OffsetDateTime.class)))
+                .thenReturn(List.of(unconfirmed));
+        when(auctionRepository.save(any())).thenReturn(unconfirmed);
 
-        // then
-        verify(jpaRepository, times(1)).cancelExpiredCreatedAuctions(any(OffsetDateTime.class));
-        // НЕ загружаем все аукционы в память
-        verify(auctionRepository, never()).findByStatus(AuctionStatus.CREATED);
+        scheduler.cancelUnconfirmedAuctions();
+
+        verify(auctionRepository).findUnconfirmedAuctionsPastDeadline(any(OffsetDateTime.class));
+        verify(auctionRepository).save(unconfirmed);
+    }
+
+    @Test
+    @DisplayName("Шедулер запускает подтверждённые CREATED-аукционы в startTime")
+    void startConfirmedAuctions_ShouldStartReady() {
+        Auction confirmed = new Auction(
+                3L,
+                new BigDecimal("300000"),
+                null, null,
+                new BigDecimal("3000"),
+                now.minusMinutes(5),
+                now.plusHours(2),
+                1L
+        );
+        confirmed.setId(3L);
+        confirmed.setConfirmedStart(true);
+
+        when(auctionRepository.findConfirmedAuctionsReadyToStart(any(OffsetDateTime.class)))
+                .thenReturn(List.of(confirmed));
+        when(auctionRepository.save(any())).thenReturn(confirmed);
+
+        scheduler.startConfirmedAuctions();
+
+        verify(auctionRepository).findConfirmedAuctionsReadyToStart(any(OffsetDateTime.class));
+        verify(auctionRepository).save(confirmed);
     }
 }

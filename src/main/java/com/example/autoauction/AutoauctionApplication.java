@@ -3,11 +3,13 @@ package com.example.autoauction;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.retry.annotation.EnableRetry;
 
 @Slf4j
 @SpringBootApplication
 @EnableRetry
+@EnableCaching
 public class AutoauctionApplication {
 
 	public static void main(String[] args) {

@@ -7677,3 +7677,519 @@ WARNING: Unmatched cancel notification for request id 59
 2026.05.22 03:38:36 INFO  shutting down Metals
 2026.05.22 03:38:36 INFO  Shut down connection with build server.
 2026.05.22 03:38:37 INFO  Exiting server
+2026.06.05 04:35:41 INFO  Started: Metals version 1.6.6+16-02957400-SNAPSHOT in folders 'D:\AutoAuction' for client Visual Studio Code 1.121.0.
+2026.06.05 04:35:41 INFO  Memory monitor started
+2026.06.05 04:35:42 WARN  Using H2 2.4.240 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.
+2026.06.05 04:35:42 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\admin\application\AdminAuctionService.java. Using fallback presentation compiler.
+июн. 05, 2026 4:35:44 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 2
+июн. 05, 2026 4:35:44 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 5
+июн. 05, 2026 4:35:44 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 3
+июн. 05, 2026 4:35:44 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 1
+2026.06.05 04:35:44 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\admin\web\AdminAuctionController.java. Using fallback presentation compiler.
+2026.06.05 04:35:44 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\admin\web\AdminAuctionController.java. Using fallback presentation compiler.
+2026.06.05 04:35:44 INFO  Attempting to connect to the build server...
+2026.06.05 04:35:44 INFO  No running Bloop server found, starting one.
+2026.06.05 04:35:45 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\admin\web\AdminAuctionController.java. Using fallback presentation compiler.
+2026.06.05 04:35:44 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\admin\web\AdminAuctionController.java. Using fallback presentation compiler.
+2026.06.05 04:35:45 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\admin\web\AdminAuctionController.java. Using fallback presentation compiler.
+июн. 05, 2026 4:35:46 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 6
+июн. 05, 2026 4:35:46 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 12
+2026.06.05 04:35:45 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\admin\web\AdminAuctionController.java. Using fallback presentation compiler.
+2026.06.05 04:35:45 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\admin\web\AdminAuctionController.java. Using fallback presentation compiler.
+июн. 05, 2026 4:35:46 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 18
+июн. 05, 2026 4:35:46 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 13
+июн. 05, 2026 4:35:46 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 16
+2026.06.05 04:35:45 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\admin\web\DashboardController.java. Using fallback presentation compiler.
+2026.06.05 04:35:45 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\admin\web\DashboardController.java. Using fallback presentation compiler.
+2026.06.05 04:35:46 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\admin\web\DashboardController.java. Using fallback presentation compiler.
+июн. 05, 2026 4:35:46 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 21
+2026.06.05 04:35:46 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\admin\web\DashboardController.java. Using fallback presentation compiler.
+2026.06.05 04:35:46 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\admin\web\DashboardController.java. Using fallback presentation compiler.
+2026.06.05 04:35:46 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\admin\web\DashboardController.java. Using fallback presentation compiler.
+июн. 05, 2026 4:35:47 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 22
+июн. 05, 2026 4:35:47 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 20
+июн. 05, 2026 4:35:47 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 19
+2026.06.05 04:35:46 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\admin\web\DashboardController.java. Using fallback presentation compiler.
+июн. 05, 2026 4:35:47 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 27
+2026.06.05 04:35:46 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\admin\web\DashboardController.java. Using fallback presentation compiler.
+2026.06.05 04:35:46 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\admin\web\DashboardController.java. Using fallback presentation compiler.
+2026.06.05 04:35:48 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\auction\web\dto\AuctionResponse.java. Using fallback presentation compiler.
+2026.06.05 04:35:48 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\auction\web\dto\AuctionResponse.java. Using fallback presentation compiler.
+2026.06.05 04:35:48 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\auction\web\dto\AuctionResponse.java. Using fallback presentation compiler.
+2026.06.05 04:35:48 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\auction\web\dto\AuctionResponse.java. Using fallback presentation compiler.
+июн. 05, 2026 4:35:48 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 37
+2026.06.05 04:35:48 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\auction\web\dto\AuctionResponse.java. Using fallback presentation compiler.
+2026.06.05 04:35:49 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\auction\web\dto\AuctionResponse.java. Using fallback presentation compiler.
+2026.06.05 04:35:49 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\auction\web\dto\AuctionResponse.java. Using fallback presentation compiler.
+2026.06.05 04:35:49 INFO  Starting compilation server
+2026.06.05 04:35:50 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\auction\web\PublicAuctionController.java. Using fallback presentation compiler.
+2026.06.05 04:35:50 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\auction\web\PublicAuctionController.java. Using fallback presentation compiler.
+2026.06.05 04:35:50 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\auction\web\PublicAuctionController.java. Using fallback presentation compiler.
+2026.06.05 04:35:50 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\auction\web\PublicAuctionController.java. Using fallback presentation compiler.
+2026.06.05 04:35:50 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\auction\web\PublicAuctionController.java. Using fallback presentation compiler.
+июн. 05, 2026 4:35:50 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 51
+2026.06.05 04:35:50 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\auction\web\PublicAuctionController.java. Using fallback presentation compiler.
+2026.06.05 04:35:50 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\auction\web\PublicAuctionController.java. Using fallback presentation compiler.
+июн. 05, 2026 4:35:51 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 55
+2026.06.05 04:35:50 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\auction\web\PublicAuctionController.java. Using fallback presentation compiler.
+2026.06.05 04:35:50 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\auction\web\PublicAuctionController.java. Using fallback presentation compiler.
+июн. 05, 2026 4:35:51 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 60
+2026.06.05 04:35:52 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\application\DiagnosticRequestService.java. Using fallback presentation compiler.
+2026.06.05 04:35:52 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\application\DiagnosticRequestService.java. Using fallback presentation compiler.
+2026.06.05 04:35:52 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\application\DiagnosticRequestService.java. Using fallback presentation compiler.
+2026.06.05 04:35:52 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\application\DiagnosticRequestService.java. Using fallback presentation compiler.
+июн. 05, 2026 4:35:53 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 65
+2026.06.05 04:35:53 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\application\DiagnosticRequestService.java. Using fallback presentation compiler.
+2026.06.05 04:35:52 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\application\DiagnosticRequestService.java. Using fallback presentation compiler.
+2026.06.05 04:35:52 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\application\DiagnosticRequestService.java. Using fallback presentation compiler.
+июн. 05, 2026 4:35:53 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 69
+2026.06.05 04:35:53 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\application\DiagnosticRequestService.java. Using fallback presentation compiler.
+2026.06.05 04:35:53 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\application\DiagnosticRequestService.java. Using fallback presentation compiler.
+2026.06.05 04:35:53 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\application\DiagnosticRequestService.java. Using fallback presentation compiler.
+июн. 05, 2026 4:35:54 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 76
+2026.06.05 04:35:54 INFO  tracing is disabled for protocol BSP, to enable tracing of incoming and outgoing JSON messages create an empty file at D:\AutoAuction\.metals\bsp.trace.json or C:\Users\Asus\AppData\Local\scalameta\metals\cache\bsp.trace.json
+2026.06.05 04:35:54 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\web\AdminDiagnosticController.java. Using fallback presentation compiler.
+2026.06.05 04:35:54 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\web\AdminDiagnosticController.java. Using fallback presentation compiler.
+2026.06.05 04:35:54 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\web\AdminDiagnosticController.java. Using fallback presentation compiler.
+2026.06.05 04:35:55 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\web\AdminDiagnosticController.java. Using fallback presentation compiler.
+2026.06.05 04:35:54 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\web\AdminDiagnosticController.java. Using fallback presentation compiler.
+июн. 05, 2026 4:35:55 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 81
+июн. 05, 2026 4:35:55 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 84
+2026.06.05 04:35:54 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\web\AdminDiagnosticController.java. Using fallback presentation compiler.
+2026.06.05 04:35:54 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\web\AdminDiagnosticController.java. Using fallback presentation compiler.
+2026.06.05 04:35:55 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\web\AdminDiagnosticController.java. Using fallback presentation compiler.
+2026.06.05 04:35:56 INFO  time: Connected to build server in 11s
+2026.06.05 04:35:56 INFO  Connected to Build server: Bloop v2.0.19
+2026.06.05 04:35:57 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\web\DiagnosticRequestController.java. Using fallback presentation compiler.
+2026.06.05 04:35:57 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\web\DiagnosticRequestController.java. Using fallback presentation compiler.
+2026.06.05 04:35:57 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\web\DiagnosticRequestController.java. Using fallback presentation compiler.
+2026.06.05 04:35:57 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\web\DiagnosticRequestController.java. Using fallback presentation compiler.
+2026.06.05 04:35:56 INFO  time: Imported build in 0.36s
+2026.06.05 04:35:57 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\web\DiagnosticRequestController.java. Using fallback presentation compiler.
+2026.06.05 04:35:57 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\web\DiagnosticRequestController.java. Using fallback presentation compiler.
+июн. 05, 2026 4:35:59 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 108
+июн. 05, 2026 4:35:59 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 111
+июн. 05, 2026 4:36:03 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 129
+2026.06.05 04:36:03 WARN  Using H2 2.4.240 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.
+июн. 05, 2026 4:36:03 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 128
+июн. 05, 2026 4:36:03 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 135
+июн. 05, 2026 4:36:03 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 130
+июн. 05, 2026 4:36:03 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 133
+июн. 05, 2026 4:36:04 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 139
+июн. 05, 2026 4:36:04 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 137
+июн. 05, 2026 4:36:04 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 138
+июн. 05, 2026 4:36:04 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 136
+июн. 05, 2026 4:36:04 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 144
+июн. 05, 2026 4:36:05 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 155
+июн. 05, 2026 4:36:05 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 156
+июн. 05, 2026 4:36:07 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 169
+2026.06.05 04:36:08 INFO  time: indexed workspace in 10s
+июн. 05, 2026 4:36:08 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 168
+2026.06.05 04:36:10 INFO  compiling autoauction (195 java sources)
+июн. 05, 2026 4:36:14 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 188
+июн. 05, 2026 4:36:15 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 190
+июн. 05, 2026 4:36:15 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 195
+июн. 05, 2026 4:36:15 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 189
+июн. 05, 2026 4:36:15 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 196
+июн. 05, 2026 4:36:15 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 191
+июн. 05, 2026 4:36:15 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 193
+июн. 05, 2026 4:36:16 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 199
+июн. 05, 2026 4:36:16 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 200
+июн. 05, 2026 4:36:16 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 202
+июн. 05, 2026 4:36:16 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 198
+июн. 05, 2026 4:36:16 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 204
+июн. 05, 2026 4:36:19 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 214
+июн. 05, 2026 4:36:19 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 218
+2026.06.05 04:36:22 WARN  javac exited with exit code 1
+2026.06.05 04:36:22 INFO  time: compiled autoauction in 11s
+июн. 05, 2026 4:36:30 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 259
+июн. 05, 2026 4:36:30 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 260
+июн. 05, 2026 4:36:48 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 284
+июн. 05, 2026 4:36:48 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 285
+июн. 05, 2026 4:36:57 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 289
+июн. 05, 2026 4:36:57 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 290
+июн. 05, 2026 4:37:00 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 300
+июн. 05, 2026 4:37:00 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 301
+июн. 05, 2026 4:37:01 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 304
+июн. 05, 2026 4:37:08 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 308
+июн. 05, 2026 4:37:08 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 310
+июн. 05, 2026 4:37:28 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 318
+июн. 05, 2026 4:37:29 AM org.eclipse.lsp4j.jsonrpc.services.GenericEndpoint notify
+INFO: Unsupported notification method: $/setTrace
+июн. 05, 2026 4:37:33 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 322
+июн. 05, 2026 4:38:17 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 345
+июн. 05, 2026 4:38:17 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 347
+июн. 05, 2026 4:44:41 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 373
+июн. 05, 2026 4:45:38 AM org.eclipse.lsp4j.jsonrpc.services.GenericEndpoint notify
+INFO: Unsupported notification method: $/setTrace
+2026.06.05 04:45:50 INFO  skipping build import with status 'Dismissed'
+июн. 05, 2026 4:45:59 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 380
+июн. 05, 2026 4:46:01 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 387
+июн. 05, 2026 4:46:01 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 389
+июн. 05, 2026 4:46:01 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 390
+июн. 05, 2026 4:47:20 AM org.eclipse.lsp4j.jsonrpc.services.GenericEndpoint notify
+INFO: Unsupported notification method: $/setTrace
+2026.06.05 04:48:21 INFO  Shutting down server
+2026.06.05 04:48:21 INFO  Memory monitor stopped
+2026.06.05 04:48:21 INFO  shutting down Metals
+2026.06.05 04:48:21 INFO  Shut down connection with build server.
+2026.06.05 04:48:21 INFO  Exiting server
+2026.06.05 04:49:02 INFO  Started: Metals version 1.6.7+51-7cf0e6b6-SNAPSHOT in folders 'D:\AutoAuction' for client Visual Studio Code 1.121.0.
+2026.06.05 04:49:02 INFO  Memory monitor started
+2026.06.05 04:49:07 WARN  Using H2 2.4.240 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.
+2026.06.05 04:49:08 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\infrastructure\persistence\JpaInspectionAnswerEntity.java. Using fallback presentation compiler.
+2026.06.05 04:49:08 INFO  Attempting to connect to the build server...
+2026.06.05 04:49:08 INFO  Found a Bloop server running
+2026.06.05 04:49:09 INFO  tracing is disabled for protocol BSP, to enable tracing of incoming and outgoing JSON messages create an empty file at D:\AutoAuction\.metals\bsp.trace.json or C:\Users\Asus\AppData\Local\scalameta\metals\cache\bsp.trace.json
+2026.06.05 04:49:08 INFO  time: Connected to build server in 0.48s
+2026.06.05 04:49:09 INFO  Connected to Build server: Bloop v2.0.19
+июн. 05, 2026 4:49:09 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 1
+2026.06.05 04:49:09 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\infrastructure\persistence\JpaInspectionAnswerEntity.java. Using fallback presentation compiler.
+2026.06.05 04:49:10 INFO  time: Imported build in 0.41s
+2026.06.05 04:49:10 INFO  no build target found for D:\AutoAuction\src\main\java\com\example\autoauction\diagnostic\infrastructure\persistence\JpaInspectionAnswerEntity.java. Using fallback presentation compiler.
+июн. 05, 2026 4:49:11 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 3
+июн. 05, 2026 4:49:11 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 6
+июн. 05, 2026 4:49:16 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 5
+июн. 05, 2026 4:49:16 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 10
+июн. 05, 2026 4:49:16 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 7
+июн. 05, 2026 4:49:16 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 9
+июн. 05, 2026 4:49:16 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 4
+июн. 05, 2026 4:49:16 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 2
+2026.06.05 04:49:17 INFO  compiling autoauction (195 java sources)
+июн. 05, 2026 4:49:19 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 13
+июн. 05, 2026 4:49:19 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 15
+июн. 05, 2026 4:49:23 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 17
+июн. 05, 2026 4:49:23 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 18
+июн. 05, 2026 4:49:23 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 16
+2026.06.05 04:49:24 WARN  Using H2 2.4.240 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.
+2026.06.05 04:49:29 WARN  javac exited with exit code 1
+2026.06.05 04:49:29 INFO  time: compiled autoauction in 12s
+июн. 05, 2026 4:49:30 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 24
+2026.06.05 04:49:31 INFO  time: indexed workspace in 21s
+июн. 05, 2026 4:49:32 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 25
+июн. 05, 2026 4:49:32 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 28
+июн. 05, 2026 4:49:32 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 31
+2026.06.05 04:49:32 INFO  compiling autoauction (195 java sources)
+июн. 05, 2026 4:49:33 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 34
+июн. 05, 2026 4:49:33 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 37
+июн. 05, 2026 4:49:33 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 33
+июн. 05, 2026 4:49:33 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 40
+июн. 05, 2026 4:49:38 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 51
+2026.06.05 04:49:40 WARN  javac exited with exit code 1
+2026.06.05 04:49:40 INFO  time: compiled autoauction in 7.47s
+июн. 05, 2026 4:49:40 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 57
+июн. 05, 2026 4:49:40 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 59
+июн. 05, 2026 4:49:40 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 61
+июн. 05, 2026 4:49:40 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 62
+июн. 05, 2026 4:49:58 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 75
+июн. 05, 2026 4:49:58 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 76
+июн. 05, 2026 4:50:06 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 85
+июн. 05, 2026 4:50:06 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 87
+июн. 05, 2026 4:52:27 AM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 101
+2026.06.05 05:08:21 INFO  compiling autoauction (195 java sources)
+2026.06.05 05:08:27 WARN  javac exited with exit code 1
+2026.06.05 05:08:27 INFO  time: compiled autoauction in 5.91s
+2026.06.05 05:08:27 INFO  compiling autoauction (195 java sources)
+2026.06.05 05:08:33 WARN  javac exited with exit code 1
+2026.06.05 05:08:33 INFO  time: compiled autoauction in 5.52s
+2026.06.05 05:08:36 INFO  compiling autoauction (195 java sources)
+2026.06.05 05:08:41 WARN  javac exited with exit code 1
+2026.06.05 05:08:41 INFO  time: compiled autoauction in 4.77s
+2026.06.05 05:08:41 INFO  compiling autoauction (195 java sources)
+2026.06.05 05:08:45 WARN  javac exited with exit code 1
+2026.06.05 05:08:45 INFO  time: compiled autoauction in 4.17s
+2026.06.05 05:08:49 INFO  compiling autoauction (195 java sources)
+2026.06.05 05:08:56 WARN  javac exited with exit code 1
+2026.06.05 05:08:56 INFO  time: compiled autoauction in 6.62s
+2026.06.05 05:08:56 INFO  compiling autoauction (195 java sources)
+2026.06.05 05:09:00 WARN  javac exited with exit code 1
+2026.06.05 05:09:00 INFO  time: compiled autoauction in 4.64s
+2026.06.05 05:09:00 INFO  compiling autoauction (195 java sources)
+2026.06.05 05:09:06 WARN  javac exited with exit code 1
+2026.06.05 05:09:06 INFO  time: compiled autoauction in 5.57s
+2026.06.05 05:10:01 INFO  compiling autoauction (195 java sources)
+2026.06.05 05:10:07 WARN  javac exited with exit code 1
+2026.06.05 05:10:07 INFO  time: compiled autoauction in 5.51s
+2026.06.05 05:10:17 INFO  compiling autoauction (195 java sources)
+2026.06.05 05:10:23 WARN  javac exited with exit code 1
+2026.06.05 05:10:23 INFO  time: compiled autoauction in 6.62s
+2026.06.05 05:10:23 INFO  compiling autoauction (195 java sources)
+2026.06.05 05:10:29 WARN  javac exited with exit code 1
+2026.06.05 05:10:29 INFO  time: compiled autoauction in 5.5s
+2026.06.05 05:10:39 INFO  compiling autoauction (195 java sources)
+2026.06.05 05:10:45 WARN  javac exited with exit code 1
+2026.06.05 05:10:45 INFO  time: compiled autoauction in 6.59s
+2026.06.05 05:10:59 INFO  compiling autoauction (195 java sources)
+2026.06.05 05:11:06 WARN  javac exited with exit code 1
+2026.06.05 05:11:06 INFO  time: compiled autoauction in 7.42s
+2026.06.05 05:11:31 INFO  compiling autoauction (195 java sources)
+2026.06.05 05:11:38 WARN  javac exited with exit code 1
+2026.06.05 05:11:38 INFO  time: compiled autoauction in 6.62s
+2026.06.05 05:13:01 INFO  compiling autoauction (195 java sources)
+2026.06.05 05:13:05 WARN  javac exited with exit code 1
+2026.06.05 05:13:05 INFO  time: compiled autoauction in 4.62s
+2026.06.05 05:13:05 INFO  compiling autoauction (195 java sources)
+2026.06.05 05:13:10 WARN  javac exited with exit code 1
+2026.06.05 05:13:10 INFO  time: compiled autoauction in 4.86s
+2026.06.05 05:13:33 INFO  compiling autoauction (195 java sources)
+2026.06.05 05:13:37 WARN  javac exited with exit code 1
+2026.06.05 05:13:37 INFO  time: compiled autoauction in 4.78s
+2026.06.05 05:13:37 INFO  compiling autoauction (195 java sources)
+2026.06.05 05:13:45 WARN  javac exited with exit code 1
+2026.06.05 05:13:45 INFO  time: compiled autoauction in 7.69s
+2026.06.05 05:19:31 INFO  compiling autoauction (195 java sources)
+2026.06.05 05:19:44 INFO  time: compiled autoauction in 12s
+2026.06.05 05:23:09 INFO  compiling autoauction (1 java source)
+2026.06.05 05:23:11 INFO  time: compiled autoauction in 2.33s
+2026.06.05 05:23:11 INFO  compiling autoauction (1 java source)
+2026.06.05 05:23:13 INFO  time: compiled autoauction in 2.32s
+2026.06.05 05:27:33 INFO  compiling autoauction-test (53 java sources)
+2026.06.05 05:27:44 INFO  time: compiled autoauction-test in 10s
+2026.06.05 05:50:44 INFO  compiling autoauction (195 java sources)
+2026.06.05 05:50:54 INFO  time: compiled autoauction in 10s
+2026.06.05 05:50:54 INFO  compiling autoauction (1 java source)
+2026.06.05 05:50:56 INFO  time: compiled autoauction in 2.13s
+2026.06.05 05:50:56 INFO  compiling autoauction (1 java source)
+2026.06.05 05:51:00 INFO  time: compiled autoauction in 3.06s
+2026.06.05 05:51:00 INFO  compiling autoauction (2 java sources)
+2026.06.05 05:51:02 INFO  time: compiled autoauction in 2.52s
+2026.06.05 05:51:02 INFO  compiling autoauction (1 java source)
+2026.06.05 05:51:04 INFO  time: compiled autoauction in 2.23s
+2026.06.05 05:51:06 INFO  compiling autoauction (1 java source)
+2026.06.05 05:51:09 INFO  time: compiled autoauction in 3.11s
+2026.06.05 05:51:09 INFO  compiling autoauction (2 java sources)
+2026.06.05 05:51:12 INFO  time: compiled autoauction in 2.68s
+2026.06.05 05:51:12 INFO  compiling autoauction (1 java source)
+2026.06.05 05:51:15 INFO  time: compiled autoauction in 3.1s
+2026.06.05 05:51:15 INFO  compiling autoauction (2 java sources)
+2026.06.05 05:51:18 INFO  time: compiled autoauction in 2.74s
+2026.06.05 05:51:18 INFO  compiling autoauction (1 java source)
+2026.06.05 05:51:20 INFO  time: compiled autoauction in 2.16s
+2026.06.05 05:52:18 INFO  compiling autoauction-test (53 java sources)
+2026.06.05 05:52:26 INFO  time: compiled autoauction-test in 8.76s
+2026.06.05 05:52:47 INFO  compiling autoauction-test (1 java source)
+2026.06.05 05:52:51 INFO  time: compiled autoauction-test in 4.08s
+2026.06.05 05:53:03 INFO  compiling autoauction-test (1 java source)
+2026.06.05 05:53:06 WARN  javac exited with exit code 1
+2026.06.05 05:53:06 INFO  time: compiled autoauction-test in 3.12s
+2026.06.05 05:53:06 INFO  compiling autoauction-test (1 java source)
+2026.06.05 05:53:09 WARN  javac exited with exit code 1
+2026.06.05 05:53:09 INFO  time: compiled autoauction-test in 2.88s
+2026.06.05 05:53:21 INFO  compiling autoauction-test (1 java source)
+2026.06.05 05:53:25 INFO  time: compiled autoauction-test in 3.88s
+2026.06.05 05:53:57 INFO  compiling autoauction-test (1 java source)
+2026.06.05 05:54:00 INFO  time: compiled autoauction-test in 3.94s
+2026.06.05 06:18:12 INFO  compiling autoauction (195 java sources)
+2026.06.05 06:18:21 INFO  time: compiled autoauction in 9.88s
+2026.06.05 06:18:21 INFO  compiling autoauction (1 java source)
+2026.06.05 06:18:25 INFO  time: compiled autoauction in 3.15s
+2026.06.05 06:18:30 INFO  compiling autoauction (1 java source)
+2026.06.05 06:18:33 INFO  time: compiled autoauction in 3.04s
+2026.06.05 06:18:33 INFO  compiling autoauction (2 java sources)
+2026.06.05 06:18:36 INFO  time: compiled autoauction in 3.01s
+2026.06.05 06:18:36 INFO  compiling autoauction (2 java sources)
+2026.06.05 06:18:39 INFO  time: compiled autoauction in 2.8s
+2026.06.05 06:18:42 INFO  compiling autoauction (1 java source)
+2026.06.05 06:18:45 INFO  time: compiled autoauction in 2.98s
+2026.06.05 06:18:45 INFO  compiling autoauction (2 java sources)
+2026.06.05 06:18:48 INFO  time: compiled autoauction in 3.27s
+2026.06.05 06:18:48 INFO  compiling autoauction (2 java sources)
+2026.06.05 06:18:52 INFO  time: compiled autoauction in 3.14s
+2026.06.05 06:18:57 INFO  compiling autoauction (1 java source)
+2026.06.05 06:19:00 INFO  time: compiled autoauction in 2.96s
+2026.06.05 06:19:00 INFO  compiling autoauction (2 java sources)
+2026.06.05 06:19:03 INFO  time: compiled autoauction in 3.01s
+2026.06.05 06:19:03 INFO  compiling autoauction (2 java sources)
+2026.06.05 06:19:05 INFO  time: compiled autoauction in 2.64s
+2026.06.05 06:21:23 INFO  compiling autoauction-test (53 java sources)
+2026.06.05 06:21:30 INFO  Note: D:\AutoAuction\src\test\java\com\example\autoauction\auth\application\AuthServiceTest.java uses unchecked or unsafe operations.
+2026.06.05 06:21:30 INFO  Note: Recompile with -Xlint:unchecked for details.
+2026.06.05 06:21:30 INFO  time: compiled autoauction-test in 8.59s
+2026.06.05 06:47:45 INFO  compiling autoauction (195 java sources)
+2026.06.05 06:47:55 INFO  time: compiled autoauction in 10s
+2026.06.05 06:47:55 INFO  compiling autoauction (1 java source)
+2026.06.05 06:47:58 INFO  time: compiled autoauction in 2.52s
+2026.06.05 06:48:01 INFO  compiling autoauction (1 java source)
+2026.06.05 06:48:03 INFO  time: compiled autoauction in 2.74s
+2026.06.05 07:31:48 INFO  compiling autoauction (195 java sources)
+2026.06.05 07:32:00 INFO  time: compiled autoauction in 11s
+2026.06.05 07:32:00 INFO  compiling autoauction (3 java sources)
+2026.06.05 07:32:03 INFO  time: compiled autoauction in 2.91s
+2026.06.05 07:32:03 INFO  compiling autoauction (1 java source)
+2026.06.05 07:32:06 INFO  time: compiled autoauction in 2.89s
+2026.06.05 07:32:11 INFO  compiling autoauction (1 java source)
+2026.06.05 07:32:14 INFO  time: compiled autoauction in 2.88s
+2026.06.05 07:32:24 INFO  compiling autoauction (1 java source)
+2026.06.05 07:32:26 INFO  time: compiled autoauction in 2.32s
+2026.06.05 07:32:26 INFO  compiling autoauction (2 java sources)
+2026.06.05 07:32:29 WARN  javac exited with exit code 1
+2026.06.05 07:32:29 INFO  time: compiled autoauction in 2.72s
+2026.06.05 07:32:32 INFO  compiling autoauction (2 java sources)
+2026.06.05 07:32:34 INFO  time: compiled autoauction in 2.35s
+2026.06.05 07:32:34 INFO  compiling autoauction (2 java sources)
+2026.06.05 07:32:37 WARN  javac exited with exit code 1
+2026.06.05 07:32:37 INFO  time: compiled autoauction in 2.62s
+2026.06.05 07:32:37 INFO  compiling autoauction (2 java sources)
+2026.06.05 07:32:39 INFO  time: compiled autoauction in 2.02s
+2026.06.05 07:32:39 INFO  compiling autoauction (2 java sources)
+2026.06.05 07:32:42 WARN  javac exited with exit code 1
+2026.06.05 07:32:42 INFO  time: compiled autoauction in 3.07s
+2026.06.05 07:32:42 INFO  compiling autoauction (3 java sources)
+2026.06.05 07:32:44 INFO  time: compiled autoauction in 2.3s
+2026.06.05 07:32:44 INFO  compiling autoauction (1 java source)
+2026.06.05 07:32:47 INFO  time: compiled autoauction in 2.48s
+2026.06.05 07:32:47 INFO  compiling autoauction (5 java sources)
+2026.06.05 07:32:50 INFO  time: compiled autoauction in 3.21s
+2026.06.05 07:33:22 INFO  compiling autoauction (4 java sources)
+2026.06.05 07:33:25 INFO  time: compiled autoauction in 2.85s
+2026.06.05 07:33:25 INFO  compiling autoauction (3 java sources)
+2026.06.05 07:33:27 INFO  time: compiled autoauction in 2.51s
+2026.06.05 07:33:34 INFO  compiling autoauction (1 java source)
+2026.06.05 07:33:37 INFO  time: compiled autoauction in 2.48s
+2026.06.05 07:33:37 INFO  compiling autoauction (3 java sources)
+2026.06.05 07:33:40 WARN  javac exited with exit code 1
+2026.06.05 07:33:40 INFO  time: compiled autoauction in 3.06s
+2026.06.05 07:33:40 INFO  compiling autoauction (2 java sources)
+2026.06.05 07:33:43 WARN  javac exited with exit code 1
+2026.06.05 07:33:43 INFO  time: compiled autoauction in 2.72s
+2026.06.05 07:33:44 INFO  compiling autoauction (2 java sources)
+2026.06.05 07:33:47 INFO  time: compiled autoauction in 2.62s
+2026.06.05 07:33:47 INFO  compiling autoauction (2 java sources)
+2026.06.05 07:33:49 INFO  time: compiled autoauction in 2.88s
+2026.06.05 07:33:49 INFO  compiling autoauction (5 java sources)
+2026.06.05 07:33:52 INFO  time: compiled autoauction in 3.01s
+2026.06.05 07:33:52 INFO  compiling autoauction (1 java source)
+2026.06.05 07:33:56 INFO  time: compiled autoauction in 2.57s
+2026.06.05 07:33:56 INFO  compiling autoauction (1 java source)
+2026.06.05 07:33:58 INFO  time: compiled autoauction in 2.57s
+2026.06.05 07:33:58 INFO  compiling autoauction (1 java source)
+2026.06.05 07:34:01 INFO  time: compiled autoauction in 2.42s
+2026.06.05 07:34:01 INFO  compiling autoauction (1 java source)
+2026.06.05 07:34:03 INFO  time: compiled autoauction in 2.38s
+2026.06.05 07:34:27 INFO  compiling autoauction (1 java source)
+2026.06.05 07:34:29 INFO  time: compiled autoauction in 2.35s
+2026.06.05 07:34:29 INFO  compiling autoauction (2 java sources)
+2026.06.05 07:34:31 INFO  time: compiled autoauction in 2.57s
+2026.06.05 07:34:31 INFO  compiling autoauction (1 java source)
+2026.06.05 07:34:35 INFO  time: compiled autoauction in 2.43s
+2026.06.05 07:40:24 INFO  Started: Metals version 1.6.7+51-7cf0e6b6-SNAPSHOT in folders 'D:\AutoAuction' for client Visual Studio Code 1.121.0.
+2026.06.05 07:40:24 INFO  Memory monitor started
+2026.06.05 07:40:29 WARN  Using H2 2.4.240 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.
+2026.06.05 07:40:30 INFO  Attempting to connect to the build server...
+2026.06.05 07:40:30 INFO  No running Bloop server found, starting one.
+2026.06.05 07:40:33 INFO  Starting compilation server
+2026.06.05 07:40:36 INFO  tracing is disabled for protocol BSP, to enable tracing of incoming and outgoing JSON messages create an empty file at D:\AutoAuction\.metals\bsp.trace.json or C:\Users\Asus\AppData\Local\scalameta\metals\cache\bsp.trace.json
+2026.06.05 07:40:37 INFO  time: Connected to build server in 6.22s
+2026.06.05 07:40:37 INFO  Connected to Build server: Bloop v2.0.19
+2026.06.05 07:40:38 INFO  time: Imported build in 0.42s
+2026.06.05 07:40:47 WARN  Using H2 2.4.240 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.
+2026.06.05 07:40:51 INFO  time: indexed workspace in 12s
+2026.06.05 07:40:53 INFO  compiling autoauction-test (53 java sources)
+2026.06.05 07:41:01 INFO  Note: D:\AutoAuction\src\test\java\com\example\autoauction\auth\application\AuthServiceTest.java uses unchecked or unsafe operations.
+2026.06.05 07:41:01 INFO  Note: Recompile with -Xlint:unchecked for details.
+2026.06.05 07:41:03 INFO  time: compiled autoauction-test in 10s

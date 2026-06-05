@@ -2,6 +2,7 @@ package com.example.autoauction.diagnostic.web;
 
 import com.example.autoauction.auth.infrastructure.security.CurrentUser;
 import com.example.autoauction.auth.domain.UserPrincipal;
+import com.example.autoauction.diagnostic.application.DiagnosticRequestService;
 import com.example.autoauction.diagnostic.application.InspectionTemplateService;
 import com.example.autoauction.diagnostic.domain.InspectionGroup;
 import com.example.autoauction.diagnostic.domain.InspectionItem;
@@ -25,14 +26,14 @@ import org.springframework.web.bind.annotation.*;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/admin/diagnostic")
+@RequestMapping("/api/v1/admin/diagnostic")
 @RequiredArgsConstructor
 @Tag(name = "Админ панель диагностики", description = "Управление шаблонами и проверка отчётов")
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminDiagnosticController {
 
     private final InspectionTemplateService templateService;
-    // TODO: добавить сервис для проверки отчётов
+    private final DiagnosticRequestService requestService;
 
     // ==================== Шаблоны ====================
 
@@ -138,34 +139,40 @@ public class AdminDiagnosticController {
 
     // ==================== Проверка отчётов ====================
 
+    @GetMapping("/reports")
+    @Operation(summary = "Получить все заявки на диагностику (все статусы)")
+    public Page<DiagnosticRequestResponse> getAllReports(@PageableDefault(size = 20) Pageable pageable) {
+        return requestService.getAllRequests(pageable);
+    }
+
     @GetMapping("/reports/pending")
-    @Operation(summary = "Получить отчёты на проверке")
+    @Operation(summary = "Получить отчёты на проверке (статус COMPLETED)")
     public Page<DiagnosticRequestResponse> getPendingReports(@PageableDefault(size = 20) Pageable pageable) {
-        // TODO: реализовать
-        return Page.empty();
+        return requestService.getCompletedReports(pageable);
     }
 
     @GetMapping("/reports/{id}")
     @Operation(summary = "Получить отчёт для проверки")
     public ResponseEntity<DiagnosticRequestResponse> getReportForReview(@PathVariable Long id) {
-        // TODO: реализовать
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(requestService.getRequestDetails(id));
     }
 
     @PostMapping("/reports/{id}/approve")
-    @Operation(summary = "Одобрить отчёт")
-    public ResponseEntity<Void> approveReport(@PathVariable Long id) {
-        // TODO: реализовать
-        return ResponseEntity.ok().build();
+    @Operation(summary = "Одобрить отчёт диагноста")
+    public ResponseEntity<DiagnosticRequestResponse> approveReport(
+            @PathVariable Long id,
+            @CurrentUser UserPrincipal currentUser
+    ) {
+        return ResponseEntity.ok(requestService.approveReport(id, currentUser.getUserId()));
     }
 
     @PostMapping("/reports/{id}/reject")
-    @Operation(summary = "Отклонить отчёт")
-    public ResponseEntity<Void> rejectReport(
+    @Operation(summary = "Отклонить отчёт диагноста с причиной")
+    public ResponseEntity<DiagnosticRequestResponse> rejectReport(
             @PathVariable Long id,
-            @RequestParam String reason
+            @RequestParam String reason,
+            @CurrentUser UserPrincipal currentUser
     ) {
-        // TODO: реализовать
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(requestService.rejectReport(id, currentUser.getUserId(), reason));
     }
 }

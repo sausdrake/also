@@ -89,7 +89,8 @@ class AdminAuctionControllerTest {
                 new BigDecimal("1000000"), new BigDecimal("1000000"),
                 new BigDecimal("1200000"), new BigDecimal("1500000"),
                 new BigDecimal("10000"), startTime, endTime,
-                AuctionStatus.CREATED, 0, null, null, adminId, now
+                AuctionStatus.CREATED, 0, null, null, adminId, now,
+                false, null, null, null, 0
         );
 
         activeAuctionResponse = new AuctionResponse(
@@ -97,7 +98,8 @@ class AdminAuctionControllerTest {
                 new BigDecimal("1000000"), new BigDecimal("1050000"),
                 new BigDecimal("1200000"), new BigDecimal("1500000"),
                 new BigDecimal("10000"), startTime, endTime,
-                AuctionStatus.ACTIVE, 2, 5L, new BigDecimal("1050000"), adminId, now
+                AuctionStatus.ACTIVE, 2, 5L, new BigDecimal("1050000"), adminId, now,
+                false, null, null, null, 0
         );
 
         cancelledAuctionResponse = new AuctionResponse(
@@ -105,7 +107,8 @@ class AdminAuctionControllerTest {
                 new BigDecimal("1000000"), new BigDecimal("1000000"),
                 new BigDecimal("1200000"), new BigDecimal("1500000"),
                 new BigDecimal("10000"), startTime, endTime,
-                AuctionStatus.CANCELLED, 0, null, null, adminId, now
+                AuctionStatus.CANCELLED, 0, null, null, adminId, now,
+                false, null, null, null, 0
         );
 
         completedAuctionResponse = new AuctionResponse(
@@ -113,7 +116,8 @@ class AdminAuctionControllerTest {
                 new BigDecimal("1000000"), new BigDecimal("1200000"),
                 new BigDecimal("1200000"), new BigDecimal("1500000"),
                 new BigDecimal("10000"), startTime, endTime,
-                AuctionStatus.COMPLETED, 5, 3L, new BigDecimal("1200000"), adminId, now
+                AuctionStatus.COMPLETED, 5, 3L, new BigDecimal("1200000"), adminId, now,
+                false, null, null, null, 0
         );
     }
 

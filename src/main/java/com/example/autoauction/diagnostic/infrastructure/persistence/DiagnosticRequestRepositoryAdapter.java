@@ -90,4 +90,21 @@ public class DiagnosticRequestRepositoryAdapter implements DiagnosticRequestRepo
         }
         return false;
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<DiagnosticRequest> findAll(Pageable pageable) {
+        return jpaRepository.findAll(pageable).map(mapper::toDomain);
+    }
+
+    @Override
+    public boolean resetForRework(Long requestId, Long diagnosticId) {
+        int updated = jpaRepository.resetForRework(requestId, diagnosticId, OffsetDateTime.now());
+        if (updated > 0) {
+            log.info("Reset request {} for rework by diagnostic {}", requestId, diagnosticId);
+            return true;
+        }
+        log.warn("Failed to reset request {} for rework (not REJECTED or not assigned to {})", requestId, diagnosticId);
+        return false;
+    }
 }

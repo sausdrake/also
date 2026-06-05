@@ -316,6 +316,41 @@ public class VehicleService {
         return VehicleResponse.fromDomain(updated);
     }
 
+    /**
+     * Создать Vehicle автоматически при одобрении диагностического отчёта.
+     * Данные берутся из диагностической заявки.
+     */
+    @Transactional
+    public VehicleResponse createFromDiagnosticRequest(
+            Long diagnosticRequestId,
+            String brand, String model, Integer year, String vin,
+            Long diagnosticUserId, String diagnosticUsername,
+            Long adminId, String adminName) {
+
+        // Если VIN уже зарегистрирован — возвращаем существующий автомобиль
+        if (vehicleRepository.existsByVin(vin)) {
+            log.warn("Vehicle with VIN {} already exists, skipping creation", vin);
+            return vehicleRepository.findByVin(vin)
+                    .map(VehicleResponse::fromDomain)
+                    .orElseThrow(() -> new IllegalStateException("VIN conflict for: " + vin));
+        }
+
+        Vehicle vehicle = new Vehicle(brand, model, year, vin,
+                com.example.autoauction.vehicle.domain.VehicleType.SEDAN, // дефолт, можно расширить
+                diagnosticUserId, diagnosticUsername);
+        // Сразу переводим в APPROVED (отчёт уже одобрен)
+        vehicle.submitForReview();
+        vehicle.approve(adminId, adminName);
+
+        Vehicle saved = vehicleRepository.save(vehicle);
+        log.info("Vehicle created from diagnostic request {}: id={}, vin={}", diagnosticRequestId, saved.getId(), vin);
+        return VehicleResponse.fromDomain(saved);
+    }
+
+    public long countByStatus(VehicleStatus status) {
+        return vehicleRepository.findByStatus(status).size();
+    }
+
     @Transactional
     public VehicleResponse rejectVehicle(Long vehicleId, Long adminId, String adminName, String reason) {
         log.info("=== ОТКЛОНЕНИЕ АВТОМОБИЛЯ ID: {} ===", vehicleId);

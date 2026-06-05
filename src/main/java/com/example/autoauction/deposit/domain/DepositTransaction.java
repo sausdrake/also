@@ -59,10 +59,11 @@ public class DepositTransaction {
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
 
     public enum TransactionType {
-        DEPOSIT,        // Пополнение
-        WITHDRAWAL,     // Списание
-        BLOCK,          // Блокировка
-        UNBLOCK,        // Разблокировка
-        CHARGE          // Удержание (штраф)
+        DEPOSIT,            // Пополнение
+        WITHDRAWAL,         // Списание
+        BLOCK,              // Блокировка
+        UNBLOCK,            // Разблокировка
+        CHARGE,             // Удержание (штраф)
+        ADMIN_ADJUSTMENT    // Ручная корректировка администратором
     }
 }

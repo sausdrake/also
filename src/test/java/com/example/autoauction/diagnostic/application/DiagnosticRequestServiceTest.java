@@ -144,9 +144,17 @@ class DiagnosticRequestServiceTest {
     @DisplayName("Назначение заявки диагносту")
     class AssignRequestTests {
 
+        private User activeDiagnostician;
+
+        @BeforeEach
+        void setUpDiagnostician() {
+            activeDiagnostician = new User(diagnosticId, "diag_user", "diag@test.com", "pass", true, Set.of());
+        }
+
         @Test
         @DisplayName("Успешное назначение заявки")
         void assignToDiagnostic_Success() {
+            when(userRepository.findById(diagnosticId)).thenReturn(Optional.of(activeDiagnostician));
             when(requestRepository.assignToDiagnostic(requestId, diagnosticId)).thenReturn(true);
             when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
 
@@ -158,8 +166,30 @@ class DiagnosticRequestServiceTest {
         }
 
         @Test
-        @DisplayName("Назначение уже занятой заявки - исключение")
+        @DisplayName("Диагностик не найден — IllegalArgumentException")
+        void assignToDiagnostic_DiagnosticianNotFound_ThrowsException() {
+            when(userRepository.findById(diagnosticId)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> requestService.assignToDiagnostic(requestId, diagnosticId))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Диагност не найден");
+        }
+
+        @Test
+        @DisplayName("Диагностик заблокирован — IllegalStateException")
+        void assignToDiagnostic_BlockedDiagnostician_ThrowsException() {
+            User blocked = new User(diagnosticId, "diag_user", "diag@test.com", "pass", false, Set.of());
+            when(userRepository.findById(diagnosticId)).thenReturn(Optional.of(blocked));
+
+            assertThatThrownBy(() -> requestService.assignToDiagnostic(requestId, diagnosticId))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("заблокирован");
+        }
+
+        @Test
+        @DisplayName("Назначение уже занятой заявки — IllegalStateException")
         void assignToDiagnostic_AlreadyAssigned_ThrowsException() {
+            when(userRepository.findById(diagnosticId)).thenReturn(Optional.of(activeDiagnostician));
             when(requestRepository.assignToDiagnostic(requestId, diagnosticId)).thenReturn(false);
 
             assertThatThrownBy(() -> requestService.assignToDiagnostic(requestId, diagnosticId))
@@ -168,8 +198,9 @@ class DiagnosticRequestServiceTest {
         }
 
         @Test
-        @DisplayName("Назначение несуществующей заявки - исключение")
+        @DisplayName("Назначение несуществующей заявки — IllegalArgumentException")
         void assignToDiagnostic_NotFound_ThrowsException() {
+            when(userRepository.findById(diagnosticId)).thenReturn(Optional.of(activeDiagnostician));
             when(requestRepository.assignToDiagnostic(requestId, diagnosticId)).thenReturn(true);
             when(requestRepository.findById(requestId)).thenReturn(Optional.empty());
 

@@ -25,4 +25,8 @@ public interface DiagnosticRequestRepository {
     boolean assignToDiagnostic(Long requestId, Long diagnosticId);
 
     boolean markAsCompleted(Long requestId, Long diagnosticId);
+
+    Page<DiagnosticRequest> findAll(Pageable pageable);
+
+    boolean resetForRework(Long requestId, Long diagnosticId);
 }

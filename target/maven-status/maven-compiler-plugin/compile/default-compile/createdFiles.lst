@@ -1,3 +1,4 @@
+com\example\autoauction\admin\web\DashboardController.class
 com\example\autoauction\config\DataInitializer.class
 com\example\autoauction\deposit\infrastructure\persistence\JpaDepositEntity.class
 com\example\autoauction\auction\infrastructure\persistence\JpaAuctionRepositoryAdapter.class
@@ -33,10 +34,12 @@ com\example\autoauction\user\web\package-info.class
 com\example\autoauction\vehicle\domain\FuelType.class
 com\example\autoauction\vehicle\web\dto\VehicleApproveRequest.class
 com\example\autoauction\user\infrastructure\persistence\JpaRoleRepositoryAdapter.class
+com\example\autoauction\admin\web\AdminUserController.class
 com\example\autoauction\diagnostic\infrastructure\persistence\InspectionAnswerRepositoryAdapter.class
 com\example\autoauction\auction\web\dto\BidResponse.class
 com\example\autoauction\common\domain\FailedOperation.class
 com\example\autoauction\config\WebMvcConfig.class
+com\example\autoauction\diagnostic\infrastructure\persistence\JpaInspectionAnswerEntity$1.class
 com\example\autoauction\vehicle\web\dto\VehicleRejectRequest.class
 com\example\autoauction\admin\application\AuctionValidator.class
 com\example\autoauction\auction\infrastructure\persistence\AuctionMapper.class
@@ -44,6 +47,7 @@ com\example\autoauction\diagnostic\web\AdminDiagnosticController.class
 com\example\autoauction\auth\domain\port\RefreshTokenRepository.class
 com\example\autoauction\auction\application\RateLimitException.class
 com\example\autoauction\deposit\infrastructure\persistence\SpringDataDepositTransactionJpaRepository.class
+com\example\autoauction\notification\infrastructure\persistence\JpaNotificationEntity.class
 com\example\autoauction\auth\infrastructure\security\UserDetailsServiceImpl.class
 com\example\autoauction\diagnostic\web\dto\InspectionTemplateDto.class
 com\example\autoauction\vehicle\infrastructure\persistence\JpaVehicleRepositoryAdapter.class
@@ -56,6 +60,7 @@ com\example\autoauction\diagnostic\domain\DiagnosticRequest.class
 com\example\autoauction\deposit\web\dto\DepositResponse.class
 com\example\autoauction\config\OpenAPIConfig.class
 com\example\autoauction\deposit\domain\FreezeReason.class
+com\example\autoauction\notification\web\NotificationController.class
 com\example\autoauction\diagnostic\domain\DiagnosticRequest$DiagnosticRequestStatus.class
 com\example\autoauction\vehicle\domain\Vehicle.class
 com\example\autoauction\vehicle\web\dto\VehicleResponse.class
@@ -81,6 +86,8 @@ com\example\autoauction\diagnostic\domain\port\DiagnosticRequestRepository.class
 com\example\autoauction\diagnostic\infrastructure\persistence\DiagnosticRequestMapper.class
 com\example\autoauction\auction\web\validation\AuctionPricesValidator.class
 com\example\autoauction\auction\infrastructure\persistence\SpringDataAuctionParticipantJpaRepository.class
+com\example\autoauction\notification\infrastructure\persistence\SpringDataNotificationRepository.class
+com\example\autoauction\notification\application\NotificationService.class
 com\example\autoauction\diagnostic\infrastructure\persistence\JpaInspectionItemEntity.class
 com\example\autoauction\auth\infrastructure\scheduler\TokenCleanupScheduler.class
 com\example\autoauction\deposit\domain\DepositTransaction.class
@@ -91,15 +98,20 @@ com\example\autoauction\diagnostic\infrastructure\persistence\JpaInspectionGroup
 com\example\autoauction\user\application\package-info.class
 com\example\autoauction\diagnostic\web\package-info.class
 com\example\autoauction\common\domain\port\FailedOperationRepository.class
+com\example\autoauction\admin\web\AdminUserController$AdjustDepositRequest.class
 com\example\autoauction\diagnostic\domain\package-info.class
 com\example\autoauction\user\domain\Role.class
 com\example\autoauction\vehicle\web\DiagnosticVehicleController.class
 com\example\autoauction\deposit\web\DepositController.class
 com\example\autoauction\admin\application\package-info.class
 com\example\autoauction\common\infrastructure\persistence\JpaFailedOperationEntity.class
+com\example\autoauction\common\media\MediaController.class
+com\example\autoauction\auction\application\RateLimitService$BucketEntry.class
+com\example\autoauction\admin\web\AdminUserController$UserDto.class
 com\example\autoauction\diagnostic\infrastructure\persistence\JpaInspectionTemplateEntity.class
 com\example\autoauction\auction\web\dto\AuctionCreateRequest.class
 com\example\autoauction\auth\infrastructure\security\JwtAuthenticationEntryPoint.class
+com\example\autoauction\admin\web\SystemSettingsController.class
 com\example\autoauction\user\domain\package-info.class
 com\example\autoauction\vehicle\domain\VehicleType.class
 com\example\autoauction\diagnostic\infrastructure\persistence\SpringDataInspectionItemJpaRepository.class
@@ -128,6 +140,7 @@ com\example\autoauction\auction\web\dto\AuctionWebSocketMessage$AuctionWebSocket
 com\example\autoauction\auth\domain\Token$TokenType.class
 com\example\autoauction\diagnostic\infrastructure\persistence\JpaDiagnosticRequestEntity.class
 com\example\autoauction\auction\web\BidController.class
+com\example\autoauction\deposit\domain\InsufficientFundsException.class
 com\example\autoauction\auth\web\dto\RegisterRequest.class
 com\example\autoauction\vehicle\web\dto\VehicleCreateRequest.class
 com\example\autoauction\auction\application\package-info.class
@@ -173,12 +186,14 @@ com\example\autoauction\vehicle\web\dto\VehicleUpdateRequest.class
 com\example\autoauction\auth\infrastructure\persistence\JpaRefreshTokenRepositoryAdapter.class
 com\example\autoauction\auth\web\AuthController$LogoutRequest.class
 com\example\autoauction\config\GlobalExceptionHandler.class
+com\example\autoauction\admin\application\SystemSettingsService.class
 com\example\autoauction\diagnostic\domain\InspectionGroup.class
 com\example\autoauction\vehicle\domain\package-info.class
 com\example\autoauction\diagnostic\application\package-info.class
 com\example\autoauction\deposit\domain\DepositStatus.class
 com\example\autoauction\diagnostic\web\dto\DiagnosticRequestResponse.class
 com\example\autoauction\diagnostic\infrastructure\package-info.class
+com\example\autoauction\diagnostic\web\PublicReportController.class
 com\example\autoauction\auth\web\AuthController.class
 com\example\autoauction\deposit\infrastructure\persistence\JpaDepositFrozenEntity.class
 com\example\autoauction\diagnostic\infrastructure\persistence\SpringDataInspectionGroupJpaRepository.class
@@ -196,6 +211,7 @@ com\example\autoauction\auth\infrastructure\persistence\RefreshTokenRepository.c
 com\example\autoauction\common\infrastructure\persistence\SpringDataFailedOperationJpaRepository.class
 com\example\autoauction\vehicle\application\package-info.class
 com\example\autoauction\diagnostic\domain\InspectionTemplate.class
+com\example\autoauction\notification\domain\Notification.class
 com\example\autoauction\diagnostic\infrastructure\persistence\InspectionItemMapper.class
 com\example\autoauction\auction\domain\package-info.class
 com\example\autoauction\deposit\infrastructure\persistence\JpaDepositTransactionEntity.class

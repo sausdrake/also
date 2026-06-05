@@ -153,4 +153,16 @@ public class JpaDepositRepositoryAdapter implements DepositRepository {
         frozenJpaRepository.deleteByAuctionId(auctionId);
         log.debug("Cleared all frozen deposits for auction {}", auctionId);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DepositTransaction> findTransactionsByUserIdFiltered(
+            Long userId,
+            com.example.autoauction.deposit.domain.DepositTransaction.TransactionType type,
+            java.time.OffsetDateTime from,
+            java.time.OffsetDateTime to) {
+        return transactionJpaRepository.findByUserIdFiltered(userId, type, from, to).stream()
+                .map(mapper::toDomain)
+                .collect(Collectors.toList());
+    }
 }

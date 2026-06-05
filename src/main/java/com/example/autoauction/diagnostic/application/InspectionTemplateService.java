@@ -59,6 +59,7 @@ public class InspectionTemplateService {
         template.setName(dto.getName());
         template.setVehicleType(dto.getVehicleType());
         template.setDescription(dto.getDescription());
+        if (dto.getIsActive() != null) template.setActive(dto.getIsActive());
 
         return templateRepository.saveTemplate(template);
     }
@@ -86,8 +87,11 @@ public class InspectionTemplateService {
 
     @Transactional
     public InspectionGroup updateGroup(Long groupId, InspectionGroupDto dto) {
-        // TODO: реализовать обновление группы
-        throw new UnsupportedOperationException("Not implemented yet");
+        InspectionGroup group = templateRepository.findGroupById(groupId)
+                .orElseThrow(() -> new IllegalArgumentException("Группа не найдена: " + groupId));
+        group.setName(dto.getName());
+        if (dto.getSortOrder() != null) group.setSortOrder(dto.getSortOrder());
+        return templateRepository.saveGroup(group);
     }
 
     @Transactional
@@ -114,8 +118,16 @@ public class InspectionTemplateService {
 
     @Transactional
     public InspectionItem updateItem(Long itemId, InspectionItemDto dto) {
-        // TODO: реализовать обновление пункта
-        throw new UnsupportedOperationException("Not implemented yet");
+        InspectionItem item = templateRepository.findItemById(itemId)
+                .orElseThrow(() -> new IllegalArgumentException("Пункт не найден: " + itemId));
+        item.setTitle(dto.getTitle());
+        item.setDescription(dto.getDescription());
+        item.setHasPhoto(dto.isHasPhoto());
+        item.setHasVideo(dto.isHasVideo());
+        item.setHasRating(dto.isHasRating());
+        item.setRequired(dto.isRequired());
+        if (dto.getSortOrder() != null) item.setSortOrder(dto.getSortOrder());
+        return templateRepository.saveItem(item);
     }
 
     @Transactional

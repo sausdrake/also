@@ -10,6 +10,7 @@ import com.example.autoauction.user.domain.port.RoleRepository;
 import com.example.autoauction.user.domain.port.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -22,8 +23,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -132,7 +137,7 @@ public class AuthService {
             }
 
             UserDetails userDetails = userDetailsService.loadUserByUsername(savedUser.getUsername());
-            String jwtToken = jwtService.generateToken(userDetails);
+            String jwtToken = generateAccessToken(userDetails, savedUser);
             String refreshToken = generateAndSaveRefreshToken(savedUser);
 
             log.debug("Tokens generated for user: {}", savedUser.getUsername());
@@ -178,9 +183,9 @@ public class AuthService {
                 throw new RuntimeException("User account is inactive");
             }
 
-            // 5. Генерация токенов
+            // 5. Генерация токенов (roles и userId включены в payload)
             UserDetails userDetails = userDetailsService.loadUserByUsername(request.username());
-            String jwtToken = jwtService.generateToken(userDetails);
+            String jwtToken = generateAccessToken(userDetails, user);
             String refreshToken = generateAndSaveRefreshToken(user);
 
             log.info("User logged in successfully: {}", request.username());
@@ -232,9 +237,9 @@ public class AuthService {
                 throw new RuntimeException("User account is inactive");
             }
 
-            // 5. Генерация новых токенов
+            // 5. Генерация новых токенов (roles и userId включены в payload)
             UserDetails userDetails = userDetailsService.loadUserByUsername(user.getUsername());
-            String newJwtToken = jwtService.generateToken(userDetails);
+            String newJwtToken = generateAccessToken(userDetails, user);
 
             // 6. Ротация refresh токена
             refreshTokenRepository.revokeAllUserTokens(user);
@@ -265,16 +270,31 @@ public class AuthService {
                         return new RuntimeException("Invalid refresh token");
                     });
 
-            // Проверяем, не отозван ли уже токен
+            // Если токен уже отозван — логируем и выходим без ошибки (idempotent logout)
             if (refreshToken.isRevoked()) {
-                log.warn("Refresh token already revoked for user: {}", refreshToken.getUser().getUsername());
-                throw new RuntimeException("Refresh token already used");
+                log.info("Refresh token already revoked for user: {} (idempotent logout)", refreshToken.getUser().getUsername());
+                return;
             }
 
             String username = refreshToken.getUser().getUsername();
             refreshTokenRepository.revokeAllUserTokens(refreshToken.getUser());
             log.info("User logged out successfully: {}", username);
         }
+    }
+
+    // ==================== ГЕНЕРАЦИЯ ACCESS TOKEN С CLAIMS ====================
+
+    /** Генерирует access token с ролями и userId в payload. */
+    private String generateAccessToken(UserDetails userDetails, User user) {
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(a -> a.getAuthority())
+                .collect(Collectors.toList());
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("roles", roles);
+        claims.put("userId", user.getId());
+        claims.put("username", user.getUsername());
+        claims.put("email", user.getEmail());
+        return jwtService.generateToken(claims, userDetails);
     }
 
     // ==================== ГЕНЕРАЦИЯ REFRESH ТОКЕНА ====================
@@ -292,8 +312,24 @@ public class AuthService {
                 Instant.now()
         );
 
-        refreshTokenRepository.save(refreshToken);
-        log.debug("Refresh token saved for user: {}", user.getUsername());
+        try {
+            refreshTokenRepository.save(refreshToken);
+            log.debug("Refresh token saved for user: {}", user.getUsername());
+        } catch (DataIntegrityViolationException e) {
+            // Крайне редкий случай: с jti это практически невозможно,
+            // но на случай неожиданного дубля — повторяем с новым jti.
+            log.warn("Duplicate refresh token detected for user {}, retrying...", user.getUsername());
+            String retryToken = jwtService.generateRefreshToken(userDetails);
+            RefreshToken retryRefreshToken = new RefreshToken(
+                    null, retryToken, user,
+                    Instant.now().plusMillis(jwtService.getRefreshExpiration()),
+                    false, Instant.now()
+            );
+            refreshTokenRepository.save(retryRefreshToken);
+            log.debug("Retry refresh token saved for user: {}", user.getUsername());
+            return retryToken;
+        }
+
         return refreshTokenString;
     }
 

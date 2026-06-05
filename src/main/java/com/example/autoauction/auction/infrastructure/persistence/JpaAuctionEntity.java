@@ -69,6 +69,22 @@ public class JpaAuctionEntity {
     @Column(name = "extension_count", nullable = false)
     private int extensionCount = 0;
 
+    @Column(name = "main_photo_url")
+    private String mainPhotoUrl;
+
+    // JSON-строка вида ["url1","url2"] — совместима с H2 и PostgreSQL
+    @Column(name = "additional_photo_urls", columnDefinition = "text")
+    private String additionalPhotoUrls;
+
+    @Column(name = "video_url")
+    private String videoUrl;
+
+    @Column(name = "confirmed_start", nullable = false)
+    private boolean confirmedStart = false;
+
+    @Column(name = "confirmation_deadline")
+    private OffsetDateTime confirmationDeadline;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version = 0L;
@@ -134,4 +150,15 @@ public class JpaAuctionEntity {
     public void setWasExtended(boolean wasExtended) { this.wasExtended = wasExtended; }
     public int getExtensionCount() { return extensionCount; }
     public void setExtensionCount(int extensionCount) { this.extensionCount = extensionCount; }
+
+    public String getMainPhotoUrl() { return mainPhotoUrl; }
+    public void setMainPhotoUrl(String mainPhotoUrl) { this.mainPhotoUrl = mainPhotoUrl; }
+    public String getAdditionalPhotoUrls() { return additionalPhotoUrls; }
+    public void setAdditionalPhotoUrls(String additionalPhotoUrls) { this.additionalPhotoUrls = additionalPhotoUrls; }
+    public String getVideoUrl() { return videoUrl; }
+    public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }
+    public boolean isConfirmedStart() { return confirmedStart; }
+    public void setConfirmedStart(boolean confirmedStart) { this.confirmedStart = confirmedStart; }
+    public OffsetDateTime getConfirmationDeadline() { return confirmationDeadline; }
+    public void setConfirmationDeadline(OffsetDateTime confirmationDeadline) { this.confirmationDeadline = confirmationDeadline; }
 }

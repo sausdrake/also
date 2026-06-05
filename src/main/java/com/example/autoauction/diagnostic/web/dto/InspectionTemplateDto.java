@@ -10,4 +10,5 @@ public class InspectionTemplateDto {
 
     private String vehicleType;
     private String description;
+    private Boolean isActive;
 }

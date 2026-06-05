@@ -5,6 +5,7 @@ import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionParticipantRepository;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
+import com.example.autoauction.auction.web.AuctionWebSocketController;
 import com.example.autoauction.auction.web.dto.BidResponse;
 import com.example.autoauction.deposit.application.DepositService;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +44,9 @@ class BidServiceTest {
 
     @Mock
     private RateLimitService rateLimitService;
+
+    @Mock
+    private AuctionWebSocketController webSocketController;
 
     @InjectMocks
     private BidService bidService;
@@ -364,6 +368,119 @@ class BidServiceTest {
             List<Long> participants = bidService.getAuctionParticipants(nonExistentAuctionId);
 
             assertTrue(participants.isEmpty());
+        }
+    }
+
+    // ==================== BUY NOW ТЕСТЫ ====================
+
+    @Nested
+    @DisplayName("🛒 Buy Now — сценарии")
+    class BuyNowTests {
+
+        @Test
+        @DisplayName("Buy Now на ACTIVE аукцион — IllegalStateException")
+        void buyNow_OnActiveAuction_Throws() {
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
+
+            IllegalStateException ex = assertThrows(IllegalStateException.class,
+                    () -> bidService.buyNow(auctionId, bidderId1));
+            assertTrue(ex.getMessage().contains("CREATED"),
+                    "Сообщение должно указывать что операция доступна только для CREATED");
+        }
+
+        @Test
+        @DisplayName("Buy Now на COMPLETED аукцион — IllegalStateException")
+        void buyNow_OnCompletedAuction_Throws() {
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(auctionRepository.findByIdWithLock(3L)).thenReturn(Optional.of(completedAuction));
+
+            assertThrows(IllegalStateException.class,
+                    () -> bidService.buyNow(3L, bidderId1));
+        }
+
+        @Test
+        @DisplayName("Buy Now на собственный аукцион — IllegalArgumentException")
+        void buyNow_OnOwnAuction_Throws() {
+            when(rateLimitService.tryAcquire(sellerId)).thenReturn(true);
+            when(auctionRepository.findByIdWithLock(2L)).thenReturn(Optional.of(createdAuction));
+
+            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                    () -> bidService.buyNow(2L, sellerId));
+            assertTrue(ex.getMessage().contains("собственный"));
+        }
+
+        @Test
+        @DisplayName("Buy Now без buyNowPrice — IllegalStateException")
+        void buyNow_NoBuyNowPrice_Throws() {
+            Auction noBuyNow = new Auction(
+                    5L, startingPrice, null, null, minBidStep,
+                    now.plusHours(1), futureEndTime, sellerId
+            );
+            noBuyNow.setId(5L);
+            noBuyNow.setStatus(AuctionStatus.CREATED);
+
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(auctionRepository.findByIdWithLock(5L)).thenReturn(Optional.of(noBuyNow));
+
+            assertThrows(IllegalStateException.class,
+                    () -> bidService.buyNow(5L, bidderId1));
+        }
+
+        @Test
+        @DisplayName("Buy Now при недостаточном депозите — IllegalArgumentException")
+        void buyNow_InsufficientDeposit_Throws() {
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(auctionRepository.findByIdWithLock(2L)).thenReturn(Optional.of(createdAuction));
+            when(depositService.canParticipateInAuction(bidderId1, startingPrice)).thenReturn(false);
+
+            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                    () -> bidService.buyNow(2L, bidderId1));
+            assertTrue(ex.getMessage().contains("Недостаточно средств"));
+        }
+
+        @Test
+        @DisplayName("Buy Now при превышении rate limit — RateLimitException")
+        void buyNow_RateLimitExceeded_Throws() {
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(false);
+
+            assertThrows(RateLimitException.class,
+                    () -> bidService.buyNow(auctionId, bidderId1));
+
+            verify(auctionRepository, never()).findByIdWithLock(any());
+        }
+
+        @Test
+        @DisplayName("Buy Now с null auctionId — IllegalArgumentException")
+        void buyNow_NullAuctionId_Throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> bidService.buyNow(null, bidderId1));
+        }
+
+        @Test
+        @DisplayName("Buy Now с null buyerId — IllegalArgumentException")
+        void buyNow_NullBuyerId_Throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> bidService.buyNow(auctionId, null));
+        }
+    }
+
+    // ==================== RATE LIMIT ТЕСТЫ ====================
+
+    @Nested
+    @DisplayName("⏱ Rate Limit — ограничение ставок")
+    class RateLimitTests {
+
+        @Test
+        @DisplayName("Ставка при превышении лимита — RateLimitException без обращения к БД")
+        void placeBid_RateLimitExceeded_Throws_NoDbAccess() {
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(false);
+
+            assertThrows(RateLimitException.class,
+                    () -> bidService.placeBid(auctionId, validBid, bidderId1));
+
+            verifyNoInteractions(auctionRepository);
+            verifyNoInteractions(depositService);
         }
     }
 

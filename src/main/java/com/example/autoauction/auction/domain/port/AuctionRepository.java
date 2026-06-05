@@ -43,6 +43,15 @@ public interface AuctionRepository {
     // Поиск с пессимистичной блокировкой
     Optional<Auction> findByIdWithLock(Long id);
 
-    // НОВЫЙ МЕТОД для шедулера (оптимизированный)
+    // Для шедулера
     List<Auction> findByStatusAndEndTimeBefore(AuctionStatus status, java.time.OffsetDateTime endTime);
+
+    // Подтверждённые аукционы, готовые к запуску
+    List<Auction> findConfirmedAuctionsReadyToStart(java.time.OffsetDateTime now);
+
+    // Неподтверждённые аукционы с истёкшим дедлайном
+    List<Auction> findUnconfirmedAuctionsPastDeadline(java.time.OffsetDateTime now);
+
+    // Найти по списку id
+    List<Auction> findAllById(List<Long> ids);
 }

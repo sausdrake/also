@@ -18,7 +18,7 @@ import java.util.List;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/admin/vehicles")
+@RequestMapping("/api/v1/admin/vehicles")
 @Tag(name = "Администрирование автомобилей", description = "Управление отчетами об автомобилях (для администраторов)")
 public class AdminVehicleController {
 

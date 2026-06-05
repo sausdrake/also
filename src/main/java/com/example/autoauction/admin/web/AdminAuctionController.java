@@ -20,11 +20,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/admin/auctions")
+@RequestMapping("/api/v1/admin/auctions")
 @Tag(name = "Администрирование аукционов", description = "Управление аукционами (только для администраторов)")
 public class AdminAuctionController {
 
@@ -168,6 +169,23 @@ public class AdminAuctionController {
         }
 
         return adminAuctionService.getAuctionsByStatus(sanitizedStatus);
+    }
+
+    @PostMapping("/{id}/confirm-start")
+    @Operation(summary = "Подтвердить запуск аукциона")
+    public ResponseEntity<AuctionResponse> confirmStart(@PathVariable Long id) {
+        return ResponseEntity.ok(adminAuctionService.confirmAuctionStart(id));
+    }
+
+    @PostMapping("/confirm-start")
+    @Operation(summary = "Массовое подтверждение запуска аукционов")
+    public ResponseEntity<List<AuctionResponse>> confirmStartBulk(
+            @RequestBody Map<String, List<Long>> body) {
+        List<Long> ids = body.get("auctionIds");
+        if (ids == null || ids.isEmpty()) {
+            throw new IllegalArgumentException("auctionIds не может быть пустым");
+        }
+        return ResponseEntity.ok(adminAuctionService.confirmAuctionStartBulk(ids));
     }
 
     @GetMapping("/vehicle/{vehicleId}")

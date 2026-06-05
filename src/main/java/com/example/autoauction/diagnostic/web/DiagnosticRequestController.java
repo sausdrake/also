@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/diagnostic-requests")
+@RequestMapping("/api/v1/diagnostic/requests")
 @RequiredArgsConstructor
 @Tag(name = "Заявки на диагностику", description = "Управление заявками на диагностику")
 public class DiagnosticRequestController {
@@ -48,16 +48,19 @@ public class DiagnosticRequestController {
     @GetMapping("/my")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Получить мои заявки")
-    public Page<DiagnosticRequestResponse> getMyRequests(
+    public ResponseEntity<Page<DiagnosticRequestResponse>> getMyRequests(
             @PageableDefault(size = 20) Pageable pageable,
             @CurrentUser UserPrincipal currentUser
     ) {
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         log.info("GET /api/diagnostic-requests/my - user: {}", currentUser.getUserId());
-        return requestService.getUserRequests(currentUser.getUserId(), pageable);
+        return ResponseEntity.ok(requestService.getUserRequests(currentUser.getUserId(), pageable));
     }
 
     /**
-     * Получить детали заявки (покупатель)
+     * Получить детали заявки
      */
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
@@ -66,15 +69,36 @@ public class DiagnosticRequestController {
             @PathVariable Long id,
             @CurrentUser UserPrincipal currentUser
     ) {
-        log.info("GET /api/diagnostic-requests/{} - user: {}", id, currentUser.getUserId());
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         DiagnosticRequestResponse response = requestService.getRequestDetails(id);
 
-        // Проверяем, что пользователь имеет право просматривать заявку
-        if (!response.getUserId().equals(currentUser.getUserId()) &&
-                !currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))) {
+        boolean isOwner = response.getUserId().equals(currentUser.getUserId());
+        boolean isAdmin = currentUser.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        // Диагностик видит заявку только если он назначен на неё
+        boolean isAssignedDiagnostician = currentUser.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_DIAGNOSTIC"))
+                && currentUser.getUserId().equals(response.getAssignedTo());
+
+        if (!isOwner && !isAdmin && !isAssignedDiagnostician) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Отозвать заявку (только PENDING, только владелец)
+     */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Отозвать заявку на диагностику")
+    public ResponseEntity<Void> cancelRequest(
+            @PathVariable Long id,
+            @CurrentUser UserPrincipal currentUser
+    ) {
+        requestService.cancelRequest(id, currentUser.getUserId());
+        return ResponseEntity.noContent().build();
     }
 }
