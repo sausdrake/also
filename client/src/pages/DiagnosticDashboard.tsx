@@ -61,6 +61,70 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 // Can the diagnostic still edit this report?
 const isEditable = (status: string) => status === 'IN_PROGRESS' || status === 'REJECTED';
 
+// ─── Photo capture (camera on mobile, file on desktop) ───
+function PhotoCapture({ ans, onChange, hasError }: {
+  ans: Answer;
+  onChange: (field: keyof Answer, value: any) => void;
+  hasError: boolean;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+
+  const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError('');
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await api.post('/media/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const url: string = res.data.publicUrl;
+      onChange('photoUrls', [...(ans.photoUrls || []), url]);
+    } catch (err: any) {
+      setUploadError(err.response?.data?.error || 'Ошибка загрузки фото');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const removePhoto = (idx: number) => {
+    onChange('photoUrls', (ans.photoUrls || []).filter((_, i) => i !== idx));
+  };
+
+  return (
+    <div className="space-y-2">
+      {/* thumbnails */}
+      {ans.photoUrls && ans.photoUrls.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {ans.photoUrls.map((url, i) => (
+            <div key={i} className="relative w-20 h-20">
+              <img src={url} alt="" className="w-full h-full object-cover rounded-lg border" />
+              <button type="button" onClick={() => removePhoto(i)}
+                className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center leading-none">✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <label className={`flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg border text-sm w-fit transition-colors ${
+        hasError && (!ans.photoUrls || ans.photoUrls.length === 0) ? 'border-red-400 bg-red-50' : 'border-gray-200 hover:bg-gray-50'
+      } ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+        <span className="text-lg">📷</span>
+        <span>{uploading ? 'Загрузка...' : 'Сделать фото'}</span>
+        <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} disabled={uploading} />
+      </label>
+      {/* fallback: pick from gallery */}
+      <label className="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg border border-gray-200 text-sm w-fit hover:bg-gray-50">
+        <span className="text-lg">🖼️</span>
+        <span>Из галереи</span>
+        <input type="file" accept="image/*" className="hidden" onChange={handleCapture} disabled={uploading} />
+      </label>
+      {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
+    </div>
+  );
+}
+
 // ─── Field renderer for the report form ───
 function FieldInput({ item, ans, onChange, hasError }: {
   item: Item;
@@ -135,18 +199,7 @@ function FieldInput({ item, ans, onChange, hasError }: {
       );
 
     case 'PHOTO':
-      return (
-        <div>
-          <p className="text-xs text-gray-500 mb-1">Ссылка на фото (URL)</p>
-          <input
-            type="url"
-            value={ans.photoUrls?.[0] || ''}
-            onChange={e => onChange('photoUrls', e.target.value ? [e.target.value] : [])}
-            placeholder="https://..."
-            className={`w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none ${hasError ? 'border-red-400' : 'border-gray-200'}`}
-          />
-        </div>
-      );
+      return <PhotoCapture ans={ans} onChange={onChange} hasError={hasError} />;
 
     case 'TEXTAREA':
     default:
@@ -170,9 +223,15 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
   const [msg, setMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Set<number>>(new Set());
+  const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [templates, setTemplates] = useState<{ id: number; name: string; vehicleType: string }[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
 
-  useEffect(() => {
-    api.get(`/diagnostic/work/${requestId}`).then(r => {
+  const loadForm = (templateId?: number) => {
+    const url = templateId
+      ? `/diagnostic/work/${requestId}?templateId=${templateId}`
+      : `/diagnostic/work/${requestId}`;
+    api.get(url).then(r => {
       setData(r.data);
       const groups: Group[] = r.data?.template?.groups ?? [];
       setOpenGroups(new Set(groups.map((g: Group) => g.id)));
@@ -189,7 +248,22 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
       });
       setAnswers(initial);
     }).catch(() => setMsg('Не удалось загрузить заявку'));
+  };
+
+  useEffect(() => {
+    loadForm();
+    api.get('/diagnostic/work/templates')
+      .then(r => setTemplates(r.data || []))
+      .catch(() => {});
   }, [requestId]);
+
+  const handleTemplateChange = (id: number) => {
+    setSelectedTemplateId(id);
+    setAnswers({});
+    setValidationErrors(new Set());
+    setMissingFields([]);
+    loadForm(id);
+  };
 
   const setAnswer = (itemId: number, field: keyof Answer, value: any) => {
     setAnswers(prev => ({
@@ -229,19 +303,23 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
     setValidationErrors(errors);
     if (errors.size > 0) {
       const errGroups = new Set<number>();
+      const missing: string[] = [];
       for (const group of template.groups) {
         if (group.items.some(i => errors.has(i.id))) errGroups.add(group.id);
+        group.items.filter(i => errors.has(i.id)).forEach(i => missing.push(`${group.name}: ${i.title}`));
       }
       setOpenGroups(prev => new Set([...prev, ...errGroups]));
+      setMissingFields(missing);
     }
     return errors.size === 0;
   };
 
   const submit = async (isSubmit: boolean) => {
     if (isSubmit && !validateForSubmit()) {
-      setMsg('Заполните все обязательные пункты (отмечены *)');
+      setMsg('');
       return;
     }
+    setMissingFields([]);
     setSubmitting(true);
     try {
       const answerList = Object.values(answers);
@@ -285,10 +363,25 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
           <div>
             <h2 className="font-semibold text-lg">{data.brand} {data.model} {data.year}</h2>
             <p className="text-sm text-gray-500">VIN: {data.vin}</p>
-            {template && <p className="text-xs text-gray-400 mt-1">Шаблон: {template.name}</p>}
           </div>
           <button onClick={onDone} className="text-sm text-gray-500 hover:text-gray-700">← Назад</button>
         </div>
+
+        {/* Template selector */}
+        {editable && templates.length > 0 && (
+          <div className="mt-3">
+            <label className="text-xs text-gray-500 mb-1 block">Шаблон анкеты</label>
+            <select
+              value={selectedTemplateId ?? (template?.id ?? '')}
+              onChange={e => handleTemplateChange(Number(e.target.value))}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            >
+              {templates.map(t => (
+                <option key={t.id} value={t.id}>{t.name} ({t.vehicleType})</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {!template && (
           <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
@@ -317,6 +410,15 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
           </div>
         )}
       </div>
+
+      {missingFields.length > 0 && (
+        <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
+          <p className="font-medium mb-1">Нельзя отправить — не заполнены обязательные поля:</p>
+          <ul className="list-disc pl-4 space-y-0.5">
+            {missingFields.map((f, i) => <li key={i}>{f}</li>)}
+          </ul>
+        </div>
+      )}
 
       {msg && (
         <div className={`p-3 rounded-xl text-sm ${

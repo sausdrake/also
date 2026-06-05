@@ -23,11 +23,19 @@ public class PublicReportController {
     @Operation(summary = "Просмотр одобренного диагностического отчёта")
     public ResponseEntity<DiagnosticRequestResponse> getReport(@PathVariable Long requestId) {
         DiagnosticRequestResponse report = requestService.getRequestDetails(requestId);
-        // Публично доступны только одобренные отчёты
-        if (report.getStatus() == null ||
-                !report.getStatus().equals("APPROVED")) {
+        if (report.getStatus() == null || !report.getStatus().equals("APPROVED")) {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(report);
+    }
+
+    @GetMapping("/by-vehicle/{vehicleId}")
+    @Operation(summary = "Получить одобренный отчёт по ID автомобиля")
+    public ResponseEntity<DiagnosticRequestResponse> getReportByVehicle(@PathVariable Long vehicleId) {
+        try {
+            return ResponseEntity.ok(requestService.getApprovedReportForVehicle(vehicleId));
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 }

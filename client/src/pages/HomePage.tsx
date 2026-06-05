@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
-import { formatDateTime } from '../utils/formatDate';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
@@ -26,12 +25,79 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 
 type FilterTab = 'ALL' | 'ACTIVE' | 'CREATED' | 'COMPLETED';
 
+// ─── Live countdown for a single card ───────────────────────────────────────
+function useCountdown(targetIso: string | null) {
+  const [text, setText] = useState('');
+  useEffect(() => {
+    if (!targetIso) return;
+    const tick = () => {
+      const diff = new Date(targetIso).getTime() - Date.now();
+      if (diff <= 0) { setText(''); return; }
+      const h = Math.floor(diff / 3_600_000);
+      const m = Math.floor((diff % 3_600_000) / 60_000);
+      const s = Math.floor((diff % 60_000) / 1000);
+      setText(h > 0 ? `${h}ч ${m}м ${s}с` : `${m}м ${s}с`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [targetIso]);
+  return text;
+}
+
+function AuctionCard({ auction }: { auction: Auction }) {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuthStore();
+  const statusInfo = STATUS_LABELS[auction.status] ?? { label: auction.status, color: 'text-gray-500' };
+
+  const endsIn   = useCountdown(auction.status === 'ACTIVE'   ? auction.endTime   : null);
+  const startsIn = useCountdown(auction.status === 'CREATED'  ? auction.startTime : null);
+
+  return (
+    <div className="bg-white rounded-xl border shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+      <div className="h-36 bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center text-4xl">
+        🚗
+      </div>
+      <div className="p-4">
+        <h3 className="font-semibold text-gray-900 truncate">
+          {auction.vehicleInfo || `Лот №${auction.id}`}
+        </h3>
+        <div className={`text-xs mt-1 ${statusInfo.color}`}>{statusInfo.label}</div>
+
+        <div className="mt-3">
+          <span className="text-xs text-gray-400">Текущая цена</span>
+          <div className="text-2xl font-bold text-blue-600">
+            {Number(auction.currentPrice).toLocaleString('ru')} сом
+          </div>
+        </div>
+
+        {endsIn && (
+          <div className="mt-1.5 text-xs font-medium text-orange-600 bg-orange-50 rounded-lg px-2 py-1 inline-block">
+            ⏱ Осталось: {endsIn}
+          </div>
+        )}
+        {startsIn && (
+          <div className="mt-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg px-2 py-1 inline-block">
+            🕐 Начало через: {startsIn}
+          </div>
+        )}
+
+        <button
+          onClick={() => navigate(`/auction/${auction.id}`)}
+          className="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 text-sm font-medium"
+        >
+          {isAuthenticated ? 'Участвовать' : 'Подробнее'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main page ───────────────────────────────────────────────────────────────
 export const HomePage = () => {
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterTab>('ALL');
-  const { isAuthenticated } = useAuthStore();
-  const navigate = useNavigate();
 
   useEffect(() => {
     fetchAuctions();
@@ -106,44 +172,9 @@ export const HomePage = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filtered.map((auction) => {
-            const statusInfo = STATUS_LABELS[auction.status] ?? { label: auction.status, color: 'text-gray-500' };
-            const endDate = auction.endTime ? new Date(auction.endTime) : null;
-            return (
-              <div
-                key={auction.id}
-                className="bg-white rounded-xl border shadow-sm hover:shadow-md transition-shadow overflow-hidden"
-              >
-                {/* Placeholder photo area */}
-                <div className="h-36 bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center text-4xl">
-                  🚗
-                </div>
-                <div className="p-4">
-                  <h3 className="font-semibold text-gray-900 truncate">
-                    {auction.vehicleInfo || `Лот №${auction.id}`}
-                  </h3>
-                  <div className={`text-xs mt-1 ${statusInfo.color}`}>{statusInfo.label}</div>
-                  <div className="mt-3">
-                    <span className="text-xs text-gray-400">Текущая цена</span>
-                    <div className="text-2xl font-bold text-blue-600">
-                      {Number(auction.currentPrice).toLocaleString('ru')} сом
-                    </div>
-                  </div>
-                  {auction.endTime && auction.status === 'ACTIVE' && (
-                    <div className="text-xs text-gray-400 mt-1">
-                      До конца: {formatDateTime(auction.endTime)}
-                    </div>
-                  )}
-                  <button
-                    onClick={() => navigate(`/auction/${auction.id}`)}
-                    className="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 text-sm font-medium"
-                  >
-                    {isAuthenticated ? 'Участвовать' : 'Подробнее'}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+          {filtered.map(auction => (
+            <AuctionCard key={auction.id} auction={auction} />
+          ))}
         </div>
       )}
     </div>

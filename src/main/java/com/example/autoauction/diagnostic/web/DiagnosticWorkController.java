@@ -3,6 +3,8 @@ package com.example.autoauction.diagnostic.web;
 import com.example.autoauction.auth.infrastructure.security.CurrentUser;
 import com.example.autoauction.auth.domain.UserPrincipal;
 import com.example.autoauction.diagnostic.application.DiagnosticRequestService;
+import com.example.autoauction.diagnostic.application.InspectionTemplateService;
+import com.example.autoauction.diagnostic.domain.InspectionTemplate;
 import com.example.autoauction.diagnostic.web.dto.DiagnosticRequestResponse;
 import com.example.autoauction.diagnostic.web.dto.SubmitInspectionRequest;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,6 +21,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import java.util.List;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/diagnostic/work")
@@ -28,6 +32,7 @@ import java.util.List;
 public class DiagnosticWorkController {
 
     private final DiagnosticRequestService requestService;
+    private final InspectionTemplateService templateService;
 
     /**
      * Получить доступные заявки (PENDING)
@@ -54,16 +59,27 @@ public class DiagnosticWorkController {
     }
 
     /**
+     * Получить список активных шаблонов для диагноста
+     */
+    @GetMapping("/templates")
+    @Operation(summary = "Список активных шаблонов анкет")
+    public ResponseEntity<List<InspectionTemplate>> getActiveTemplates() {
+        List<InspectionTemplate> templates = templateService.getActiveTemplates(Pageable.unpaged()).getContent();
+        return ResponseEntity.ok(templates);
+    }
+
+    /**
      * Получить заявку с шаблоном для заполнения
      */
     @GetMapping("/{requestId}")
     @Operation(summary = "Получить заявку с шаблоном для заполнения")
     public ResponseEntity<DiagnosticRequestResponse> getRequestWithTemplate(
             @PathVariable Long requestId,
+            @RequestParam(required = false) Long templateId,
             @CurrentUser UserPrincipal currentUser
     ) {
-        log.info("GET /api/diagnostic/work/{} - diagnostic: {}", requestId, currentUser.getUserId());
-        DiagnosticRequestResponse response = requestService.getRequestWithTemplate(requestId, currentUser.getUserId());
+        log.info("GET /api/diagnostic/work/{} templateId={} - diagnostic: {}", requestId, templateId, currentUser.getUserId());
+        DiagnosticRequestResponse response = requestService.getRequestWithTemplate(requestId, currentUser.getUserId(), templateId);
         return ResponseEntity.ok(response);
     }
 

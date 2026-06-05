@@ -134,28 +134,34 @@ public class DiagnosticRequestService {
      */
     @Transactional(readOnly = true)
     public DiagnosticRequestResponse getRequestWithTemplate(Long requestId, Long diagnosticId) {
+        return getRequestWithTemplate(requestId, diagnosticId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public DiagnosticRequestResponse getRequestWithTemplate(Long requestId, Long diagnosticId, Long templateId) {
         DiagnosticRequest request = requestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена: " + requestId));
 
-        // Проверяем, что диагност назначен на эту заявку
         if (request.getAssignedTo() == null || !request.getAssignedTo().equals(diagnosticId)) {
             throw new SecurityException("Вы не назначены на эту заявку");
         }
 
-        // Получаем шаблон с группами и пунктами
-        InspectionTemplate template = templateRepository.findActiveTemplates(Pageable.ofSize(1))
-                .stream().findFirst()
-                .orElseThrow(() -> new IllegalStateException("Нет активных шаблонов анкет"));
-        template = templateRepository.findFullTemplateById(template.getId())
-                .orElseThrow(() -> new IllegalStateException("Ошибка загрузки шаблона"));
+        InspectionTemplate template;
+        if (templateId != null) {
+            template = templateRepository.findFullTemplateById(templateId)
+                    .orElseThrow(() -> new IllegalArgumentException("Шаблон не найден: " + templateId));
+        } else {
+            template = templateRepository.findActiveTemplates(Pageable.ofSize(1))
+                    .stream().findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Нет активных шаблонов анкет"));
+            template = templateRepository.findFullTemplateById(template.getId())
+                    .orElseThrow(() -> new IllegalStateException("Ошибка загрузки шаблона"));
+        }
 
-        // Получаем уже сохранённые ответы (если есть)
         List<InspectionAnswer> existingAnswers = answerRepository.findByDiagnosticRequestId(requestId);
-
         DiagnosticRequestResponse response = DiagnosticRequestResponse.fromDomain(request);
         response.setTemplate(template);
         response.setExistingAnswers(existingAnswers);
-
         return response;
     }
 
@@ -378,6 +384,26 @@ public class DiagnosticRequestService {
         userRepository.findById(request.getUserId())
                 .ifPresent(user -> response.setUserName(user.getUsername()));
 
+        return response;
+    }
+
+    @Transactional(readOnly = true)
+    public DiagnosticRequestResponse getApprovedReportForVehicle(Long vehicleId) {
+        var vehicle = vehicleService.getVehicleDetails(vehicleId);
+        DiagnosticRequest request = requestRepository.findApprovedByVin(vehicle.vin())
+                .orElseThrow(() -> new IllegalStateException("Одобренный отчёт не найден"));
+
+        List<InspectionAnswer> answers = answerRepository.findByDiagnosticRequestId(request.getId());
+
+        InspectionTemplate template = templateRepository.findActiveTemplates(Pageable.ofSize(1))
+                .stream().findFirst().orElse(null);
+        if (template != null) {
+            template = templateRepository.findFullTemplateById(template.getId()).orElse(null);
+        }
+
+        DiagnosticRequestResponse response = DiagnosticRequestResponse.fromDomain(request);
+        response.setTemplate(template);
+        response.setExistingAnswers(answers);
         return response;
     }
 }

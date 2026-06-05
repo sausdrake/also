@@ -107,4 +107,12 @@ public class DiagnosticRequestRepositoryAdapter implements DiagnosticRequestRepo
         log.warn("Failed to reset request {} for rework (not REJECTED or not assigned to {})", requestId, diagnosticId);
         return false;
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<DiagnosticRequest> findApprovedByVin(String vin) {
+        return jpaRepository.findFirstByVinAndStatusOrderByUpdatedAtDesc(
+                vin, DiagnosticRequest.DiagnosticRequestStatus.APPROVED)
+                .map(mapper::toDomain);
+    }
 }

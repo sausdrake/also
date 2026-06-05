@@ -36,4 +36,7 @@ public interface SpringDataDiagnosticRequestJpaRepository extends JpaRepository<
     @Modifying(clearAutomatically = true)
     @Query("UPDATE JpaDiagnosticRequestEntity d SET d.status = 'IN_PROGRESS', d.rejectedReason = NULL, d.updatedAt = :now WHERE d.id = :requestId AND d.assignedTo = :diagnosticId AND d.status = 'REJECTED'")
     int resetForRework(@Param("requestId") Long requestId, @Param("diagnosticId") Long diagnosticId, @Param("now") OffsetDateTime now);
+
+    Optional<JpaDiagnosticRequestEntity> findFirstByVinAndStatusOrderByUpdatedAtDesc(
+            String vin, DiagnosticRequest.DiagnosticRequestStatus status);
 }

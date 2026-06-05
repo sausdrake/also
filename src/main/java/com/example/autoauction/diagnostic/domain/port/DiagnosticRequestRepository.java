@@ -29,4 +29,6 @@ public interface DiagnosticRequestRepository {
     Page<DiagnosticRequest> findAll(Pageable pageable);
 
     boolean resetForRework(Long requestId, Long diagnosticId);
+
+    Optional<DiagnosticRequest> findApprovedByVin(String vin);
 }

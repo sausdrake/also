@@ -6,50 +6,59 @@ interface AuctionTimerProps {
   status: string;
 }
 
+const ENDED = new Set(['COMPLETED', 'SOLD', 'EXPIRED', 'CANCELLED']);
+
+const fmt = (ms: number) => {
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  const s = Math.floor((ms % 60_000) / 1000);
+  return `${h}ч ${m}м ${s}с`;
+};
+
 export const AuctionTimer = ({ startTime, endTime, status }: AuctionTimerProps) => {
-  const [timeLeft, setTimeLeft] = useState<string>('');
+  const [timeLeft, setTimeLeft] = useState('');
   const [isUrgent, setIsUrgent] = useState(false);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date();
-      
+    if (ENDED.has(status)) return;
+
+    const tick = () => {
+      const now = Date.now();
       if (status === 'CREATED' && startTime) {
-        const start = new Date(startTime);
-        const diff = start.getTime() - now.getTime();
-        
+        const diff = new Date(startTime).getTime() - now;
         if (diff <= 0) {
-          setTimeLeft('Скоро начнётся');
+          setTimeLeft('Начинается...');
           setIsUrgent(false);
         } else {
-          const hours = Math.floor(diff / (1000 * 60 * 60));
-          const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-          const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-          setTimeLeft(`Старт через ${hours}ч ${minutes}м ${seconds}с`);
-          setIsUrgent(hours === 0 && minutes < 5);
+          setTimeLeft(fmt(diff));
+          setIsUrgent(diff < 5 * 60_000);
         }
-      } 
-      else if (status === 'ACTIVE' && endTime) {
-        const end = new Date(endTime);
-        const diff = end.getTime() - now.getTime();
-        
+      } else if (status === 'ACTIVE' && endTime) {
+        const diff = new Date(endTime).getTime() - now;
         if (diff <= 0) {
-          setTimeLeft('Аукцион завершён');
+          setTimeLeft('Завершается...');
           setIsUrgent(false);
         } else {
-          const hours = Math.floor(diff / (1000 * 60 * 60));
-          const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-          const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-          setTimeLeft(`${hours}ч ${minutes}м ${seconds}с`);
-          setIsUrgent(hours === 0 && minutes < 5);
+          setTimeLeft(fmt(diff));
+          setIsUrgent(diff < 5 * 60_000);
         }
       }
-    }, 1000);
+    };
 
-    return () => clearInterval(interval);
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
   }, [startTime, endTime, status]);
 
-  if (!startTime && !endTime) return null;
+  if (ENDED.has(status)) {
+    return (
+      <div className="text-center p-3 rounded-lg bg-gray-100 text-gray-500">
+        <div className="text-sm font-medium">🏁 Аукцион завершён</div>
+      </div>
+    );
+  }
+
+  if (!timeLeft) return null;
 
   return (
     <div className={`text-center p-3 rounded-lg ${isUrgent ? 'bg-red-100 text-red-700 animate-pulse' : 'bg-gray-100 text-gray-700'}`}>

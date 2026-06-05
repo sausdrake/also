@@ -153,16 +153,19 @@ function ReportsTab() {
   const [reports, setReports]   = useState<Report[]>([]);
   const [loading, setLoading]   = useState(true);
   const [msg, setMsg]           = useState('');
+  const [msgErr, setMsgErr]     = useState(false);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [search, setSearch]     = useState('');
   const [rejectTarget, setRejectTarget] = useState<number | null>(null);
   const [detailReport, setDetailReport] = useState<Report | null>(null);
 
+  const notify = (text: string, err = false) => { setMsg(text); setMsgErr(err); };
+
   const load = () => {
     setLoading(true);
     api.get('/admin/diagnostic/reports?size=200&sort=createdAt,desc')
       .then(r => setReports(r.data.content || []))
-      .catch(() => setMsg('Ошибка загрузки отчётов'))
+      .catch(() => notify('Ошибка загрузки отчётов', true))
       .finally(() => setLoading(false));
   };
 
@@ -182,22 +185,22 @@ function ReportsTab() {
   }, [reports, statusFilter, search]);
 
   const approve = async (id: number) => {
-    try { await api.post(`/admin/diagnostic/reports/${id}/approve`); setMsg(`Отчёт #${id} одобрен`); load(); }
-    catch (e: any) { setMsg(e.response?.data?.message || 'Ошибка'); }
+    try { await api.post(`/admin/diagnostic/reports/${id}/approve`); notify(`Отчёт #${id} одобрен`); load(); }
+    catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); }
   };
 
   const reject = async (reason: string) => {
     if (rejectTarget == null) return;
     try {
       await api.post(`/admin/diagnostic/reports/${rejectTarget}/reject?reason=${encodeURIComponent(reason)}`);
-      setMsg(`Отчёт #${rejectTarget} отклонён`);
+      notify(`Отчёт #${rejectTarget} отклонён`);
       setRejectTarget(null); load();
-    } catch (e: any) { setMsg(e.response?.data?.message || 'Ошибка'); setRejectTarget(null); }
+    } catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); setRejectTarget(null); }
   };
 
   const loadDetail = async (id: number) => {
     try { const r = await api.get(`/admin/diagnostic/reports/${id}`); setDetailReport(r.data); }
-    catch (e: any) { setMsg(e.response?.data?.message || 'Ошибка загрузки'); }
+    catch (e: any) { notify(e.response?.data?.message || 'Ошибка загрузки', true); }
   };
 
   // Display COMPLETED as "Отправлен" in UI
@@ -250,7 +253,7 @@ function ReportsTab() {
         </div>
       )}
 
-      {msg && <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-3 text-sm">{msg}</div>}
+      {msg && <div className={`rounded-lg p-3 text-sm border ${msgErr ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700'}`}>{msg}</div>}
 
       {/* Filters and search */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -321,6 +324,7 @@ function AuctionsTab() {
   const [allAuctions, setAllAuctions] = useState<Auction[]>([]);
   const [loading, setLoading]         = useState(true);
   const [msg, setMsg]                 = useState('');
+  const [msgErr, setMsgErr]           = useState(false);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [search, setSearch]           = useState('');
   const [showCreate, setShowCreate]   = useState(false);
@@ -332,11 +336,13 @@ function AuctionsTab() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
+  const notifyA = (text: string, err = false) => { setMsg(text); setMsgErr(err); };
+
   const loadAuctions = () => {
     setLoading(true);
     api.get('/admin/auctions?size=200&sort=id,desc')
       .then(r => setAllAuctions(r.data.content || []))
-      .catch(() => setMsg('Ошибка загрузки аукционов'))
+      .catch(() => notifyA('Ошибка загрузки аукционов', true))
       .finally(() => setLoading(false));
   };
 
@@ -369,17 +375,17 @@ function AuctionsTab() {
   );
 
   const confirmStart = async (id: number) => {
-    try { await api.post(`/admin/auctions/${id}/confirm-start`); setMsg(`Аукцион #${id} подтверждён`); loadAuctions(); }
-    catch (e: any) { setMsg(e.response?.data?.message || 'Ошибка'); }
+    try { await api.post(`/admin/auctions/${id}/confirm-start`); notifyA(`Аукцион #${id} подтверждён`); loadAuctions(); }
+    catch (e: any) { notifyA(e.response?.data?.message || 'Ошибка подтверждения аукциона', true); }
   };
 
   const cancelAuction = async () => {
     if (cancelTarget == null) return;
     try {
       await api.post(`/admin/auctions/${cancelTarget}/cancel`);
-      setMsg(`Аукцион #${cancelTarget} отменён`);
+      notifyA(`Аукцион #${cancelTarget} отменён`);
       setCancelTarget(null); loadAuctions();
-    } catch (e: any) { setMsg(e.response?.data?.message || 'Ошибка'); setCancelTarget(null); }
+    } catch (e: any) { notifyA(e.response?.data?.message || 'Ошибка отмены аукциона', true); setCancelTarget(null); }
   };
 
   const validateForm = () => {
@@ -415,11 +421,11 @@ function AuctionsTab() {
         buyNowPrice: form.buyNowPrice ? parseFloat(form.buyNowPrice) : null,
         reservePrice: form.reservePrice ? parseFloat(form.reservePrice) : null,
       });
-      setMsg('Аукцион создан');
+      notifyA('Аукцион успешно создан');
       setShowCreate(false);
       setForm({ vehicleId: '', startingPrice: '', minBidStep: '', startTime: '', endTime: '', buyNowPrice: '', reservePrice: '' });
       loadAuctions();
-    } catch (e: any) { setMsg(e.response?.data?.message || 'Ошибка'); }
+    } catch (e: any) { notifyA(e.response?.data?.message || 'Не удалось создать аукцион', true); }
   };
 
   if (loading) return <div className="p-4 text-gray-400">Загрузка...</div>;
@@ -432,7 +438,7 @@ function AuctionsTab() {
           onYes={cancelAuction} onNo={() => setCancelTarget(null)}
         />
       )}
-      {msg && <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-3 text-sm">{msg}</div>}
+      {msg && <div className={`rounded-lg p-3 text-sm border ${msgErr ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700'}`}>{msg}</div>}
 
       {/* Filters, search, create button */}
       <div className="space-y-3">
@@ -560,6 +566,7 @@ function UsersTab() {
   const [users, setUsers]       = useState<UserItem[]>([]);
   const [loading, setLoading]   = useState(true);
   const [msg, setMsg]           = useState('');
+  const [msgErr, setMsgErr]     = useState(false);
   const [filterRole, setFilterRole] = useState('');
   const [search, setSearch]     = useState('');
   const [roleTarget, setRoleTarget] = useState<UserItem | null>(null);
@@ -568,6 +575,8 @@ function UsersTab() {
   const [adjustAmount, setAdjustAmount] = useState('');
   const [adjustComment, setAdjustComment] = useState('');
   const [showBalance, setShowBalance] = useState(false);
+
+  const notifyU = (text: string, err = false) => { setMsg(text); setMsgErr(err); };
 
   const load = (withBal = showBalance) => {
     const p = filterRole ? `?role=${filterRole}` : '?';
@@ -592,29 +601,29 @@ function UsersTab() {
   const toggleBlock = async (u: UserItem) => {
     try {
       await api.patch(`/admin/users/${u.id}/${u.active ? 'block' : 'unblock'}`);
-      setMsg(`${u.username} ${u.active ? 'заблокирован' : 'разблокирован'}`);
+      notifyU(`${u.username} ${u.active ? 'заблокирован' : 'разблокирован'}`);
       load();
-    } catch (e: any) { setMsg(e.response?.data?.message || 'Ошибка'); }
+    } catch (e: any) { notifyU(e.response?.data?.message || 'Ошибка', true); }
   };
 
   const applyRole = async () => {
     if (!roleTarget || !newRole.trim()) return;
     try {
       await api.patch(`/admin/users/${roleTarget.id}/role`, { role: newRole.trim() });
-      setMsg(`Роль ${roleTarget.username} → ${newRole.trim()}`);
+      notifyU(`Роль ${roleTarget.username} → ${newRole.trim()}`);
       setRoleTarget(null); load();
-    } catch (e: any) { setMsg(e.response?.data?.message || 'Ошибка'); }
+    } catch (e: any) { notifyU(e.response?.data?.message || 'Ошибка', true); }
   };
 
   const adjustDeposit = async () => {
     if (!adjustTarget || !adjustAmount || !adjustComment.trim()) return;
     const amount = parseFloat(adjustAmount);
-    if (isNaN(amount)) { setMsg('Некорректная сумма'); return; }
+    if (isNaN(amount)) { notifyU('Некорректная сумма', true); return; }
     try {
       await api.post(`/admin/users/${adjustTarget.id}/deposit/adjust`, { amount, comment: adjustComment.trim() });
-      setMsg(`Депозит ${adjustTarget.username} скорректирован на ${amount}`);
+      notifyU(`Депозит ${adjustTarget.username} скорректирован на ${amount}`);
       setAdjustTarget(null); setAdjustAmount(''); setAdjustComment(''); load();
-    } catch (e: any) { setMsg(e.response?.data?.message || 'Ошибка'); }
+    } catch (e: any) { notifyU(e.response?.data?.message || 'Ошибка', true); }
   };
 
   if (loading) return <div className="p-4 text-gray-400">Загрузка...</div>;
@@ -661,7 +670,7 @@ function UsersTab() {
         </div>
       )}
 
-      {msg && <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-3 text-sm">{msg}</div>}
+      {msg && <div className={`rounded-lg p-3 text-sm border ${msgErr ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700'}`}>{msg}</div>}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -763,6 +772,7 @@ function SettingsTab() {
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [loading, setLoading]   = useState(true);
   const [msg, setMsg]           = useState('');
+  const [msgErr, setMsgErr]     = useState(false);
   const [errors, setErrors]     = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -788,8 +798,8 @@ function SettingsTab() {
     const safe = Object.fromEntries(Object.entries(settings).filter(([k]) => k in SETTINGS_META));
     try {
       await api.put('/admin/settings', safe);
-      setMsg('Настройки сохранены');
-    } catch (e: any) { setMsg(e.response?.data?.message || 'Ошибка'); }
+      setMsg('Настройки сохранены'); setMsgErr(false);
+    } catch (e: any) { setMsg(e.response?.data?.message || 'Ошибка'); setMsgErr(true); }
   };
 
   if (loading) return <div className="p-4 text-gray-400">Загрузка...</div>;
@@ -797,7 +807,7 @@ function SettingsTab() {
   return (
     <div className="max-w-xl space-y-4">
       {msg && (
-        <div className="border rounded-lg p-3 text-sm bg-green-50 border-green-200 text-green-800">{msg}</div>
+        <div className={`rounded-lg p-3 text-sm border ${msgErr ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700'}`}>{msg}</div>
       )}
       <div className="bg-white border rounded-xl shadow-sm divide-y">
         {Object.keys(SETTINGS_META).filter(k => k in settings).map(key => {
@@ -850,7 +860,10 @@ function TemplatesTab() {
   const [selected, setSelected]   = useState<Template | null>(null);
   const [loading, setLoading]     = useState(true);
   const [msg, setMsg]             = useState('');
+  const [msgErr, setMsgErr]       = useState(false);
   const [tplSearch, setTplSearch] = useState('');
+
+  const notifyT = (text: string, err = false) => { setMsg(text); setMsgErr(err); };
 
   const [showTplForm, setShowTplForm] = useState(false);
   const [tplName, setTplName]     = useState('');
@@ -890,26 +903,26 @@ function TemplatesTab() {
     if (!tplName.trim()) return;
     try {
       await api.post('/admin/diagnostic/templates', { name: tplName.trim(), vehicleType: tplType, isActive: true });
-      setMsg('Шаблон создан'); setTplName(''); setShowTplForm(false); loadTemplates();
-    } catch (e: any) { setMsg(e.response?.data?.message || 'Ошибка'); }
+      notifyT('Шаблон создан'); setTplName(''); setShowTplForm(false); loadTemplates();
+    } catch (e: any) { notifyT(e.response?.data?.message || 'Ошибка', true); }
   };
 
   const toggleActive = async (t: Template) => {
     try {
       await api.put(`/admin/diagnostic/templates/${t.id}`, { name: t.name, vehicleType: t.vehicleType, isActive: !t.isActive });
-      setMsg(`Шаблон ${t.isActive ? 'деактивирован' : 'активирован'}`);
+      notifyT(`Шаблон ${t.isActive ? 'деактивирован' : 'активирован'}`);
       loadTemplates();
       if (selected?.id === t.id) loadTemplate(t.id);
-    } catch (e: any) { setMsg(e.response?.data?.message || 'Ошибка'); }
+    } catch (e: any) { notifyT(e.response?.data?.message || 'Ошибка', true); }
   };
 
   const deleteTemplate = async (id: number) => {
     try {
       await api.delete(`/admin/diagnostic/templates/${id}`);
-      setMsg('Шаблон удалён');
+      notifyT('Шаблон удалён');
       if (selected?.id === id) setSelected(null);
       loadTemplates();
-    } catch (e: any) { setMsg(e.response?.data?.message || 'Ошибка'); }
+    } catch (e: any) { notifyT(e.response?.data?.message || 'Ошибка', true); }
   };
 
   const addSection = async () => {
@@ -919,13 +932,13 @@ function TemplatesTab() {
         name: sectionName.trim(), sortOrder: (selected.groups?.length ?? 0) + 1,
       });
       setSectionName(''); setShowSectionForm(false); loadTemplate(selected.id);
-    } catch (e: any) { setMsg(e.response?.data?.message || 'Ошибка'); }
+    } catch (e: any) { notifyT(e.response?.data?.message || 'Ошибка', true); }
   };
 
   const deleteSection = async (groupId: number) => {
     if (!selected) return;
     try { await api.delete(`/admin/diagnostic/groups/${groupId}`); loadTemplate(selected.id); }
-    catch (e: any) { setMsg(e.response?.data?.message || 'Ошибка'); }
+    catch (e: any) { notifyT(e.response?.data?.message || 'Ошибка', true); }
   };
 
   const addField = async (groupId: number) => {
@@ -944,13 +957,13 @@ function TemplatesTab() {
       setItemTitle(''); setItemDesc(''); setItemRequired(true);
       setItemFieldType('TEXT'); setActiveSection(null);
       if (selected) loadTemplate(selected.id);
-    } catch (e: any) { setMsg(e.response?.data?.message || 'Ошибка'); }
+    } catch (e: any) { notifyT(e.response?.data?.message || 'Ошибка', true); }
   };
 
   const deleteField = async (itemId: number) => {
     if (!selected) return;
     try { await api.delete(`/admin/diagnostic/items/${itemId}`); loadTemplate(selected.id); }
-    catch (e: any) { setMsg(e.response?.data?.message || 'Ошибка'); }
+    catch (e: any) { notifyT(e.response?.data?.message || 'Ошибка', true); }
   };
 
   if (loading) return <div className="p-4 text-gray-400">Загрузка...</div>;
@@ -959,7 +972,7 @@ function TemplatesTab() {
 
   return (
     <div className="space-y-4">
-      {msg && <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-3 text-sm">{msg}</div>}
+      {msg && <div className={`rounded-lg p-3 text-sm border ${msgErr ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700'}`}>{msg}</div>}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Template list */}
