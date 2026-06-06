@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import api from '../api/client';
 import { formatDate } from '../utils/formatDate';
+
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
 // ─── Types ───
 interface Request {
@@ -78,7 +81,10 @@ function PhotoCapture({ ans, onChange, hasError }: {
     try {
       const fd = new FormData();
       fd.append('file', file);
-      const res = await api.post('/media/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const token = localStorage.getItem('accessToken');
+      const res = await axios.post(`${BASE_URL}/api/media/upload`, fd, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       const url: string = res.data.publicUrl;
       onChange('photoUrls', [...(ans.photoUrls || []), url]);
     } catch (err: any) {
