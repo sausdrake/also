@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { Client } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
 import { useAuthStore } from '../store/authStore';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
@@ -13,6 +15,7 @@ interface Auction {
   status: string;
   endTime: string;
   startTime: string;
+  mainPhotoUrl?: string;
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -55,8 +58,10 @@ function AuctionCard({ auction }: { auction: Auction }) {
 
   return (
     <div className="bg-white rounded-xl border shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-      <div className="h-36 bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center text-4xl">
-        🚗
+      <div className="h-36 bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center overflow-hidden">
+        {auction.mainPhotoUrl
+          ? <img src={auction.mainPhotoUrl} alt="" className="w-full h-full object-cover" />
+          : <span className="text-4xl">🚗</span>}
       </div>
       <div className="p-4">
         <h3 className="font-semibold text-gray-900 truncate">
@@ -98,10 +103,51 @@ export const HomePage = () => {
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterTab>('ALL');
+  const wsClientRef = useRef<Client | null>(null);
 
   useEffect(() => {
     fetchAuctions();
   }, []);
+
+  // Subscribe to live price updates for all active auctions
+  const activeIds = auctions.filter(a => a.status === 'ACTIVE').map(a => a.id);
+  const idsKey = activeIds.join(',');
+
+  useEffect(() => {
+    if (!idsKey) return;
+
+    const client = new Client({
+      webSocketFactory: () => new SockJS(`${BASE_URL}/ws-auction`) as any,
+      reconnectDelay: 5000,
+      debug: () => {},
+      onConnect: () => {
+        idsKey.split(',').map(Number).forEach(id => {
+          client.subscribe(`/topic/auction/${id}`, (frame) => {
+            try {
+              const msg = JSON.parse(frame.body);
+              if (msg.currentPrice == null && msg.status == null) return;
+              setAuctions(prev => prev.map(a =>
+                a.id === id ? {
+                  ...a,
+                  ...(msg.currentPrice != null && { currentPrice: msg.currentPrice }),
+                  ...(msg.status       != null && { status:       msg.status       }),
+                  ...(msg.endTime      != null && { endTime:      msg.endTime      }),
+                } : a
+              ));
+            } catch {}
+          });
+        });
+      },
+    });
+
+    client.activate();
+    wsClientRef.current = client;
+
+    return () => {
+      client.deactivate();
+      wsClientRef.current = null;
+    };
+  }, [idsKey]);
 
   const fetchAuctions = async () => {
     try {

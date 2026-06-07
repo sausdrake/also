@@ -29,6 +29,12 @@ public class JpaNotificationEntity {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    @Column(name = "reference_id")
+    private Long referenceId;
+
+    @Column(name = "reference_type", length = 50)
+    private String referenceType;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getUserId() { return userId; }
@@ -43,4 +49,8 @@ public class JpaNotificationEntity {
     public void setRead(boolean read) { this.read = read; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public Long getReferenceId() { return referenceId; }
+    public void setReferenceId(Long referenceId) { this.referenceId = referenceId; }
+    public String getReferenceType() { return referenceType; }
+    public void setReferenceType(String referenceType) { this.referenceType = referenceType; }
 }

@@ -25,11 +25,18 @@ public class NotificationService {
 
     @Transactional
     public void send(Long userId, String type, String title, String message) {
+        send(userId, type, title, message, null, null);
+    }
+
+    @Transactional
+    public void send(Long userId, String type, String title, String message, Long referenceId, String referenceType) {
         JpaNotificationEntity entity = new JpaNotificationEntity();
         entity.setUserId(userId);
         entity.setType(type);
         entity.setTitle(title);
         entity.setMessage(message);
+        entity.setReferenceId(referenceId);
+        entity.setReferenceType(referenceType);
         repository.save(entity);
 
         Notification notification = toDto(entity);
@@ -38,7 +45,6 @@ public class NotificationService {
         } catch (Exception e) {
             log.warn("Failed to push notification via WS to user {}: {}", userId, e.getMessage());
         }
-
         log.debug("Notification sent to user {}: [{}] {}", userId, type, title);
     }
 
@@ -77,6 +83,8 @@ public class NotificationService {
         n.setMessage(e.getMessage());
         n.setRead(e.isRead());
         n.setCreatedAt(e.getCreatedAt());
+        n.setReferenceId(e.getReferenceId());
+        n.setReferenceType(e.getReferenceType());
         return n;
     }
 }

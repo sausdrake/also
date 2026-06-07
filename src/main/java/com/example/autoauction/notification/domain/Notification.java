@@ -10,6 +10,8 @@ public class Notification {
     private String message;
     private boolean read;
     private LocalDateTime createdAt;
+    private Long referenceId;
+    private String referenceType;
 
     public Notification(Long userId, String type, String title, String message) {
         this.userId = userId;
@@ -36,4 +38,8 @@ public class Notification {
     public void setRead(boolean read) { this.read = read; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public Long getReferenceId() { return referenceId; }
+    public void setReferenceId(Long referenceId) { this.referenceId = referenceId; }
+    public String getReferenceType() { return referenceType; }
+    public void setReferenceType(String referenceType) { this.referenceType = referenceType; }
 }

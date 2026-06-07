@@ -22,9 +22,9 @@ export const useWebSocket = (auctionId: number) => {
   useEffect(() => {
     if (!auctionId) return;
 
-    const socket = new SockJS(`${import.meta.env.VITE_API_URL || 'http://localhost:8081'}/ws-auction`);
+    const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
     const client = new Client({
-      webSocketFactory: () => socket as any,
+      webSocketFactory: () => new SockJS(`${BASE_URL}/ws-auction`) as any,
       debug: () => {},
       reconnectDelay: 5000,
       onConnect: () => {

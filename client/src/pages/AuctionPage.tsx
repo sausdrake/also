@@ -1,12 +1,14 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { AuctionTimer } from '../components/AuctionTimer';
 import { useAuthStore } from '../store/authStore';
+import { PhotoLightbox } from '../components/PhotoLightbox';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
+// ─── Types ───────────────────────────────────────────────────────────────────
 interface AuctionDetail {
   id: number;
   vehicleId: number;
@@ -20,10 +22,27 @@ interface AuctionDetail {
   startTime: string;
   endTime: string;
   totalBids: number;
+  mainPhotoUrl?: string;
+  additionalPhotoUrls?: string;
+  videoUrl?: string;
 }
 
-interface DiagItem  { id: number; title: string; fieldType: string; }
-interface DiagGroup { id: number; name: string; items: DiagItem[]; }
+interface VehicleDetail {
+  id: number;
+  brand: string;
+  model: string;
+  year: number;
+  vin: string;
+  color?: string;
+  mileage?: number;
+  engineCapacity?: number;
+  fuelType?: string;
+  transmission?: string;
+  description?: string;
+}
+
+interface DiagItem   { id: number; title: string; fieldType: string; description?: string; }
+interface DiagGroup  { id: number; name: string; items: DiagItem[]; }
 interface DiagAnswer { inspectionItemId: number; rating: number | null; comment: string; photoUrls: string[]; }
 interface DiagReport {
   vin: string;
@@ -31,135 +50,215 @@ interface DiagReport {
   existingAnswers: DiagAnswer[];
 }
 
+interface LiveBid {
+  price: number;
+  at: Date;
+  bidderId?: number;
+}
+
 const MAX_BID = 999_999_999;
+const BID_HISTORY_MAX = 50;
 
-// ─── Diagnostic report accordion ───────────────────────────────────────────
-function DiagnosticReportAccordion({ report }: { report: DiagReport }) {
-  const [open, setOpen] = useState(false);
-  const [openGroups, setOpenGroups] = useState<Set<number>>(new Set());
-  const answerMap = Object.fromEntries(
-    (report.existingAnswers || []).map(a => [a.inspectionItemId, a])
-  );
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString('ru');
 
-  const toggleGroup = (id: number) => setOpenGroups(prev => {
-    const s = new Set(prev);
-    s.has(id) ? s.delete(id) : s.add(id);
-    return s;
-  });
+function bidStorageKey(auctionId: string) { return `auction_bids_${auctionId}`; }
 
-  const renderValue = (item: DiagItem, ans?: DiagAnswer) => {
-    if (!ans) return <span className="text-gray-400">—</span>;
+function loadStoredBids(auctionId: string): LiveBid[] {
+  try {
+    const raw = localStorage.getItem(bidStorageKey(auctionId));
+    if (!raw) return [];
+    return (JSON.parse(raw) as { price: number; at: string; bidderId?: number }[])
+      .map(b => ({ price: b.price, at: new Date(b.at), bidderId: b.bidderId }));
+  } catch { return []; }
+}
+
+function storeBids(auctionId: string, bids: LiveBid[]) {
+  try {
+    localStorage.setItem(bidStorageKey(auctionId),
+      JSON.stringify(bids.slice(0, BID_HISTORY_MAX).map(b => ({ price: b.price, at: b.at.toISOString(), bidderId: b.bidderId }))));
+  } catch {}
+}
+const fuelLabel: Record<string, string> = {
+  PETROL: 'Бензин', DIESEL: 'Дизель', ELECTRIC: 'Электро',
+  HYBRID: 'Гибрид', GAS: 'Газ',
+};
+const transLabel: Record<string, string> = {
+  MANUAL: 'Механика', AUTOMATIC: 'Автомат', CVT: 'Вариатор', ROBOT: 'Робот',
+};
+
+// ─── Diagnostic section view ──────────────────────────────────────────────────
+function DiagSection({ group, answers }: { group: DiagGroup; answers: DiagAnswer[] }) {
+  const [open, setOpen] = useState(true);
+  const [lightbox, setLightbox] = useState<{ urls: string[]; index: number } | null>(null);
+  const ansMap = Object.fromEntries(answers.map(a => [a.inspectionItemId, a]));
+
+  const renderVal = (item: DiagItem, ans?: DiagAnswer) => {
+    if (!ans) return <span className="text-gray-300 text-sm">Не заполнено</span>;
+
     switch (item.fieldType) {
-      case 'NUMBER':
-        return ans.rating != null
-          ? <span>{['', '1 — Плохо', '2 — Удовл.', '3 — Нормально', '4 — Хорошо', '5 — Отлично'][ans.rating]}</span>
-          : <span className="text-gray-400">—</span>;
-      case 'PHOTO':
-        return ans.photoUrls?.length
-          ? <div className="flex flex-wrap gap-2 mt-1">
-              {ans.photoUrls.map((url, i) => (
-                <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                  <img src={url} alt="" className="w-16 h-16 object-cover rounded-lg border hover:opacity-80" />
-                </a>
+      case 'NUMBER': {
+        if (ans.rating == null) return <span className="text-gray-300 text-sm">—</span>;
+        const labels = ['', 'Плохо', 'Удовл.', 'Нормально', 'Хорошо', 'Отлично'];
+        const colors = ['', 'bg-red-500', 'bg-orange-400', 'bg-yellow-400', 'bg-green-400', 'bg-green-600'];
+        return (
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className={`w-7 h-7 rounded-lg text-xs flex items-center justify-center font-bold text-white ${
+                  ans.rating! >= i ? colors[ans.rating!] : 'bg-gray-100 text-gray-300'
+                }`}>{i}</div>
               ))}
             </div>
-          : <span className="text-gray-400">Нет фото</span>;
+            <span className="text-sm text-gray-500">{labels[ans.rating]}</span>
+          </div>
+        );
+      }
+      case 'PHOTO':
+        return ans.photoUrls?.length
+          ? (
+            <div className="flex flex-wrap gap-2 mt-1">
+              {ans.photoUrls.map((url, i) => (
+                <button key={i} type="button"
+                  onClick={() => setLightbox({ urls: ans.photoUrls, index: i })}
+                  className="shrink-0">
+                  <img src={url} alt="" className="w-24 h-24 object-cover rounded-xl border hover:opacity-80 transition-opacity cursor-pointer" />
+                </button>
+              ))}
+            </div>
+          )
+          : <span className="text-gray-300 text-sm">Нет фото</span>;
       case 'CHECKBOX':
-        return <span>{ans.comment === 'true' ? '✅ Да' : '❌ Нет'}</span>;
+        return (
+          <span className={`text-sm font-semibold ${ans.comment === 'true' ? 'text-green-600' : 'text-red-500'}`}>
+            {ans.comment === 'true' ? '✓ Да' : '✕ Нет'}
+          </span>
+        );
       default:
-        return <span>{ans.comment || <span className="text-gray-400">—</span>}</span>;
+        return <span className="text-sm text-gray-800">{ans.comment || <span className="text-gray-300">—</span>}</span>;
     }
   };
 
-  const groups = report.template?.groups ?? [];
-  const totalAnswered = groups.flatMap(g => g.items).filter(i => answerMap[i.id]).length;
-  const totalItems   = groups.flatMap(g => g.items).length;
+  const filled = group.items.filter(i => {
+    const a = ansMap[i.id];
+    if (!a) return false;
+    if (i.fieldType === 'NUMBER') return a.rating != null;
+    if (i.fieldType === 'PHOTO') return (a.photoUrls?.length ?? 0) > 0;
+    if (i.fieldType === 'CHECKBOX') return a.comment === 'true' || a.comment === 'false';
+    return (a.comment?.trim().length ?? 0) > 0;
+  }).length;
 
   return (
-    <div className="border rounded-xl overflow-hidden">
+    <div className="border border-gray-100 rounded-2xl overflow-hidden">
       <button
         onClick={() => setOpen(v => !v)}
-        className="w-full flex justify-between items-center px-4 py-3 bg-gray-50 hover:bg-gray-100 text-left"
+        className="w-full flex items-center justify-between px-5 py-4 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
       >
-        <div>
-          <span className="font-medium">🔍 Диагностический отчёт</span>
-          <span className="text-xs text-gray-400 ml-2">VIN: {report.vin}</span>
-        </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-500">{totalAnswered}/{totalItems} пунктов</span>
-          <span className="text-gray-500 text-sm">{open ? '▲' : '▼'}</span>
+          <span className="font-semibold text-gray-900">{group.name}</span>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-white border text-gray-500">
+            {filled}/{group.items.length}
+          </span>
         </div>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
       </button>
 
       {open && (
-        <div className="divide-y">
-          <div className="px-4 py-2 bg-green-50 text-xs text-green-700 font-medium">
-            ✅ Отчёт одобрен | Шаблон: {report.template?.name}
-          </div>
-          {groups.map(group => (
-            <div key={group.id}>
-              <button
-                onClick={() => toggleGroup(group.id)}
-                className="w-full flex justify-between items-center px-4 py-2.5 hover:bg-gray-50 text-left text-sm"
-              >
-                <span className="font-medium text-gray-700">{group.name}</span>
-                <span className="text-gray-400 text-xs">{openGroups.has(group.id) ? '▲' : '▼'}</span>
-              </button>
-              {openGroups.has(group.id) && (
-                <div className="divide-y bg-white">
-                  {group.items.map(item => (
-                    <div key={item.id} className="px-4 py-3 text-sm">
-                      <p className="text-gray-500 text-xs mb-1">{item.title}</p>
-                      <div className="text-gray-800">{renderValue(item, answerMap[item.id])}</div>
-                    </div>
-                  ))}
+        <div className="divide-y divide-gray-50">
+          {group.items.map(item => {
+            const ans = ansMap[item.id];
+            const isFilled = ans && (
+              item.fieldType === 'NUMBER' ? ans.rating != null :
+              item.fieldType === 'PHOTO' ? (ans.photoUrls?.length ?? 0) > 0 :
+              item.fieldType === 'CHECKBOX' ? (ans.comment === 'true' || ans.comment === 'false') :
+              (ans.comment?.trim().length ?? 0) > 0
+            );
+            return (
+              <div key={item.id} className="px-5 py-3">
+                <div className="flex items-start gap-2 mb-1">
+                  <div className={`mt-1 w-1.5 h-1.5 rounded-full shrink-0 ${isFilled ? 'bg-green-400' : 'bg-gray-200'}`} />
+                  <p className="text-xs text-gray-500 flex-1">{item.title}</p>
                 </div>
-              )}
-            </div>
-          ))}
+                <div className="pl-3.5">{renderVal(item, ans)}</div>
+              </div>
+            );
+          })}
         </div>
+      )}
+
+      {lightbox && (
+        <PhotoLightbox
+          urls={lightbox.urls}
+          index={lightbox.index}
+          onClose={() => setLightbox(null)}
+          onPrev={() => setLightbox(lb => lb && { ...lb, index: (lb.index - 1 + lb.urls.length) % lb.urls.length })}
+          onNext={() => setLightbox(lb => lb && { ...lb, index: (lb.index + 1) % lb.urls.length })}
+        />
       )}
     </div>
   );
 }
 
 // ─── Main page ──────────────────────────────────────────────────────────────
+type Tab = 'overview' | 'report' | 'bids' | 'docs';
+
 export const AuctionPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const auctionId = parseInt(id || '0');
-  const { isAuthenticated, accessToken } = useAuthStore();
+  const { isAuthenticated, accessToken, user } = useAuthStore();
   const { isConnected, lastMessage } = useWebSocket(auctionId);
-  const [auction, setAuction] = useState<AuctionDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [bidAmount, setBidAmount] = useState('');
-  const [bidError, setBidError] = useState('');
-  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-  const [report, setReport] = useState<DiagReport | null>(null);
 
+  const [auction, setAuction]   = useState<AuctionDetail | null>(null);
+  const [vehicle, setVehicle]   = useState<VehicleDetail | null>(null);
+  const [report, setReport]     = useState<DiagReport | null>(null);
+  const [loading, setLoading]   = useState(true);
+
+  const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [selectedPhoto, setSelectedPhoto] = useState(0);
+  const [galleryLightbox, setGalleryLightbox] = useState<number | null>(null);
+
+  const [bidAmount, setBidAmount] = useState('');
+  const [bidError, setBidError]   = useState('');
+  const [message, setMessage]     = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const [liveBids, setLiveBids] = useState<LiveBid[]>(() => id ? loadStoredBids(id) : []);
+  const bidsEndRef = useRef<HTMLDivElement>(null);
+
+  // WebSocket updates
   useEffect(() => {
-    if (lastMessage && auction) {
-      setAuction(prev => prev ? {
-        ...prev,
-        currentPrice: lastMessage.currentPrice,
-        totalBids: lastMessage.totalBids,
-        status: lastMessage.status,
-      } : null);
-      const minBid = lastMessage.currentPrice + (auction?.minBidStep ?? 0);
-      setBidAmount(String(minBid));
-      showMsg(`Новая ставка! Цена: ${lastMessage.currentPrice.toLocaleString('ru')} сом`, 'success');
+    if (!lastMessage || !auction) return;
+    setAuction(prev => prev ? {
+      ...prev,
+      ...(lastMessage.currentPrice != null && { currentPrice: lastMessage.currentPrice }),
+      ...(lastMessage.totalBids   != null && { totalBids:    lastMessage.totalBids }),
+      ...(lastMessage.status      != null && { status:       lastMessage.status }),
+      ...(lastMessage.endTime     != null && { endTime:      lastMessage.endTime }),
+    } : null);
+    if (lastMessage.messageType === 'BID_PLACED' && lastMessage.currentPrice != null) {
+      setLiveBids(prev => {
+        const updated = [{ price: lastMessage.currentPrice, at: new Date(), bidderId: lastMessage.winnerId }, ...prev].slice(0, BID_HISTORY_MAX);
+        if (id) storeBids(id, updated);
+        return updated;
+      });
+      setBidAmount(String(lastMessage.currentPrice + (auction?.minBidStep ?? 0)));
+      showMsg(`Новая ставка: ${fmt(lastMessage.currentPrice)} сом`, 'success');
     }
   }, [lastMessage]);
 
-  useEffect(() => {
-    fetchAuction();
-  }, [id]);
+  useEffect(() => { fetchAuction(); }, [id]);
 
   useEffect(() => {
     if (!auction?.vehicleId) return;
+    axios.get(`${BASE_URL}/api/v1/public/vehicles/${auction.vehicleId}`)
+      .then(r => setVehicle(r.data))
+      .catch(() => {});
     axios.get(`${BASE_URL}/api/v1/public/reports/by-vehicle/${auction.vehicleId}`)
       .then(r => setReport(r.data))
-      .catch(() => {}); // no report = hide accordion
+      .catch(() => {});
   }, [auction?.vehicleId]);
 
   const authHeaders = () => {
@@ -174,28 +273,32 @@ export const AuctionPage = () => {
 
   const fetchAuction = async () => {
     try {
-      const { data } = await axios.get(
-        `${BASE_URL}/api/public/auctions/${id}`,
-        { headers: authHeaders() }
-      );
+      const { data } = await axios.get(`${BASE_URL}/api/public/auctions/${id}`, { headers: authHeaders() });
       setAuction(data);
       setBidAmount(String(data.currentPrice + data.minBidStep));
+      // Seed bid history only when localStorage has no history for this auction
+      if (data.totalBids > 0 && id) {
+        const stored = loadStoredBids(id);
+        if (stored.length === 0) {
+          const seed: LiveBid[] = [{ price: data.currentPrice, at: new Date() }];
+          setLiveBids(seed);
+          storeBids(id, seed);
+        }
+      }
     } catch {
-      // handled below via null check
+      // handled via null check
     } finally {
       setLoading(false);
     }
   };
 
-  const validateBid = (raw: string): string | null => {
+  const validateBid = (raw: string) => {
     const val = Number(raw);
     if (!raw.trim() || isNaN(val)) return 'Введите сумму ставки';
-    if (!Number.isFinite(val)) return 'Некорректная сумма';
-    if (val <= 0) return 'Сумма ставки должна быть больше 0';
-    if (val > MAX_BID) return `Сумма не может превышать ${MAX_BID.toLocaleString('ru')} сом`;
-    if (auction && val < auction.currentPrice + auction.minBidStep) {
-      return `Минимальная ставка: ${(auction.currentPrice + auction.minBidStep).toLocaleString('ru')} сом`;
-    }
+    if (val <= 0) return 'Сумма должна быть больше 0';
+    if (val > MAX_BID) return `Максимум ${fmt(MAX_BID)} сом`;
+    if (auction && val < auction.currentPrice + auction.minBidStep)
+      return `Минимальная ставка: ${fmt(auction.currentPrice + auction.minBidStep)} сом`;
     return null;
   };
 
@@ -204,192 +307,451 @@ export const AuctionPage = () => {
     const err = validateBid(bidAmount);
     if (err) { setBidError(err); return; }
     setBidError('');
-
     try {
-      await axios.post(
-        `${BASE_URL}/api/auctions/${id}/bids`,
-        { amount: Number(bidAmount) },
-        { headers: authHeaders() }
-      );
-      showMsg(`Ставка ${Number(bidAmount).toLocaleString('ru')} сом принята!`, 'success');
+      await axios.post(`${BASE_URL}/api/auctions/${id}/bids`, { amount: Number(bidAmount) }, { headers: authHeaders() });
+      showMsg(`Ставка ${fmt(Number(bidAmount))} сом принята!`, 'success');
     } catch (e: any) {
-      const msg = e.response?.data?.message || e.response?.data?.error || 'Ошибка при размещении ставки';
-      showMsg(msg, 'error');
+      showMsg(e.response?.data?.message || 'Ошибка при размещении ставки', 'error');
     }
   };
 
   const buyNow = async () => {
     if (!isAuthenticated) { navigate('/login'); return; }
-    if (!auction?.buyNowPrice) { showMsg('Покупка сейчас не доступна', 'error'); return; }
+    if (!auction?.buyNowPrice) return;
     try {
-      await axios.post(
-        `${BASE_URL}/api/auctions/${id}/buy-now`,
-        {},
-        { headers: authHeaders() }
-      );
-      showMsg(`Поздравляем! Куплено за ${auction.buyNowPrice.toLocaleString('ru')} сом`, 'success');
-      setAuction(prev => prev ? { ...prev, status: 'COMPLETED' } : null);
+      await axios.post(`${BASE_URL}/api/auctions/${id}/buy-now`, {}, { headers: authHeaders() });
+      showMsg(`Поздравляем! Куплено за ${fmt(auction.buyNowPrice)} сом`, 'success');
+      fetchAuction();
     } catch (e: any) {
-      const msg = e.response?.data?.message || e.response?.data?.error || 'Ошибка при покупке';
-      showMsg(msg, 'error');
+      showMsg(e.response?.data?.message || 'Ошибка при покупке', 'error');
     }
   };
 
-  if (loading) return <div className="flex justify-center py-20 text-2xl">⏳</div>;
-
-  if (!auction) return (
-    <div className="text-center py-20">
-      <p className="text-red-500 text-lg">Аукцион не найден</p>
-      <button onClick={() => navigate('/')} className="mt-4 text-blue-600 hover:underline">← На главную</button>
+  // ─── Loading / not found ─────────────────────────────────────────────────
+  if (loading) return (
+    <div className="flex items-center justify-center py-32">
+      <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
     </div>
   );
 
-  const minNextBid = auction.currentPrice + auction.minBidStep;
-  const isActive = auction.status === 'ACTIVE';
-  const isCreated = auction.status === 'CREATED';
-  const isCompleted = ['COMPLETED', 'SOLD', 'EXPIRED', 'CANCELLED'].includes(auction.status);
-  const reserveProgress = auction.reservePrice
-    ? Math.min((auction.currentPrice / auction.reservePrice) * 100, 100)
-    : 0;
+  if (!auction) return (
+    <div className="text-center py-24">
+      <p className="text-gray-500 text-lg">Аукцион не найден</p>
+      <button onClick={() => navigate('/')} className="mt-4 text-blue-600 hover:underline text-sm">← На главную</button>
+    </div>
+  );
 
+  // ─── Computed ─────────────────────────────────────────────────────────────
+  const photos: string[] = (() => {
+    const extras: string[] = (() => {
+      try { return auction.additionalPhotoUrls ? JSON.parse(auction.additionalPhotoUrls) : []; }
+      catch { return []; }
+    })();
+    return [auction.mainPhotoUrl, ...extras].filter(Boolean) as string[];
+  })();
+
+  const minNextBid = auction.currentPrice + auction.minBidStep;
+  const isActive    = auction.status === 'ACTIVE';
+  const isCreated   = auction.status === 'CREATED';
+  const isCompleted = ['COMPLETED', 'SOLD', 'EXPIRED', 'CANCELLED'].includes(auction.status);
+
+  const reserveProgress = auction.reservePrice
+    ? Math.min((auction.currentPrice / auction.reservePrice) * 100, 100) : 0;
+
+  const TABS: { key: Tab; label: string }[] = [
+    { key: 'overview', label: 'Обзор' },
+    { key: 'report',   label: report ? 'Диагностический отчёт' : 'Диагностика' },
+    { key: 'bids',     label: `История ставок (${auction.totalBids})` },
+    { key: 'docs',     label: 'Документы' },
+  ];
+
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <button onClick={() => navigate('/')} className="text-blue-600 hover:underline mb-4 inline-block text-sm">
-        ← Все аукционы
+    <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+      {/* Breadcrumb */}
+      <button onClick={() => navigate('/')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        Все аукционы
       </button>
 
-      {/* WS-индикатор */}
-      <div className="mb-4 text-right">
-        <span className={`text-xs px-2 py-1 rounded-full ${isConnected ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-          {isConnected ? '🟢 Live' : '⚪ Офлайн'}
-        </span>
-      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* ── Left column: gallery + tabs ─────────────────────────── */}
+        <div className="lg:col-span-3 space-y-4">
+          {/* Gallery */}
+          {photos.length > 0 ? (
+            <div className="space-y-2">
+              <button type="button" className="w-full" onClick={() => setGalleryLightbox(selectedPhoto)}>
+                <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-gray-100">
+                  <img
+                    src={photos[selectedPhoto]}
+                    alt=""
+                    className="w-full h-full object-cover hover:opacity-95 transition-opacity cursor-zoom-in"
+                  />
+                  <div className="absolute top-3 right-3">
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                      isConnected ? 'bg-green-500/90 text-white' : 'bg-gray-500/70 text-white'
+                    }`}>
+                      {isConnected ? '● Live' : '○ Офлайн'}
+                    </span>
+                  </div>
+                </div>
+              </button>
+              {photos.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {photos.map((url, i) => (
+                    <button key={i} onClick={() => setSelectedPhoto(i)}
+                      className={`shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${
+                        i === selectedPhoto ? 'border-blue-500' : 'border-transparent opacity-70 hover:opacity-100'
+                      }`}>
+                      <img src={url} alt="" className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="aspect-[4/3] rounded-2xl bg-gray-100 flex items-center justify-center text-gray-300">
+              <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+          )}
 
-      <div className="bg-white rounded-xl shadow-sm border p-6 space-y-6">
-        <h1 className="text-2xl font-bold">{auction.vehicleInfo || `Аукцион №${auction.id}`}</h1>
-
-        <AuctionTimer startTime={auction.startTime} endTime={auction.endTime} status={auction.status} />
-
-        {/* Цена */}
-        <div className="text-center">
-          <div className="text-xs text-gray-400">Текущая цена</div>
-          <div className="text-5xl font-bold text-blue-600 mt-1">
-            {Number(auction.currentPrice).toLocaleString('ru')} сом
+          {/* Tabs */}
+          <div className="border-b border-gray-200">
+            <nav className="flex gap-0 overflow-x-auto">
+              {TABS.map(tab => (
+                <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                  className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                    activeTab === tab.key
+                      ? 'border-blue-600 text-blue-700'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}>
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
           </div>
-          <div className="text-xs text-gray-400 mt-1">Ставок: {auction.totalBids}</div>
-        </div>
 
-        {/* Параметры */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-xl text-sm">
-          {[
-            ['Старт', `${Number(auction.startingPrice).toLocaleString('ru')} сом`],
-            ['Шаг', `${Number(auction.minBidStep).toLocaleString('ru')} сом`],
-            ['Лот', `#${auction.id}`],
-            ['Статус', auction.status],
-          ].map(([k, v]) => (
-            <div key={k}>
-              <div className="text-xs text-gray-400">{k}</div>
-              <div className="font-medium">{v}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Резервная цена */}
-        {auction.reservePrice && (
-          <div className="p-4 bg-gray-50 rounded-xl">
-            <div className="flex justify-between text-xs text-gray-500 mb-1">
-              <span>Прогресс к резервной цене</span>
-              <span>{Math.round(reserveProgress)}%</span>
-            </div>
-            <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-blue-500 rounded-full transition-all duration-500"
-                style={{ width: `${reserveProgress}%` }}
-              />
-            </div>
-            <div className="text-xs text-gray-400 mt-1.5">
-              {reserveProgress >= 100
-                ? '✅ Резервная цена достигнута — автомобиль будет продан'
-                : '🎯 При достижении отметки продажа гарантирована'}
-            </div>
-          </div>
-        )}
-
-        {/* Диагностический отчёт */}
-        {report && <DiagnosticReportAccordion report={report} />}
-
-        {/* Buy Now */}
-        {auction.buyNowPrice && isCreated && (
+          {/* Tab content */}
           <div>
-            <button
-              onClick={buyNow}
-              className="w-full py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 font-semibold text-lg"
-            >
-              Купить сейчас за {Number(auction.buyNowPrice).toLocaleString('ru')} сом
-            </button>
-            <p className="text-xs text-gray-400 text-center mt-1">
-              До начала аукциона — по фиксированной цене
-            </p>
-          </div>
-        )}
+            {/* ── Overview ── */}
+            {activeTab === 'overview' && (
+              <div className="space-y-5">
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">
+                    {vehicle ? `${vehicle.brand} ${vehicle.model} ${vehicle.year}` : auction.vehicleInfo}
+                  </h1>
+                  {vehicle?.vin && (
+                    <p className="text-sm text-gray-400 mt-0.5 font-mono">VIN: {vehicle.vin}</p>
+                  )}
+                </div>
 
-        {/* Форма ставки */}
-        {isActive && (
-          <div className="border-t pt-6">
-            <h3 className="font-semibold mb-3">Сделать ставку</h3>
-            {!isAuthenticated && (
-              <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-                <button onClick={() => navigate('/login')} className="text-blue-600 font-medium hover:underline">Войдите</button>, чтобы участвовать в торгах
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    vehicle?.year         && { label: 'Год выпуска',  value: String(vehicle.year) },
+                    vehicle?.mileage      && { label: 'Пробег',       value: `${fmt(vehicle.mileage)} км` },
+                    vehicle?.engineCapacity && { label: 'Двигатель',  value: `${vehicle.engineCapacity} л` },
+                    vehicle?.fuelType     && { label: 'Топливо',      value: fuelLabel[vehicle.fuelType] || vehicle.fuelType },
+                    vehicle?.transmission && { label: 'КПП',          value: transLabel[vehicle.transmission] || vehicle.transmission },
+                    vehicle?.color        && { label: 'Цвет',         value: vehicle.color },
+                  ].filter(Boolean).map(({ label, value }) => (
+                    <div key={label} className="bg-gray-50 rounded-xl p-3">
+                      <p className="text-xs text-gray-400 mb-0.5">{label}</p>
+                      <p className="font-semibold text-gray-900 text-sm">{value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {vehicle?.description && (
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    <p className="text-xs text-gray-400 mb-1">Описание</p>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{vehicle.description}</p>
+                  </div>
+                )}
+
+                {/* Auction params */}
+                <div className="grid grid-cols-3 gap-3 text-sm">
+                  {[
+                    ['Стартовая цена',  `${fmt(auction.startingPrice)} сом`],
+                    ['Минимальный шаг', `${fmt(auction.minBidStep)} сом`],
+                    ['Лот',            `#${auction.id}`],
+                  ].map(([k, v]) => (
+                    <div key={k} className="bg-gray-50 rounded-xl p-3">
+                      <p className="text-xs text-gray-400 mb-0.5">{k}</p>
+                      <p className="font-semibold text-gray-900">{v}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {auction.reservePrice && (
+                  <div className="p-4 bg-gray-50 rounded-xl">
+                    <div className="flex justify-between text-xs text-gray-500 mb-2">
+                      <span>Прогресс к резервной цене</span>
+                      <span>{Math.round(reserveProgress)}%</span>
+                    </div>
+                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                        style={{ width: `${reserveProgress}%` }} />
+                    </div>
+                    <p className="text-xs text-gray-400 mt-2">
+                      {reserveProgress >= 100
+                        ? '✓ Резервная цена достигнута — продажа гарантирована'
+                        : 'При достижении отметки продажа гарантирована'}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1">
-                <label className="text-xs text-gray-500 mb-1 block">
-                  Мин. ставка: {minNextBid.toLocaleString('ru')} сом
-                </label>
-                <input
-                  type="number"
-                  value={bidAmount}
-                  min={minNextBid}
-                  max={MAX_BID}
-                  onChange={e => { setBidAmount(e.target.value); setBidError(''); }}
-                  className={`w-full px-4 py-3 border rounded-xl text-lg focus:ring-2 focus:ring-blue-500 focus:outline-none ${bidError ? 'border-red-400' : 'border-gray-300'}`}
-                  placeholder="Введите сумму"
-                  disabled={!isAuthenticated}
-                />
-                {bidError && <p className="text-red-500 text-xs mt-1">{bidError}</p>}
+
+            {/* ── Diagnostic report ── */}
+            {activeTab === 'report' && (
+              <div className="space-y-4">
+                {report ? (
+                  <>
+                    {/* Header badge */}
+                    <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-100 rounded-2xl">
+                      <div className="w-10 h-10 bg-green-600 rounded-xl flex items-center justify-center shrink-0">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-green-800 text-sm">Независимая диагностика пройдена</p>
+                        <p className="text-xs text-green-600 mt-0.5">
+                          Шаблон: {report.template?.name} · VIN: {report.vin}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Stats */}
+                    {(() => {
+                      const allItems = (report.template?.groups ?? []).flatMap(g => g.items);
+                      const filled = allItems.filter(i => {
+                        const a = report.existingAnswers.find(a => a.inspectionItemId === i.id);
+                        if (!a) return false;
+                        if (i.fieldType === 'NUMBER') return a.rating != null;
+                        if (i.fieldType === 'PHOTO') return (a.photoUrls?.length ?? 0) > 0;
+                        if (i.fieldType === 'CHECKBOX') return a.comment === 'true' || a.comment === 'false';
+                        return (a.comment?.trim().length ?? 0) > 0;
+                      }).length;
+                      const pct = allItems.length ? Math.round((filled / allItems.length) * 100) : 0;
+                      return (
+                        <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl text-sm">
+                          <div className="flex-1">
+                            <div className="flex justify-between text-xs text-gray-400 mb-1">
+                              <span>Заполнено пунктов</span>
+                              <span>{filled} / {allItems.length}</span>
+                            </div>
+                            <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                              <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                          <span className="text-xs font-medium text-gray-600">{pct}%</span>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Sections */}
+                    {(report.template?.groups ?? []).map(group => (
+                      <DiagSection key={group.id} group={group} answers={report.existingAnswers} />
+                    ))}
+                  </>
+                ) : (
+                  <div className="text-center py-16 text-gray-400">
+                    <svg className="w-12 h-12 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <p className="font-medium">Диагностический отчёт не найден</p>
+                    <p className="text-sm mt-1">Отчёт ещё не прикреплён к этому лоту</p>
+                  </div>
+                )}
               </div>
-              <div className="flex items-end">
-                <button
-                  onClick={placeBid}
-                  disabled={!isAuthenticated}
-                  className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Ставка
-                </button>
+            )}
+
+            {/* ── Bids history ── */}
+            {activeTab === 'bids' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-500">Всего ставок: <strong>{auction.totalBids}</strong></p>
+                  {isConnected && (
+                    <span className="text-xs text-green-600 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block" />
+                      Обновляется в реальном времени
+                    </span>
+                  )}
+                </div>
+
+                {liveBids.length > 0 ? (
+                  <div className="space-y-2">
+                    {liveBids.map((bid, i) => {
+                      const isOwnBid = bid.bidderId != null && user?.id != null && bid.bidderId === user.id;
+                      return (
+                        <div key={i} className={`flex items-center justify-between px-4 py-3 rounded-xl ${
+                          i === 0 ? 'bg-blue-50 border border-blue-100' : 'bg-gray-50'
+                        }`}>
+                          <div className="flex items-center gap-2">
+                            {i === 0 && <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">Последняя</span>}
+                            {isOwnBid && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Ваша</span>}
+                            <span className="text-sm text-gray-500">
+                              {bid.at.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            </span>
+                          </div>
+                          <span className={`font-bold ${i === 0 ? 'text-blue-700' : 'text-gray-700'}`}>
+                            {fmt(bid.price)} сом
+                          </span>
+                        </div>
+                      );
+                    })}
+                    <div ref={bidsEndRef} />
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-gray-400">
+                    <svg className="w-10 h-10 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    <p className="text-sm">Ставки появятся здесь в реальном времени</p>
+                    <p className="text-xs mt-1">Всего сделано ставок: {auction.totalBids}</p>
+                  </div>
+                )}
               </div>
+            )}
+
+            {/* ── Docs ── */}
+            {activeTab === 'docs' && (
+              <div className="text-center py-16 text-gray-400">
+                <svg className="w-12 h-12 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                    d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                <p className="font-medium">Документы не прикреплены</p>
+                <p className="text-sm mt-1">Документы по автомобилю проверяются при передаче</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Right column: price + bid form ────────────────────────── */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="sticky top-6 space-y-4">
+            {/* Price card */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-4">
+              <div>
+                <h1 className="font-bold text-gray-900 leading-snug">
+                  {vehicle ? `${vehicle.brand} ${vehicle.model} ${vehicle.year}` : auction.vehicleInfo}
+                </h1>
+                {vehicle?.vin && <p className="text-xs text-gray-400 mt-0.5 font-mono">VIN: {vehicle.vin}</p>}
+              </div>
+
+              <div className="text-center py-2">
+                <p className="text-xs text-gray-400 mb-1">Текущая ставка</p>
+                <p className="text-4xl font-extrabold text-blue-600 tabular-nums">
+                  {fmt(auction.currentPrice)}
+                </p>
+                <p className="text-sm text-gray-400 mt-0.5">сом · {auction.totalBids} ставок</p>
+              </div>
+
+              <AuctionTimer startTime={auction.startTime} endTime={auction.endTime} status={auction.status} />
+
+              {/* Flash message */}
+              {message && (
+                <div className={`p-3 rounded-xl text-sm font-medium ${
+                  message.type === 'success'
+                    ? 'bg-green-50 text-green-700 border border-green-200'
+                    : 'bg-red-50 text-red-700 border border-red-200'
+                }`}>
+                  {message.text}
+                </div>
+              )}
+
+              {/* Buy Now */}
+              {auction.buyNowPrice && isCreated && (
+                <div>
+                  <button onClick={buyNow}
+                    className="w-full py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 font-semibold">
+                    Купить сейчас за {fmt(auction.buyNowPrice)} сом
+                  </button>
+                  <p className="text-xs text-gray-400 text-center mt-1">До начала аукциона — по фиксированной цене</p>
+                </div>
+              )}
+
+              {/* Bid form */}
+              {isActive && (
+                <div className="space-y-2">
+                  {!isAuthenticated && (
+                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-xl text-xs text-yellow-800">
+                      <button onClick={() => navigate('/login')} className="text-blue-600 font-semibold hover:underline">Войдите</button>,
+                      {' '}чтобы участвовать в торгах
+                    </div>
+                  )}
+                  <label className="text-xs text-gray-400">Мин. ставка: {fmt(minNextBid)} сом</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      value={bidAmount}
+                      min={minNextBid}
+                      max={MAX_BID}
+                      onChange={e => { setBidAmount(e.target.value); setBidError(''); }}
+                      className={`flex-1 px-4 py-3 border rounded-xl text-base focus:ring-2 focus:ring-blue-500 focus:outline-none ${
+                        bidError ? 'border-red-400' : 'border-gray-200'
+                      }`}
+                      placeholder={fmt(minNextBid)}
+                      disabled={!isAuthenticated}
+                    />
+                    <button onClick={placeBid} disabled={!isAuthenticated}
+                      className="px-5 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold disabled:opacity-50 disabled:cursor-not-allowed">
+                      Ставка
+                    </button>
+                  </div>
+                  {bidError && <p className="text-red-500 text-xs">{bidError}</p>}
+                </div>
+              )}
+
+              {isCompleted && (
+                <div className="text-center py-3 text-gray-500 text-sm border-t border-gray-100">
+                  Аукцион завершён
+                </div>
+              )}
             </div>
-          </div>
-        )}
 
-        {/* Завершён */}
-        {isCompleted && (
-          <div className="border-t pt-6 text-center text-gray-500 text-sm">
-            Аукцион завершён. Спасибо за участие.
+            {/* Diagnostic summary badge (right panel) */}
+            {report && (
+              <button onClick={() => setActiveTab('report')}
+                className="w-full flex items-center gap-3 p-4 bg-green-50 border border-green-100 rounded-2xl hover:bg-green-100 transition-colors text-left">
+                <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center shrink-0">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
+                      d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-green-800">Диагностика пройдена</p>
+                  <p className="text-xs text-green-600 truncate">{report.template?.name}</p>
+                </div>
+                <svg className="w-4 h-4 text-green-500 ml-auto shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            )}
           </div>
-        )}
-
-        {/* Flash-сообщение */}
-        {message && (
-          <div className={`p-3 rounded-xl text-sm font-medium ${
-            message.type === 'success'
-              ? 'bg-green-50 text-green-700 border border-green-200'
-              : 'bg-red-50 text-red-700 border border-red-200'
-          }`}>
-            {message.text}
-          </div>
-        )}
+        </div>
       </div>
+
+      {galleryLightbox !== null && (
+        <PhotoLightbox
+          urls={photos}
+          index={galleryLightbox}
+          onClose={() => setGalleryLightbox(null)}
+          onPrev={() => setGalleryLightbox(i => (i! - 1 + photos.length) % photos.length)}
+          onNext={() => setGalleryLightbox(i => (i! + 1) % photos.length)}
+        />
+      )}
     </div>
   );
 };

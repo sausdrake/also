@@ -9,6 +9,7 @@ import com.example.autoauction.auction.web.AuctionWebSocketController;
 import com.example.autoauction.auction.web.dto.BidResponse;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.deposit.domain.Deposit;
+import com.example.autoauction.notification.application.NotificationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -30,21 +31,24 @@ public class BidService {
     private final AuctionParticipantRepository participantRepository;
     private final AuctionFinalizer auctionFinalizer;
     private final RateLimitService rateLimitService;
-    private final AuctionWebSocketController webSocketController;  // ✅ Добавлен
+    private final AuctionWebSocketController webSocketController;
+    private final NotificationService notificationService;
 
     public BidService(AuctionRepository auctionRepository,
                       DepositService depositService,
                       AuctionParticipantRepository participantRepository,
                       AuctionFinalizer auctionFinalizer,
                       RateLimitService rateLimitService,
-                      AuctionWebSocketController webSocketController) {  // ✅ Добавлен
+                      AuctionWebSocketController webSocketController,
+                      NotificationService notificationService) {
         this.auctionRepository = auctionRepository;
         this.depositService = depositService;
         this.participantRepository = participantRepository;
         this.auctionFinalizer = auctionFinalizer;
         this.rateLimitService = rateLimitService;
         this.webSocketController = webSocketController;
-        log.info("BidService initialized with WebSocket support");
+        this.notificationService = notificationService;
+        log.info("BidService initialized with WebSocket and Notification support");
     }
 
     @Transactional
@@ -188,6 +192,8 @@ public class BidService {
             participantRepository.registerParticipant(auctionId, bidderId, requiredDeposit);
         }
 
+        Long prevLeaderId = auction.getWinnerId();
+
         boolean auctionExtended = false;
         OffsetDateTime oldEndTime = auction.getEndTime();
 
@@ -208,6 +214,44 @@ public class BidService {
 
             // ✅ Отправляем уведомление о новой ставке
             webSocketController.sendAuctionUpdate(auction, "BID_PLACED");
+
+            // Уведомление предыдущему лидеру о том, что его ставку перебили
+            if (prevLeaderId != null && !prevLeaderId.equals(bidderId)) {
+                try {
+                    notificationService.send(prevLeaderId, "OUTBID",
+                            "Вашу ставку перебили",
+                            String.format("В аукционе \"%s\" сделана новая ставка: %s сом. Успейте сделать новую ставку!",
+                                    auction.getVehicleInfo(), amount.toPlainString()),
+                            auctionId, "AUCTION");
+                } catch (Exception e2) {
+                    log.warn("Failed to send outbid notification to user {}: {}", prevLeaderId, e2.getMessage());
+                }
+            }
+
+            // Notify seller about new bid on their vehicle
+            Long sellerId = auction.getCreatedBy();
+            if (sellerId != null && !sellerId.equals(bidderId)) {
+                try {
+                    notificationService.send(sellerId, "NEW_BID_ON_VEHICLE",
+                            "Новая ставка на ваш автомобиль",
+                            String.format("На ваш автомобиль \"%s\" была сделана новая ставка %s сом.",
+                                    auction.getVehicleInfo(), amount.toPlainString()),
+                            auctionId, "AUCTION");
+                } catch (Exception e) {
+                    log.warn("Failed to notify seller {} about new bid: {}", sellerId, e.getMessage());
+                }
+            }
+
+            // Notify bidder that they are now leading
+            try {
+                notificationService.send(bidderId, "AUCTION_LEADER",
+                        "Вы лидер торгов!",
+                        String.format("Ваша ставка %s сом является максимальной по лоту \"%s\".",
+                                amount.toPlainString(), auction.getVehicleInfo()),
+                        auctionId, "AUCTION");
+            } catch (Exception e) {
+                log.warn("Failed to notify bidder {} about leadership: {}", bidderId, e.getMessage());
+            }
 
         } catch (IllegalStateException | IllegalArgumentException e) {
             log.warn("Ошибка при создании ставки: {}", e.getMessage());

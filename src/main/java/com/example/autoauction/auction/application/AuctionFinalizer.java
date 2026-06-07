@@ -7,6 +7,7 @@ import com.example.autoauction.auction.domain.port.AuctionParticipantRepository;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.auction.web.AuctionWebSocketController;
 import com.example.autoauction.deposit.application.DepositService;
+import com.example.autoauction.notification.application.NotificationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,18 +24,21 @@ public class AuctionFinalizer {
     private final AuctionRepository auctionRepository;
     private final DepositService depositService;
     private final AuctionParticipantRepository participantRepository;
-    private final AuctionWebSocketController webSocketController;  // ✅ Добавлен
+    private final AuctionWebSocketController webSocketController;
+    private final NotificationService notificationService;
     private final Clock clock;
 
     public AuctionFinalizer(AuctionRepository auctionRepository,
                             DepositService depositService,
                             AuctionParticipantRepository participantRepository,
-                            AuctionWebSocketController webSocketController,  // ✅ Добавлен
+                            AuctionWebSocketController webSocketController,
+                            NotificationService notificationService,
                             Clock clock) {
         this.auctionRepository = auctionRepository;
         this.depositService = depositService;
         this.participantRepository = participantRepository;
         this.webSocketController = webSocketController;
+        this.notificationService = notificationService;
         this.clock = clock;
     }
 
@@ -85,17 +89,52 @@ public class AuctionFinalizer {
 
                 if (winnerId != null) {
                     markWinnerSafely(winnerId, auction.getId());
-                    // ✅ Отправляем персональное уведомление победителю
                     try {
                         webSocketController.sendPersonalUpdate(winnerId, auction, "YOU_WON");
                     } catch (Exception e) {
                         log.warn("Failed to send personal WebSocket notification to user {}: {}", winnerId, e.getMessage());
+                    }
+                    try {
+                        notificationService.send(winnerId, "AUCTION_WON",
+                                "Вы выиграли аукцион!",
+                                String.format("Поздравляем! Вы выиграли аукцион \"%s\" с ценой %s сом.",
+                                        auction.getVehicleInfo(), winningBid.toPlainString()),
+                                auction.getId(), "AUCTION");
+                    } catch (Exception e) {
+                        log.warn("Failed to send win notification to user {}: {}", winnerId, e.getMessage());
                     }
                 }
 
                 for (Long participantId : participants) {
                     if (!participantId.equals(winnerId)) {
                         unfreezeDepositSafely(participantId, auction.getId());
+                    }
+                }
+
+                // Notify each loser
+                for (Long participantId : participants) {
+                    if (!participantId.equals(winnerId)) {
+                        try {
+                            notificationService.send(participantId, "AUCTION_LOST",
+                                    "Вы не выиграли аукцион",
+                                    String.format("Аукцион \"%s\" завершён. Победителем стал другой участник. Ваши средства разблокированы.",
+                                            auction.getVehicleInfo()),
+                                    auction.getId(), "AUCTION");
+                        } catch (Exception e) {
+                            log.warn("Failed to send AUCTION_LOST to user {}: {}", participantId, e.getMessage());
+                        }
+                    }
+                }
+                // Notify seller about auction completion
+                Long sellerId = auction.getCreatedBy();
+                if (sellerId != null) {
+                    try {
+                        notificationService.send(sellerId, "AUCTION_COMPLETED",
+                                "Аукцион завершён",
+                                String.format("Аукцион \"%s\" завершён. Победитель определён.", auction.getVehicleInfo()),
+                                auction.getId(), "AUCTION");
+                    } catch (Exception e) {
+                        log.warn("Failed to send AUCTION_COMPLETED to seller {}: {}", sellerId, e.getMessage());
                     }
                 }
 
@@ -177,6 +216,17 @@ public class AuctionFinalizer {
         }
 
         participantRepository.clearParticipants(auction.getId());
+
+        // Уведомление победителю о Buy Now
+        try {
+            notificationService.send(winnerId, "AUCTION_WON",
+                    "Вы выиграли аукцион!",
+                    String.format("Поздравляем! Вы купили \"%s\" по цене %s сом (Buy Now).",
+                            auction.getVehicleInfo(), buyNowAmount.toPlainString()),
+                    auction.getId(), "AUCTION");
+        } catch (Exception e) {
+            log.warn("Failed to send Buy Now win notification to user {}: {}", winnerId, e.getMessage());
+        }
 
         // ✅ Отправляем уведомление о Buy Now
         try {

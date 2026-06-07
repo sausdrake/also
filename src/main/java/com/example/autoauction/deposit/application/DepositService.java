@@ -9,6 +9,7 @@ import com.example.autoauction.deposit.domain.FrozenDeposit;
 import com.example.autoauction.deposit.domain.port.DepositRepository;
 import com.example.autoauction.deposit.web.dto.DepositResponse;
 import com.example.autoauction.deposit.web.dto.DepositTransactionResponse;
+import com.example.autoauction.notification.application.NotificationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,11 +24,14 @@ public class DepositService {
 
     private final DepositRepository depositRepository;
     private final FailedOperationService failedOperationService;
+    private final NotificationService notificationService;
 
     public DepositService(DepositRepository depositRepository,
-                          FailedOperationService failedOperationService) {
+                          FailedOperationService failedOperationService,
+                          NotificationService notificationService) {
         this.depositRepository = depositRepository;
         this.failedOperationService = failedOperationService;
+        this.notificationService = notificationService;
         log.info("DepositService initialized");
     }
 
@@ -85,6 +89,16 @@ public class DepositService {
 
         Deposit saved = depositRepository.save(deposit);
         log.info("Deposit successful. New balance: {}", saved.getBalance());
+
+        try {
+            notificationService.send(userId, "DEPOSIT_ADDED",
+                    "Депозит пополнен",
+                    String.format("Ваш депозит успешно пополнен на %s сом. Текущий баланс: %s сом.",
+                            amount.toPlainString(), saved.getBalance().toPlainString()));
+        } catch (Exception e) {
+            log.warn("Failed to send deposit added notification to user {}: {}", userId, e.getMessage());
+        }
+
         return DepositResponse.fromDomain(saved);
     }
 
@@ -156,6 +170,15 @@ public class DepositService {
 
         depositRepository.save(deposit);
         log.info("Deposit frozen. New available balance: {}", deposit.getAvailableBalance());
+
+        try {
+            notificationService.send(userId, "DEPOSIT_FROZEN",
+                    "Депозит заморожен",
+                    String.format("Для участия в аукционе #%d заморожено %s сом (1%% от стартовой цены).",
+                            auctionId, requiredAmount.toPlainString()));
+        } catch (Exception e) {
+            log.warn("Failed to send deposit freeze notification to user {}: {}", userId, e.getMessage());
+        }
     }
 
     @Transactional
@@ -201,6 +224,15 @@ public class DepositService {
 
             depositRepository.save(deposit);
             log.info("Deposit unfrozen for auction {}. New available balance: {}", auctionId, deposit.getAvailableBalance());
+
+            try {
+                notificationService.send(userId, "DEPOSIT_UNFROZEN",
+                        "Депозит разморожен",
+                        String.format("Заморозка %s сом по аукциону #%d снята. Средства доступны.",
+                                frozenAmount.toPlainString(), auctionId));
+            } catch (Exception e2) {
+                log.warn("Failed to send deposit unfreeze notification to user {}: {}", userId, e2.getMessage());
+            }
 
         } catch (IllegalArgumentException e) {
             // Если депозит не найден - логируем и не выбрасываем исключение
@@ -366,6 +398,53 @@ public class DepositService {
         return depositRepository.findTransactionsByUserIdFiltered(userId, type, from, to).stream()
                 .map(DepositTransactionResponse::fromDomain)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void releaseWinnerDeposit(Long userId, Long auctionId) {
+        log.info("Releasing winner deposit for user: {}, auction: {}", userId, auctionId);
+
+        Deposit deposit = depositRepository.findByUserId(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Депозит не найден для пользователя: " + userId));
+
+        List<FrozenDeposit> frozen = depositRepository.getFrozenDepositsByDepositId(deposit.getId());
+        FrozenDeposit target = frozen.stream()
+                .filter(f -> f.getAuctionId().equals(auctionId) && f.isWinner())
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "Заморозка победителя для аукциона " + auctionId + " не найдена. " +
+                        "Убедитесь, что аукцион завершён и пользователь является победителем."));
+
+        BigDecimal frozenAmount = target.getAmount();
+        BigDecimal balanceBefore = deposit.getAvailableBalance();
+
+        deposit.unfreezeForAuction(frozenAmount);
+        depositRepository.unfreezeForAuction(deposit.getId(), auctionId);
+
+        DepositTransaction transaction = new DepositTransaction(
+                deposit.getId(),
+                userId,
+                DepositTransaction.TransactionType.UNBLOCK,
+                frozenAmount,
+                balanceBefore,
+                deposit.getAvailableBalance(),
+                auctionId.toString(),
+                "Разблокировка депозита победителя аукциона #" + auctionId + " (подтверждено администратором)"
+        );
+        transaction.setAuctionId(auctionId);
+        depositRepository.saveTransaction(transaction);
+
+        depositRepository.save(deposit);
+        log.info("Winner deposit released for user {}, auction {}. Amount: {}", userId, auctionId, frozenAmount);
+
+        try {
+            notificationService.send(userId, "DEPOSIT_RELEASED",
+                    "Депозит освобождён",
+                    String.format("Заморозка %s сом по аукциону #%d снята администратором.",
+                            frozenAmount.toPlainString(), auctionId));
+        } catch (Exception e) {
+            log.warn("Failed to send deposit release notification to user {}: {}", userId, e.getMessage());
+        }
     }
 
     static final BigDecimal MAX_ADJUST_AMOUNT = new BigDecimal("99999999");

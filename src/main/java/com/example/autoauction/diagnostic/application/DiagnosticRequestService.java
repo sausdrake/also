@@ -4,6 +4,8 @@ import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
 import com.example.autoauction.vehicle.application.VehicleService;
 import com.example.autoauction.diagnostic.domain.InspectionAnswer;
+import com.example.autoauction.diagnostic.domain.InspectionGroup;
+import com.example.autoauction.diagnostic.domain.InspectionItem;
 import com.example.autoauction.diagnostic.domain.InspectionTemplate;
 import com.example.autoauction.diagnostic.domain.port.DiagnosticRequestRepository;
 import com.example.autoauction.diagnostic.domain.port.InspectionAnswerRepository;
@@ -12,6 +14,7 @@ import com.example.autoauction.diagnostic.web.dto.CreateDiagnosticRequest;
 import com.example.autoauction.diagnostic.web.dto.DiagnosticRequestResponse;
 import com.example.autoauction.diagnostic.web.dto.InspectionAnswerDto;
 import com.example.autoauction.diagnostic.web.dto.SubmitInspectionRequest;
+import com.example.autoauction.notification.application.NotificationService;
 import com.example.autoauction.user.domain.User;
 import com.example.autoauction.user.domain.port.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +42,7 @@ public class DiagnosticRequestService {
     private final DepositService depositService;
     private final UserRepository userRepository;
     private final VehicleService vehicleService;
+    private final NotificationService notificationService;
 
     private static final BigDecimal DEPOSIT_PERCENT = new BigDecimal("0.01");
 
@@ -126,6 +130,17 @@ public class DiagnosticRequestService {
         DiagnosticRequest request = requestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена: " + requestId));
 
+        // Notify owner
+        try {
+            notificationService.send(request.getUserId(), "DIAG_ACCEPTED",
+                    "Заявка принята диагностом",
+                    String.format("Диагност принял вашу заявку на осмотр автомобиля %s %s (%d).",
+                            request.getBrand(), request.getModel(), request.getYear()),
+                    requestId, "DIAGNOSTIC");
+        } catch (Exception e) {
+            log.warn("Failed to send DIAG_ACCEPTED notification: {}", e.getMessage());
+        }
+
         return DiagnosticRequestResponse.fromDomain(request);
     }
 
@@ -210,6 +225,20 @@ public class DiagnosticRequestService {
         if (dto.isSubmit()) {
             requestRepository.markAsCompleted(requestId, diagnosticId);
             log.info("Request {} marked as completed", requestId);
+
+            // Notify all admins about new report awaiting review
+            try {
+                java.util.List<com.example.autoauction.user.domain.User> admins = userRepository.findByRoleName("ROLE_ADMIN");
+                for (com.example.autoauction.user.domain.User admin : admins) {
+                    notificationService.send(admin.getId(), "DIAG_REPORT_SUBMITTED",
+                            "Новый отчёт на проверке",
+                            String.format("Отчёт по заявке #%d (%s %s) отправлен на проверку.",
+                                    requestId, request.getBrand(), request.getModel()),
+                            requestId, "DIAGNOSTIC");
+                }
+            } catch (Exception e) {
+                log.warn("Failed to send DIAG_REPORT_SUBMITTED notifications: {}", e.getMessage());
+            }
         }
     }
 
@@ -315,6 +344,16 @@ public class DiagnosticRequestService {
         request.setUpdatedAt(OffsetDateTime.now());
         DiagnosticRequest saved = requestRepository.save(request);
 
+        try {
+            notificationService.send(request.getUserId(), "DIAG_REPORT_APPROVED",
+                    "Диагностический отчёт одобрен",
+                    String.format("Отчёт по вашему автомобилю %s %s (%d) одобрен. Автомобиль готов к созданию аукциона.",
+                            request.getBrand(), request.getModel(), request.getYear()),
+                    requestId, "DIAGNOSTIC");
+        } catch (Exception e) {
+            log.warn("Failed to send DIAG_REPORT_APPROVED notification: {}", e.getMessage());
+        }
+
         // Разморозить депозит заявителя после одобрения
         depositService.unfreezeForDiagnosticRequest(request.getUserId(), requestId);
 
@@ -357,6 +396,17 @@ public class DiagnosticRequestService {
         request.setUpdatedAt(OffsetDateTime.now());
         DiagnosticRequest saved = requestRepository.save(request);
 
+        if (request.getAssignedTo() != null) {
+            try {
+                notificationService.send(request.getAssignedTo(), "DIAG_REPORT_REJECTED",
+                        "Отчёт отклонён",
+                        String.format("Ваш отчёт по заявке #%d отклонён. Причина: %s", requestId, reason),
+                        requestId, "DIAGNOSTIC");
+            } catch (Exception e) {
+                log.warn("Failed to send DIAG_REPORT_REJECTED notification: {}", e.getMessage());
+            }
+        }
+
         log.info("Report {} rejected by admin {} with reason: {}", requestId, adminId, reason);
         return DiagnosticRequestResponse.fromDomain(saved);
     }
@@ -373,16 +423,40 @@ public class DiagnosticRequestService {
 
         DiagnosticRequestResponse response = DiagnosticRequestResponse.fromDomain(request);
         response.setAnswers(answers);
+        response.setExistingAnswers(answers);
 
-        // Добавляем информацию о диагносте
         if (request.getAssignedTo() != null) {
             userRepository.findById(request.getAssignedTo())
                     .ifPresent(diagnostic -> response.setDiagnosticName(diagnostic.getUsername()));
         }
 
-        // Добавляем информацию о заявителе
         userRepository.findById(request.getUserId())
                 .ifPresent(user -> response.setUserName(user.getUsername()));
+
+        try {
+            InspectionTemplate template = null;
+            // Determine the exact template used by tracing: answer.itemId → item.groupId → group.templateId
+            if (!answers.isEmpty()) {
+                Long sampleItemId = answers.get(0).getInspectionItemId();
+                InspectionItem item = templateRepository.findItemById(sampleItemId).orElse(null);
+                if (item != null) {
+                    InspectionGroup group = templateRepository.findGroupById(item.getGroupId()).orElse(null);
+                    if (group != null) {
+                        template = templateRepository.findFullTemplateById(group.getTemplateId()).orElse(null);
+                    }
+                }
+            }
+            // Fallback: load first active template (e.g. report has no answers yet)
+            if (template == null) {
+                Page<InspectionTemplate> activePage = templateRepository.findActiveTemplates(Pageable.ofSize(1));
+                if (!activePage.isEmpty()) {
+                    template = templateRepository.findFullTemplateById(activePage.getContent().get(0).getId()).orElse(null);
+                }
+            }
+            response.setTemplate(template);
+        } catch (Exception e) {
+            log.warn("Could not load template for report {}: {}", requestId, e.getMessage());
+        }
 
         return response;
     }
@@ -395,10 +469,22 @@ public class DiagnosticRequestService {
 
         List<InspectionAnswer> answers = answerRepository.findByDiagnosticRequestId(request.getId());
 
-        InspectionTemplate template = templateRepository.findActiveTemplates(Pageable.ofSize(1))
-                .stream().findFirst().orElse(null);
-        if (template != null) {
-            template = templateRepository.findFullTemplateById(template.getId()).orElse(null);
+        InspectionTemplate template = null;
+        if (!answers.isEmpty()) {
+            Long sampleItemId = answers.get(0).getInspectionItemId();
+            InspectionItem item = templateRepository.findItemById(sampleItemId).orElse(null);
+            if (item != null) {
+                InspectionGroup group = templateRepository.findGroupById(item.getGroupId()).orElse(null);
+                if (group != null) {
+                    template = templateRepository.findFullTemplateById(group.getTemplateId()).orElse(null);
+                }
+            }
+        }
+        if (template == null) {
+            Page<InspectionTemplate> activePage = templateRepository.findActiveTemplates(Pageable.ofSize(1));
+            if (!activePage.isEmpty()) {
+                template = templateRepository.findFullTemplateById(activePage.getContent().get(0).getId()).orElse(null);
+            }
         }
 
         DiagnosticRequestResponse response = DiagnosticRequestResponse.fromDomain(request);
