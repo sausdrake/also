@@ -59,4 +59,10 @@ public interface SpringDataAuctionJpaRepository extends JpaRepository<JpaAuction
 
     @Query("SELECT a.status FROM JpaAuctionEntity a WHERE a.vehicleId = :vehicleId")
     List<AuctionStatus> findStatusesByVehicleId(@Param("vehicleId") Long vehicleId);
+
+    Page<JpaAuctionEntity> findByWinnerId(Long winnerId, Pageable pageable);
+
+    @Query("SELECT a FROM JpaAuctionEntity a WHERE a.status = 'ACTIVE' AND a.endTime BETWEEN :from AND :to")
+    List<JpaAuctionEntity> findActiveEndingBetween(@Param("from") OffsetDateTime from,
+                                                   @Param("to") OffsetDateTime to);
 }

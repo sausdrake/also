@@ -196,4 +196,23 @@ public class AdminAuctionController {
     ) {
         return adminAuctionService.getAuctionsByVehicleId(vehicleId);
     }
+
+    @GetMapping("/{id}/participants")
+    @Operation(summary = "Получить список участников аукциона")
+    public ResponseEntity<List<Map<String, Object>>> getParticipants(@PathVariable Long id) {
+        return ResponseEntity.ok(adminAuctionService.getParticipants(id));
+    }
+
+    @PostMapping("/{id}/force-unfreeze-all")
+    @Operation(summary = "Принудительно разморозить депозиты всех участников (кроме победителя)")
+    public ResponseEntity<Map<String, Object>> forceUnfreezeAll(@PathVariable Long id) {
+        return ResponseEntity.ok(adminAuctionService.forceUnfreezeAll(id));
+    }
+
+    @PostMapping("/{id}/release-winner")
+    @Operation(summary = "Освободить депозит победителя аукциона")
+    public ResponseEntity<Void> releaseWinner(@PathVariable Long id) {
+        adminAuctionService.releaseWinner(id);
+        return ResponseEntity.ok().build();
+    }
 }

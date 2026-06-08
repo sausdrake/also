@@ -351,6 +351,10 @@ public class VehicleService {
         return vehicleRepository.findByStatus(status).size();
     }
 
+    public long countAllVehicles() {
+        return vehicleRepository.findAll().size();
+    }
+
     @Transactional
     public VehicleResponse rejectVehicle(Long vehicleId, Long adminId, String adminName, String reason) {
         log.info("=== ОТКЛОНЕНИЕ АВТОМОБИЛЯ ID: {} ===", vehicleId);

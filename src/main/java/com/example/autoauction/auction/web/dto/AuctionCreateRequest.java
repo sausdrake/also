@@ -42,5 +42,11 @@ public record AuctionCreateRequest(
 
         @Schema(description = "Время окончания аукциона", example = "2026-03-17T10:00:00+07:00")
         @NotNull(message = "Время окончания обязательно")
-        OffsetDateTime endTime
+        OffsetDateTime endTime,
+
+        @Schema(description = "URL главного фото", example = "https://...")
+        String mainPhotoUrl,
+
+        @Schema(description = "JSON-строка дополнительных фото", example = "[\"url1\",\"url2\"]")
+        String additionalPhotoUrls
 ) {}

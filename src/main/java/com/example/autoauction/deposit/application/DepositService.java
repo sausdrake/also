@@ -375,6 +375,17 @@ public class DepositService {
     }
 
     @Transactional(readOnly = true)
+    public BigDecimal getFrozenAmountForAuction(Long userId, Long auctionId) {
+        return depositRepository.findByUserId(userId)
+                .map(d -> depositRepository.getFrozenDepositsByDepositId(d.getId()).stream()
+                        .filter(f -> f.getAuctionId().equals(auctionId))
+                        .map(FrozenDeposit::getAmount)
+                        .findFirst()
+                        .orElse(BigDecimal.ZERO))
+                .orElse(BigDecimal.ZERO);
+    }
+
+    @Transactional(readOnly = true)
     public DepositResponse getDepositByUserId(Long userId) {
         Deposit deposit = depositRepository.findByUserId(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Депозит не найден для пользователя: " + userId));

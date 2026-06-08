@@ -3,7 +3,18 @@ import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { useAuthStore } from '../store/authStore';
 import { useDepositStore } from '../store/depositStore';
+import { parseDate } from '../utils/formatDate';
 import { formatDateTime } from '../utils/formatDate';
+
+interface WatchedAuction {
+  auctionId: number;
+  vehicleInfo: string;
+  currentPrice: number;
+  startingPrice: number;
+  status: string;
+  endTime: string;
+  mainPhotoUrl?: string;
+}
 
 // ─────────────────── Deposit Tab ───────────────────
 
@@ -168,7 +179,29 @@ function DepositTab() {
   );
 }
 
-// ─────────────────── Bids Tab ───────────────────
+// ─────────────────── Shared helpers ───────────────────
+
+const STATUS_STYLE: Record<string, string> = {
+  ACTIVE:    'bg-green-100 text-green-700',
+  COMPLETED: 'bg-blue-100 text-blue-700',
+  SOLD:      'bg-purple-100 text-purple-700',
+  CANCELLED: 'bg-gray-100 text-gray-500',
+  CREATED:   'bg-yellow-100 text-yellow-700',
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  ACTIVE:    'Активен',
+  COMPLETED: 'Завершён',
+  SOLD:      'Продан',
+  CANCELLED: 'Отменён',
+  CREATED:   'Ожидает',
+};
+
+function fmt(val: any) {
+  return val != null ? `${Number(val).toLocaleString('ru')} сом` : '—';
+}
+
+// ─────────────────── Bids Tab (участвовал) ───────────────────
 
 function BidsTab() {
   const [auctions, setAuctions] = useState<any[]>([]);
@@ -176,8 +209,8 @@ function BidsTab() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get('/public/auctions?page=0&size=50')
-      .then(r => setAuctions(r.data.content || []))
+    api.get('/auctions/participated')
+      .then(r => setAuctions(r.data || []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -186,7 +219,7 @@ function BidsTab() {
 
   return (
     <div className="space-y-4">
-      <p className="text-gray-500 text-sm">Аукционы, в которых вы участвовали</p>
+      <p className="text-gray-500 text-sm">Аукционы, в которых вы делали ставки</p>
       {auctions.length === 0 ? (
         <div className="bg-white border rounded-xl p-8 text-center text-gray-400">
           Вы ещё не участвовали ни в одном аукционе
@@ -198,17 +231,97 @@ function BidsTab() {
               className="bg-white border rounded-xl p-4 flex justify-between items-center cursor-pointer hover:shadow-md transition-shadow">
               <div>
                 <p className="font-medium">{a.vehicleInfo || `Аукцион #${a.id}`}</p>
-                <p className="text-sm text-gray-500">Текущая цена: {Number(a.currentPrice).toLocaleString('ru')} сом</p>
+                <p className="text-sm text-gray-500">
+                  Текущая цена: {fmt(a.currentPrice)}
+                  {a.endTime && <span className="ml-3 text-gray-400">· {formatDateTime(a.endTime)}</span>}
+                </p>
               </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                a.status === 'ACTIVE' ? 'bg-green-100 text-green-700' :
-                a.status === 'COMPLETED' ? 'bg-blue-100 text-blue-700' :
-                a.status === 'SOLD' ? 'bg-purple-100 text-purple-700' :
-                'bg-gray-100 text-gray-600'
-              }`}>{a.status}</span>
+              <span className={`px-3 py-1 rounded-full text-xs font-medium ${STATUS_STYLE[a.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                {STATUS_LABEL[a.status] ?? a.status}
+              </span>
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────── Won Tab (выигранные) ───────────────────
+
+function WonTab() {
+  const [auctions, setAuctions] = useState<any[]>([]);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  const load = (p: number) => {
+    setLoading(true);
+    api.get(`/auctions/won?page=${p}&size=20`)
+      .then(r => {
+        setAuctions(r.data.content || []);
+        setTotalPages(r.data.totalPages ?? 0);
+        setPage(p);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(0); }, []);
+
+  if (loading) return <div className="p-4">Загрузка...</div>;
+
+  return (
+    <div className="space-y-4">
+      <p className="text-gray-500 text-sm">Аукционы, которые вы выиграли</p>
+      {auctions.length === 0 ? (
+        <div className="bg-white border rounded-xl p-8 text-center text-gray-400">
+          Вы ещё не выиграли ни одного аукциона
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-3">
+            {auctions.map((a: any) => (
+              <div key={a.id} onClick={() => navigate(`/auction/${a.id}`)}
+                className="bg-white border rounded-xl p-4 cursor-pointer hover:shadow-md transition-shadow">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-semibold">{a.vehicleInfo || `Аукцион #${a.id}`}</p>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      Выигрышная ставка: <span className="font-medium text-green-700">{fmt(a.winningBid ?? a.currentPrice)}</span>
+                    </p>
+                    {a.endTime && (
+                      <p className="text-xs text-gray-400 mt-0.5">Завершён: {formatDateTime(a.endTime)}</p>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                      Победитель
+                    </span>
+                    <span className={`px-2 py-0.5 rounded text-xs ${STATUS_STYLE[a.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {STATUS_LABEL[a.status] ?? a.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex justify-center gap-2 pt-2">
+              <button disabled={page === 0} onClick={() => load(page - 1)}
+                className="px-3 py-1 rounded border text-sm disabled:opacity-40 hover:bg-gray-50">
+                ← Назад
+              </button>
+              <span className="px-3 py-1 text-sm text-gray-500">{page + 1} / {totalPages}</span>
+              <button disabled={page + 1 >= totalPages} onClick={() => load(page + 1)}
+                className="px-3 py-1 rounded border text-sm disabled:opacity-40 hover:bg-gray-50">
+                Вперёд →
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -367,6 +480,172 @@ function RequestsTab() {
   );
 }
 
+// ─────────────────── Watched Tab (отслеживаемые) ───────────────────
+
+function useCountdown(targetIso: string | null) {
+  const [text, setText] = useState('');
+  useEffect(() => {
+    if (!targetIso) return;
+    const tick = () => {
+      const diff = (parseDate(targetIso)?.getTime() ?? 0) - Date.now();
+      if (diff <= 0) { setText('Завершён'); return; }
+      const d = Math.floor(diff / 86_400_000);
+      const h = Math.floor((diff % 86_400_000) / 3_600_000);
+      const m = Math.floor((diff % 3_600_000) / 60_000);
+      const s = Math.floor((diff % 60_000) / 1000);
+      if (d > 0) setText(`${d} дн. ${h} ч.`);
+      else if (h > 0) setText(`${h} ч. ${m} мин. ${s} с`);
+      else setText(`${m} мин. ${s} с`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [targetIso]);
+  return text;
+}
+
+interface WatchedCardProps {
+  a: WatchedAuction;
+  onUnsubscribe: (id: number) => void;
+  onNavigate: (id: number) => void;
+}
+
+function WatchedCard({ a, onUnsubscribe, onNavigate }: WatchedCardProps) {
+  const countdown = useCountdown(a.status === 'ACTIVE' ? a.endTime : null);
+
+  const statusColor = (status: string) => {
+    if (status === 'ACTIVE') return 'bg-green-100 text-green-700';
+    if (status === 'CREATED') return 'bg-blue-100 text-blue-700';
+    return 'bg-gray-100 text-gray-600';
+  };
+
+  const statusLabel = (status: string) => {
+    if (status === 'ACTIVE') return 'Активен';
+    if (status === 'CREATED') return 'Создан';
+    if (status === 'COMPLETED') return 'Завершён';
+    if (status === 'EXPIRED') return 'Истёк';
+    if (status === 'CANCELLED') return 'Отменён';
+    return status;
+  };
+
+  return (
+    <div className="bg-white border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow relative">
+      <button
+        onClick={() => onUnsubscribe(a.auctionId)}
+        className="absolute top-2 right-2 z-10 w-6 h-6 bg-white/80 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center text-xs font-bold border"
+        title="Отписаться"
+      >
+        ✕
+      </button>
+      {a.mainPhotoUrl ? (
+        <img src={a.mainPhotoUrl} alt="" className="w-full h-32 object-cover" />
+      ) : (
+        <div className="w-full h-32 bg-gray-100 flex items-center justify-center text-gray-300">
+          <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
+      )}
+      <div className="p-3 space-y-2">
+        <div className="flex items-start justify-between gap-2">
+          <p className="font-medium text-sm text-gray-900 leading-tight line-clamp-2">{a.vehicleInfo || `Лот #${a.auctionId}`}</p>
+          <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(a.status)}`}>
+            {statusLabel(a.status)}
+          </span>
+        </div>
+        <div>
+          <p className="text-xs text-gray-400">Текущая цена</p>
+          <p className="font-bold text-blue-600">{Number(a.currentPrice).toLocaleString('ru')} сом</p>
+        </div>
+        {a.status === 'ACTIVE' && countdown && (
+          <p className="text-xs font-medium text-orange-600">Осталось: {countdown}</p>
+        )}
+        <button
+          onClick={() => onNavigate(a.auctionId)}
+          className="w-full py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors"
+        >
+          Перейти к лоту
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function WatchedTab() {
+  const [watchedAuctions, setWatchedAuctions] = useState<WatchedAuction[]>([]);
+  const [watchSearch, setWatchSearch] = useState('');
+  const [watchSort, setWatchSort] = useState<'price_asc' | 'price_desc' | 'time_asc' | 'time_desc'>('time_asc');
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  const loadWatched = () => {
+    api.get('/subscriptions').then(r => setWatchedAuctions(r.data)).catch(() => {}).finally(() => setLoading(false));
+  };
+
+  useEffect(() => { loadWatched(); }, []);
+
+  const handleUnsubscribe = async (auctionId: number) => {
+    try {
+      await api.delete(`/subscriptions/${auctionId}`);
+      setWatchedAuctions(prev => prev.filter(a => a.auctionId !== auctionId));
+    } catch {}
+  };
+
+  const filtered = watchedAuctions
+    .filter(a => !watchSearch || a.vehicleInfo?.toLowerCase().includes(watchSearch.toLowerCase()))
+    .sort((a, b) => {
+      if (watchSort === 'price_asc') return a.currentPrice - b.currentPrice;
+      if (watchSort === 'price_desc') return b.currentPrice - a.currentPrice;
+      if (watchSort === 'time_asc') return new Date(a.endTime).getTime() - new Date(b.endTime).getTime();
+      if (watchSort === 'time_desc') return new Date(b.endTime).getTime() - new Date(a.endTime).getTime();
+      return 0;
+    });
+
+  if (loading) return <div className="p-4">Загрузка...</div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row gap-3">
+        <input
+          type="text"
+          value={watchSearch}
+          onChange={e => setWatchSearch(e.target.value)}
+          placeholder="Поиск по названию..."
+          className="flex-1 border rounded-lg px-3 py-2 text-sm"
+        />
+        <select
+          value={watchSort}
+          onChange={e => setWatchSort(e.target.value as typeof watchSort)}
+          className="border rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="time_asc">По времени (сначала ранние)</option>
+          <option value="time_desc">По времени (сначала поздние)</option>
+          <option value="price_asc">По цене (сначала дешёвые)</option>
+          <option value="price_desc">По цене (сначала дорогие)</option>
+        </select>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="bg-white border rounded-xl p-8 text-center text-gray-400">
+          {watchSearch ? 'Ничего не найдено' : 'Вы не следите ни за одним лотом'}
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {filtered.map(a => (
+            <WatchedCard
+              key={a.auctionId}
+              a={a}
+              onUnsubscribe={handleUnsubscribe}
+              onNavigate={id => navigate(`/auction/${id}`)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─────────────────── Profile Tab ───────────────────
 
 function ProfileTab() {
@@ -409,11 +688,13 @@ function ProfileTab() {
 
 // ─────────────────── Main ProfilePage ───────────────────
 
-// USER: депозит, ставки, заявки на диагностику, профиль
+// USER: депозит, ставки, выигранные, заявки, отслеживаемые, профиль
 const USER_TABS = [
   { path: '', label: 'Депозит' },
-  { path: 'bids', label: 'Мои ставки' },
+  { path: 'bids', label: 'Участвовал' },
+  { path: 'won', label: 'Выигранные' },
   { path: 'requests', label: 'Заявки' },
+  { path: 'watched', label: 'Отслеживаемые' },
   { path: 'settings', label: 'Профиль' },
 ];
 
@@ -459,7 +740,9 @@ export function ProfilePage() {
           <>
             <Route index element={<DepositTab />} />
             <Route path="bids" element={<BidsTab />} />
+            <Route path="won" element={<WonTab />} />
             <Route path="requests" element={<RequestsTab />} />
+            <Route path="watched" element={<WatchedTab />} />
             <Route path="settings" element={<ProfileTab />} />
           </>
         )}

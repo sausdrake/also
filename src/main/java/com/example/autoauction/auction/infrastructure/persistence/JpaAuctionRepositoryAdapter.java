@@ -183,4 +183,21 @@ public class JpaAuctionRepositoryAdapter implements AuctionRepository {
                 .map(this::enrichDomain)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Auction> findByWinnerId(Long winnerId, Pageable pageable) {
+        return jpaRepository.findByWinnerId(winnerId, pageable)
+                .map(mapper::toDomain)
+                .map(this::enrichDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Auction> findActiveEndingBetween(OffsetDateTime from, OffsetDateTime to) {
+        return jpaRepository.findActiveEndingBetween(from, to).stream()
+                .map(mapper::toDomain)
+                .map(this::enrichDomain)
+                .collect(Collectors.toList());
+    }
 }

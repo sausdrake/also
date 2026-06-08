@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useNotifications } from '../hooks/useNotifications';
+import { parseDate } from '../utils/formatDate';
 import type { Notification } from '../hooks/useNotifications';
 
 type NotifCategory = 'ALL' | 'AUCTIONS' | 'DEPOSITS' | 'DIAGNOSTIC' | 'SYSTEM';
@@ -54,11 +55,12 @@ const COLOR_CLASSES: Record<string, { bg: string; border: string; icon: string }
 
 function relativeTime(iso: string): string {
   if (!iso) return '';
-  const diff = Date.now() - new Date(iso).getTime();
+  const parsed = parseDate(iso);
+  const diff = Date.now() - (parsed?.getTime() ?? Date.now());
   if (diff < 60_000)        return 'Только что';
   if (diff < 3_600_000)     return `${Math.floor(diff / 60_000)} мин назад`;
   if (diff < 86_400_000)    return `${Math.floor(diff / 3_600_000)} ч назад`;
-  const d = new Date(iso);
+  const d = parsed ?? new Date();
   const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
   if (d.toDateString() === yesterday.toDateString()) return 'Вчера';
   return d.toLocaleDateString('ru', { day: '2-digit', month: '2-digit' });

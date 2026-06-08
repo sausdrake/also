@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+import { parseDate } from '../utils/formatDate';
 
 interface Bid {
   id: number;
@@ -57,7 +58,7 @@ export const BidHistory = ({ auctionId }: BidHistoryProps) => {
             <tbody>
               {bids.map((bid) => (
                 <tr key={bid.id} className="border-t">
-                  <td className="px-4 py-2 text-sm">{new Date(bid.createdAt).toLocaleTimeString()}</td>
+                  <td className="px-4 py-2 text-sm">{(parseDate(bid.createdAt) ?? new Date()).toLocaleTimeString()}</td>
                   <td className="px-4 py-2 text-sm">{bid.bidderName}</td>
                   <td className="px-4 py-2 text-right text-sm font-medium">{bid.amount.toLocaleString()} сом</td>
                 </tr>

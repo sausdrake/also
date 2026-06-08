@@ -328,6 +328,12 @@ public class DiagnosticRequestService {
                 .map(DiagnosticRequestResponse::fromDomain);
     }
 
+    @Transactional(readOnly = true)
+    public long countApprovedReports() {
+        return requestRepository.findByStatus(DiagnosticRequest.DiagnosticRequestStatus.APPROVED, PageRequest.of(0, 1))
+                .getTotalElements();
+    }
+
     /**
      * Администратор одобряет отчёт
      */

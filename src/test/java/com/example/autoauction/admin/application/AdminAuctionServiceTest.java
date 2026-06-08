@@ -81,7 +81,7 @@ class AdminAuctionServiceTest {
                 new BigDecimal("1500000"),
                 new BigDecimal("10000"),
                 startTime,
-                endTime
+                endTime, null, null
         );
 
         approvedVehicle = new VehicleResponse(
@@ -147,7 +147,7 @@ class AdminAuctionServiceTest {
                     1L, startingPrice, reservePrice, buyNowPrice,
                     new BigDecimal("10000"),
                     OffsetDateTime.now().plusDays(1),
-                    OffsetDateTime.now().plusDays(7)
+                    OffsetDateTime.now().plusDays(7), null, null
             );
 
             // Мокаем ВСЕ вызовы, которые происходят до validateBusinessRules
@@ -186,7 +186,7 @@ class AdminAuctionServiceTest {
                     1L, new BigDecimal("1000000"), new BigDecimal("1200000"),
                     new BigDecimal("1500000"), minBidStep,
                     OffsetDateTime.now().plusDays(1),
-                    OffsetDateTime.now().plusDays(7)
+                    OffsetDateTime.now().plusDays(7), null, null
             );
 
             // Мокаем ВСЕ вызовы, которые происходят до validateBusinessRules
@@ -223,7 +223,7 @@ class AdminAuctionServiceTest {
             AuctionCreateRequest invalidRequest = new AuctionCreateRequest(
                     1L, new BigDecimal("1000000"), new BigDecimal("1200000"),
                     new BigDecimal("1500000"), new BigDecimal("10000"),
-                    startTime, endTime
+                    startTime, endTime, null, null
             );
 
             // Мокаем ВСЕ вызовы, которые происходят до validateBusinessRules
@@ -261,7 +261,7 @@ class AdminAuctionServiceTest {
                     null, new BigDecimal("1000000"), new BigDecimal("1200000"),
                     new BigDecimal("1500000"), new BigDecimal("10000"),
                     OffsetDateTime.now().plusDays(1),
-                    OffsetDateTime.now().plusDays(7)
+                    OffsetDateTime.now().plusDays(7), null, null
             );
 
             // Мокаем валидатор, чтобы он выбрасывал исключение
@@ -613,7 +613,7 @@ class AdminAuctionServiceTest {
             AuctionCreateRequest request = new AuctionCreateRequest(
                     1L, new BigDecimal("1000000"), new BigDecimal("1200000"),
                     new BigDecimal("1500000"), new BigDecimal("10000"),
-                    pastTime, pastTime.plusDays(7)
+                    pastTime, pastTime.plusDays(7), null, null
             );
 
             doNothing().when(auctionValidator).validateBasicRequest(request);
@@ -638,7 +638,7 @@ class AdminAuctionServiceTest {
             AuctionCreateRequest request = new AuctionCreateRequest(
                     1L, new BigDecimal("1000000"), new BigDecimal("1200000"),
                     new BigDecimal("1500000"), new BigDecimal("10000"),
-                    startTime, endTime
+                    startTime, endTime, null, null
             );
 
             doNothing().when(auctionValidator).validateBasicRequest(request);
@@ -708,7 +708,7 @@ class AdminAuctionServiceTest {
                     1L, minPrice, null, null,
                     new BigDecimal("10000"),
                     OffsetDateTime.now().plusDays(1),
-                    OffsetDateTime.now().plusDays(7)
+                    OffsetDateTime.now().plusDays(7), null, null
             );
 
             doNothing().when(auctionValidator).validateBasicRequest(any());
@@ -736,7 +736,7 @@ class AdminAuctionServiceTest {
                     null,
                     new BigDecimal("10000"),
                     OffsetDateTime.now().plusDays(1),
-                    OffsetDateTime.now().plusDays(7)
+                    OffsetDateTime.now().plusDays(7), null, null
             );
 
             doNothing().when(auctionValidator).validateBasicRequest(any());
@@ -762,7 +762,7 @@ class AdminAuctionServiceTest {
                     1L, new BigDecimal("1000000"), null, null,
                     minBidStep,
                     OffsetDateTime.now().plusDays(1),
-                    OffsetDateTime.now().plusDays(7)
+                    OffsetDateTime.now().plusDays(7), null, null
             );
 
             doNothing().when(auctionValidator).validateBasicRequest(any());
@@ -789,7 +789,7 @@ class AdminAuctionServiceTest {
             AuctionCreateRequest request = new AuctionCreateRequest(
                     1L, new BigDecimal("1000000"), null, null,
                     new BigDecimal("10000"),
-                    startTime, endTime
+                    startTime, endTime, null, null
             );
 
             doNothing().when(auctionValidator).validateBasicRequest(any());
@@ -816,7 +816,7 @@ class AdminAuctionServiceTest {
             AuctionCreateRequest request = new AuctionCreateRequest(
                     1L, new BigDecimal("1000000"), null, null,
                     new BigDecimal("10000"),
-                    startTime, endTime
+                    startTime, endTime, null, null
             );
 
             doNothing().when(auctionValidator).validateBasicRequest(any());

@@ -54,4 +54,10 @@ public interface AuctionRepository {
 
     // Найти по списку id
     List<Auction> findAllById(List<Long> ids);
+
+    // Аукционы, выигранные конкретным пользователем
+    Page<Auction> findByWinnerId(Long winnerId, Pageable pageable);
+
+    // Активные аукционы, завершающиеся в заданном временном окне
+    List<Auction> findActiveEndingBetween(java.time.OffsetDateTime from, java.time.OffsetDateTime to);
 }

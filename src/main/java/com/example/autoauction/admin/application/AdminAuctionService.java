@@ -4,9 +4,12 @@ package com.example.autoauction.admin.application;
 import com.example.autoauction.auction.application.AuctionFinalizer;
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
+import com.example.autoauction.auction.domain.port.AuctionParticipantRepository;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.auction.web.dto.AuctionCreateRequest;
 import com.example.autoauction.auction.web.dto.AuctionResponse;
+import com.example.autoauction.deposit.application.DepositService;
+import com.example.autoauction.user.application.UserService;
 import com.example.autoauction.vehicle.application.VehicleService;
 import com.example.autoauction.vehicle.domain.VehicleStatus;
 import com.example.autoauction.vehicle.web.dto.VehicleResponse;
@@ -17,7 +20,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -30,17 +36,26 @@ public class AdminAuctionService {
     private final AuctionValidator auctionValidator;
     private final AuctionFinalizer auctionFinalizer;
     private final SystemSettingsService settingsService;
+    private final AuctionParticipantRepository participantRepository;
+    private final DepositService depositService;
+    private final UserService userService;
 
     public AdminAuctionService(AuctionRepository auctionRepository,
                                VehicleService vehicleService,
                                AuctionValidator auctionValidator,
                                AuctionFinalizer auctionFinalizer,
-                               SystemSettingsService settingsService) {
+                               SystemSettingsService settingsService,
+                               AuctionParticipantRepository participantRepository,
+                               DepositService depositService,
+                               UserService userService) {
         this.auctionFinalizer = auctionFinalizer;
         this.auctionRepository = auctionRepository;
         this.vehicleService = vehicleService;
         this.auctionValidator = auctionValidator;
         this.settingsService = settingsService;
+        this.participantRepository = participantRepository;
+        this.depositService = depositService;
+        this.userService = userService;
         log.info("AdminAuctionService инициализирован");
     }
 
@@ -166,6 +181,13 @@ public class AdminAuctionService {
         String vehicleInfo = String.format("%s %s %d (VIN: %s)",
                 vehicle.brand(), vehicle.model(), vehicle.year(), vehicle.vin());
         auction.setVehicleInfo(vehicleInfo);
+
+        if (request.mainPhotoUrl() != null) {
+            auction.setMainPhotoUrl(request.mainPhotoUrl());
+        }
+        if (request.additionalPhotoUrls() != null) {
+            auction.setAdditionalPhotoUrls(request.additionalPhotoUrls());
+        }
 
         return auction;
     }
@@ -301,5 +323,57 @@ public class AdminAuctionService {
         return auctionRepository.findByVehicleId(vehicleId).stream()
                 .map(AuctionResponse::fromDomain)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getParticipants(Long auctionId) {
+        Auction auction = auctionRepository.findById(auctionId)
+                .orElseThrow(() -> new IllegalArgumentException("Аукцион не найден: " + auctionId));
+        List<Long> userIds = participantRepository.getParticipants(auctionId);
+        return userIds.stream().map(userId -> {
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("userId", userId);
+            userService.getUser(userId).ifPresent(u -> {
+                entry.put("username", u.getUsername());
+                entry.put("email", u.getEmail());
+            });
+            entry.put("frozenAmount", depositService.getFrozenAmountForAuction(userId, auctionId));
+            entry.put("isWinner", userId.equals(auction.getWinnerId()));
+            return entry;
+        }).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public Map<String, Object> forceUnfreezeAll(Long auctionId) {
+        Auction auction = auctionRepository.findById(auctionId)
+                .orElseThrow(() -> new IllegalArgumentException("Аукцион не найден: " + auctionId));
+        List<Long> userIds = participantRepository.getParticipants(auctionId);
+        int count = 0;
+        for (Long userId : userIds) {
+            if (userId.equals(auction.getWinnerId())) continue;
+            try {
+                depositService.unfreezeForAuction(userId, auctionId);
+                count++;
+            } catch (Exception e) {
+                log.warn("Could not unfreeze deposit for user {} auction {}: {}", userId, auctionId, e.getMessage());
+            }
+        }
+        log.info("Force-unfroze {} participants for auction {}", count, auctionId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("message", "Разморожено участников: " + count);
+        result.put("count", count);
+        return result;
+    }
+
+    @Transactional
+    public void releaseWinner(Long auctionId) {
+        Auction auction = auctionRepository.findById(auctionId)
+                .orElseThrow(() -> new IllegalArgumentException("Аукцион не найден: " + auctionId));
+        Long winnerId = auction.getWinnerId();
+        if (winnerId == null) {
+            throw new IllegalStateException("У аукциона " + auctionId + " нет победителя");
+        }
+        depositService.releaseWinnerDeposit(winnerId, auctionId);
+        log.info("Winner deposit released for auction {}, winner {}", auctionId, winnerId);
     }
 }

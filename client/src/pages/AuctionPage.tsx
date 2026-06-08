@@ -5,6 +5,7 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import { AuctionTimer } from '../components/AuctionTimer';
 import { useAuthStore } from '../store/authStore';
 import { PhotoLightbox } from '../components/PhotoLightbox';
+import api from '../api/client';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
@@ -223,10 +224,14 @@ export const AuctionPage = () => {
 
   const [bidAmount, setBidAmount] = useState('');
   const [bidError, setBidError]   = useState('');
-  const [message, setMessage]     = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [message, setMessage]     = useState<{ text: string; type: 'success' | 'error' | 'warning' } | null>(null);
 
   const [liveBids, setLiveBids] = useState<LiveBid[]>(() => id ? loadStoredBids(id) : []);
   const bidsEndRef = useRef<HTMLDivElement>(null);
+
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [subLoading, setSubLoading] = useState(false);
+  const [wasExtended, setWasExtended] = useState(false);
 
   // WebSocket updates
   useEffect(() => {
@@ -247,6 +252,10 @@ export const AuctionPage = () => {
       setBidAmount(String(lastMessage.currentPrice + (auction?.minBidStep ?? 0)));
       showMsg(`Новая ставка: ${fmt(lastMessage.currentPrice)} сом`, 'success');
     }
+    if (lastMessage.messageType === 'AUCTION_EXTENDED') {
+      setWasExtended(true);
+      showMsg('⏰ Аукцион продлён на 5 минут — сделана ставка в последние минуты!', 'warning');
+    }
   }, [lastMessage]);
 
   useEffect(() => { fetchAuction(); }, [id]);
@@ -261,14 +270,37 @@ export const AuctionPage = () => {
       .catch(() => {});
   }, [auction?.vehicleId]);
 
+  useEffect(() => {
+    if (!isAuthenticated || !id) return;
+    api.get(`/subscriptions/${id}/status`)
+      .then(r => setIsSubscribed(r.data.subscribed))
+      .catch(() => {});
+  }, [id, isAuthenticated]);
+
   const authHeaders = () => {
     const token = accessToken || localStorage.getItem('accessToken');
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
-  const showMsg = (text: string, type: 'success' | 'error') => {
+  const showMsg = (text: string, type: 'success' | 'error' | 'warning') => {
     setMessage({ text, type });
     setTimeout(() => setMessage(null), 5000);
+  };
+
+  const handleToggleSub = async () => {
+    if (!isAuthenticated || !id) return;
+    setSubLoading(true);
+    try {
+      if (isSubscribed) {
+        await api.delete(`/subscriptions/${id}`);
+        setIsSubscribed(false);
+      } else {
+        await api.post(`/subscriptions/${id}`);
+        setIsSubscribed(true);
+      }
+    } catch {} finally {
+      setSubLoading(false);
+    }
   };
 
   const fetchAuction = async () => {
@@ -311,7 +343,9 @@ export const AuctionPage = () => {
       await axios.post(`${BASE_URL}/api/auctions/${id}/bids`, { amount: Number(bidAmount) }, { headers: authHeaders() });
       showMsg(`Ставка ${fmt(Number(bidAmount))} сом принята!`, 'success');
     } catch (e: any) {
-      showMsg(e.response?.data?.message || 'Ошибка при размещении ставки', 'error');
+      const status = e.response?.status;
+      const msg = e.response?.data?.message || 'Ошибка при размещении ставки';
+      showMsg(msg, status === 429 ? 'warning' : 'error');
     }
   };
 
@@ -657,13 +691,15 @@ export const AuctionPage = () => {
                 <p className="text-sm text-gray-400 mt-0.5">сом · {auction.totalBids} ставок</p>
               </div>
 
-              <AuctionTimer startTime={auction.startTime} endTime={auction.endTime} status={auction.status} />
+              <AuctionTimer startTime={auction.startTime} endTime={auction.endTime} status={auction.status} extended={wasExtended} />
 
               {/* Flash message */}
               {message && (
                 <div className={`p-3 rounded-xl text-sm font-medium ${
                   message.type === 'success'
                     ? 'bg-green-50 text-green-700 border border-green-200'
+                    : message.type === 'warning'
+                    ? 'bg-yellow-50 text-yellow-700 border border-yellow-200'
                     : 'bg-red-50 text-red-700 border border-red-200'
                 }`}>
                   {message.text}
@@ -717,6 +753,20 @@ export const AuctionPage = () => {
                 <div className="text-center py-3 text-gray-500 text-sm border-t border-gray-100">
                   Аукцион завершён
                 </div>
+              )}
+
+              {isAuthenticated && (
+                <button
+                  onClick={handleToggleSub}
+                  disabled={subLoading}
+                  className={`w-full py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    isSubscribed
+                      ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
+                      : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {isSubscribed ? '⭐ Вы подписаны' : '⭐ Следить за лотом'}
+                </button>
               )}
             </div>
 

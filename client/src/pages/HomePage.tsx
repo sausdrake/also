@@ -4,6 +4,7 @@ import axios from 'axios';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { useAuthStore } from '../store/authStore';
+import { parseDate } from '../utils/formatDate';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
@@ -34,7 +35,7 @@ function useCountdown(targetIso: string | null) {
   useEffect(() => {
     if (!targetIso) return;
     const tick = () => {
-      const diff = new Date(targetIso).getTime() - Date.now();
+      const diff = (parseDate(targetIso)?.getTime() ?? 0) - Date.now();
       if (diff <= 0) { setText(''); return; }
       const h = Math.floor(diff / 3_600_000);
       const m = Math.floor((diff % 3_600_000) / 60_000);

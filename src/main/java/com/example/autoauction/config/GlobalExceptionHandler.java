@@ -2,6 +2,7 @@
 
 package com.example.autoauction.config;
 
+import com.example.autoauction.auction.application.RateLimitException;
 import com.example.autoauction.deposit.domain.InsufficientFundsException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -194,6 +195,17 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.BAD_REQUEST)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(response);
+    }
+
+    @ExceptionHandler(RateLimitException.class)
+    public ResponseEntity<Map<String, Object>> handleRateLimit(RateLimitException e) {
+        log.warn("Rate limit: {}", e.getMessage());
+        Map<String, Object> error = new HashMap<>();
+        error.put("timestamp", java.time.LocalDateTime.now().toString());
+        error.put("status", 429);
+        error.put("error", "Слишком много запросов");
+        error.put("message", e.getMessage());
+        return ResponseEntity.status(429).contentType(MediaType.APPLICATION_JSON).body(error);
     }
 
     @ExceptionHandler(Exception.class)

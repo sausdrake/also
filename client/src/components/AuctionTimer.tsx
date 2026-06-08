@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { parseDate } from '../utils/formatDate';
 
 interface AuctionTimerProps {
   startTime?: string;
   endTime?: string;
   status: string;
+  extended?: boolean;
 }
 
 const ENDED = new Set(['COMPLETED', 'SOLD', 'EXPIRED', 'CANCELLED']);
@@ -15,7 +17,7 @@ const fmt = (ms: number) => {
   return `${h}ч ${m}м ${s}с`;
 };
 
-export const AuctionTimer = ({ startTime, endTime, status }: AuctionTimerProps) => {
+export const AuctionTimer = ({ startTime, endTime, status, extended }: AuctionTimerProps) => {
   const [timeLeft, setTimeLeft] = useState('');
   const [isUrgent, setIsUrgent] = useState(false);
 
@@ -25,7 +27,7 @@ export const AuctionTimer = ({ startTime, endTime, status }: AuctionTimerProps) 
     const tick = () => {
       const now = Date.now();
       if (status === 'CREATED' && startTime) {
-        const diff = new Date(startTime).getTime() - now;
+        const diff = (parseDate(startTime)?.getTime() ?? 0) - now;
         if (diff <= 0) {
           setTimeLeft('Начинается...');
           setIsUrgent(false);
@@ -34,7 +36,7 @@ export const AuctionTimer = ({ startTime, endTime, status }: AuctionTimerProps) 
           setIsUrgent(diff < 5 * 60_000);
         }
       } else if (status === 'ACTIVE' && endTime) {
-        const diff = new Date(endTime).getTime() - now;
+        const diff = (parseDate(endTime)?.getTime() ?? 0) - now;
         if (diff <= 0) {
           setTimeLeft('Завершается...');
           setIsUrgent(false);
@@ -62,7 +64,10 @@ export const AuctionTimer = ({ startTime, endTime, status }: AuctionTimerProps) 
 
   return (
     <div className={`text-center p-3 rounded-lg ${isUrgent ? 'bg-red-100 text-red-700 animate-pulse' : 'bg-gray-100 text-gray-700'}`}>
-      <div className="text-sm font-medium">⏱️ {status === 'CREATED' ? 'До начала' : 'До окончания'}</div>
+      <div className="text-sm font-medium flex items-center justify-center gap-1">
+        <span>⏱️ {status === 'CREATED' ? 'До начала' : 'До окончания'}</span>
+        {extended && <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold">+5 мин</span>}
+      </div>
       <div className={`text-xl font-bold ${isUrgent ? 'text-red-600' : ''}`}>{timeLeft}</div>
     </div>
   );

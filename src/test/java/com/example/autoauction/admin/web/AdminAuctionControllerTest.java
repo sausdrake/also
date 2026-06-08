@@ -81,7 +81,8 @@ class AdminAuctionControllerTest {
                 new BigDecimal("1500000"),
                 new BigDecimal("10000"),
                 startTime,
-                endTime
+                endTime,
+                null, null
         );
 
         auctionResponse = new AuctionResponse(
@@ -150,7 +151,8 @@ class AdminAuctionControllerTest {
         void createAuction_WithInvalidData_ShouldReturnBadRequest() throws Exception {
             AuctionCreateRequest invalidRequest = new AuctionCreateRequest(
                     null, new BigDecimal("-1000"), null, null,
-                    new BigDecimal("0"), null, null
+                    new BigDecimal("0"), null, null,
+                    null, null
             );
 
             mockMvc.perform(post("/api/admin/auctions")
