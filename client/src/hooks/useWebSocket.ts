@@ -22,11 +22,15 @@ export const useWebSocket = (auctionId: number) => {
   useEffect(() => {
     if (!auctionId) return;
 
+    const token = localStorage.getItem('accessToken');
+    if (!token) return;
+
     const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
     const client = new Client({
       webSocketFactory: () => new SockJS(`${BASE_URL}/ws-auction`) as any,
       debug: () => {},
       reconnectDelay: 5000,
+      connectHeaders: { Authorization: `Bearer ${token}` },
       onConnect: () => {
         console.log('✅ WebSocket connected');
         setIsConnected(true);

@@ -63,7 +63,7 @@ class NotificationServiceTest {
             service.send(42L, "BID_OUTBID", "Вас обогнали", "Новая цена: 150000");
 
             verify(repository).save(any(JpaNotificationEntity.class));
-            verify(messagingTemplate).convertAndSend(eq("/topic/user/42"), any(Notification.class));
+            verify(messagingTemplate).convertAndSendToUser(eq("42"), eq("/queue/notifications"), any(Notification.class));
         }
 
         @Test
@@ -71,7 +71,7 @@ class NotificationServiceTest {
         void send_DoesNotThrowOnWsError() {
             when(repository.save(any())).thenReturn(entity);
             doThrow(new RuntimeException("WS error"))
-                    .when(messagingTemplate).convertAndSend(anyString(), any(Object.class));
+                    .when(messagingTemplate).convertAndSendToUser(anyString(), anyString(), any(Object.class));
 
             // Не должно выбрасывать
             service.send(42L, "TYPE", "Title", "Message");

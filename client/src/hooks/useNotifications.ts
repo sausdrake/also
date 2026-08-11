@@ -51,13 +51,17 @@ export function useNotifications() {
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
 
-    const userId = user.id;
+    const token = localStorage.getItem('accessToken');
+    if (!token) return;
+
     const client = new Client({
       webSocketFactory: () => new SockJS(`${BASE_URL}/ws-auction`) as any,
       debug: () => {},
       reconnectDelay: 5000,
+      connectHeaders: { Authorization: `Bearer ${token}` },
       onConnect: () => {
-        client.subscribe(`/topic/user/${userId}`, (frame) => {
+        // Server routes via convertAndSendToUser → only this session receives its own notifications
+        client.subscribe('/user/queue/notifications', (frame) => {
           try {
             const notification: Notification = JSON.parse(frame.body);
             setNotifications(prev => {

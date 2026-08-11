@@ -41,7 +41,7 @@ public class NotificationService {
 
         Notification notification = toDto(entity);
         try {
-            messagingTemplate.convertAndSend("/topic/user/" + userId, notification);
+            messagingTemplate.convertAndSendToUser(userId.toString(), "/queue/notifications", notification);
         } catch (Exception e) {
             log.warn("Failed to push notification via WS to user {}: {}", userId, e.getMessage());
         }
