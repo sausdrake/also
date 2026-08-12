@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_DB: auto_auction
       POSTGRES_USER: auto_auction_user
-      POSTGRES_PASSWORD: auto_auction_password
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -31,7 +31,7 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auto_auction
       SPRING_DATASOURCE_USERNAME: auto_auction_user
-      SPRING_DATASOURCE_PASSWORD: auto_auction_password
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       JWT_SECRET: ${JWT_SECRET}
     ports:

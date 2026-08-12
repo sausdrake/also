@@ -152,7 +152,9 @@
 				<configuration>
 					<url>jdbc:postgresql://localhost:5432/auto_auction</url>
 					<user>auto_auction_user</user>
-					<password>auto_auction_password</password>
+					<!-- password intentionally not hardcoded here; supply via FLYWAY_PASSWORD
+					     env var (Flyway's native env var support) or -Dflyway.password= -->
+					<!-- <password>set via FLYWAY_PASSWORD env var</password> -->
 					<locations>
 						<location>filesystem:src/main/resources/db/migration</location>
 					</locations>
