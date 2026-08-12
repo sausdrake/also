@@ -5,6 +5,7 @@ import com.example.autoauction.user.domain.User;
 import com.example.autoauction.user.domain.port.RoleRepository;
 import com.example.autoauction.user.domain.port.UserRepository;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Set;
 
 @Component
+@Profile("dev")
 public class DataInitializer implements CommandLineRunner {
 
     private final UserRepository userRepository;
