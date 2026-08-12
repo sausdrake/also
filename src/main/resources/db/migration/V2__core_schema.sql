@@ -120,8 +120,34 @@ CREATE TABLE IF NOT EXISTS auction_participants (
     CONSTRAINT auction_participants_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_auction_participants_auction_id ON auction_participants(auction_id);
-CREATE INDEX IF NOT EXISTS idx_auction_participants_user_id ON auction_participants(user_id);
+-- Plain CREATE INDEX IF NOT EXISTS is not safe here: PostgreSQL checks that the
+-- connecting role owns auction_participants before it ever evaluates whether the
+-- index already exists, so IF NOT EXISTS cannot suppress an ownership error on a
+-- table this migration doesn't own on the authoritative database (it is owned by
+-- a different role there). Pre-checking pg_indexes avoids issuing CREATE INDEX at
+-- all when the index is already present, so the ownership check is never reached.
+-- current_schema() keeps this check aligned with whatever schema Flyway is
+-- actually targeting, rather than assuming a fixed schema name.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = current_schema()
+          AND tablename = 'auction_participants'
+          AND indexname = 'idx_auction_participants_auction_id'
+    ) THEN
+        CREATE INDEX idx_auction_participants_auction_id ON auction_participants(auction_id);
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = current_schema()
+          AND tablename = 'auction_participants'
+          AND indexname = 'idx_auction_participants_user_id'
+    ) THEN
+        CREATE INDEX idx_auction_participants_user_id ON auction_participants(user_id);
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
     id BIGSERIAL PRIMARY KEY,
