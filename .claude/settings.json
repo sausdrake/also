@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git status --short)",
+      "Bash(git diff)",
+      "Bash(git diff --cached)",
+      "Bash(git diff --check)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(./mvnw -Dspring.profiles.active=test -Dtest=* test)",
+      "Bash(./mvnw compile)",
+      "Bash(./mvnw test-compile)"
+    ],
+    "deny": [
+      "Bash(git reset --hard*)",
+      "Bash(git clean -fd*)",
+      "Bash(git clean -df*)",
+      "Bash(git clean -f -d*)",
+      "Bash(git clean --force --directory*)",
+      "Bash(git push --force*)",
+      "Bash(git push --force-with-lease*)",
+      "Bash(git push -f*)",
+      "Bash(git stash*)",
+      "Bash(git checkout -- *)",
+      "Bash(git restore*)"
+    ]
+  }
+}
