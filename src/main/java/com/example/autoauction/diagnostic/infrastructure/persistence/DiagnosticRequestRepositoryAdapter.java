@@ -94,6 +94,22 @@ public class DiagnosticRequestRepositoryAdapter implements DiagnosticRequestRepo
     }
 
     @Override
+    public boolean bindTemplateIfUnset(Long requestId, Long templateId) {
+        int updated = jpaRepository.bindTemplateIfUnset(requestId, templateId, OffsetDateTime.now());
+        if (updated > 0) {
+            log.info("Backfill: bound request {} to template {}", requestId, templateId);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DiagnosticRequest> findAll() {
+        return jpaRepository.findAll().stream().map(mapper::toDomain).collect(Collectors.toList());
+    }
+
+    @Override
     public boolean markAsCompleted(Long requestId, Long diagnosticId) {
         int updated = jpaRepository.markAsCompleted(requestId, diagnosticId, OffsetDateTime.now());
         if (updated > 0) {

@@ -60,6 +60,9 @@ class DiagnosticRequestServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private com.example.autoauction.vehicle.application.VehicleService vehicleService;
+
     @InjectMocks
     private DiagnosticRequestService requestService;
 
@@ -615,6 +618,94 @@ class DiagnosticRequestServiceTest {
             assertThat(response).isNotNull();
             assertThat(response.getDiagnosticName()).isEqualTo("diagnostic");
             assertThat(response.getUserName()).isEqualTo("requester");
+        }
+
+        @Test
+        @DisplayName("MEDIA-3.1B: templateId привязан - резолвится напрямую по ID, без обращения к ответам")
+        void getRequestDetails_TemplateBound_ResolvesDirectly() {
+            savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setTemplateId(1L);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+            when(answerRepository.findByDiagnosticRequestId(requestId)).thenReturn(List.of());
+            when(templateRepository.findFullTemplateById(1L)).thenReturn(Optional.of(template));
+
+            DiagnosticRequestResponse response = requestService.getRequestDetails(requestId);
+
+            assertThat(response.getTemplate()).isNotNull();
+            assertThat(response.getTemplate().getId()).isEqualTo(1L);
+            verify(templateRepository, never()).findItemById(any());
+            verify(templateRepository, never()).findActiveTemplates(any());
+        }
+
+        @Test
+        @DisplayName("MEDIA-3.1B: templateId не привязан (историческая заявка) - template=null, " +
+                "БЕЗ инференса из первого ответа и БЕЗ фолбэка на активный шаблон")
+        void getRequestDetails_TemplateUnbound_NullWithoutInference() {
+            savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setTemplateId(null);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+
+            InspectionAnswer answer = new InspectionAnswer();
+            answer.setInspectionItemId(10L);
+            when(answerRepository.findByDiagnosticRequestId(requestId)).thenReturn(List.of(answer));
+
+            DiagnosticRequestResponse response = requestService.getRequestDetails(requestId);
+
+            assertThat(response.getTemplate()).isNull();
+            assertThat(response.getExistingAnswers()).hasSize(1); // raw answer data still readable
+            verify(templateRepository, never()).findItemById(any());
+            verify(templateRepository, never()).findGroupById(any());
+            verify(templateRepository, never()).findActiveTemplates(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("Публичный отчёт по автомобилю (MEDIA-3.1B)")
+    class GetApprovedReportForVehicleTests {
+
+        private com.example.autoauction.vehicle.web.dto.VehicleResponse vehicleResponse(String vin) {
+            return new com.example.autoauction.vehicle.web.dto.VehicleResponse(
+                    1L, "BMW", "X5", 2022, vin, null, null, null, null, null, null, null, null, null,
+                    null, null, null, null, null, null, null, null, null);
+        }
+
+        @Test
+        @DisplayName("templateId привязан - резолвится напрямую по ID")
+        void getApprovedReportForVehicle_TemplateBound_ResolvesDirectly() {
+            savedRequest.setStatus(DiagnosticRequest.DiagnosticRequestStatus.APPROVED);
+            savedRequest.setTemplateId(1L);
+            when(vehicleService.getVehicleDetails(5L)).thenReturn(vehicleResponse("WBSDE91070CZ12345"));
+            when(requestRepository.findApprovedByVin("WBSDE91070CZ12345")).thenReturn(Optional.of(savedRequest));
+            when(answerRepository.findByDiagnosticRequestId(requestId)).thenReturn(List.of());
+            when(templateRepository.findFullTemplateById(1L)).thenReturn(Optional.of(template));
+
+            DiagnosticRequestResponse response = requestService.getApprovedReportForVehicle(5L);
+
+            assertThat(response.getTemplate()).isNotNull();
+            assertThat(response.getTemplate().getId()).isEqualTo(1L);
+            verify(templateRepository, never()).findItemById(any());
+            verify(templateRepository, never()).findActiveTemplates(any());
+        }
+
+        @Test
+        @DisplayName("templateId не привязан - template=null, без инференса из первого ответа, " +
+                "публичный отчёт остаётся читаемым (raw ответы сохраняются)")
+        void getApprovedReportForVehicle_TemplateUnbound_NullWithoutInference() {
+            savedRequest.setStatus(DiagnosticRequest.DiagnosticRequestStatus.APPROVED);
+            savedRequest.setTemplateId(null);
+            when(vehicleService.getVehicleDetails(5L)).thenReturn(vehicleResponse("WBSDE91070CZ12345"));
+            when(requestRepository.findApprovedByVin("WBSDE91070CZ12345")).thenReturn(Optional.of(savedRequest));
+
+            InspectionAnswer answerFromSomeTemplate = new InspectionAnswer();
+            answerFromSomeTemplate.setInspectionItemId(10L);
+            when(answerRepository.findByDiagnosticRequestId(requestId)).thenReturn(List.of(answerFromSomeTemplate));
+
+            DiagnosticRequestResponse response = requestService.getApprovedReportForVehicle(5L);
+
+            assertThat(response.getTemplate()).isNull();
+            assertThat(response.getExistingAnswers()).hasSize(1);
+            verify(templateRepository, never()).findItemById(any());
+            verify(templateRepository, never()).findActiveTemplates(any());
         }
     }
 

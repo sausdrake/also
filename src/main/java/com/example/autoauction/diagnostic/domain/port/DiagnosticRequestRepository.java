@@ -27,6 +27,12 @@ public interface DiagnosticRequestRepository {
     /** Atomic conditional bind; see SpringDataDiagnosticRequestJpaRepository.bindTemplate. */
     boolean bindTemplate(Long requestId, Long diagnosticId, Long templateId);
 
+    /** MEDIA-3.1B historical backfill; see SpringDataDiagnosticRequestJpaRepository.bindTemplateIfUnset. */
+    boolean bindTemplateIfUnset(Long requestId, Long templateId);
+
+    /** All requests, used only by the MEDIA-3.1B historical backfill. */
+    List<DiagnosticRequest> findAll();
+
     boolean markAsCompleted(Long requestId, Long diagnosticId);
 
     Page<DiagnosticRequest> findAll(Pageable pageable);

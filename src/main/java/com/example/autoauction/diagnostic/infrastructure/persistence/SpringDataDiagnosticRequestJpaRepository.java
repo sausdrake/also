@@ -40,6 +40,19 @@ public interface SpringDataDiagnosticRequestJpaRepository extends JpaRepository<
     int bindTemplate(@Param("requestId") Long requestId, @Param("diagnosticId") Long diagnosticId,
                      @Param("templateId") Long templateId, @Param("now") OffsetDateTime now);
 
+    // MEDIA-3.1B: historical backfill bind - deliberately a SEPARATE guard shape
+    // from bindTemplate() above, not a modification of it. The backfill runs as
+    // a system/admin operation, not a diagnostician action: it has no
+    // diagnosticId to check and applies to requests in ANY already-non-PENDING
+    // status (IN_PROGRESS/COMPLETED/APPROVED/REJECTED), not just IN_PROGRESS.
+    // template_id IS NULL is still the sole guard, preserving the same
+    // never-overwrite-an-existing-binding invariant.
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE JpaDiagnosticRequestEntity d SET d.templateId = :templateId, d.updatedAt = :now " +
+            "WHERE d.id = :requestId AND d.templateId IS NULL")
+    int bindTemplateIfUnset(@Param("requestId") Long requestId, @Param("templateId") Long templateId,
+                            @Param("now") OffsetDateTime now);
+
     @Modifying(clearAutomatically = true)
     @Query("UPDATE JpaDiagnosticRequestEntity d SET d.status = 'COMPLETED', d.updatedAt = :now WHERE d.id = :requestId AND d.assignedTo = :diagnosticId")
     int markAsCompleted(@Param("requestId") Long requestId, @Param("diagnosticId") Long diagnosticId, @Param("now") OffsetDateTime now);

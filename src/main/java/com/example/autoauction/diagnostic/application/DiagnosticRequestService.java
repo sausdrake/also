@@ -14,6 +14,7 @@ import com.example.autoauction.diagnostic.web.dto.CreateDiagnosticRequest;
 import com.example.autoauction.diagnostic.web.dto.DiagnosticRequestResponse;
 import com.example.autoauction.diagnostic.web.dto.InspectionAnswerDto;
 import com.example.autoauction.diagnostic.web.dto.SubmitInspectionRequest;
+import com.example.autoauction.diagnostic.web.dto.TemplateBackfillResult;
 import com.example.autoauction.notification.application.NotificationService;
 import com.example.autoauction.user.domain.User;
 import com.example.autoauction.user.domain.port.UserRepository;
@@ -27,8 +28,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Slf4j
@@ -520,30 +523,7 @@ public class DiagnosticRequestService {
         userRepository.findById(request.getUserId())
                 .ifPresent(user -> response.setUserName(user.getUsername()));
 
-        try {
-            InspectionTemplate template = null;
-            // Determine the exact template used by tracing: answer.itemId → item.groupId → group.templateId
-            if (!answers.isEmpty()) {
-                Long sampleItemId = answers.get(0).getInspectionItemId();
-                InspectionItem item = templateRepository.findItemById(sampleItemId).orElse(null);
-                if (item != null) {
-                    InspectionGroup group = templateRepository.findGroupById(item.getGroupId()).orElse(null);
-                    if (group != null) {
-                        template = templateRepository.findFullTemplateById(group.getTemplateId()).orElse(null);
-                    }
-                }
-            }
-            // Fallback: load first active template (e.g. report has no answers yet)
-            if (template == null) {
-                Page<InspectionTemplate> activePage = templateRepository.findActiveTemplates(Pageable.ofSize(1));
-                if (!activePage.isEmpty()) {
-                    template = templateRepository.findFullTemplateById(activePage.getContent().get(0).getId()).orElse(null);
-                }
-            }
-            response.setTemplate(template);
-        } catch (Exception e) {
-            log.warn("Could not load template for report {}: {}", requestId, e.getMessage());
-        }
+        response.setTemplate(resolveTemplateForReport(request));
 
         return response;
     }
@@ -556,27 +536,107 @@ public class DiagnosticRequestService {
 
         List<InspectionAnswer> answers = answerRepository.findByDiagnosticRequestId(request.getId());
 
-        InspectionTemplate template = null;
-        if (!answers.isEmpty()) {
-            Long sampleItemId = answers.get(0).getInspectionItemId();
-            InspectionItem item = templateRepository.findItemById(sampleItemId).orElse(null);
-            if (item != null) {
-                InspectionGroup group = templateRepository.findGroupById(item.getGroupId()).orElse(null);
-                if (group != null) {
-                    template = templateRepository.findFullTemplateById(group.getTemplateId()).orElse(null);
-                }
-            }
+        DiagnosticRequestResponse response = DiagnosticRequestResponse.fromDomain(request);
+        response.setTemplate(resolveTemplateForReport(request));
+        response.setExistingAnswers(answers);
+        return response;
+    }
+
+    /**
+     * MEDIA-3.1B: the ONE canonical template-resolution path for report methods.
+     * templateId is read directly - never inferred from answers, never a
+     * fallback to any active template. A null return means the request is an
+     * unresolved historical state (see backfillHistoricalTemplateIds); callers
+     * must render that as "no template" and MUST NOT invent one.
+     * findFullTemplateById is used deliberately (not active-only): a template
+     * deactivated after being bound must still resolve for an already-bound
+     * request (same reasoning as getRequestWithTemplate, MEDIA-3.1A).
+     */
+    private InspectionTemplate resolveTemplateForReport(DiagnosticRequest request) {
+        if (request.getTemplateId() == null) {
+            return null;
         }
-        if (template == null) {
-            Page<InspectionTemplate> activePage = templateRepository.findActiveTemplates(Pageable.ofSize(1));
-            if (!activePage.isEmpty()) {
-                template = templateRepository.findFullTemplateById(activePage.getContent().get(0).getId()).orElse(null);
+        return templateRepository.findFullTemplateById(request.getTemplateId()).orElse(null);
+    }
+
+    /**
+     * MEDIA-3.1B: one-off, idempotent historical backfill. For every request
+     * whose templateId is still unset (excluding PENDING, which never needed
+     * one), classifies it deterministically from its InspectionAnswers and
+     * binds ONLY when every answer resolves to the exact same template.
+     * Ambiguous, answer-less, or broken-reference requests are left NULL and
+     * logged with an explicit reason - never guessed. Safe to run repeatedly:
+     * already-bound requests are excluded up front, and the atomic
+     * bindTemplateIfUnset() write can never overwrite a binding that appeared
+     * concurrently (e.g. via a live diagnostician bindTemplate() call).
+     */
+    @Transactional
+    public TemplateBackfillResult backfillHistoricalTemplateIds() {
+        int backfilled = 0;
+        int alreadyBound = 0;
+        Map<String, Integer> unresolvedByReason = new HashMap<>();
+
+        List<DiagnosticRequest> candidates = requestRepository.findAll().stream()
+                .filter(r -> r.getTemplateId() == null)
+                .filter(r -> r.getStatus() != DiagnosticRequest.DiagnosticRequestStatus.PENDING)
+                .toList();
+
+        for (DiagnosticRequest request : candidates) {
+            List<InspectionAnswer> answers = answerRepository.findByDiagnosticRequestId(request.getId());
+
+            if (answers.isEmpty()) {
+                log.warn("MEDIA-3.1B backfill: request {} unresolved - reason=NO_ANSWERS", request.getId());
+                unresolvedByReason.merge("NO_ANSWERS", 1, Integer::sum);
+                continue;
+            }
+
+            Set<Long> resolvedTemplateIds = new HashSet<>();
+            String brokenReason = null;
+            for (InspectionAnswer answer : answers) {
+                InspectionItem item = templateRepository.findItemById(answer.getInspectionItemId()).orElse(null);
+                if (item == null) {
+                    brokenReason = "BROKEN_ITEM_REFERENCE";
+                    break;
+                }
+                InspectionGroup group = templateRepository.findGroupById(item.getGroupId()).orElse(null);
+                if (group == null) {
+                    brokenReason = "BROKEN_GROUP_REFERENCE";
+                    break;
+                }
+                InspectionTemplate template = templateRepository.findTemplateById(group.getTemplateId()).orElse(null);
+                if (template == null) {
+                    brokenReason = "BROKEN_TEMPLATE_REFERENCE";
+                    break;
+                }
+                resolvedTemplateIds.add(group.getTemplateId());
+            }
+
+            if (brokenReason != null) {
+                log.warn("MEDIA-3.1B backfill: request {} unresolved - reason={}", request.getId(), brokenReason);
+                unresolvedByReason.merge(brokenReason, 1, Integer::sum);
+                continue;
+            }
+            if (resolvedTemplateIds.size() > 1) {
+                log.warn("MEDIA-3.1B backfill: request {} unresolved - reason=MULTIPLE_TEMPLATES {}",
+                        request.getId(), resolvedTemplateIds);
+                unresolvedByReason.merge("MULTIPLE_TEMPLATES", 1, Integer::sum);
+                continue;
+            }
+
+            Long resolvedTemplateId = resolvedTemplateIds.iterator().next();
+            boolean applied = requestRepository.bindTemplateIfUnset(request.getId(), resolvedTemplateId);
+            if (applied) {
+                backfilled++;
+                log.info("MEDIA-3.1B backfill: request {} -> template {}", request.getId(), resolvedTemplateId);
+            } else {
+                // Bound concurrently (e.g. a live diagnostician bind) between our read and
+                // write - not an error, and definitely not overwritten.
+                alreadyBound++;
             }
         }
 
-        DiagnosticRequestResponse response = DiagnosticRequestResponse.fromDomain(request);
-        response.setTemplate(template);
-        response.setExistingAnswers(answers);
-        return response;
+        log.info("MEDIA-3.1B backfill complete: backfilled={}, alreadyBound={}, unresolved={}",
+                backfilled, alreadyBound, unresolvedByReason);
+        return new TemplateBackfillResult(backfilled, alreadyBound, unresolvedByReason);
     }
 }

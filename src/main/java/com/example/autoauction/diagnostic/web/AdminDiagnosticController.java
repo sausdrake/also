@@ -175,4 +175,17 @@ public class AdminDiagnosticController {
     ) {
         return ResponseEntity.ok(requestService.rejectReport(id, currentUser.getUserId(), reason));
     }
+
+    // ==================== MEDIA-3.1B: исторический backfill шаблонов ====================
+
+    /**
+     * Одноразовый, идемпотентный backfill DiagnosticRequest.templateId для
+     * заявок, созданных до MEDIA-3.1A. Никогда не угадывает шаблон - см.
+     * DiagnosticRequestService.backfillHistoricalTemplateIds().
+     */
+    @PostMapping("/requests/backfill-template-ids")
+    @Operation(summary = "Backfill historical inspection template bindings")
+    public ResponseEntity<com.example.autoauction.diagnostic.web.dto.TemplateBackfillResult> backfillTemplateIds() {
+        return ResponseEntity.ok(requestService.backfillHistoricalTemplateIds());
+    }
 }
