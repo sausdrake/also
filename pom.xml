@@ -122,6 +122,13 @@
 			<version>2.2.0</version>
 		</dependency>
 
+		<!-- MEDIA-3.2: S3-compatible client (Cloudflare R2) -->
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>s3</artifactId>
+			<version>2.25.60</version>
+		</dependency>
+
 		<!-- Utilities -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>

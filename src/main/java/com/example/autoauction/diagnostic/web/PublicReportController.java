@@ -1,6 +1,8 @@
 package com.example.autoauction.diagnostic.web;
 
 import com.example.autoauction.diagnostic.application.DiagnosticRequestService;
+import com.example.autoauction.diagnostic.media.application.DiagnosticMediaService;
+import com.example.autoauction.diagnostic.media.web.dto.MediaReadUrlResponse;
 import com.example.autoauction.diagnostic.web.dto.DiagnosticRequestResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PublicReportController {
 
     private final DiagnosticRequestService requestService;
+    private final DiagnosticMediaService mediaService;
 
     @GetMapping("/{requestId}")
     @Operation(summary = "Просмотр одобренного диагностического отчёта")
@@ -34,6 +37,22 @@ public class PublicReportController {
     public ResponseEntity<DiagnosticRequestResponse> getReportByVehicle(@PathVariable Long vehicleId) {
         try {
             return ResponseEntity.ok(requestService.getApprovedReportForVehicle(vehicleId));
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    /**
+     * MEDIA-3.2: public read-URL for media belonging to an APPROVED report
+     * only. The object is never made public merely because it exists in R2 -
+     * a fresh, short-lived presigned URL is issued only after re-verifying
+     * the owning request's current status here.
+     */
+    @GetMapping("/media/{mediaId}/url")
+    @Operation(summary = "Получить ссылку на медиафайл одобренного отчёта")
+    public ResponseEntity<MediaReadUrlResponse> getMediaReadUrl(@PathVariable Long mediaId) {
+        try {
+            return ResponseEntity.ok(mediaService.getReadUrlForApprovedReport(mediaId));
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }
