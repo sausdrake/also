@@ -53,7 +53,15 @@ public class PublicReportController {
     public ResponseEntity<MediaReadUrlResponse> getMediaReadUrl(@PathVariable Long mediaId) {
         try {
             return ResponseEntity.ok(mediaService.getReadUrlForApprovedReport(mediaId));
-        } catch (Exception e) {
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            // The only two exception types getReadUrlForApprovedReport throws for a
+            // legitimately inaccessible media (not found / not approved / not READY) - both
+            // deliberately map to 404 here, not their normal GlobalExceptionHandler status
+            // (400/409), so a public unauthenticated caller cannot distinguish "does not
+            // exist" from "exists but is not yet approved". Anything else (infrastructure
+            // failures, SDK exceptions, bugs) is NOT caught here and propagates to
+            // GlobalExceptionHandler for a proper 500 + logged stack trace, instead of being
+            // silently misreported as "not found".
             return ResponseEntity.notFound().build();
         }
     }
