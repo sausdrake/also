@@ -24,6 +24,9 @@ public interface DiagnosticRequestRepository {
 
     boolean assignToDiagnostic(Long requestId, Long diagnosticId);
 
+    /** Atomic conditional bind; see SpringDataDiagnosticRequestJpaRepository.bindTemplate. */
+    boolean bindTemplate(Long requestId, Long diagnosticId, Long templateId);
+
     boolean markAsCompleted(Long requestId, Long diagnosticId);
 
     Page<DiagnosticRequest> findAll(Pageable pageable);

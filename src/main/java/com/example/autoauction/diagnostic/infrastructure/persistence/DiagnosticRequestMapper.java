@@ -19,6 +19,7 @@ public class DiagnosticRequestMapper {
         entity.setDepositFrozen(domain.getDepositFrozen());
         entity.setStatus(domain.getStatus());
         entity.setAssignedTo(domain.getAssignedTo());
+        entity.setTemplateId(domain.getTemplateId());
         entity.setRejectedReason(domain.getRejectedReason());
         entity.setCreatedAt(domain.getCreatedAt());
         entity.setUpdatedAt(domain.getUpdatedAt());
@@ -38,6 +39,7 @@ public class DiagnosticRequestMapper {
         domain.setDepositFrozen(entity.getDepositFrozen());
         domain.setStatus(entity.getStatus());
         domain.setAssignedTo(entity.getAssignedTo());
+        domain.setTemplateId(entity.getTemplateId());
         domain.setRejectedReason(entity.getRejectedReason());
         domain.setCreatedAt(entity.getCreatedAt());
         domain.setUpdatedAt(entity.getUpdatedAt());

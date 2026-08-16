@@ -3,6 +3,8 @@ package com.example.autoauction.diagnostic.application;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
 import com.example.autoauction.diagnostic.domain.InspectionAnswer;
+import com.example.autoauction.diagnostic.domain.InspectionGroup;
+import com.example.autoauction.diagnostic.domain.InspectionItem;
 import com.example.autoauction.diagnostic.domain.InspectionTemplate;
 import com.example.autoauction.diagnostic.domain.port.DiagnosticRequestRepository;
 import com.example.autoauction.diagnostic.domain.port.InspectionAnswerRepository;
@@ -211,15 +213,16 @@ class DiagnosticRequestServiceTest {
     }
 
     @Nested
-    @DisplayName("Получение заявки с шаблоном")
+    @DisplayName("Получение заявки с привязанным шаблоном (MEDIA-3.1A)")
     class GetRequestWithTemplateTests {
 
         @Test
-        @DisplayName("Успешное получение заявки с шаблоном")
+        @DisplayName("Успешное получение заявки с привязанным шаблоном")
         void getRequestWithTemplate_Success() {
             savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setTemplateId(1L);
             when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
-            when(templateRepository.findActiveTemplates(any())).thenReturn(new PageImpl<>(List.of(template)));
+            when(templateRepository.findFullTemplateById(1L)).thenReturn(Optional.of(template));
             when(answerRepository.findByDiagnosticRequestId(requestId)).thenReturn(List.of());
 
             DiagnosticRequestResponse response = requestService.getRequestWithTemplate(requestId, diagnosticId);
@@ -227,6 +230,8 @@ class DiagnosticRequestServiceTest {
             assertThat(response).isNotNull();
             assertThat(response.getTemplate()).isNotNull();
             assertThat(response.getTemplate().getName()).isEqualTo("Стандартный шаблон");
+            verify(templateRepository, never()).findActiveTemplates(any());
+            verify(templateRepository, never()).findActiveTemplateById(any());
         }
 
         @Test
@@ -241,15 +246,174 @@ class DiagnosticRequestServiceTest {
         }
 
         @Test
-        @DisplayName("Нет активных шаблонов - исключение")
-        void getRequestWithTemplate_NoActiveTemplates_ThrowsException() {
+        @DisplayName("Шаблон ещё не привязан - IllegalStateException, без фолбэка на активный шаблон")
+        void getRequestWithTemplate_NoTemplateBound_ThrowsException() {
             savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setTemplateId(null);
             when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
-            when(templateRepository.findActiveTemplates(any())).thenReturn(Page.empty());
 
             assertThatThrownBy(() -> requestService.getRequestWithTemplate(requestId, diagnosticId))
                     .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("Нет активных шаблонов анкет");
+                    .hasMessageContaining("не выбран шаблон");
+
+            verify(templateRepository, never()).findActiveTemplates(any());
+            verify(templateRepository, never()).findFullTemplateById(any());
+        }
+
+        @Test
+        @DisplayName("Деактивация шаблона после привязки не влияет на уже привязанную заявку")
+        void getRequestWithTemplate_TemplateDeactivatedAfterBinding_StillResolves() {
+            savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setTemplateId(1L);
+            InspectionTemplate deactivated = new InspectionTemplate();
+            deactivated.setId(1L);
+            deactivated.setName("Стандартный шаблон");
+            deactivated.setActive(false); // деактивирован ПОСЛЕ привязки
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+            when(templateRepository.findFullTemplateById(1L)).thenReturn(Optional.of(deactivated));
+            when(answerRepository.findByDiagnosticRequestId(requestId)).thenReturn(List.of());
+
+            DiagnosticRequestResponse response = requestService.getRequestWithTemplate(requestId, diagnosticId);
+
+            assertThat(response.getTemplate()).isNotNull();
+            assertThat(response.getTemplate().getId()).isEqualTo(1L);
+        }
+    }
+
+    @Nested
+    @DisplayName("Привязка шаблона к заявке (MEDIA-3.1A)")
+    class BindTemplateTests {
+
+        @BeforeEach
+        void setUpInProgress() {
+            savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setStatus(DiagnosticRequest.DiagnosticRequestStatus.IN_PROGRESS);
+            savedRequest.setTemplateId(null);
+        }
+
+        @Test
+        @DisplayName("Успешная первая привязка")
+        void bindTemplate_Success() {
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+            when(templateRepository.findTemplateById(1L)).thenReturn(Optional.of(template));
+            when(requestRepository.bindTemplate(requestId, diagnosticId, 1L)).thenReturn(true);
+            DiagnosticRequest bound = clone(savedRequest);
+            bound.setTemplateId(1L);
+            when(requestRepository.findById(requestId))
+                    .thenReturn(Optional.of(savedRequest))
+                    .thenReturn(Optional.of(bound));
+            when(templateRepository.findFullTemplateById(1L)).thenReturn(Optional.of(template));
+
+            DiagnosticRequestResponse response = requestService.bindTemplate(requestId, diagnosticId, 1L);
+
+            assertThat(response.getTemplate()).isNotNull();
+            assertThat(response.getTemplate().getId()).isEqualTo(1L);
+            verify(requestRepository).bindTemplate(requestId, diagnosticId, 1L);
+        }
+
+        @Test
+        @DisplayName("Требуется, чтобы вызывающий был назначенным диагностом")
+        void bindTemplate_RequiresAssignedDiagnostician() {
+            savedRequest.setAssignedTo(999L);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+
+            assertThatThrownBy(() -> requestService.bindTemplate(requestId, diagnosticId, 1L))
+                    .isInstanceOf(SecurityException.class);
+
+            verify(requestRepository, never()).bindTemplate(anyLong(), anyLong(), anyLong());
+        }
+
+        @Test
+        @DisplayName("Требуется статус IN_PROGRESS")
+        void bindTemplate_RequiresInProgress() {
+            savedRequest.setStatus(DiagnosticRequest.DiagnosticRequestStatus.PENDING);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+
+            assertThatThrownBy(() -> requestService.bindTemplate(requestId, diagnosticId, 1L))
+                    .isInstanceOf(IllegalStateException.class);
+
+            verify(requestRepository, never()).bindTemplate(anyLong(), anyLong(), anyLong());
+        }
+
+        @Test
+        @DisplayName("Несуществующий шаблон отклоняется")
+        void bindTemplate_TemplateNotFound_ThrowsException() {
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+            when(templateRepository.findTemplateById(999L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> requestService.bindTemplate(requestId, diagnosticId, 999L))
+                    .isInstanceOf(IllegalArgumentException.class);
+
+            verify(requestRepository, never()).bindTemplate(anyLong(), anyLong(), anyLong());
+        }
+
+        @Test
+        @DisplayName("Неактивный шаблон отклоняется")
+        void bindTemplate_InactiveTemplate_ThrowsException() {
+            InspectionTemplate inactive = new InspectionTemplate();
+            inactive.setId(2L);
+            inactive.setActive(false);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+            when(templateRepository.findTemplateById(2L)).thenReturn(Optional.of(inactive));
+
+            assertThatThrownBy(() -> requestService.bindTemplate(requestId, diagnosticId, 2L))
+                    .isInstanceOf(IllegalStateException.class);
+
+            verify(requestRepository, never()).bindTemplate(anyLong(), anyLong(), anyLong());
+        }
+
+        @Test
+        @DisplayName("Повторная привязка того же шаблона - идемпотентный успех")
+        void bindTemplate_SameTemplateResubmitted_IdempotentSuccess() {
+            when(templateRepository.findTemplateById(1L)).thenReturn(Optional.of(template));
+            when(requestRepository.bindTemplate(requestId, diagnosticId, 1L)).thenReturn(false);
+            DiagnosticRequest alreadyBound = clone(savedRequest);
+            alreadyBound.setTemplateId(1L);
+            when(requestRepository.findById(requestId))
+                    .thenReturn(Optional.of(savedRequest))
+                    .thenReturn(Optional.of(alreadyBound))
+                    .thenReturn(Optional.of(alreadyBound));
+            when(templateRepository.findFullTemplateById(1L)).thenReturn(Optional.of(template));
+
+            DiagnosticRequestResponse response = requestService.bindTemplate(requestId, diagnosticId, 1L);
+
+            assertThat(response.getTemplate().getId()).isEqualTo(1L);
+        }
+
+        @Test
+        @DisplayName("Другой шаблон после привязки - конфликт (409)")
+        void bindTemplate_DifferentTemplateAfterBinding_ThrowsConflict() {
+            InspectionTemplate other = new InspectionTemplate();
+            other.setId(2L);
+            other.setActive(true);
+            when(templateRepository.findTemplateById(2L)).thenReturn(Optional.of(other));
+            when(requestRepository.bindTemplate(requestId, diagnosticId, 2L)).thenReturn(false);
+            DiagnosticRequest alreadyBoundToOther = clone(savedRequest);
+            alreadyBoundToOther.setTemplateId(1L);
+            when(requestRepository.findById(requestId))
+                    .thenReturn(Optional.of(savedRequest))
+                    .thenReturn(Optional.of(alreadyBoundToOther));
+
+            assertThatThrownBy(() -> requestService.bindTemplate(requestId, diagnosticId, 2L))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("другому шаблону");
+        }
+
+        private DiagnosticRequest clone(DiagnosticRequest source) {
+            DiagnosticRequest copy = new DiagnosticRequest();
+            copy.setId(source.getId());
+            copy.setUserId(source.getUserId());
+            copy.setBrand(source.getBrand());
+            copy.setModel(source.getModel());
+            copy.setYear(source.getYear());
+            copy.setVin(source.getVin());
+            copy.setDepositFrozen(source.getDepositFrozen());
+            copy.setStatus(source.getStatus());
+            copy.setAssignedTo(source.getAssignedTo());
+            copy.setTemplateId(source.getTemplateId());
+            copy.setCreatedAt(source.getCreatedAt());
+            copy.setUpdatedAt(source.getUpdatedAt());
+            return copy;
         }
     }
 
@@ -261,6 +425,7 @@ class DiagnosticRequestServiceTest {
         @DisplayName("Успешное сохранение черновика")
         void saveInspectionAnswers_Draft_Success() {
             savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setTemplateId(1L);
             when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
             doNothing().when(answerRepository).deleteByDiagnosticRequestId(requestId);
             when(answerRepository.saveAll(anyList())).thenReturn(List.of());
@@ -280,6 +445,7 @@ class DiagnosticRequestServiceTest {
         @DisplayName("Успешная отправка на проверку")
         void saveInspectionAnswers_Submit_Success() {
             savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setTemplateId(1L);
             when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
             doNothing().when(answerRepository).deleteByDiagnosticRequestId(requestId);
             when(answerRepository.saveAll(anyList())).thenReturn(List.of());
@@ -306,6 +472,125 @@ class DiagnosticRequestServiceTest {
 
             assertThatThrownBy(() -> requestService.saveInspectionAnswers(requestId, diagnosticId, submitRequest))
                     .isInstanceOf(SecurityException.class);
+        }
+
+        @Test
+        @DisplayName("MEDIA-3.1A: без привязанного шаблона - явный отказ, без вывода")
+        void saveInspectionAnswers_NoTemplateBound_ThrowsException() {
+            savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setTemplateId(null);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+
+            SubmitInspectionRequest submitRequest = new SubmitInspectionRequest();
+            submitRequest.setSubmit(false);
+            submitRequest.setAnswers(List.of());
+
+            assertThatThrownBy(() -> requestService.saveInspectionAnswers(requestId, diagnosticId, submitRequest))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("не выбран шаблон");
+
+            verify(answerRepository, never()).saveAll(anyList());
+        }
+
+        @Test
+        @DisplayName("MEDIA-3.1A: пункт из привязанного шаблона принимается")
+        void saveInspectionAnswers_ItemFromBoundTemplate_Accepted() {
+            savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setTemplateId(1L);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+
+            InspectionItem item = new InspectionItem();
+            item.setId(10L);
+            item.setGroupId(20L);
+            InspectionGroup group = new InspectionGroup();
+            group.setId(20L);
+            group.setTemplateId(1L); // тот же шаблон, что привязан к заявке
+            when(templateRepository.findItemById(10L)).thenReturn(Optional.of(item));
+            when(templateRepository.findGroupById(20L)).thenReturn(Optional.of(group));
+            when(answerRepository.saveAll(anyList())).thenReturn(List.of());
+
+            InspectionAnswerDto answerDto = new InspectionAnswerDto();
+            answerDto.setItemId(10L);
+            SubmitInspectionRequest submitRequest = new SubmitInspectionRequest();
+            submitRequest.setSubmit(false);
+            submitRequest.setAnswers(List.of(answerDto));
+
+            requestService.saveInspectionAnswers(requestId, diagnosticId, submitRequest);
+
+            verify(answerRepository).saveAll(anyList());
+        }
+
+        @Test
+        @DisplayName("MEDIA-3.1A: пункт из другого шаблона отклоняется")
+        void saveInspectionAnswers_ItemFromAnotherTemplate_Rejected() {
+            savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setTemplateId(1L);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+
+            InspectionItem item = new InspectionItem();
+            item.setId(10L);
+            item.setGroupId(20L);
+            InspectionGroup group = new InspectionGroup();
+            group.setId(20L);
+            group.setTemplateId(2L); // ДРУГОЙ шаблон, не привязанный к заявке
+            when(templateRepository.findItemById(10L)).thenReturn(Optional.of(item));
+            when(templateRepository.findGroupById(20L)).thenReturn(Optional.of(group));
+
+            InspectionAnswerDto answerDto = new InspectionAnswerDto();
+            answerDto.setItemId(10L);
+            SubmitInspectionRequest submitRequest = new SubmitInspectionRequest();
+            submitRequest.setSubmit(false);
+            submitRequest.setAnswers(List.of(answerDto));
+
+            assertThatThrownBy(() -> requestService.saveInspectionAnswers(requestId, diagnosticId, submitRequest))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("не принадлежит шаблону");
+
+            verify(answerRepository, never()).saveAll(anyList());
+        }
+
+        @Test
+        @DisplayName("MEDIA-3.1A: несуществующий пункт отклоняется существующей семантикой ошибок")
+        void saveInspectionAnswers_NonexistentItem_Rejected() {
+            savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setTemplateId(1L);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+            when(templateRepository.findItemById(999L)).thenReturn(Optional.empty());
+
+            InspectionAnswerDto answerDto = new InspectionAnswerDto();
+            answerDto.setItemId(999L);
+            SubmitInspectionRequest submitRequest = new SubmitInspectionRequest();
+            submitRequest.setSubmit(false);
+            submitRequest.setAnswers(List.of(answerDto));
+
+            assertThatThrownBy(() -> requestService.saveInspectionAnswers(requestId, diagnosticId, submitRequest))
+                    .isInstanceOf(IllegalArgumentException.class);
+
+            verify(answerRepository, never()).saveAll(anyList());
+        }
+    }
+
+    @Nested
+    @DisplayName("Исправление отклонённого отчёта сохраняет привязанный шаблон (MEDIA-3.1A)")
+    class ResetForReworkPreservesTemplateTests {
+
+        @Test
+        @DisplayName("resetForRework не трогает templateId")
+        void resetForRework_DoesNotTouchTemplateId() {
+            savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setStatus(DiagnosticRequest.DiagnosticRequestStatus.REJECTED);
+            savedRequest.setTemplateId(1L);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+            when(requestRepository.resetForRework(requestId, diagnosticId)).thenReturn(true);
+
+            requestService.resetForRework(requestId, diagnosticId);
+
+            // resetForRework() must never call bindTemplate() or otherwise mutate
+            // template_id - the repository method it does call has no templateId
+            // parameter at all, so this is enforced structurally, not just by
+            // this assertion; verifying here as an explicit regression guard.
+            verify(requestRepository, never()).bindTemplate(anyLong(), anyLong(), anyLong());
+            verify(requestRepository).resetForRework(requestId, diagnosticId);
         }
     }
 

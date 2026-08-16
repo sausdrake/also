@@ -39,6 +39,9 @@ public class JpaDiagnosticRequestEntity {
     @Column(name = "assigned_to")
     private Long assignedTo;
 
+    @Column(name = "template_id")
+    private Long templateId;
+
     @Column(name = "rejected_reason", length = 1000)
     private String rejectedReason;
 

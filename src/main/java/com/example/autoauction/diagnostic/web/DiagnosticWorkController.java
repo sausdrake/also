@@ -5,6 +5,7 @@ import com.example.autoauction.auth.domain.UserPrincipal;
 import com.example.autoauction.diagnostic.application.DiagnosticRequestService;
 import com.example.autoauction.diagnostic.application.InspectionTemplateService;
 import com.example.autoauction.diagnostic.domain.InspectionTemplate;
+import com.example.autoauction.diagnostic.web.dto.BindTemplateRequest;
 import com.example.autoauction.diagnostic.web.dto.DiagnosticRequestResponse;
 import com.example.autoauction.diagnostic.web.dto.SubmitInspectionRequest;
 import io.swagger.v3.oas.annotations.Operation;
@@ -69,17 +70,35 @@ public class DiagnosticWorkController {
     }
 
     /**
-     * Получить заявку с шаблоном для заполнения
+     * Получить заявку с привязанным шаблоном для заполнения.
+     * MEDIA-3.1A: чисто read-only - шаблон должен быть уже привязан через
+     * POST /{requestId}/template; здесь он больше не выбирается.
      */
     @GetMapping("/{requestId}")
-    @Operation(summary = "Получить заявку с шаблоном для заполнения")
+    @Operation(summary = "Получить заявку с привязанным шаблоном для заполнения")
     public ResponseEntity<DiagnosticRequestResponse> getRequestWithTemplate(
             @PathVariable Long requestId,
-            @RequestParam(required = false) Long templateId,
             @CurrentUser UserPrincipal currentUser
     ) {
-        log.info("GET /api/diagnostic/work/{} templateId={} - diagnostic: {}", requestId, templateId, currentUser.getUserId());
-        DiagnosticRequestResponse response = requestService.getRequestWithTemplate(requestId, currentUser.getUserId(), templateId);
+        log.info("GET /api/diagnostic/work/{} - diagnostic: {}", requestId, currentUser.getUserId());
+        DiagnosticRequestResponse response = requestService.getRequestWithTemplate(requestId, currentUser.getUserId());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Явно привязать шаблон анкеты к заявке (один раз, необратимо).
+     * MEDIA-3.1A.
+     */
+    @PostMapping("/{requestId}/template")
+    @Operation(summary = "Привязать шаблон анкеты к заявке")
+    public ResponseEntity<DiagnosticRequestResponse> bindTemplate(
+            @PathVariable Long requestId,
+            @Valid @RequestBody BindTemplateRequest request,
+            @CurrentUser UserPrincipal currentUser
+    ) {
+        log.info("POST /api/diagnostic/work/{}/template - diagnostic: {}, templateId: {}",
+                requestId, currentUser.getUserId(), request.getTemplateId());
+        DiagnosticRequestResponse response = requestService.bindTemplate(requestId, currentUser.getUserId(), request.getTemplateId());
         return ResponseEntity.ok(response);
     }
 

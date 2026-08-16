@@ -82,6 +82,18 @@ public class DiagnosticRequestRepositoryAdapter implements DiagnosticRequestRepo
     }
 
     @Override
+    public boolean bindTemplate(Long requestId, Long diagnosticId, Long templateId) {
+        int updated = jpaRepository.bindTemplate(requestId, diagnosticId, templateId, OffsetDateTime.now());
+        if (updated > 0) {
+            log.info("Bound request {} to template {} by diagnostic {}", requestId, templateId, diagnosticId);
+            return true;
+        }
+        log.warn("Failed to bind request {} to template {} (not IN_PROGRESS, not assigned to {}, or already bound)",
+                requestId, templateId, diagnosticId);
+        return false;
+    }
+
+    @Override
     public boolean markAsCompleted(Long requestId, Long diagnosticId) {
         int updated = jpaRepository.markAsCompleted(requestId, diagnosticId, OffsetDateTime.now());
         if (updated > 0) {

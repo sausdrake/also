@@ -145,15 +145,19 @@ public class DiagnosticRequestService {
     }
 
     /**
-     * Получить заявку с шаблоном для заполнения
+     * Получить заявку с шаблоном для заполнения.
+     *
+     * MEDIA-3.1A: purely read-only. The template is never resolved or chosen
+     * here - it must already be bound via bindTemplate(). No "first active
+     * template" fallback, no answer-based inference: both were proven unsafe
+     * (MEDIA-3 Phase 1.5/1.6) because they re-evaluate mutable state (which
+     * templates are currently active) instead of reading the one persisted,
+     * immutable decision. findFullTemplateById is used deliberately instead
+     * of an active-only lookup: a template deactivated after a request was
+     * bound to it must not change that request's meaning.
      */
     @Transactional(readOnly = true)
     public DiagnosticRequestResponse getRequestWithTemplate(Long requestId, Long diagnosticId) {
-        return getRequestWithTemplate(requestId, diagnosticId, null);
-    }
-
-    @Transactional(readOnly = true)
-    public DiagnosticRequestResponse getRequestWithTemplate(Long requestId, Long diagnosticId, Long templateId) {
         DiagnosticRequest request = requestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена: " + requestId));
 
@@ -161,22 +165,77 @@ public class DiagnosticRequestService {
             throw new SecurityException("Вы не назначены на эту заявку");
         }
 
-        InspectionTemplate template;
-        if (templateId != null) {
-            template = templateRepository.findFullTemplateById(templateId)
-                    .orElseThrow(() -> new IllegalArgumentException("Шаблон не найден: " + templateId));
-        } else {
-            template = templateRepository.findActiveTemplates(Pageable.ofSize(1))
-                    .stream().findFirst()
-                    .orElseThrow(() -> new IllegalStateException("Нет активных шаблонов анкет"));
-            template = templateRepository.findFullTemplateById(template.getId())
-                    .orElseThrow(() -> new IllegalStateException("Ошибка загрузки шаблона"));
+        if (request.getTemplateId() == null) {
+            throw new IllegalStateException("Для этой заявки ещё не выбран шаблон анкеты");
         }
+
+        InspectionTemplate template = templateRepository.findFullTemplateById(request.getTemplateId())
+                .orElseThrow(() -> new IllegalStateException("Шаблон, привязанный к заявке, не найден: " + request.getTemplateId()));
 
         List<InspectionAnswer> existingAnswers = answerRepository.findByDiagnosticRequestId(requestId);
         DiagnosticRequestResponse response = DiagnosticRequestResponse.fromDomain(request);
         response.setTemplate(template);
         response.setExistingAnswers(existingAnswers);
+        return response;
+    }
+
+    /**
+     * MEDIA-3.1A: explicit, one-time template binding. Authorization and the
+     * IN_PROGRESS/unbound preconditions are checked here for a precise error
+     * message on the common path, but the atomic conditional UPDATE (see
+     * DiagnosticRequestRepository.bindTemplate) is the actual concurrency/
+     * immutability guard - the checks below can be stale by the time the
+     * UPDATE runs, and that is fine because the UPDATE itself re-verifies
+     * every condition atomically.
+     */
+    @Transactional
+    public DiagnosticRequestResponse bindTemplate(Long requestId, Long diagnosticId, Long templateId) {
+        DiagnosticRequest request = requestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена: " + requestId));
+
+        if (request.getAssignedTo() == null || !request.getAssignedTo().equals(diagnosticId)) {
+            throw new SecurityException("Вы не назначены на эту заявку");
+        }
+        if (request.getStatus() != DiagnosticRequest.DiagnosticRequestStatus.IN_PROGRESS) {
+            throw new IllegalStateException("Шаблон можно выбрать только для заявки в статусе IN_PROGRESS. Текущий статус: " + request.getStatus());
+        }
+
+        InspectionTemplate template = templateRepository.findTemplateById(templateId)
+                .orElseThrow(() -> new IllegalArgumentException("Шаблон не найден: " + templateId));
+        if (!template.isActive()) {
+            throw new IllegalStateException("Шаблон неактивен и не может быть выбран: " + templateId);
+        }
+
+        boolean bound = requestRepository.bindTemplate(requestId, diagnosticId, templateId);
+        if (!bound) {
+            // Lost the race, or the request moved out of a bindable state between
+            // our checks above and the atomic UPDATE. Re-read to find out which.
+            DiagnosticRequest current = requestRepository.findById(requestId)
+                    .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена: " + requestId));
+
+            if (current.getTemplateId() != null) {
+                if (current.getTemplateId().equals(templateId)) {
+                    // Same template already bound (by this call racing itself, a
+                    // retry, or a concurrent identical request) - idempotent success.
+                    log.info("Request {} already bound to template {} - idempotent", requestId, templateId);
+                } else {
+                    throw new IllegalStateException(
+                            "Заявка уже привязана к другому шаблону: " + current.getTemplateId());
+                }
+            } else {
+                throw new IllegalStateException(
+                        "Не удалось привязать шаблон: заявка более не в статусе IN_PROGRESS или переназначена");
+            }
+        }
+
+        DiagnosticRequest finalRequest = requestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена: " + requestId));
+        InspectionTemplate boundTemplate = templateRepository.findFullTemplateById(finalRequest.getTemplateId())
+                .orElseThrow(() -> new IllegalStateException("Шаблон, привязанный к заявке, не найден: " + finalRequest.getTemplateId()));
+
+        log.info("Request {} bound to template {} by diagnostic {}", requestId, finalRequest.getTemplateId(), diagnosticId);
+        DiagnosticRequestResponse response = DiagnosticRequestResponse.fromDomain(finalRequest);
+        response.setTemplate(boundTemplate);
         return response;
     }
 
@@ -193,11 +252,28 @@ public class DiagnosticRequestService {
         if (!request.getAssignedTo().equals(diagnosticId)) {
             throw new SecurityException("Вы не назначены на эту заявку");
         }
-        // Проверка на дубликаты пунктов
+
+        // MEDIA-3.1A: a request must have a bound template before any answer can
+        // be saved against it - without one, there is no authoritative template
+        // to validate submitted itemIds against, and inferring one is exactly
+        // the unsafe behavior this phase replaces.
+        if (request.getTemplateId() == null) {
+            throw new IllegalStateException("Для этой заявки ещё не выбран шаблон анкеты");
+        }
+
+        // Проверка на дубликаты пунктов и принадлежность пунктов привязанному шаблону
         Set<Long> uniqueItemIds = new HashSet<>();
         for (InspectionAnswerDto answerDto : dto.getAnswers()) {
             if (!uniqueItemIds.add(answerDto.getItemId())) {
                 throw new IllegalArgumentException("Обнаружен дубликат пункта анкеты: " + answerDto.getItemId());
+            }
+            InspectionItem item = templateRepository.findItemById(answerDto.getItemId())
+                    .orElseThrow(() -> new IllegalArgumentException("Пункт анкеты не найден: " + answerDto.getItemId()));
+            InspectionGroup group = templateRepository.findGroupById(item.getGroupId())
+                    .orElseThrow(() -> new IllegalArgumentException("Группа анкеты не найдена: " + item.getGroupId()));
+            if (!group.getTemplateId().equals(request.getTemplateId())) {
+                throw new IllegalArgumentException(
+                        "Пункт анкеты " + answerDto.getItemId() + " не принадлежит шаблону, привязанному к заявке");
             }
         }
 

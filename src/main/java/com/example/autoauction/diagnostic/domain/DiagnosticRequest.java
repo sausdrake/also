@@ -15,6 +15,7 @@ public class DiagnosticRequest {
     private BigDecimal depositFrozen;
     private DiagnosticRequestStatus status;
     private Long assignedTo;
+    private Long templateId;
     private String rejectedReason;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;

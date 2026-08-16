@@ -29,6 +29,17 @@ public interface SpringDataDiagnosticRequestJpaRepository extends JpaRepository<
     @Query("UPDATE JpaDiagnosticRequestEntity d SET d.assignedTo = :diagnosticId, d.status = 'IN_PROGRESS' WHERE d.id = :requestId AND d.status = 'PENDING'")
     int assignToDiagnostic(@Param("requestId") Long requestId, @Param("diagnosticId") Long diagnosticId);
 
+    // MEDIA-3.1A: atomic conditional bind - template_id IS NULL is both the
+    // immutability guard (a second bind attempt can never match) and the
+    // concurrency guard (of two racing binds, only one UPDATE can match this
+    // WHERE clause; see DiagnosticRequestService.bindTemplate for how the
+    // loser interprets an affected-row count of 0).
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE JpaDiagnosticRequestEntity d SET d.templateId = :templateId, d.updatedAt = :now " +
+            "WHERE d.id = :requestId AND d.assignedTo = :diagnosticId AND d.status = 'IN_PROGRESS' AND d.templateId IS NULL")
+    int bindTemplate(@Param("requestId") Long requestId, @Param("diagnosticId") Long diagnosticId,
+                     @Param("templateId") Long templateId, @Param("now") OffsetDateTime now);
+
     @Modifying(clearAutomatically = true)
     @Query("UPDATE JpaDiagnosticRequestEntity d SET d.status = 'COMPLETED', d.updatedAt = :now WHERE d.id = :requestId AND d.assignedTo = :diagnosticId")
     int markAsCompleted(@Param("requestId") Long requestId, @Param("diagnosticId") Long diagnosticId, @Param("now") OffsetDateTime now);
