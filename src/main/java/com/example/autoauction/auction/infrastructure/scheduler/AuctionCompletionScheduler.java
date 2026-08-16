@@ -44,9 +44,21 @@ public class AuctionCompletionScheduler {
         log.info("AuctionCompletionScheduler initialized");
     }
 
-    /** Каждую минуту: завершаем истёкшие ACTIVE-аукционы */
+    /**
+     * Каждую минуту: завершаем истёкшие ACTIVE-аукционы.
+     *
+     * R-3: deliberately NOT @Transactional at this level. AuctionFinalizer.finalizeAuction()
+     * is independently @Transactional (REQUIRED) and is called here as a genuine external
+     * bean call, so each auction gets its OWN physical transaction. If this method were
+     * @Transactional REQUIRED, every finalizeAuction() call in the loop would join the SAME
+     * physical transaction; one auction's optimistic-lock conflict on save() would then mark
+     * that shared transaction rollback-only, silently reverting every other auction already
+     * processed in the same invocation when the outer commit converts to a rollback (proven
+     * empirically in AuctionCompletionSchedulerTransactionIsolationIntegrationTest). Removing
+     * this annotation makes each finalizeAuction() call the transaction owner for its own
+     * auction, isolating failures to that single auction.
+     */
     @Scheduled(fixedDelay = 60_000)
-    @Transactional
     public void completeExpiredAuctions() {
         OffsetDateTime now = OffsetDateTime.now();
         List<Auction> expired = auctionRepository.findByStatusAndEndTimeBefore(AuctionStatus.ACTIVE, now);
@@ -120,9 +132,14 @@ public class AuctionCompletionScheduler {
     /**
      * Каждую минуту: отменяем CREATED-аукционы без подтверждения,
      * у которых дедлайн (startTime - confirmHours) уже прошёл.
+     *
+     * R-3: deliberately NOT @Transactional at this level, for the same reason as
+     * completeExpiredAuctions() above - AuctionFinalizer.cancelAuction() is independently
+     * @Transactional (REQUIRED) and called here as a genuine external bean call, so each
+     * auction gets its own physical transaction instead of all auctions in the batch sharing
+     * (and being able to poison) one.
      */
     @Scheduled(fixedDelay = 60_000)
-    @Transactional
     public void cancelUnconfirmedAuctions() {
         OffsetDateTime deadline = OffsetDateTime.now().plusHours(confirmHours);
         List<Auction> overdue = auctionRepository.findUnconfirmedAuctionsPastDeadline(deadline);
