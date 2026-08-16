@@ -16,6 +16,7 @@ public class DepositTransaction {
     private BigDecimal balanceAfter;
     private String reference;
     private String description;
+    private String idempotencyKey;
     private OffsetDateTime createdAt;
 
     public DepositTransaction(Long depositId, Long userId, TransactionType type,
@@ -43,6 +44,7 @@ public class DepositTransaction {
     public BigDecimal getBalanceAfter() { return balanceAfter; }
     public String getReference() { return reference; }
     public String getDescription() { return description; }
+    public String getIdempotencyKey() { return idempotencyKey; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
 
     // Сеттеры (добавляем!)
@@ -56,6 +58,7 @@ public class DepositTransaction {
     public void setBalanceAfter(BigDecimal balanceAfter) { this.balanceAfter = balanceAfter; }
     public void setReference(String reference) { this.reference = reference; }
     public void setDescription(String description) { this.description = description; }
+    public void setIdempotencyKey(String idempotencyKey) { this.idempotencyKey = idempotencyKey; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
 
     public enum TransactionType {

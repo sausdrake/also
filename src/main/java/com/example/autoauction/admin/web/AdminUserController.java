@@ -98,12 +98,13 @@ public class AdminUserController {
             @PathVariable Long id,
             @Valid @RequestBody AdjustDepositRequest body
     ) {
-        return ResponseEntity.ok(depositService.adminAdjust(id, body.amount(), body.comment()));
+        return ResponseEntity.ok(depositService.adminAdjust(id, body.amount(), body.comment(), body.idempotencyKey()));
     }
 
     record AdjustDepositRequest(
             @NotNull(message = "Сумма обязательна") BigDecimal amount,
-            @NotBlank(message = "Комментарий обязателен") String comment
+            @NotBlank(message = "Комментарий обязателен") String comment,
+            @NotBlank(message = "Ключ идемпотентности обязателен") String idempotencyKey
     ) {}
 
     @GetMapping("/{id}/deposit")

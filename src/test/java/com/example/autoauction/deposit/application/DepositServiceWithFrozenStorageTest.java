@@ -42,7 +42,6 @@ class DepositServiceWithFrozenStorageTest {
     private final Long userId = 1L;
     private final Long auctionId = 100L;
     private final Long depositId = 10L;
-    private final BigDecimal startingPrice = new BigDecimal("1000000");
     private final BigDecimal requiredDeposit = new BigDecimal("10000.00");
     private final BigDecimal depositBalance = new BigDecimal("50000");
 
@@ -62,7 +61,7 @@ class DepositServiceWithFrozenStorageTest {
         when(depositRepository.saveTransaction(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // when
-        depositService.freezeForAuction(userId, auctionId, startingPrice);
+        depositService.freezeForAuction(userId, auctionId, requiredDeposit);
 
         // then
         ArgumentCaptor<Long> depositIdCaptor = ArgumentCaptor.forClass(Long.class);
@@ -136,12 +135,12 @@ class DepositServiceWithFrozenStorageTest {
     }
 
     @Test
-    @DisplayName("Попытка заморозки с null startingPrice - исключение")
-    void freezeForAuction_NullStartingPrice_ThrowsException() {
+    @DisplayName("Попытка заморозки с null требуемой суммой - исключение")
+    void freezeForAuction_NullRequiredAmount_ThrowsException() {
         // when & then
         assertThatThrownBy(() -> depositService.freezeForAuction(userId, auctionId, null))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Starting price must be positive");
+                .hasMessageContaining("Required deposit amount must be positive");
 
         verify(depositRepository, never()).freezeForAuction(anyLong(), anyLong(), any(), any());
     }
@@ -154,7 +153,7 @@ class DepositServiceWithFrozenStorageTest {
         when(depositRepository.isFrozenForAuction(depositId, auctionId)).thenReturn(true);
 
         // when
-        depositService.freezeForAuction(userId, auctionId, startingPrice);
+        depositService.freezeForAuction(userId, auctionId, requiredDeposit);
 
         // then
         verify(depositRepository, never()).freezeForAuction(anyLong(), anyLong(), any(), any());
@@ -165,14 +164,14 @@ class DepositServiceWithFrozenStorageTest {
     @DisplayName("Заморозка при недостаточном балансе - исключение")
     void freezeForAuction_InsufficientBalance_ThrowsException() {
         // given
-        Deposit poorDeposit = new Deposit(userId, new BigDecimal("5000")); // всего 5000, надо 10000
+        Deposit poorDeposit = new Deposit(userId, new BigDecimal("5000")); // всего 5000, надо 10000.00
         poorDeposit.setId(depositId);
 
         when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(poorDeposit));
         when(depositRepository.isFrozenForAuction(depositId, auctionId)).thenReturn(false);
 
         // when & then
-        assertThatThrownBy(() -> depositService.freezeForAuction(userId, auctionId, startingPrice))
+        assertThatThrownBy(() -> depositService.freezeForAuction(userId, auctionId, requiredDeposit))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Недостаточно средств");
 

@@ -14,6 +14,7 @@ public interface SpringDataDepositTransactionJpaRepository extends JpaRepository
     List<JpaDepositTransactionEntity> findByUserId(Long userId);
     List<JpaDepositTransactionEntity> findByDepositId(Long depositId);
     List<JpaDepositTransactionEntity> findByAuctionId(Long auctionId);
+    java.util.Optional<JpaDepositTransactionEntity> findByIdempotencyKey(String idempotencyKey);
 
     @Query("SELECT t FROM JpaDepositTransactionEntity t WHERE t.userId = :userId " +
            "AND (:type IS NULL OR t.type = :type) " +

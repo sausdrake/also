@@ -7,6 +7,7 @@ import com.example.autoauction.deposit.domain.DepositTransaction;
 import com.example.autoauction.deposit.web.dto.DepositRequest;
 import com.example.autoauction.deposit.web.dto.DepositResponse;
 import com.example.autoauction.deposit.web.dto.DepositTransactionResponse;
+import com.example.autoauction.deposit.web.dto.WithdrawRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -52,14 +53,14 @@ public class DepositController {
     @PostMapping("/withdraw")
     @Operation(summary = "Вывести средства с депозита")
     public ResponseEntity<DepositResponse> withdraw(
-            @Valid @RequestBody DepositRequest request,
+            @Valid @RequestBody WithdrawRequest request,
             @Parameter(hidden = true)
             @CurrentUser UserPrincipal currentUser
     ) {
         Long userId = currentUser.getUserId();
         log.info("User {} withdrawing: {}", userId, request.amount());
 
-        DepositResponse response = depositService.withdraw(userId, request.amount());
+        DepositResponse response = depositService.withdraw(userId, request.amount(), request.idempotencyKey());
         return ResponseEntity.ok(response);
     }
 
@@ -91,17 +92,17 @@ public class DepositController {
     }
 
     @GetMapping("/can-participate")
-    @Operation(summary = "Проверить возможность участия в аукционе")
+    @Operation(summary = "Проверить возможность участия в аукционе (по фиксированной сумме депозита лота)")
     public ResponseEntity<ParticipationResponse> canParticipate(
-            @RequestParam(required = false) BigDecimal startingPrice,
+            @RequestParam(required = false) BigDecimal requiredDepositAmount,
             @Parameter(hidden = true)
             @CurrentUser UserPrincipal currentUser
     ) {
         Long userId = currentUser.getUserId();
         boolean canParticipate;
 
-        if (startingPrice != null) {
-            canParticipate = depositService.canParticipateInAuction(userId, startingPrice);
+        if (requiredDepositAmount != null) {
+            canParticipate = depositService.canParticipateInAuction(userId, requiredDepositAmount);
         } else {
             canParticipate = depositService.canParticipateInAuction(userId);
         }
@@ -118,7 +119,8 @@ public class DepositController {
     ) {
         BigDecimal amount = new BigDecimal(body.get("amount").toString());
         String comment = (String) body.get("comment");
-        return ResponseEntity.ok(depositService.adminAdjust(userId, amount, comment));
+        String idempotencyKey = (String) body.get("idempotencyKey");
+        return ResponseEntity.ok(depositService.adminAdjust(userId, amount, comment, idempotencyKey));
     }
 
     public record ParticipationResponse(boolean canParticipate) {}

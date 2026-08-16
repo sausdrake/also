@@ -24,6 +24,7 @@ public class AuctionMapper {
         entity.setReservePrice(domain.getReservePrice());
         entity.setBuyNowPrice(domain.getBuyNowPrice());
         entity.setMinBidStep(domain.getMinBidStep());
+        entity.setRequiredDepositAmount(domain.getRequiredDepositAmount());
         entity.setStartTime(domain.getStartTime());
         entity.setEndTime(domain.getEndTime());
         entity.setStatus(domain.getStatus());
@@ -75,6 +76,7 @@ public class AuctionMapper {
         auction.setVideoUrl(entity.getVideoUrl());
         auction.setConfirmedStart(entity.isConfirmedStart());
         auction.setConfirmationDeadline(entity.getConfirmationDeadline());
+        auction.setRequiredDepositAmount(entity.getRequiredDepositAmount());
         return auction;
     }
 }

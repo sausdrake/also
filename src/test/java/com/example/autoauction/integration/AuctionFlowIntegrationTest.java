@@ -93,6 +93,7 @@ class AuctionFlowIntegrationTest {
                 endTime,
                 sellerId
         );
+        auction.setRequiredDepositAmount(new BigDecimal("10000"));
         auction.start();
         auction = auctionRepository.save(auction);
         auctionId = auction.getId();
@@ -172,6 +173,7 @@ class AuctionFlowIntegrationTest {
                 futureStart.plusDays(7),
                 sellerId
         );
+        notStartedAuction.setRequiredDepositAmount(new BigDecimal("10000"));
         notStartedAuction = auctionRepository.save(notStartedAuction);
 
         // Покупатель с достаточным депозитом
@@ -210,6 +212,7 @@ class AuctionFlowIntegrationTest {
                 futureStart.plusDays(7),
                 sellerId
         );
+        noBuyNowAuction.setRequiredDepositAmount(new BigDecimal("10000"));
         noBuyNowAuction = auctionRepository.save(noBuyNowAuction);
 
         User buyer = new User(null, "buyer2", "buyer2@test.com", "encoded", true, Set.of(userRole));
@@ -236,6 +239,7 @@ class AuctionFlowIntegrationTest {
                 futureStart.plusDays(7),
                 sellerId
         );
+        ownAuction.setRequiredDepositAmount(new BigDecimal("10000"));
         ownAuction = auctionRepository.save(ownAuction);
 
         Auction finalOwnAuction = ownAuction;
@@ -260,6 +264,7 @@ class AuctionFlowIntegrationTest {
                 futureStart.plusDays(7),
                 sellerId
         );
+        notStartedAuction.setRequiredDepositAmount(new BigDecimal("10000"));
         notStartedAuction = auctionRepository.save(notStartedAuction);
 
         // Покупатель с нулевым депозитом

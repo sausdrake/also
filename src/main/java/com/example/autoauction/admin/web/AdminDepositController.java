@@ -50,6 +50,7 @@ public class AdminDepositController {
     ) {
         BigDecimal amount = new BigDecimal(body.get("amount").toString());
         String comment = (String) body.get("comment");
-        return ResponseEntity.ok(depositService.adminAdjust(userId, amount, comment));
+        String idempotencyKey = (String) body.get("idempotencyKey");
+        return ResponseEntity.ok(depositService.adminAdjust(userId, amount, comment, idempotencyKey));
     }
 }

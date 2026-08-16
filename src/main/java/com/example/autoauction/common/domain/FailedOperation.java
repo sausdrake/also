@@ -14,6 +14,14 @@ public class FailedOperation {
     private String status;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
+    private OffsetDateTime nextRetryAt;
+    private OffsetDateTime resolvedAt;
+
+    /** PENDING -&gt; PROCESSING -&gt; RESOLVED, or PROCESSING -&gt; PENDING (retry later) / FAILED (escalated). */
+    public static final String STATUS_PENDING = "PENDING";
+    public static final String STATUS_PROCESSING = "PROCESSING";
+    public static final String STATUS_RESOLVED = "RESOLVED";
+    public static final String STATUS_FAILED = "FAILED";
 
     public FailedOperation(String operationType, Long userId, Long auctionId,
                            String errorMessage, String stackTrace, OffsetDateTime createdAt) {
@@ -49,4 +57,8 @@ public class FailedOperation {
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public OffsetDateTime getNextRetryAt() { return nextRetryAt; }
+    public void setNextRetryAt(OffsetDateTime nextRetryAt) { this.nextRetryAt = nextRetryAt; }
+    public OffsetDateTime getResolvedAt() { return resolvedAt; }
+    public void setResolvedAt(OffsetDateTime resolvedAt) { this.resolvedAt = resolvedAt; }
 }

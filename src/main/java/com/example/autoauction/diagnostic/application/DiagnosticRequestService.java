@@ -402,6 +402,11 @@ public class DiagnosticRequestService {
         request.setUpdatedAt(OffsetDateTime.now());
         DiagnosticRequest saved = requestRepository.save(request);
 
+        // R-1.2: отклонение отчёта должно освобождать депозит заявителя точно так же, как
+        // и одобрение (approveReport) — иначе депозит остаётся замороженным навсегда без
+        // какого-либо пути освобождения.
+        depositService.unfreezeForDiagnosticRequest(request.getUserId(), requestId);
+
         if (request.getAssignedTo() != null) {
             try {
                 notificationService.send(request.getAssignedTo(), "DIAG_REPORT_REJECTED",

@@ -182,6 +182,10 @@ public class AdminAuctionService {
                 vehicle.brand(), vehicle.model(), vehicle.year(), vehicle.vin());
         auction.setVehicleInfo(vehicleInfo);
 
+        if (request.requiredDepositAmount() != null) {
+            auction.setRequiredDepositAmount(request.requiredDepositAmount());
+        }
+
         if (request.mainPhotoUrl() != null) {
             auction.setMainPhotoUrl(request.mainPhotoUrl());
         }
@@ -262,14 +266,17 @@ public class AdminAuctionService {
                 });
 
         log.debug("Текущий статус аукциона: {}", auction.getStatus());
-        auction.cancel();
+
+        if (auction.isFinished()) {
+            throw new IllegalStateException(
+                    String.format("Невозможно отменить аукцион в статусе '%s'. Только аукционы со статусами 'CREATED' или 'ACTIVE' могут быть отменены",
+                            auction.getStatus()));
+        }
+
+        auctionFinalizer.cancelAuction(auction);
         log.info("Аукцион отменен, новый статус: {}", auction.getStatus());
 
-        Auction saved = auctionRepository.save(auction);
-        if (saved == null) {
-            throw new IllegalStateException("Не удалось сохранить аукцион после отмены");
-        }
-        return AuctionResponse.fromDomain(saved);
+        return AuctionResponse.fromDomain(auction);
     }
 
     // Обновлённый метод с пагинацией

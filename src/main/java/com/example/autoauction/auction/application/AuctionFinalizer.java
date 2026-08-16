@@ -182,6 +182,46 @@ public class AuctionFinalizer {
     }
 
     @Transactional
+    public boolean cancelAuction(Auction auction) {
+        if (auction.isFinished()) {
+            log.debug("Auction {} is already finished with status {}, skipping cancellation", auction.getId(), auction.getStatus());
+            return false;
+        }
+
+        log.info("Cancelling auction {} (vehicle {})", auction.getId(), auction.getVehicleId());
+
+        List<Long> participants = participantRepository.getParticipants(auction.getId());
+        for (Long participantId : participants) {
+            unfreezeDepositSafely(participantId, auction.getId());
+        }
+
+        auction.cancel();
+        auctionRepository.save(auction);
+        participantRepository.clearParticipants(auction.getId());
+
+        try {
+            webSocketController.sendAuctionEnded(auction.getId(), null, null);
+        } catch (Exception e) {
+            log.warn("Failed to send WebSocket notification for cancelled auction {}: {}", auction.getId(), e.getMessage());
+        }
+
+        for (Long participantId : participants) {
+            try {
+                notificationService.send(participantId, "AUCTION_CANCELLED",
+                        "Аукцион отменён",
+                        String.format("Аукцион \"%s\" был отменён администратором. Ваши средства разблокированы.",
+                                auction.getVehicleInfo()),
+                        auction.getId(), "AUCTION");
+            } catch (Exception e) {
+                log.warn("Failed to send AUCTION_CANCELLED to user {}: {}", participantId, e.getMessage());
+            }
+        }
+
+        log.info("Auction {} cancelled, {} participant(s) unfrozen", auction.getId(), participants.size());
+        return true;
+    }
+
+    @Transactional
     public boolean finalizeAuctionById(Long auctionId) {
         Auction auction = auctionRepository.findByIdWithLock(auctionId)
                 .orElseThrow(() -> new IllegalArgumentException("Auction not found: " + auctionId));

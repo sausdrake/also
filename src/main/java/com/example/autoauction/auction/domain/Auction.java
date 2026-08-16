@@ -5,6 +5,7 @@ import com.example.autoauction.config.AuctionExtensionProperties;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.Objects;
@@ -20,6 +21,15 @@ public class Auction {
     private BigDecimal reservePrice;
     private BigDecimal buyNowPrice;
     private BigDecimal minBidStep;
+
+    /**
+     * Фиксированная сумма депозита, требуемая для участия в ЭТОМ аукционе, задаётся
+     * администратором индивидуально для каждого лота (НЕ процент от startingPrice).
+     * Nullable для обратной совместимости с уже существующими записями аукционов,
+     * созданными до введения этого поля — для таких записей ставки/Buy Now блокируются
+     * явной ошибкой (см. BidService), а не тихим fallback-расчётом.
+     */
+    private BigDecimal requiredDepositAmount;
 
     private OffsetDateTime startTime;
     private OffsetDateTime endTime;
@@ -159,6 +169,7 @@ public class Auction {
     public BigDecimal getReservePrice() { return reservePrice; }
     public BigDecimal getBuyNowPrice() { return buyNowPrice; }
     public BigDecimal getMinBidStep() { return minBidStep; }
+    public BigDecimal getRequiredDepositAmount() { return requiredDepositAmount; }
     public OffsetDateTime getStartTime() { return startTime; }
     public OffsetDateTime getEndTime() { return endTime; }
     public AuctionStatus getStatus() { return status; }
@@ -237,6 +248,28 @@ public class Auction {
 
     public void setVersion(Long version) {
         this.version = version;
+    }
+
+    /**
+     * Плоский сеттер значения без бизнес-guard'а — как и другие сеттеры этого класса
+     * (setStatus, setTotalBids), используется как для реконструкции из БД (AuctionMapper),
+     * так и для установки при создании (AdminAuctionService). В этом кодбейзе нет
+     * endpoint'а редактирования аукциона, поэтому единственный вызывающий бизнес-код —
+     * создание нового аукциона (totalBids=0, участников нет). Если в будущем появится
+     * возможность редактировать существующий аукцион, вызывающий код ОБЯЗАН сам проверить
+     * !auction.isFinished() && (auction.getTotalBids() == null || auction.getTotalBids() == 0)
+     * перед вызовом этого метода на уже персистентном аукционе — иначе можно изменить
+     * требуемый депозит уже после того, как участники заморозили деньги под старую сумму.
+     */
+    public void setRequiredDepositAmount(BigDecimal requiredDepositAmount) {
+        if (requiredDepositAmount != null) {
+            if (requiredDepositAmount.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalArgumentException("Требуемый депозит должен быть больше 0");
+            }
+            requiredDepositAmount = requiredDepositAmount.setScale(2, RoundingMode.HALF_UP);
+        }
+        this.requiredDepositAmount = requiredDepositAmount;
+        this.updatedAt = now();
     }
 
     public void setClock(Clock clock) {

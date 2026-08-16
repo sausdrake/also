@@ -332,4 +332,111 @@ class DiagnosticRequestServiceTest {
             assertThat(response.getUserName()).isEqualTo("requester");
         }
     }
+
+    // R-1.2: rejectReport() must unfreeze the applicant's deposit exactly like
+    // approveReport() already does - otherwise the deposit is permanently stranded.
+    @Nested
+    @DisplayName("Отклонение отчёта (R-1.2)")
+    class RejectReportTests {
+
+        private final Long adminId = 999L;
+
+        private DiagnosticRequest completedRequest() {
+            DiagnosticRequest r = new DiagnosticRequest();
+            r.setId(requestId);
+            r.setUserId(userId);
+            r.setBrand("BMW");
+            r.setModel("X5");
+            r.setYear(2022);
+            r.setVin("WBSDE91070CZ12345");
+            r.setDepositFrozen(new BigDecimal("10000"));
+            r.setStatus(DiagnosticRequest.DiagnosticRequestStatus.COMPLETED);
+            r.setCreatedAt(OffsetDateTime.now());
+            r.setUpdatedAt(OffsetDateTime.now());
+            return r;
+        }
+
+        @Test
+        @DisplayName("1. rejectReport размораживает депозит заявителя")
+        void rejectReport_UnfreezesDeposit() {
+            DiagnosticRequest completed = completedRequest();
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(completed));
+            when(requestRepository.save(any(DiagnosticRequest.class))).thenAnswer(i -> i.getArgument(0));
+
+            requestService.rejectReport(requestId, adminId, "Недостаточно фотографий");
+
+            verify(depositService, times(1)).unfreezeForDiagnosticRequest(userId, requestId);
+        }
+
+        @Test
+        @DisplayName("2/3. Разморозка выполняется через DepositService.unfreezeForDiagnosticRequest " +
+                "(единственный легитимный механизм создания UNBLOCK-транзакции и удаления FrozenDeposit " +
+                "- см. DepositServiceTest/DepositServiceWithFrozenStorageTest, где эти инварианты уже " +
+                "проверены для самого unfreezeForDiagnosticRequest; здесь проверяется, что rejectReport " +
+                "действительно его вызывает и не мутирует депозит напрямую)")
+        void rejectReport_DelegatesToUnfreezeMechanism_DoesNotMutateDepositDirectly() {
+            DiagnosticRequest completed = completedRequest();
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(completed));
+            when(requestRepository.save(any(DiagnosticRequest.class))).thenAnswer(i -> i.getArgument(0));
+
+            requestService.rejectReport(requestId, adminId, "Недостаточно фотографий");
+
+            // DiagnosticRequestService must never touch Deposit/DepositRepository directly -
+            // all financial mutation stays inside DepositService.
+            verify(depositService, times(1)).unfreezeForDiagnosticRequest(anyLong(), anyLong());
+            verifyNoMoreInteractions(depositService);
+        }
+
+        @Test
+        @DisplayName("4. Повторное отклонение уже отклонённого отчёта — блокируется существующим " +
+                "guard'ом жизненного цикла (статус уже не COMPLETED), депозит не размораживается повторно")
+        void rejectReport_AlreadyRejected_BlockedByLifecycleGuard_NoDoubleUnfreeze() {
+            DiagnosticRequest alreadyRejected = completedRequest();
+            alreadyRejected.setStatus(DiagnosticRequest.DiagnosticRequestStatus.REJECTED);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(alreadyRejected));
+
+            assertThatThrownBy(() -> requestService.rejectReport(requestId, adminId, "повтор"))
+                    .isInstanceOf(IllegalStateException.class);
+
+            verifyNoInteractions(depositService);
+        }
+
+        @Test
+        @DisplayName("5. Сбой при размораживании — исключение пробрасывается наружу (откатывает всю " +
+                "транзакцию rejectReport целиком), не оставляя отчёт REJECTED с фактически ещё " +
+                "замороженным депозитом")
+        void rejectReport_UnfreezeFailure_PropagatesAndDoesNotSilentlyMarkRejected() {
+            DiagnosticRequest completed = completedRequest();
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(completed));
+            when(requestRepository.save(any(DiagnosticRequest.class))).thenAnswer(i -> i.getArgument(0));
+            doThrow(new IllegalStateException("DB unavailable"))
+                    .when(depositService).unfreezeForDiagnosticRequest(userId, requestId);
+
+            assertThatThrownBy(() -> requestService.rejectReport(requestId, adminId, "причина"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("DB unavailable");
+        }
+
+        @Test
+        @DisplayName("Пустая причина отклонения — IllegalArgumentException, депозит не трогается")
+        void rejectReport_BlankReason_ThrowsBeforeAnyMutation() {
+            assertThatThrownBy(() -> requestService.rejectReport(requestId, adminId, "  "))
+                    .isInstanceOf(IllegalArgumentException.class);
+
+            verifyNoInteractions(depositService);
+        }
+
+        @Test
+        @DisplayName("Можно отклонить только отчёт в статусе COMPLETED")
+        void rejectReport_WrongStatus_ThrowsBeforeUnfreeze() {
+            DiagnosticRequest pending = completedRequest();
+            pending.setStatus(DiagnosticRequest.DiagnosticRequestStatus.PENDING);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(pending));
+
+            assertThatThrownBy(() -> requestService.rejectReport(requestId, adminId, "причина"))
+                    .isInstanceOf(IllegalStateException.class);
+
+            verifyNoInteractions(depositService);
+        }
+    }
 }

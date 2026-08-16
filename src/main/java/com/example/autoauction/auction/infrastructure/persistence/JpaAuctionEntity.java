@@ -37,6 +37,9 @@ public class JpaAuctionEntity {
     @Column(name = "min_bid_step", nullable = false, precision = 10, scale = 2)
     private BigDecimal minBidStep;
 
+    @Column(name = "required_deposit_amount", precision = 10, scale = 2)
+    private BigDecimal requiredDepositAmount;
+
     @Column(name = "start_time", nullable = false)
     private OffsetDateTime startTime;
 
@@ -116,6 +119,9 @@ public class JpaAuctionEntity {
 
     public BigDecimal getMinBidStep() { return minBidStep; }
     public void setMinBidStep(BigDecimal minBidStep) { this.minBidStep = minBidStep; }
+
+    public BigDecimal getRequiredDepositAmount() { return requiredDepositAmount; }
+    public void setRequiredDepositAmount(BigDecimal requiredDepositAmount) { this.requiredDepositAmount = requiredDepositAmount; }
 
     public OffsetDateTime getStartTime() { return startTime; }
     public void setStartTime(OffsetDateTime startTime) { this.startTime = startTime; }

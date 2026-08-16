@@ -2249,6 +2249,11 @@ function DepositsPage() {
   const [adjustTarget, setAdjustTarget] = useState<DepositItem | null>(null);
   const [adjustAmount, setAdjustAmount] = useState('');
   const [adjustComment, setAdjustComment] = useState('');
+  // Generated once when the modal opens for a given target, reused across retries of the
+  // same submit attempt (e.g. after a network error) so the backend's idempotency check
+  // actually protects against double-submission. A fresh key is only generated when a new
+  // adjustment is started (modal re-opened), never per HTTP request.
+  const [adjustKey, setAdjustKey] = useState('');
   const [txTarget, setTxTarget]   = useState<DepositItem | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [txLoading, setTxLoading] = useState(false);
@@ -2291,7 +2296,8 @@ function DepositsPage() {
     const amount = parseFloat(adjustAmount);
     if (isNaN(amount)) { notify('Некорректная сумма', true); return; }
     try {
-      await api.post(`/admin/deposits/${adjustTarget.userId}/adjust`, { amount, comment: adjustComment.trim() });
+      await api.post(`/admin/deposits/${adjustTarget.userId}/adjust`,
+        { amount, comment: adjustComment.trim(), idempotencyKey: adjustKey });
       notify(`Депозит скорректирован на ${amount > 0 ? '+' : ''}${amount} сом`);
       setAdjustTarget(null); setAdjustAmount(''); setAdjustComment(''); load();
     } catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); }
@@ -2449,7 +2455,7 @@ function DepositsPage() {
                           className="text-xs px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">
                           История
                         </button>
-                        <button onClick={() => { setAdjustTarget(d); setAdjustAmount(''); setAdjustComment(''); }}
+                        <button onClick={() => { setAdjustTarget(d); setAdjustAmount(''); setAdjustComment(''); setAdjustKey(crypto.randomUUID()); }}
                           className="text-xs px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium">
                           Корректировать
                         </button>

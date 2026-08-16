@@ -1,0 +1,14 @@
+-- D-2: fixed, admin-configured, per-auction deposit amount (replaces the removed 1%-of-
+-- starting-price formula). The amount belongs to the auction/lot, not to a global setting
+-- and not to the user's Deposit.
+--
+-- Nullable by design: existing auction rows predate this field and must not receive an
+-- invented default value. BidService explicitly rejects bidding/Buy Now on any auction
+-- where required_deposit_amount IS NULL (fail-closed), rather than falling back to any
+-- calculation. There is no auction-edit endpoint in this codebase, so this column is only
+-- ever written once, at creation time, before any bid/participant can exist for that
+-- auction row.
+--
+-- Precision/scale matches the sibling price columns on this same table (starting_price,
+-- reserve_price, buy_now_price, min_bid_step all use NUMERIC(10,2)).
+ALTER TABLE auctions ADD COLUMN required_deposit_amount NUMERIC(10,2);

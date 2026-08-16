@@ -46,7 +46,7 @@ public class DepositMapper {
     public JpaDepositTransactionEntity toEntity(DepositTransaction domain) {
         if (domain == null) return null;
 
-        return new JpaDepositTransactionEntity(
+        JpaDepositTransactionEntity entity = new JpaDepositTransactionEntity(
                 domain.getDepositId(),
                 domain.getUserId(),
                 domain.getAuctionId(),
@@ -57,6 +57,8 @@ public class DepositMapper {
                 domain.getReference(),
                 domain.getDescription()
         );
+        entity.setIdempotencyKey(domain.getIdempotencyKey());
+        return entity;
     }
 
     public DepositTransaction toDomain(JpaDepositTransactionEntity entity) {
@@ -74,6 +76,7 @@ public class DepositMapper {
         );
         transaction.setId(entity.getId());
         transaction.setAuctionId(entity.getAuctionId());
+        transaction.setIdempotencyKey(entity.getIdempotencyKey());
         transaction.setCreatedAt(entity.getCreatedAt());
 
         return transaction;

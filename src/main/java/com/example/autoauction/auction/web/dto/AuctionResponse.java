@@ -71,8 +71,28 @@ public record AuctionResponse(
         String videoUrl,
 
         @Schema(description = "Количество продлений аукциона")
-        int extensionCount
+        int extensionCount,
+
+        @Schema(description = "Требуемая фиксированная сумма депозита для участия в этом аукционе " +
+                "(задаётся администратором индивидуально для лота); null, если ещё не настроена", example = "10000")
+        BigDecimal requiredDepositAmount
 ) {
+    /**
+     * Обратно-совместимый конструктор для существующего кода/тестов, построенных до
+     * появления requiredDepositAmount.
+     */
+    public AuctionResponse(Long id, Long vehicleId, String vehicleInfo, BigDecimal startingPrice,
+                            BigDecimal currentPrice, BigDecimal reservePrice, BigDecimal buyNowPrice,
+                            BigDecimal minBidStep, OffsetDateTime startTime, OffsetDateTime endTime,
+                            AuctionStatus status, Integer totalBids, Long winnerId, BigDecimal winningBid,
+                            Long createdBy, OffsetDateTime createdAt, boolean confirmedStart,
+                            String mainPhotoUrl, String additionalPhotoUrls, String videoUrl,
+                            int extensionCount) {
+        this(id, vehicleId, vehicleInfo, startingPrice, currentPrice, reservePrice, buyNowPrice,
+                minBidStep, startTime, endTime, status, totalBids, winnerId, winningBid, createdBy,
+                createdAt, confirmedStart, mainPhotoUrl, additionalPhotoUrls, videoUrl, extensionCount, null);
+    }
+
     public static AuctionResponse fromDomain(Auction auction) {
         return new AuctionResponse(
                 auction.getId(),
@@ -95,7 +115,8 @@ public record AuctionResponse(
                 auction.getMainPhotoUrl(),
                 auction.getAdditionalPhotoUrls(),
                 auction.getVideoUrl(),
-                auction.getExtensionCount()
+                auction.getExtensionCount(),
+                auction.getRequiredDepositAmount()
         );
     }
 }

@@ -1,5 +1,6 @@
 package com.example.autoauction.admin.application;
 
+import com.example.autoauction.auction.application.AuctionFinalizer;
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
@@ -55,6 +56,9 @@ class AdminAuctionServiceTest {
 
     @Mock
     private AuctionValidator auctionValidator;
+
+    @Mock
+    private AuctionFinalizer auctionFinalizer;
 
     @InjectMocks
     private AdminAuctionService adminAuctionService;
@@ -423,11 +427,15 @@ class AdminAuctionServiceTest {
         }
 
         @Test
-        @DisplayName("Отмена созданного аукциона")
+        @DisplayName("Отмена созданного аукциона — делегируется AuctionFinalizer (разморозка депозитов)")
         void cancelAuction_WhenCreated_ShouldSucceed() {
             // given
             when(auctionRepository.findByIdWithLock(1L)).thenReturn(Optional.of(auction));
-            when(auctionRepository.save(any(Auction.class))).thenReturn(auction);
+            when(auctionFinalizer.cancelAuction(any(Auction.class))).thenAnswer(inv -> {
+                Auction a = inv.getArgument(0);
+                a.cancel();
+                return true;
+            });
 
             // when
             AuctionResponse response = adminAuctionService.cancelAuction(1L, adminId);
@@ -435,16 +443,20 @@ class AdminAuctionServiceTest {
             // then
             assertEquals(AuctionStatus.CANCELLED, response.status());
             verify(auctionRepository, times(1)).findByIdWithLock(1L);
-            verify(auctionRepository, times(1)).save(any(Auction.class));
+            verify(auctionFinalizer, times(1)).cancelAuction(auction);
         }
 
         @Test
-        @DisplayName("Отмена активного аукциона")
+        @DisplayName("Отмена активного аукциона — делегируется AuctionFinalizer (разморозка депозитов)")
         void cancelAuction_WhenActive_ShouldSucceed() {
             // given
             auction.start();
             when(auctionRepository.findByIdWithLock(1L)).thenReturn(Optional.of(auction));
-            when(auctionRepository.save(any(Auction.class))).thenReturn(auction);
+            when(auctionFinalizer.cancelAuction(any(Auction.class))).thenAnswer(inv -> {
+                Auction a = inv.getArgument(0);
+                a.cancel();
+                return true;
+            });
 
             // when
             AuctionResponse response = adminAuctionService.cancelAuction(1L, adminId);
@@ -452,7 +464,27 @@ class AdminAuctionServiceTest {
             // then
             assertEquals(AuctionStatus.CANCELLED, response.status());
             verify(auctionRepository, times(1)).findByIdWithLock(1L);
-            verify(auctionRepository, times(1)).save(any(Auction.class));
+            verify(auctionFinalizer, times(1)).cancelAuction(auction);
+        }
+
+        @Test
+        @DisplayName("D-1: отмена активного аукциона со ставками передаёт живой объект в AuctionFinalizer.cancelAuction (не голое auction.cancel())")
+        void cancelAuction_WhenActiveWithBids_DelegatesToFinalizerNotBareCancel() {
+            // given: ранее cancelAuction() вызывал только auction.cancel()+save(), не размораживая
+            // депозиты участников. Регрессия должна гарантировать делегирование в AuctionFinalizer,
+            // единственное место, где реализована разморозка всех участников при отмене.
+            auction.start();
+            auction.setTotalBids(3);
+            when(auctionRepository.findByIdWithLock(1L)).thenReturn(Optional.of(auction));
+            when(auctionFinalizer.cancelAuction(auction)).thenReturn(true);
+
+            // when
+            adminAuctionService.cancelAuction(1L, adminId);
+
+            // then: AdminAuctionService больше не отменяет и не сохраняет аукцион напрямую -
+            // это делегировано AuctionFinalizer, которое отвечает за разморозку депозитов.
+            verify(auctionFinalizer, times(1)).cancelAuction(auction);
+            verify(auctionRepository, never()).save(any(Auction.class));
         }
 
         @ParameterizedTest
@@ -468,6 +500,7 @@ class AdminAuctionServiceTest {
                     adminAuctionService.cancelAuction(1L, adminId)
             );
             verify(auctionRepository, never()).save(any(Auction.class));
+            verify(auctionFinalizer, never()).cancelAuction(any());
         }
 
         @Test

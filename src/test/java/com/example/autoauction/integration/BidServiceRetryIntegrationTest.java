@@ -75,6 +75,7 @@ class BidServiceRetryIntegrationTest {
                 now.plusDays(7),
                 sellerId
         );
+        auction.setRequiredDepositAmount(new BigDecimal("10000"));
         auction.start();
         auction = auctionRepository.save(auction);
         auctionId = auction.getId();

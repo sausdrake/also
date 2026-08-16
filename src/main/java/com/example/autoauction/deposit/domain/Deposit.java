@@ -1,7 +1,6 @@
 package com.example.autoauction.deposit.domain;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 
 public class Deposit {
@@ -42,21 +41,8 @@ public class Deposit {
     public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
     public void setVersion(Long version) { this.version = version; }
 
-    public static BigDecimal calculateRequiredDeposit(BigDecimal startingPrice) {
-        if (startingPrice == null || startingPrice.compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO;
-        }
-        return startingPrice.multiply(new BigDecimal("0.01"))
-                .setScale(2, RoundingMode.HALF_UP);
-    }
-
     public BigDecimal getAvailableBalance() {
         return balance.subtract(blockedAmount);
-    }
-
-    public boolean canParticipateInAuction(BigDecimal auctionStartingPrice) {
-        BigDecimal required = calculateRequiredDeposit(auctionStartingPrice);
-        return getAvailableBalance().compareTo(required) >= 0;
     }
 
     public void freezeForAuction(BigDecimal requiredAmount) {

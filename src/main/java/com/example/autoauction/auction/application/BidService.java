@@ -8,7 +8,6 @@ import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.auction.web.AuctionWebSocketController;
 import com.example.autoauction.auction.web.dto.BidResponse;
 import com.example.autoauction.deposit.application.DepositService;
-import com.example.autoauction.deposit.domain.Deposit;
 import com.example.autoauction.notification.application.NotificationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -91,16 +90,21 @@ public class BidService {
             throw new IllegalArgumentException("Нельзя купить собственный автомобиль");
         }
 
-        BigDecimal requiredDeposit = Deposit.calculateRequiredDeposit(auction.getStartingPrice());
-        if (!depositService.canParticipateInAuction(buyerId, auction.getStartingPrice())) {
+        BigDecimal requiredDeposit = auction.getRequiredDepositAmount();
+        if (requiredDeposit == null) {
+            log.error("Auction {} has no requiredDepositAmount configured, rejecting Buy Now", auctionId);
+            throw new IllegalStateException(
+                    "Для этого аукциона не настроен размер депозита. Обратитесь к администратору.");
+        }
+        if (!depositService.canParticipateInAuction(buyerId, requiredDeposit)) {
             log.warn("User {} has insufficient deposit for Buy Now. Required: {}", buyerId, requiredDeposit);
             throw new IllegalArgumentException(
-                    String.format("Недостаточно средств на депозите для Buy Now. Требуется: %s (1%% от стартовой цены %s)",
-                            requiredDeposit, auction.getStartingPrice())
+                    String.format("Недостаточно средств на депозите для Buy Now. Требуется: %s",
+                            requiredDeposit)
             );
         }
 
-        depositService.freezeForAuction(buyerId, auctionId, auction.getStartingPrice());
+        depositService.freezeForAuction(buyerId, auctionId, requiredDeposit);
         log.info("Deposit frozen for user {} on auction {}", buyerId, auctionId);
 
         participantRepository.registerParticipant(auctionId, buyerId, requiredDeposit);
@@ -170,18 +174,23 @@ public class BidService {
         boolean wasAuctionExtended = false;
 
         if (!isExistingParticipant) {
-            BigDecimal requiredDeposit = Deposit.calculateRequiredDeposit(auction.getStartingPrice());
+            BigDecimal requiredDeposit = auction.getRequiredDepositAmount();
+            if (requiredDeposit == null) {
+                log.error("Auction {} has no requiredDepositAmount configured, rejecting bid", auctionId);
+                throw new IllegalStateException(
+                        "Для этого аукциона не настроен размер депозита. Обратитесь к администратору.");
+            }
 
-            if (!depositService.canParticipateInAuction(bidderId, auction.getStartingPrice())) {
+            if (!depositService.canParticipateInAuction(bidderId, requiredDeposit)) {
                 log.warn("User {} has insufficient deposit. Required: {}", bidderId, requiredDeposit);
                 throw new IllegalArgumentException(
-                        String.format("Недостаточно средств на депозите. Требуется: %s (1%% от стартовой цены %s)",
-                                requiredDeposit, auction.getStartingPrice())
+                        String.format("Недостаточно средств на депозите. Требуется: %s",
+                                requiredDeposit)
                 );
             }
 
             try {
-                depositService.freezeForAuction(bidderId, auctionId, auction.getStartingPrice());
+                depositService.freezeForAuction(bidderId, auctionId, requiredDeposit);
                 log.info("Deposit frozen for user {} on auction {}", bidderId, auctionId);
             } catch (Exception e) {
                 log.error("Failed to freeze deposit for user {} on auction {}: {}",

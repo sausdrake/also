@@ -27,6 +27,7 @@ public interface DepositRepository {
             java.time.OffsetDateTime to);
     List<DepositTransaction> findTransactionsByDepositId(Long depositId);
     List<DepositTransaction> findTransactionsByAuctionId(Long auctionId);
+    Optional<DepositTransaction> findTransactionByIdempotencyKey(String idempotencyKey);
 
     // НОВЫЕ МЕТОДЫ для работы с frozen deposits
     void freezeForAuction(Long depositId, Long auctionId, java.math.BigDecimal amount, FreezeReason reason);
@@ -35,5 +36,7 @@ public interface DepositRepository {
     List<FrozenDeposit> getFrozenDepositsByDepositId(Long depositId);
     List<FrozenDeposit> getFrozenDepositsByAuctionId(Long auctionId);
     boolean isFrozenForAuction(Long depositId, Long auctionId);
+    /** True if a frozen record exists for this (depositId, auctionId) and is NOT yet marked winner. */
+    boolean needsWinnerMark(Long depositId, Long auctionId);
     void clearFrozenForAuction(Long auctionId);
 }

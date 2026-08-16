@@ -101,6 +101,12 @@ public class JpaDepositRepositoryAdapter implements DepositRepository {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<DepositTransaction> findTransactionByIdempotencyKey(String idempotencyKey) {
+        return transactionJpaRepository.findByIdempotencyKey(idempotencyKey).map(mapper::toDomain);
+    }
+
     // НОВЫЕ МЕТОДЫ
     @Override
     public void freezeForAuction(Long depositId, Long auctionId, java.math.BigDecimal amount, FreezeReason reason) {
@@ -122,8 +128,8 @@ public class JpaDepositRepositoryAdapter implements DepositRepository {
 
     @Override
     public void markFrozenAsWinner(Long depositId, Long auctionId) {
-        frozenJpaRepository.markAsWinner(depositId, auctionId);
-        log.debug("Marked deposit {} as winner for auction {}", depositId, auctionId);
+        int updated = frozenJpaRepository.markAsWinner(depositId, auctionId);
+        log.debug("Marked deposit {} as winner for auction {} (rows updated: {})", depositId, auctionId, updated);
     }
 
     @Override
@@ -146,6 +152,12 @@ public class JpaDepositRepositoryAdapter implements DepositRepository {
     @Transactional(readOnly = true)
     public boolean isFrozenForAuction(Long depositId, Long auctionId) {
         return frozenJpaRepository.existsByDepositIdAndAuctionId(depositId, auctionId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean needsWinnerMark(Long depositId, Long auctionId) {
+        return frozenJpaRepository.existsByDepositIdAndAuctionIdAndIsWinnerFalse(depositId, auctionId);
     }
 
     @Override

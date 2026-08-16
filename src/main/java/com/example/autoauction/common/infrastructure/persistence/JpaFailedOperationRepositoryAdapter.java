@@ -6,6 +6,7 @@ import com.example.autoauction.common.domain.port.FailedOperationRepository;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -40,13 +41,38 @@ public class JpaFailedOperationRepositoryAdapter implements FailedOperationRepos
     }
 
     @Override
+    public List<FailedOperation> findAll() {
+        return jpaRepository.findAll().stream()
+                .map(this::toDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
     }
 
+    @Override
+    public List<FailedOperation> findRetryablePending(OffsetDateTime now) {
+        return jpaRepository.findRetryablePending(FailedOperation.STATUS_PENDING, now).stream()
+                .map(this::toDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public boolean claim(Long id) {
+        int updated = jpaRepository.claim(id, FailedOperation.STATUS_PENDING, FailedOperation.STATUS_PROCESSING,
+                OffsetDateTime.now());
+        return updated > 0;
+    }
+
     private JpaFailedOperationEntity toEntity(FailedOperation domain) {
         if (domain == null) return null;
-        return new JpaFailedOperationEntity(
+        // R-2: previously this constructed a brand-new entity and never carried the id
+        // across, so save() always INSERTed a new row and could never update an existing
+        // one - there was no way to persist a status/retryCount transition at all. Now
+        // carries the full current state so an existing id performs a genuine UPDATE.
+        JpaFailedOperationEntity entity = new JpaFailedOperationEntity(
                 domain.getOperationType(),
                 domain.getUserId(),
                 domain.getAuctionId(),
@@ -54,6 +80,13 @@ public class JpaFailedOperationRepositoryAdapter implements FailedOperationRepos
                 domain.getStackTrace(),
                 domain.getCreatedAt()
         );
+        entity.setId(domain.getId());
+        entity.setRetryCount(domain.getRetryCount());
+        entity.setStatus(domain.getStatus());
+        entity.setUpdatedAt(domain.getUpdatedAt());
+        entity.setNextRetryAt(domain.getNextRetryAt());
+        entity.setResolvedAt(domain.getResolvedAt());
+        return entity;
     }
 
     private FailedOperation toDomain(JpaFailedOperationEntity entity) {
@@ -70,6 +103,8 @@ public class JpaFailedOperationRepositoryAdapter implements FailedOperationRepos
         operation.setRetryCount(entity.getRetryCount());
         operation.setStatus(entity.getStatus());
         operation.setUpdatedAt(entity.getUpdatedAt());
+        operation.setNextRetryAt(entity.getNextRetryAt());
+        operation.setResolvedAt(entity.getResolvedAt());
         return operation;
     }
 }

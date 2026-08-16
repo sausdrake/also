@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { useAuthStore } from '../store/authStore';
@@ -26,6 +26,17 @@ function DepositTab() {
   const [topUpAmount, setTopUpAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [msg, setMsg] = useState<{ text: string; ok: boolean }>({ text: '', ok: true });
+  // Stable idempotency key for the withdrawal currently being attempted: generated once
+  // for a given amount and reused on retry (e.g. after a network error) so the backend's
+  // idempotency check protects against double-withdrawal. Regenerated only when the amount
+  // field changes, i.e. a genuinely new withdrawal attempt.
+  const withdrawKeyRef = useRef<{ amount: string; key: string } | null>(null);
+  const getWithdrawKey = (amount: string): string => {
+    if (withdrawKeyRef.current?.amount !== amount) {
+      withdrawKeyRef.current = { amount, key: crypto.randomUUID() };
+    }
+    return withdrawKeyRef.current.key;
+  };
 
   const reloadTransactions = () => api.get('/deposits/my/transactions').then(r => setTransactions(r.data)).catch(() => {});
 
@@ -63,9 +74,11 @@ function DepositTab() {
     const err = validateAmount(withdrawAmount, avail);
     if (err) { showMsg(err, false); return; }
     try {
-      await api.post('/deposits/withdraw', { amount: parseFloat(withdrawAmount) });
+      await api.post('/deposits/withdraw',
+        { amount: parseFloat(withdrawAmount), idempotencyKey: getWithdrawKey(withdrawAmount) });
       showMsg('Средства выведены');
       setWithdrawAmount('');
+      withdrawKeyRef.current = null;
       fetchDeposit();
       reloadTransactions();
     } catch (e: any) {

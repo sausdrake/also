@@ -63,6 +63,7 @@ class BidServiceTest {
     private final Long nonExistentAuctionId = 999L;
 
     private final BigDecimal startingPrice = new BigDecimal("1000000");
+    private final BigDecimal requiredDeposit = new BigDecimal("10000.00");
     private final BigDecimal minBidStep = new BigDecimal("10000");
     private final BigDecimal reservePrice = new BigDecimal("1200000");
     private final BigDecimal buyNowPrice = new BigDecimal("1500000");
@@ -90,6 +91,7 @@ class BidServiceTest {
         activeAuction.setCurrentPrice(startingPrice);
         activeAuction.setTotalBids(0);
         activeAuction.setVersion(0L);
+        activeAuction.setRequiredDepositAmount(requiredDeposit);
 
         // Созданный (ещё не активный) аукцион
         createdAuction = new Auction(
@@ -98,6 +100,7 @@ class BidServiceTest {
         );
         createdAuction.setId(2L);
         createdAuction.setStatus(AuctionStatus.CREATED);
+        createdAuction.setRequiredDepositAmount(requiredDeposit);
 
         // Завершённый аукцион
         completedAuction = new Auction(
@@ -133,8 +136,8 @@ class BidServiceTest {
             // given
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
-            when(depositService.canParticipateInAuction(bidderId1, startingPrice)).thenReturn(true);
-            doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, startingPrice);
+            when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
+            doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, requiredDeposit);
             when(participantRepository.isParticipant(auctionId, bidderId1)).thenReturn(false);
             doNothing().when(participantRepository).registerParticipant(eq(auctionId), eq(bidderId1), any(BigDecimal.class));
             when(auctionRepository.save(any(Auction.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -151,8 +154,8 @@ class BidServiceTest {
             assertEquals(AuctionStatus.ACTIVE, response.status());
 
             verify(rateLimitService, times(1)).tryAcquire(bidderId1);
-            verify(depositService, times(1)).canParticipateInAuction(bidderId1, startingPrice);
-            verify(depositService, times(1)).freezeForAuction(bidderId1, auctionId, startingPrice);
+            verify(depositService, times(1)).canParticipateInAuction(bidderId1, requiredDeposit);
+            verify(depositService, times(1)).freezeForAuction(bidderId1, auctionId, requiredDeposit);
             verify(participantRepository, times(1)).registerParticipant(eq(auctionId), eq(bidderId1), any(BigDecimal.class));
             verify(auctionRepository, times(1)).save(any(Auction.class));
         }
@@ -163,8 +166,8 @@ class BidServiceTest {
             // given
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
-            when(depositService.canParticipateInAuction(bidderId1, startingPrice)).thenReturn(true);
-            doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, startingPrice);
+            when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
+            doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, requiredDeposit);
             when(participantRepository.isParticipant(auctionId, bidderId1))
                     .thenReturn(false)   // первый вызов
                     .thenReturn(true);   // второй вызов (уже участник)
@@ -187,7 +190,7 @@ class BidServiceTest {
             assertEquals(2, response.totalBids());
 
             verify(participantRepository, times(1)).registerParticipant(eq(auctionId), eq(bidderId1), any(BigDecimal.class));
-            verify(depositService, times(1)).freezeForAuction(bidderId1, auctionId, startingPrice);
+            verify(depositService, times(1)).freezeForAuction(bidderId1, auctionId, requiredDeposit);
         }
 
         @Test
@@ -196,8 +199,8 @@ class BidServiceTest {
             // given
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
-            when(depositService.canParticipateInAuction(bidderId1, startingPrice)).thenReturn(true);
-            doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, startingPrice);
+            when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
+            doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, requiredDeposit);
             when(participantRepository.isParticipant(auctionId, bidderId1)).thenReturn(false);
             doNothing().when(participantRepository).registerParticipant(eq(auctionId), eq(bidderId1), any(BigDecimal.class));
             when(auctionRepository.save(any(Auction.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -256,8 +259,8 @@ class BidServiceTest {
         void placeBid_BidTooLow_ThrowsException() {
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
-            when(depositService.canParticipateInAuction(bidderId1, startingPrice)).thenReturn(true);
-            doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, startingPrice);
+            when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
+            doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, requiredDeposit);
             when(participantRepository.isParticipant(auctionId, bidderId1)).thenReturn(false);
 
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
@@ -272,7 +275,7 @@ class BidServiceTest {
         void placeBid_InsufficientDeposit_ThrowsException() {
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
-            when(depositService.canParticipateInAuction(bidderId1, startingPrice)).thenReturn(false);
+            when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(false);
             when(participantRepository.isParticipant(auctionId, bidderId1)).thenReturn(false);
 
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
@@ -280,6 +283,21 @@ class BidServiceTest {
             assertTrue(exception.getMessage().contains("Недостаточно средств"));
 
             verify(depositService, never()).freezeForAuction(anyLong(), anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("D-2: аукцион без настроенного requiredDepositAmount - IllegalStateException, депозит не трогается")
+        void placeBid_NoRequiredDepositAmountConfigured_ThrowsAndDoesNotTouchDeposit() {
+            activeAuction.setRequiredDepositAmount(null);
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
+            when(participantRepository.isParticipant(auctionId, bidderId1)).thenReturn(false);
+
+            IllegalStateException exception = assertThrows(IllegalStateException.class,
+                    () -> bidService.placeBid(auctionId, validBid, bidderId1));
+            assertTrue(exception.getMessage().contains("не настроен"));
+
+            verifyNoInteractions(depositService);
         }
     }
 
@@ -294,15 +312,15 @@ class BidServiceTest {
         void placeBid_Success_FreezesDeposit() {
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
-            when(depositService.canParticipateInAuction(bidderId1, startingPrice)).thenReturn(true);
-            doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, startingPrice);
+            when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
+            doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, requiredDeposit);
             when(participantRepository.isParticipant(auctionId, bidderId1)).thenReturn(false);
             doNothing().when(participantRepository).registerParticipant(eq(auctionId), eq(bidderId1), any(BigDecimal.class));
             when(auctionRepository.save(any(Auction.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
             bidService.placeBid(auctionId, validBid, bidderId1);
 
-            verify(depositService, times(1)).freezeForAuction(bidderId1, auctionId, startingPrice);
+            verify(depositService, times(1)).freezeForAuction(bidderId1, auctionId, requiredDeposit);
         }
 
         @Test
@@ -310,8 +328,8 @@ class BidServiceTest {
         void placeBid_Failed_UnfreezesDeposit() {
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
-            when(depositService.canParticipateInAuction(bidderId1, startingPrice)).thenReturn(true);
-            doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, startingPrice);
+            when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
+            doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, requiredDeposit);
             when(participantRepository.isParticipant(auctionId, bidderId1)).thenReturn(false);
 
             assertThrows(IllegalArgumentException.class,
@@ -332,8 +350,8 @@ class BidServiceTest {
         void placeBid_AddsUserToParticipantsList() {
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
-            when(depositService.canParticipateInAuction(bidderId1, startingPrice)).thenReturn(true);
-            doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, startingPrice);
+            when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
+            doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, requiredDeposit);
             when(participantRepository.isParticipant(auctionId, bidderId1)).thenReturn(false);
             doNothing().when(participantRepository).registerParticipant(eq(auctionId), eq(bidderId1), any(BigDecimal.class));
             when(auctionRepository.save(any(Auction.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -348,8 +366,8 @@ class BidServiceTest {
         void placeBid_MultipleUsers_AllAdded() {
             when(rateLimitService.tryAcquire(anyLong())).thenReturn(true);
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
-            when(depositService.canParticipateInAuction(anyLong(), eq(startingPrice))).thenReturn(true);
-            doNothing().when(depositService).freezeForAuction(anyLong(), eq(auctionId), eq(startingPrice));
+            when(depositService.canParticipateInAuction(anyLong(), eq(requiredDeposit))).thenReturn(true);
+            doNothing().when(depositService).freezeForAuction(anyLong(), eq(auctionId), eq(requiredDeposit));
             when(participantRepository.isParticipant(eq(auctionId), anyLong())).thenReturn(false);
             doNothing().when(participantRepository).registerParticipant(eq(auctionId), anyLong(), any(BigDecimal.class));
             when(auctionRepository.save(any(Auction.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -432,11 +450,25 @@ class BidServiceTest {
         void buyNow_InsufficientDeposit_Throws() {
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(2L)).thenReturn(Optional.of(createdAuction));
-            when(depositService.canParticipateInAuction(bidderId1, startingPrice)).thenReturn(false);
+            when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(false);
 
             IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                     () -> bidService.buyNow(2L, bidderId1));
             assertTrue(ex.getMessage().contains("Недостаточно средств"));
+        }
+
+        @Test
+        @DisplayName("D-2: Buy Now на аукционе без настроенного requiredDepositAmount - IllegalStateException")
+        void buyNow_NoRequiredDepositAmountConfigured_Throws() {
+            createdAuction.setRequiredDepositAmount(null);
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(auctionRepository.findByIdWithLock(2L)).thenReturn(Optional.of(createdAuction));
+
+            IllegalStateException ex = assertThrows(IllegalStateException.class,
+                    () -> bidService.buyNow(2L, bidderId1));
+            assertTrue(ex.getMessage().contains("не настроен"));
+
+            verifyNoInteractions(depositService);
         }
 
         @Test
@@ -497,8 +529,8 @@ class BidServiceTest {
 
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
-            when(depositService.canParticipateInAuction(bidderId1, startingPrice)).thenReturn(true);
-            doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, startingPrice);
+            when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
+            doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, requiredDeposit);
             when(participantRepository.isParticipant(auctionId, bidderId1)).thenReturn(false);
             doNothing().when(participantRepository).registerParticipant(eq(auctionId), eq(bidderId1), any(BigDecimal.class));
             when(auctionRepository.save(any(Auction.class))).thenAnswer(invocation -> invocation.getArgument(0));

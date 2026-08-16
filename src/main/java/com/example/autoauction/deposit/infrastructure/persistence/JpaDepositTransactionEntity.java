@@ -44,6 +44,18 @@ public class JpaDepositTransactionEntity {
     @Column(name = "description", length = 10000)
     private String description;
 
+    // unique=true here only drives Hibernate's OWN ddl-auto schema generation (used by the
+    // H2 test profile) so that integration tests actually exercise the same uniqueness
+    // invariant that V21's raw-SQL partial unique index establishes in production (Flyway
+    // is the sole schema authority there; production runs ddl-auto=validate, which does not
+    // strictly check unique-constraint metadata, so this annotation has no production
+    // effect). NULL handling is standard SQL behavior in both H2 and Postgres: a unique
+    // index never treats two NULLs as duplicates, so this plain unique index is
+    // functionally equivalent to V21's "WHERE idempotency_key IS NOT NULL" partial index
+    // for the property that matters here - only non-null keys are constrained.
+    @Column(name = "idempotency_key", length = 100, unique = true)
+    private String idempotencyKey;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -95,6 +107,9 @@ public class JpaDepositTransactionEntity {
 
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+
+    public String getIdempotencyKey() { return idempotencyKey; }
+    public void setIdempotencyKey(String idempotencyKey) { this.idempotencyKey = idempotencyKey; }
 
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }

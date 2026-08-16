@@ -83,12 +83,41 @@ class AuctionCompletionSchedulerOptimizedTest {
 
         when(auctionRepository.findUnconfirmedAuctionsPastDeadline(any(OffsetDateTime.class)))
                 .thenReturn(List.of(unconfirmed));
-        when(auctionRepository.save(any())).thenReturn(unconfirmed);
+        when(auctionFinalizer.cancelAuction(unconfirmed)).thenReturn(true);
 
         scheduler.cancelUnconfirmedAuctions();
 
+        // R-1.5: scheduler must delegate to AuctionFinalizer.cancelAuction() (the canonical
+        // place that unfreezes participants) rather than calling auction.cancel()+save()
+        // directly.
         verify(auctionRepository).findUnconfirmedAuctionsPastDeadline(any(OffsetDateTime.class));
-        verify(auctionRepository).save(unconfirmed);
+        verify(auctionFinalizer).cancelAuction(unconfirmed);
+        verify(auctionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("R-1.5: если AuctionFinalizer сообщает, что аукцион уже завершён (isFinished), " +
+            "шедулер не бросает исключение и не сохраняет аукцион напрямую")
+    void cancelUnconfirmedAuctions_AlreadyFinishedByFinalizer_NoDirectSave() {
+        Auction unconfirmed = new Auction(
+                3L,
+                new BigDecimal("500000"),
+                null, null,
+                new BigDecimal("5000"),
+                now.plusMinutes(30),
+                now.plusHours(3),
+                1L
+        );
+        unconfirmed.setId(3L);
+
+        when(auctionRepository.findUnconfirmedAuctionsPastDeadline(any(OffsetDateTime.class)))
+                .thenReturn(List.of(unconfirmed));
+        when(auctionFinalizer.cancelAuction(unconfirmed)).thenReturn(false);
+
+        scheduler.cancelUnconfirmedAuctions();
+
+        verify(auctionFinalizer).cancelAuction(unconfirmed);
+        verify(auctionRepository, never()).save(any());
     }
 
     @Test

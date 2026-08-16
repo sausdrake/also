@@ -89,7 +89,9 @@ public class GlobalExceptionHandler {
 
         // Извлекаем более понятное сообщение
         String message = "Database constraint violation";
-        if (e.getMessage().contains("UK_")) {
+        if (e.getMessage() != null && e.getMessage().toLowerCase().contains("idempotency_key")) {
+            message = "Эта корректировка уже была обработана ранее (повтор с тем же ключом идемпотентности)";
+        } else if (e.getMessage().contains("UK_")) {
             if (e.getMessage().contains("username")) {
                 message = "Username already exists";
             } else if (e.getMessage().contains("email")) {

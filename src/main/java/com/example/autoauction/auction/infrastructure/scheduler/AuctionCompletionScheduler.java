@@ -131,10 +131,18 @@ public class AuctionCompletionScheduler {
 
         for (Auction auction : overdue) {
             try {
-                auction.cancel();
-                auctionRepository.save(auction);
-                log.info("Auction {} auto-cancelled (no confirmation within {} hours of start)",
-                        auction.getId(), confirmHours);
+                // R-1.5: route through AuctionFinalizer.cancelAuction() rather than calling
+                // auction.cancel()+save() directly — this is the canonical, single place that
+                // unfreezes every participant's deposit before cancelling. CREATED-status
+                // auctions should never have frozen participants under the current call graph
+                // (freezing only ever happens together, atomically, with a transition away
+                // from CREATED — see BidService.placeBid/buyNow), but routing through the
+                // finalizer removes the duplicated cancellation logic and closes that gap
+                // permanently rather than relying on that invariant holding forever.
+                if (auctionFinalizer.cancelAuction(auction)) {
+                    log.info("Auction {} auto-cancelled (no confirmation within {} hours of start)",
+                            auction.getId(), confirmHours);
+                }
             } catch (Exception e) {
                 log.error("Failed to auto-cancel auction {}: {}", auction.getId(), e.getMessage());
             }

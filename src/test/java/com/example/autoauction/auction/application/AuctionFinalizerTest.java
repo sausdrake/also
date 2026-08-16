@@ -111,6 +111,69 @@ class AuctionFinalizerTest {
     }
 
     @Nested
+    @DisplayName("Отмена аукциона (D-1)")
+    class CancelAuctionTests {
+
+        @Test
+        @DisplayName("Отмена активного аукциона со ставками -> CANCELLED, все участники разморожены")
+        void cancelAuction_ActiveWithBids_ShouldCancelAndUnfreezeAllParticipants() {
+            // given
+            activeAuction.setTotalBids(5);
+            when(participantRepository.getParticipants(auctionId)).thenReturn(List.of(winnerId, loserId));
+            doNothing().when(depositService).unfreezeForAuction(eq(winnerId), eq(auctionId));
+            doNothing().when(depositService).unfreezeForAuction(eq(loserId), eq(auctionId));
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+            doNothing().when(participantRepository).clearParticipants(auctionId);
+
+            // when
+            boolean result = auctionFinalizer.cancelAuction(activeAuction);
+
+            // then
+            assertThat(result).isTrue();
+            assertThat(activeAuction.getStatus()).isEqualTo(AuctionStatus.CANCELLED);
+            // Критично: даже "победитель" по текущей цене разблокируется - у отменённого
+            // аукциона нет settled-победителя.
+            verify(depositService, times(1)).unfreezeForAuction(winnerId, auctionId);
+            verify(depositService, times(1)).unfreezeForAuction(loserId, auctionId);
+            verify(participantRepository, times(1)).clearParticipants(auctionId);
+            verify(auctionRepository, times(1)).save(activeAuction);
+        }
+
+        @Test
+        @DisplayName("Отмена аукциона без участников -> CANCELLED, unfreezeForAuction не вызывается")
+        void cancelAuction_NoParticipants_ShouldCancelWithoutUnfreezeCalls() {
+            // given
+            when(participantRepository.getParticipants(auctionId)).thenReturn(List.of());
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+            doNothing().when(participantRepository).clearParticipants(auctionId);
+
+            // when
+            boolean result = auctionFinalizer.cancelAuction(activeAuction);
+
+            // then
+            assertThat(result).isTrue();
+            assertThat(activeAuction.getStatus()).isEqualTo(AuctionStatus.CANCELLED);
+            verify(depositService, never()).unfreezeForAuction(anyLong(), anyLong());
+        }
+
+        @Test
+        @DisplayName("Отмена уже завершённого аукциона -> идемпотентно, ничего не делает")
+        void cancelAuction_AlreadyFinished_ShouldReturnFalseAndDoNothing() {
+            // given
+            activeAuction.setStatus(AuctionStatus.COMPLETED);
+
+            // when
+            boolean result = auctionFinalizer.cancelAuction(activeAuction);
+
+            // then
+            assertThat(result).isFalse();
+            verify(auctionRepository, never()).save(any());
+            verify(participantRepository, never()).clearParticipants(anyLong());
+            verifyNoInteractions(depositService);
+        }
+    }
+
+    @Nested
     @DisplayName("Buy Now тесты")
     class BuyNowTests {
 
