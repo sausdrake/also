@@ -428,6 +428,7 @@ class DiagnosticRequestServiceTest {
         @DisplayName("Успешное сохранение черновика")
         void saveInspectionAnswers_Draft_Success() {
             savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setStatus(DiagnosticRequest.DiagnosticRequestStatus.IN_PROGRESS);
             savedRequest.setTemplateId(1L);
             when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
             doNothing().when(answerRepository).deleteByDiagnosticRequestId(requestId);
@@ -448,6 +449,7 @@ class DiagnosticRequestServiceTest {
         @DisplayName("Успешная отправка на проверку")
         void saveInspectionAnswers_Submit_Success() {
             savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setStatus(DiagnosticRequest.DiagnosticRequestStatus.IN_PROGRESS);
             savedRequest.setTemplateId(1L);
             when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
             doNothing().when(answerRepository).deleteByDiagnosticRequestId(requestId);
@@ -481,6 +483,7 @@ class DiagnosticRequestServiceTest {
         @DisplayName("MEDIA-3.1A: без привязанного шаблона - явный отказ, без вывода")
         void saveInspectionAnswers_NoTemplateBound_ThrowsException() {
             savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setStatus(DiagnosticRequest.DiagnosticRequestStatus.IN_PROGRESS);
             savedRequest.setTemplateId(null);
             when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
 
@@ -499,6 +502,7 @@ class DiagnosticRequestServiceTest {
         @DisplayName("MEDIA-3.1A: пункт из привязанного шаблона принимается")
         void saveInspectionAnswers_ItemFromBoundTemplate_Accepted() {
             savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setStatus(DiagnosticRequest.DiagnosticRequestStatus.IN_PROGRESS);
             savedRequest.setTemplateId(1L);
             when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
 
@@ -527,6 +531,7 @@ class DiagnosticRequestServiceTest {
         @DisplayName("MEDIA-3.1A: пункт из другого шаблона отклоняется")
         void saveInspectionAnswers_ItemFromAnotherTemplate_Rejected() {
             savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setStatus(DiagnosticRequest.DiagnosticRequestStatus.IN_PROGRESS);
             savedRequest.setTemplateId(1L);
             when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
 
@@ -556,6 +561,7 @@ class DiagnosticRequestServiceTest {
         @DisplayName("MEDIA-3.1A: несуществующий пункт отклоняется существующей семантикой ошибок")
         void saveInspectionAnswers_NonexistentItem_Rejected() {
             savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setStatus(DiagnosticRequest.DiagnosticRequestStatus.IN_PROGRESS);
             savedRequest.setTemplateId(1L);
             when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
             when(templateRepository.findItemById(999L)).thenReturn(Optional.empty());
@@ -570,6 +576,103 @@ class DiagnosticRequestServiceTest {
                     .isInstanceOf(IllegalArgumentException.class);
 
             verify(answerRepository, never()).saveAll(anyList());
+        }
+
+        @Test
+        @DisplayName("MEDIA-3.3: COMPLETED - сохранение ответов запрещено")
+        void saveInspectionAnswers_Completed_ThrowsException() {
+            savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setStatus(DiagnosticRequest.DiagnosticRequestStatus.COMPLETED);
+            savedRequest.setTemplateId(1L);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+
+            SubmitInspectionRequest submitRequest = new SubmitInspectionRequest();
+            submitRequest.setSubmit(false);
+            submitRequest.setAnswers(List.of());
+
+            assertThatThrownBy(() -> requestService.saveInspectionAnswers(requestId, diagnosticId, submitRequest))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("IN_PROGRESS");
+
+            verify(answerRepository, never()).saveAll(anyList());
+            verify(answerRepository, never()).deleteByDiagnosticRequestId(anyLong());
+        }
+
+        @Test
+        @DisplayName("MEDIA-3.3: APPROVED - сохранение ответов запрещено (терминальный статус)")
+        void saveInspectionAnswers_Approved_ThrowsException() {
+            savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setStatus(DiagnosticRequest.DiagnosticRequestStatus.APPROVED);
+            savedRequest.setTemplateId(1L);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+
+            SubmitInspectionRequest submitRequest = new SubmitInspectionRequest();
+            submitRequest.setSubmit(false);
+            submitRequest.setAnswers(List.of());
+
+            assertThatThrownBy(() -> requestService.saveInspectionAnswers(requestId, diagnosticId, submitRequest))
+                    .isInstanceOf(IllegalStateException.class);
+
+            verify(answerRepository, never()).saveAll(anyList());
+            verify(answerRepository, never()).deleteByDiagnosticRequestId(anyLong());
+        }
+
+        @Test
+        @DisplayName("MEDIA-3.3: REJECTED - сохранение ответов запрещено до resetForRework()")
+        void saveInspectionAnswers_Rejected_ThrowsException() {
+            savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setStatus(DiagnosticRequest.DiagnosticRequestStatus.REJECTED);
+            savedRequest.setTemplateId(1L);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+
+            SubmitInspectionRequest submitRequest = new SubmitInspectionRequest();
+            submitRequest.setSubmit(false);
+            submitRequest.setAnswers(List.of());
+
+            assertThatThrownBy(() -> requestService.saveInspectionAnswers(requestId, diagnosticId, submitRequest))
+                    .isInstanceOf(IllegalStateException.class);
+
+            verify(answerRepository, never()).saveAll(anyList());
+            verify(answerRepository, never()).deleteByDiagnosticRequestId(anyLong());
+        }
+
+        @Test
+        @DisplayName("MEDIA-3.3: PENDING - сохранение ответов запрещено (нет назначенного диагноста)")
+        void saveInspectionAnswers_Pending_ThrowsException() {
+            savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setStatus(DiagnosticRequest.DiagnosticRequestStatus.PENDING);
+            savedRequest.setTemplateId(1L);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+
+            SubmitInspectionRequest submitRequest = new SubmitInspectionRequest();
+            submitRequest.setSubmit(false);
+            submitRequest.setAnswers(List.of());
+
+            assertThatThrownBy(() -> requestService.saveInspectionAnswers(requestId, diagnosticId, submitRequest))
+                    .isInstanceOf(IllegalStateException.class);
+
+            verify(answerRepository, never()).saveAll(anyList());
+        }
+
+        @Test
+        @DisplayName("MEDIA-3.3: легитимный rework (REJECTED -> IN_PROGRESS через resetForRework) " +
+                "восстанавливает возможность сохранять ответы")
+        void saveInspectionAnswers_AfterLegitimateRework_Succeeds() {
+            savedRequest.setAssignedTo(diagnosticId);
+            // simulates the state AFTER resetForRework() has already transitioned the request
+            savedRequest.setStatus(DiagnosticRequest.DiagnosticRequestStatus.IN_PROGRESS);
+            savedRequest.setTemplateId(1L);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+            doNothing().when(answerRepository).deleteByDiagnosticRequestId(requestId);
+            when(answerRepository.saveAll(anyList())).thenReturn(List.of());
+
+            SubmitInspectionRequest submitRequest = new SubmitInspectionRequest();
+            submitRequest.setSubmit(false);
+            submitRequest.setAnswers(List.of());
+
+            requestService.saveInspectionAnswers(requestId, diagnosticId, submitRequest);
+
+            verify(answerRepository).saveAll(anyList());
         }
     }
 

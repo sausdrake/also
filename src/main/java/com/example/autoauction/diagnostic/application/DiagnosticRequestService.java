@@ -46,6 +46,15 @@ public class DiagnosticRequestService {
     private final UserRepository userRepository;
     private final VehicleService vehicleService;
     private final NotificationService notificationService;
+    // MEDIA-3.3: report dual-read only - never used to write/migrate here, see
+    // LegacyMediaMigrationService for the migration itself.
+    private final com.example.autoauction.diagnostic.media.domain.port.DiagnosticMediaRepository mediaRepository;
+    private final com.example.autoauction.diagnostic.media.domain.port.StorageClient storageClient;
+
+    private static final String LEGACY_MEDIA_KEY_PREFIX = "diagnostic-media-legacy/";
+
+    @org.springframework.beans.factory.annotation.Value("${diagnostic.media.read-url-ttl-minutes}")
+    private long readUrlTtlMinutes;
 
     private static final BigDecimal DEPOSIT_PERCENT = new BigDecimal("0.01");
 
@@ -254,6 +263,20 @@ public class DiagnosticRequestService {
 
         if (!request.getAssignedTo().equals(diagnosticId)) {
             throw new SecurityException("Вы не назначены на эту заявку");
+        }
+
+        // MEDIA-3.3: the only status in which answers may be written. Confirmed from the
+        // actual state machine: PENDING never has assignedTo set (already blocked above);
+        // COMPLETED/APPROVED are reached only via markAsCompleted/approveReport, neither of
+        // which has a path back to IN_PROGRESS; REJECTED's only way back to editable is the
+        // explicit resetForRework() action, which itself transitions status to IN_PROGRESS -
+        // so IN_PROGRESS is the complete and only legitimate editable window. Without this
+        // check, a still-assigned diagnostician could silently mutate InspectionAnswer
+        // (including photoUrls/videoUrls) for an already-COMPLETED/APPROVED/REJECTED request,
+        // which MEDIA-3.3's legacy-media migration must be able to treat as impossible.
+        if (request.getStatus() != DiagnosticRequest.DiagnosticRequestStatus.IN_PROGRESS) {
+            throw new IllegalStateException(
+                    "Ответы можно сохранять только для заявки в статусе IN_PROGRESS. Текущий статус: " + request.getStatus());
         }
 
         // MEDIA-3.1A: a request must have a bound template before any answer can
@@ -510,6 +533,7 @@ public class DiagnosticRequestService {
                 .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена: " + requestId));
 
         List<InspectionAnswer> answers = answerRepository.findByDiagnosticRequestId(requestId);
+        answers.forEach(a -> resolveMediaUrlsForReport(requestId, a));
 
         DiagnosticRequestResponse response = DiagnosticRequestResponse.fromDomain(request);
         response.setAnswers(answers);
@@ -535,11 +559,92 @@ public class DiagnosticRequestService {
                 .orElseThrow(() -> new IllegalStateException("Одобренный отчёт не найден"));
 
         List<InspectionAnswer> answers = answerRepository.findByDiagnosticRequestId(request.getId());
+        answers.forEach(a -> resolveMediaUrlsForReport(request.getId(), a));
 
         DiagnosticRequestResponse response = DiagnosticRequestResponse.fromDomain(request);
         response.setTemplate(resolveTemplateForReport(request));
         response.setExistingAnswers(answers);
         return response;
+    }
+
+    /**
+     * MEDIA-3.3: narrowly-scoped media dual-read for report paths only - does not touch
+     * resolveTemplateForReport()'s semantics. For one InspectionAnswer: if EVERY legacy
+     * photo/video URL for it has a corresponding READY, migrated DiagnosticMedia row
+     * (identified by the diagnostic-media-legacy/ key prefix), replace photoUrls/videoUrls
+     * in-place with freshly-generated signed URLs from the canonical DiagnosticMedia set.
+     * Otherwise (zero, partial, or shape-mismatched migration) leaves the raw legacy URLs
+     * completely untouched - never merges the two representations, never duplicates an item,
+     * never silently drops a file that hasn't been migrated yet.
+     *
+     * Completeness requires ALL of: (1) total migrated row count == total legacy URL count;
+     * (2) migrated PHOTO count == legacy photoUrls count AND migrated VIDEO count == legacy
+     * videoUrls count (catches a wrong-type migration even if the total happens to match);
+     * (3) the set of migrated sortOrder positions is exactly {0 .. legacyCount-1} with no
+     * gaps or duplicates (catches a position collision/hole even if both counts above match).
+     *
+     * KNOWN RESIDUAL RISK: LegacyMediaMigrationService only ever migrates COMPLETED/APPROVED
+     * requests (REJECTED is deliberately excluded - see its class Javadoc), which removes the
+     * direct case of migrating a not-yet-stable snapshot. It does NOT remove every possibility
+     * of staleness: COMPLETED can still be sent to REJECTED via rejectReport(), reworked back
+     * to IN_PROGRESS via resetForRework(), and resubmitted to COMPLETED again. None of the
+     * checks above can detect migrated rows left over from a PRIOR migrate() run if that full
+     * reject/rework/recomplete cycle produces new photoUrls/videoUrls of the exact same
+     * per-type counts as before - there is no persisted link from a DiagnosticMedia row back
+     * to the specific legacy URL it was created from, so shape-identical stale data cannot be
+     * told apart from a genuine complete migration by count/position alone. See
+     * LegacyMediaMigrationService's class Javadoc for why this narrower residual case is
+     * accepted for this phase.
+     */
+    private void resolveMediaUrlsForReport(Long requestId, InspectionAnswer answer) {
+        int legacyPhotoCount = answer.getPhotoUrls() == null ? 0 : answer.getPhotoUrls().size();
+        int legacyVideoCount = answer.getVideoUrls() == null ? 0 : answer.getVideoUrls().size();
+        int legacyCount = legacyPhotoCount + legacyVideoCount;
+        if (legacyCount == 0) {
+            return;
+        }
+
+        List<com.example.autoauction.diagnostic.media.domain.DiagnosticMedia> migratedLegacy =
+                mediaRepository.findByRequestAndItem(requestId, answer.getInspectionItemId()).stream()
+                        .filter(m -> m.getStorageKey().startsWith(LEGACY_MEDIA_KEY_PREFIX))
+                        .filter(m -> m.getUploadStatus() == com.example.autoauction.diagnostic.media.domain.UploadStatus.READY)
+                        .sorted(java.util.Comparator.comparing(com.example.autoauction.diagnostic.media.domain.DiagnosticMedia::getSortOrder))
+                        .toList();
+
+        if (migratedLegacy.size() != legacyCount) {
+            return; // incomplete or zero migration - preserve the complete legacy representation as-is
+        }
+
+        long migratedPhotoCount = migratedLegacy.stream()
+                .filter(m -> m.getMediaType() == com.example.autoauction.diagnostic.media.domain.MediaType.PHOTO).count();
+        long migratedVideoCount = migratedLegacy.stream()
+                .filter(m -> m.getMediaType() == com.example.autoauction.diagnostic.media.domain.MediaType.VIDEO).count();
+        if (migratedPhotoCount != legacyPhotoCount || migratedVideoCount != legacyVideoCount) {
+            return; // right total, wrong photo/video split - do not trust it
+        }
+
+        java.util.Set<Integer> expectedPositions = java.util.stream.IntStream.range(0, legacyCount)
+                .boxed().collect(java.util.stream.Collectors.toSet());
+        java.util.Set<Integer> actualPositions = migratedLegacy.stream()
+                .map(com.example.autoauction.diagnostic.media.domain.DiagnosticMedia::getSortOrder)
+                .collect(java.util.stream.Collectors.toSet());
+        if (!actualPositions.equals(expectedPositions)) {
+            return; // gap or duplicate position - do not trust it
+        }
+
+        java.time.Duration ttl = java.time.Duration.ofMinutes(readUrlTtlMinutes);
+        List<String> photoUrls = new ArrayList<>();
+        List<String> videoUrls = new ArrayList<>();
+        for (var media : migratedLegacy) {
+            String url = storageClient.createPresignedReadUrl(media.getStorageKey(), ttl).toString();
+            if (media.getMediaType() == com.example.autoauction.diagnostic.media.domain.MediaType.PHOTO) {
+                photoUrls.add(url);
+            } else {
+                videoUrls.add(url);
+            }
+        }
+        answer.setPhotoUrls(photoUrls);
+        answer.setVideoUrls(videoUrls);
     }
 
     /**

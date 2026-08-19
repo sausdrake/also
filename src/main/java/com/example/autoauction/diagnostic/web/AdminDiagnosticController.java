@@ -34,6 +34,7 @@ public class AdminDiagnosticController {
 
     private final InspectionTemplateService templateService;
     private final DiagnosticRequestService requestService;
+    private final com.example.autoauction.diagnostic.media.application.LegacyMediaMigrationService legacyMediaMigrationService;
 
     // ==================== Шаблоны ====================
 
@@ -187,5 +188,21 @@ public class AdminDiagnosticController {
     @Operation(summary = "Backfill historical inspection template bindings")
     public ResponseEntity<com.example.autoauction.diagnostic.web.dto.TemplateBackfillResult> backfillTemplateIds() {
         return ResponseEntity.ok(requestService.backfillHistoricalTemplateIds());
+    }
+
+    // ==================== MEDIA-3.3: миграция исторических медиа ====================
+
+    /**
+     * Одноразовая, идемпотентная миграция InspectionAnswer.photoUrls/videoUrls
+     * в канонический DiagnosticMedia/R2 для заявок в статусе COMPLETED или
+     * APPROVED. REJECTED намеренно исключён - см. LegacyMediaMigrationService
+     * (класс-Javadoc): resetForRework() может вернуть REJECTED-заявку в
+     * IN_PROGRESS, поэтому это не стабильный исторический снимок. Никогда не
+     * угадывает недостающие данные - см. LegacyMediaMigrationService.migrate().
+     */
+    @PostMapping("/requests/legacy-media/migrate")
+    @Operation(summary = "Migrate legacy diagnostic media into DiagnosticMedia/R2")
+    public ResponseEntity<com.example.autoauction.diagnostic.media.web.dto.LegacyMediaMigrationResult> migrateLegacyMedia() {
+        return ResponseEntity.ok(legacyMediaMigrationService.migrate());
     }
 }

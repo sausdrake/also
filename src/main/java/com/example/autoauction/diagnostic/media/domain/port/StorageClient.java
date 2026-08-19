@@ -1,5 +1,6 @@
 package com.example.autoauction.diagnostic.media.domain.port;
 
+import java.io.InputStream;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
@@ -19,6 +20,15 @@ public interface StorageClient {
 
     /** Presigned single-PUT upload URL for a server-chosen storage key. */
     PresignedUpload createPresignedUpload(String storageKey, String contentType, Duration ttl);
+
+    /**
+     * MEDIA-3.3: server-side direct upload, for cases with no browser client to follow a
+     * presigned URL (legacy media migration). Streamed deliberately - callers must not load
+     * a whole (potentially large) file into memory to call this; pass a stream backed by the
+     * source (e.g. Files.newInputStream), not a byte[]. Implementations must not require the
+     * stream to support mark/reset.
+     */
+    void putObject(String storageKey, InputStream input, long sizeBytes, String contentType);
 
     /** HEAD equivalent - empty if the object does not exist. */
     Optional<StoredObjectMetadata> headObject(String storageKey);
