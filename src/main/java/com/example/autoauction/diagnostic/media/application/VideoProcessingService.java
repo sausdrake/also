@@ -9,6 +9,7 @@ import com.example.autoauction.diagnostic.media.domain.port.StorageClient;
 import com.example.autoauction.diagnostic.media.domain.port.VideoProcessor;
 import com.example.autoauction.diagnostic.media.web.dto.MediaResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -31,37 +32,53 @@ import java.util.stream.Stream;
  * (a later phase) is the only concurrency this class needs to cooperate
  * with, and it already serializes every @Scheduled job in this app.
  *
- * CONFIGURATION NOTE: Phase 10 owns application.properties/Docker. The
- * limits below are deliberately isolated constants for THIS phase only -
- * not duplicated into FfmpegVideoProcessor, which never reads its own
- * configuration and only ever treats the ProcessingLimits built here as
- * authoritative (the Phase 5/6 architectural constraint).
+ * CONFIGURATION NOTE (MEDIA-3.4 Phase 10): the five processing limits and
+ * the stale-processing threshold are owned exclusively by this class via
+ * simple @Value injection (application.properties: diagnostic.media.processing.*),
+ * following the dominant per-field @Value convention already used for every
+ * other diagnostic.media.* setting in this repo - never duplicated into
+ * FfmpegVideoProcessor, which never reads its own configuration and only
+ * ever treats the ProcessingLimits built here as authoritative (the Phase
+ * 5/6 architectural constraint, unchanged by Phase 10). FFmpeg executable
+ * paths, subprocess timeouts, and capture-size bounds remain intentionally
+ * hardcoded in FfmpegVideoProcessor - not part of this configuration.
  */
 @Slf4j
 @Service
 public class VideoProcessingService {
 
-    private static final int MAX_DURATION_SECONDS = 120;
-    private static final int MAX_WIDTH = 1920;
-    private static final int MAX_HEIGHT = 1080;
-    private static final int THUMBNAIL_MAX_WIDTH = 320;
-    private static final int THUMBNAIL_MAX_HEIGHT = 240;
-
-    // MEDIA-3.4 Phase 7: same "Phase 10 owns configuration" isolation as the limits above -
-    // comfortably longer than the FFmpeg adapter's own 30s/60s timeouts, so a legitimately
-    // still-running (not crashed) claim is never mistaken for stale.
-    private static final Duration STALE_PROCESSING_THRESHOLD = Duration.ofMinutes(30);
-
     private static final String THUMBNAIL_KEY_PREFIX = "diagnostic-media-thumbnail/";
+
+    private final int maxDurationSeconds;
+    private final int maxWidth;
+    private final int maxHeight;
+    private final int thumbnailMaxWidth;
+    private final int thumbnailMaxHeight;
+    private final Duration staleProcessingThreshold;
 
     private final DiagnosticMediaRepository mediaRepository;
     private final StorageClient storageClient;
     private final VideoProcessor videoProcessor;
 
-    public VideoProcessingService(DiagnosticMediaRepository mediaRepository, StorageClient storageClient, VideoProcessor videoProcessor) {
+    public VideoProcessingService(
+            DiagnosticMediaRepository mediaRepository,
+            StorageClient storageClient,
+            VideoProcessor videoProcessor,
+            @Value("${diagnostic.media.processing.max-duration-seconds}") int maxDurationSeconds,
+            @Value("${diagnostic.media.processing.max-width}") int maxWidth,
+            @Value("${diagnostic.media.processing.max-height}") int maxHeight,
+            @Value("${diagnostic.media.processing.thumbnail-max-width}") int thumbnailMaxWidth,
+            @Value("${diagnostic.media.processing.thumbnail-max-height}") int thumbnailMaxHeight,
+            @Value("${diagnostic.media.processing.stale-threshold-minutes}") long staleThresholdMinutes) {
         this.mediaRepository = mediaRepository;
         this.storageClient = storageClient;
         this.videoProcessor = videoProcessor;
+        this.maxDurationSeconds = maxDurationSeconds;
+        this.maxWidth = maxWidth;
+        this.maxHeight = maxHeight;
+        this.thumbnailMaxWidth = thumbnailMaxWidth;
+        this.thumbnailMaxHeight = thumbnailMaxHeight;
+        this.staleProcessingThreshold = Duration.ofMinutes(staleThresholdMinutes);
     }
 
     /**
@@ -93,14 +110,14 @@ public class VideoProcessingService {
      * isolated - identical operational discipline to processPending().
      */
     public void reconcileStale(int batchSize) {
-        OffsetDateTime cutoff = OffsetDateTime.now().minus(STALE_PROCESSING_THRESHOLD);
+        OffsetDateTime cutoff = OffsetDateTime.now().minus(staleProcessingThreshold);
         List<DiagnosticMedia> staleCandidates = mediaRepository.findStaleProcessing(cutoff, batchSize);
         for (DiagnosticMedia media : staleCandidates) {
             try {
                 boolean reset = mediaRepository.resetStaleProcessing(media.getId());
                 if (reset) {
                     log.warn("VideoProcessingService: media {} - STALE_PROCESSING_RESET (claimed at {}, older than {} minutes) -> PENDING",
-                            media.getId(), media.getProcessingClaimedAt(), STALE_PROCESSING_THRESHOLD.toMinutes());
+                            media.getId(), media.getProcessingClaimedAt(), staleProcessingThreshold.toMinutes());
                 } else {
                     log.info("VideoProcessingService: media {} - stale reset raced (row already left PROCESSING before reset ran), no-op",
                             media.getId());
@@ -345,13 +362,13 @@ public class VideoProcessingService {
         if (result.height() <= 0) {
             return "height must be positive: " + result.height();
         }
-        if (result.durationSeconds() > MAX_DURATION_SECONDS) {
+        if (result.durationSeconds() > maxDurationSeconds) {
             return "durationSeconds exceeds configured maximum: " + result.durationSeconds();
         }
-        if (result.width() > MAX_WIDTH) {
+        if (result.width() > maxWidth) {
             return "width exceeds configured maximum: " + result.width();
         }
-        if (result.height() > MAX_HEIGHT) {
+        if (result.height() > maxHeight) {
             return "height exceeds configured maximum: " + result.height();
         }
 
@@ -392,7 +409,7 @@ public class VideoProcessingService {
     }
 
     private VideoProcessor.ProcessingLimits buildProcessingLimits() {
-        return new VideoProcessor.ProcessingLimits(MAX_DURATION_SECONDS, MAX_WIDTH, MAX_HEIGHT, THUMBNAIL_MAX_WIDTH, THUMBNAIL_MAX_HEIGHT);
+        return new VideoProcessor.ProcessingLimits(maxDurationSeconds, maxWidth, maxHeight, thumbnailMaxWidth, thumbnailMaxHeight);
     }
 
     /** Never throws - a failed failure-marking attempt must not abort the batch. */

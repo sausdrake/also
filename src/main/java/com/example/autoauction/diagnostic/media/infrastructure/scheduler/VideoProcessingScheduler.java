@@ -1,7 +1,9 @@
 package com.example.autoauction.diagnostic.media.infrastructure.scheduler;
 
 import com.example.autoauction.diagnostic.media.application.VideoProcessingService;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -43,18 +45,37 @@ import org.springframework.stereotype.Component;
  * periodic maintenance sweeps over the same diagnostic_media table) - not
  * the tighter 60s auction/financial cadence, which serves a distinct,
  * more time-critical business need this class has no reason to match.
+ *
+ * MEDIA-3.4 Phase 10: batchSize and the fixed delay are now @Value-injected
+ * (diagnostic.media.processing.batch-size / .scheduler.fixed-delay-ms),
+ * defaulting to the exact values above so existing behavior is unchanged.
+ * batchSize is fail-fast validated at startup (@PostConstruct, mirroring
+ * JwtService's own validateSecretKey() convention) rather than via a new
+ * @ConfigurationProperties/@Validated framework - the CADENCE/BATCH-SIZE
+ * RATIONALE above depends on batchSize staying small, so a misconfigured
+ * value below 1 must never silently pass through.
  */
 @Slf4j
 @Component
 public class VideoProcessingScheduler {
 
-    private static final int BATCH_SIZE = 1;
-
+    private final int batchSize;
     private final VideoProcessingService videoProcessingService;
 
-    public VideoProcessingScheduler(VideoProcessingService videoProcessingService) {
+    public VideoProcessingScheduler(
+            VideoProcessingService videoProcessingService,
+            @Value("${diagnostic.media.processing.batch-size}") int batchSize) {
         this.videoProcessingService = videoProcessingService;
-        log.info("VideoProcessingScheduler initialized (batchSize={})", BATCH_SIZE);
+        this.batchSize = batchSize;
+        log.info("VideoProcessingScheduler initialized (batchSize={})", batchSize);
+    }
+
+    @PostConstruct
+    void validateBatchSize() {
+        if (batchSize < 1) {
+            throw new IllegalStateException(
+                    "diagnostic.media.processing.batch-size must be at least 1, got: " + batchSize);
+        }
     }
 
     /**
@@ -66,15 +87,15 @@ public class VideoProcessingScheduler {
      * next tick - both isolations are explicit MEDIA-3.4 Phase 8
      * requirements, not an structural accident.
      */
-    @Scheduled(fixedDelay = 300_000)
+    @Scheduled(fixedDelayString = "${diagnostic.media.processing.scheduler.fixed-delay-ms}")
     public void processVideos() {
         try {
-            videoProcessingService.processPending(BATCH_SIZE);
+            videoProcessingService.processPending(batchSize);
         } catch (Exception e) {
             log.error("Video processing sweep failed: {}", e.getMessage(), e);
         }
         try {
-            videoProcessingService.reconcileStale(BATCH_SIZE);
+            videoProcessingService.reconcileStale(batchSize);
         } catch (Exception e) {
             log.error("Stale video-processing reconciliation sweep failed: {}", e.getMessage(), e);
         }

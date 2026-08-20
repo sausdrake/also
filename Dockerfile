@@ -18,6 +18,9 @@ WORKDIR /app
 # Копируем JAR из этапа сборки
 COPY --from=builder /app/target/autoauction-*.jar app.jar
 
+# MEDIA-3.4: FFmpeg/ffprobe for server-side video processing (see FfmpegVideoProcessor)
+RUN apk add --no-cache ffmpeg
+
 # Создаём пользователя для запуска (не root)
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser

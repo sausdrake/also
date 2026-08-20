@@ -5,9 +5,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.scheduling.annotation.Scheduled;
 
+import java.lang.reflect.Method;
 import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -34,7 +36,7 @@ class VideoProcessingSchedulerTest {
     @DisplayName("1: планировщик вызывает processPending(batchSize)")
     void invokesProcessPendingWithConfiguredBatchSize() {
         VideoProcessingService service = mock(VideoProcessingService.class);
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
 
         scheduler.processVideos();
 
@@ -45,7 +47,7 @@ class VideoProcessingSchedulerTest {
     @DisplayName("2: планировщик вызывает reconcileStale(batchSize)")
     void invokesReconcileStaleWithConfiguredBatchSize() {
         VideoProcessingService service = mock(VideoProcessingService.class);
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
 
         scheduler.processVideos();
 
@@ -57,7 +59,7 @@ class VideoProcessingSchedulerTest {
     void processPendingThrows_ReconcileStaleStillRunsSameTick() {
         VideoProcessingService service = mock(VideoProcessingService.class);
         doThrow(new RuntimeException("simulated processPending failure")).when(service).processPending(anyInt());
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
 
         scheduler.processVideos(); // must not throw
 
@@ -69,7 +71,7 @@ class VideoProcessingSchedulerTest {
     void reconcileStaleThrows_FutureInvocationsRemainPossible() {
         VideoProcessingService service = mock(VideoProcessingService.class);
         doThrow(new RuntimeException("simulated reconcileStale failure")).when(service).reconcileStale(anyInt());
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
 
         scheduler.processVideos(); // must not throw
         scheduler.processVideos(); // a second tick must still run normally
@@ -82,12 +84,48 @@ class VideoProcessingSchedulerTest {
     @DisplayName("5: одинаковый сконфигурированный batchSize передаётся в оба вызова")
     void sameBatchSizePassedToBothCalls() {
         VideoProcessingService service = mock(VideoProcessingService.class);
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
 
         scheduler.processVideos();
 
         verify(service).processPending(EXPECTED_BATCH_SIZE);
         verify(service).reconcileStale(EXPECTED_BATCH_SIZE);
+    }
+
+    @Test
+    @DisplayName("12 (Phase 10): нестандартный сконфигурированный batchSize передаётся в оба вызова (не только значение по умолчанию 1)")
+    void nonDefaultConfiguredBatchSizePassedToBothCalls() {
+        VideoProcessingService service = mock(VideoProcessingService.class);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, 3);
+
+        scheduler.processVideos();
+
+        verify(service).processPending(3);
+        verify(service).reconcileStale(3);
+    }
+
+    @Test
+    @DisplayName("13 (Phase 10): fixedDelay читается из diagnostic.media.processing.scheduler.fixed-delay-ms, а не захардкожен")
+    void fixedDelayIsPropertyDriven() throws NoSuchMethodException {
+        Method processVideos = VideoProcessingScheduler.class.getDeclaredMethod("processVideos");
+        Scheduled scheduled = processVideos.getAnnotation(Scheduled.class);
+
+        assertThat(scheduled.fixedDelayString()).isEqualTo("${diagnostic.media.processing.scheduler.fixed-delay-ms}");
+    }
+
+    @Test
+    @DisplayName("14 (Phase 10): batchSize < 1 отклоняется при старте (validateBatchSize, @PostConstruct)")
+    void invalidBatchSizeRejectedAtStartup() {
+        VideoProcessingService service = mock(VideoProcessingService.class);
+
+        VideoProcessingScheduler zero = new VideoProcessingScheduler(service, 0);
+        assertThatThrownBy(zero::validateBatchSize).isInstanceOf(IllegalStateException.class);
+
+        VideoProcessingScheduler negative = new VideoProcessingScheduler(service, -1);
+        assertThatThrownBy(negative::validateBatchSize).isInstanceOf(IllegalStateException.class);
+
+        VideoProcessingScheduler valid = new VideoProcessingScheduler(service, 1);
+        valid.validateBatchSize(); // must not throw
     }
 
     @Test
@@ -108,7 +146,7 @@ class VideoProcessingSchedulerTest {
     @DisplayName("7: один вызов processVideos() вызывает каждый сервисный метод ровно один раз")
     void singleTickInvokesEachServiceMethodExactlyOnce() {
         VideoProcessingService service = mock(VideoProcessingService.class);
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
 
         scheduler.processVideos();
 
@@ -120,7 +158,7 @@ class VideoProcessingSchedulerTest {
     @DisplayName("11 (Phase 9): планировщик никогда не вызывает retryProcessing() - FAILED->PENDING остаётся только ручной admin-операцией")
     void neverCallsRetryProcessing() {
         VideoProcessingService service = mock(VideoProcessingService.class);
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
 
         scheduler.processVideos();
 
