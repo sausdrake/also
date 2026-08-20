@@ -35,6 +35,7 @@ public class AdminDiagnosticController {
     private final InspectionTemplateService templateService;
     private final DiagnosticRequestService requestService;
     private final com.example.autoauction.diagnostic.media.application.LegacyMediaMigrationService legacyMediaMigrationService;
+    private final com.example.autoauction.diagnostic.media.application.VideoProcessingService videoProcessingService;
 
     // ==================== Шаблоны ====================
 
@@ -204,5 +205,20 @@ public class AdminDiagnosticController {
     @Operation(summary = "Migrate legacy diagnostic media into DiagnosticMedia/R2")
     public ResponseEntity<com.example.autoauction.diagnostic.media.web.dto.LegacyMediaMigrationResult> migrateLegacyMedia() {
         return ResponseEntity.ok(legacyMediaMigrationService.migrate());
+    }
+
+    // ==================== MEDIA-3.4 Phase 9: повторная обработка видео ====================
+
+    /**
+     * Ручной перезапуск видеообработки для записи в статусе FAILED.
+     * Никогда не вызывается автоматически - планировщик (VideoProcessingScheduler)
+     * никогда не трогает FAILED. Идемпотентно: повтор для уже-PENDING записи
+     * безопасно возвращает её текущее состояние без ошибки - см.
+     * VideoProcessingService.retryProcessing().
+     */
+    @PostMapping("/media/{id}/retry-processing")
+    @Operation(summary = "Retry FAILED video processing (admin-triggered, idempotent)")
+    public ResponseEntity<com.example.autoauction.diagnostic.media.web.dto.MediaResponse> retryProcessing(@PathVariable Long id) {
+        return ResponseEntity.ok(videoProcessingService.retryProcessing(id));
     }
 }

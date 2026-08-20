@@ -9,9 +9,11 @@ import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -112,5 +114,16 @@ class VideoProcessingSchedulerTest {
 
         verify(service, times(1)).processPending(anyInt());
         verify(service, times(1)).reconcileStale(anyInt());
+    }
+
+    @Test
+    @DisplayName("11 (Phase 9): планировщик никогда не вызывает retryProcessing() - FAILED->PENDING остаётся только ручной admin-операцией")
+    void neverCallsRetryProcessing() {
+        VideoProcessingService service = mock(VideoProcessingService.class);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service);
+
+        scheduler.processVideos();
+
+        verify(service, never()).retryProcessing(anyLong());
     }
 }

@@ -2,9 +2,12 @@ package com.example.autoauction.diagnostic.media.application;
 
 import com.example.autoauction.diagnostic.media.domain.DiagnosticMedia;
 import com.example.autoauction.diagnostic.media.domain.MediaType;
+import com.example.autoauction.diagnostic.media.domain.ProcessingStatus;
+import com.example.autoauction.diagnostic.media.domain.UploadStatus;
 import com.example.autoauction.diagnostic.media.domain.port.DiagnosticMediaRepository;
 import com.example.autoauction.diagnostic.media.domain.port.StorageClient;
 import com.example.autoauction.diagnostic.media.domain.port.VideoProcessor;
+import com.example.autoauction.diagnostic.media.web.dto.MediaResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -106,6 +109,90 @@ public class VideoProcessingService {
                 log.error("VideoProcessingService: media {} - STALE_RECOVERY_FAILURE, isolated: {}", media.getId(), e.getMessage(), e);
             }
         }
+    }
+
+    /**
+     * MEDIA-3.4 Phase 9: admin-triggered FAILED -> PENDING retry. Never
+     * called automatically - processPending()/reconcileStale() never invoke
+     * this; it exists solely for the admin HTTP endpoint. Idempotent from
+     * the caller's perspective: retrying an already-PENDING row is a safe
+     * no-op (current state returned, no error) - the same idempotency shape
+     * as DiagnosticMediaService.finalize()'s established precedent for an
+     * already-settled row. DELETED/PROCESSING/READY are genuine conflicts,
+     * not no-ops, and are rejected.
+     */
+    public MediaResponse retryProcessing(Long mediaId) {
+        DiagnosticMedia media = mediaRepository.findById(mediaId)
+                .orElseThrow(() -> new IllegalArgumentException("Медиафайл не найден: " + mediaId));
+
+        MediaResponse noop = classifyForRetry(media);
+        if (noop != null) {
+            return noop;
+        }
+
+        // classifyForRetry() only returns null for FAILED (uploadStatus already confirmed READY
+        // there, since DELETED is the only other reachable uploadStatus once processingStatus
+        // has ever left NOT_REQUIRED/PENDING - see classifyForRetry's Javadoc). This is the ONLY
+        // state from which retryFailedProcessing() is ever called.
+        boolean retried = mediaRepository.retryFailedProcessing(mediaId);
+        if (retried) {
+            DiagnosticMedia after = mediaRepository.findById(mediaId)
+                    .orElseThrow(() -> new IllegalArgumentException("Медиафайл не найден: " + mediaId));
+            log.info("VideoProcessingService: media {} - admin retry succeeded (FAILED -> PENDING)", mediaId);
+            return MediaResponse.fromDomain(after);
+        }
+
+        // retryFailedProcessing()'s boolean is overloaded - false does not by itself mean
+        // "conflict". Re-read the authoritative state instead of assuming failure: another
+        // actor may have already resolved this (e.g. a concurrent retry request winning the
+        // same atomic UPDATE) between our check above and this call.
+        DiagnosticMedia after = mediaRepository.findById(mediaId)
+                .orElseThrow(() -> new IllegalArgumentException("Медиафайл не найден: " + mediaId));
+        MediaResponse afterNoop = classifyForRetry(after);
+        if (afterNoop != null) {
+            log.info("VideoProcessingService: media {} - retry raced with a concurrent change, resolved to {}",
+                    mediaId, after.getProcessingStatus());
+            return afterNoop;
+        }
+        // Still FAILED+READY despite a failed atomic UPDATE attempt - a genuine failure to
+        // retry, not a race resolved by someone else. Surface it, do not silently claim success.
+        log.warn("VideoProcessingService: media {} - retryFailedProcessing() returned false but state is still FAILED+READY",
+                mediaId);
+        throw new IllegalStateException("Не удалось запустить повторную обработку медиафайла " + mediaId
+                + ": состояние не изменилось (processingStatus=" + after.getProcessingStatus() + ")");
+    }
+
+    /**
+     * Classifies mediaId's CURRENT state for a retry request. Returns a
+     * MediaResponse if the state is the idempotent PENDING no-op; throws
+     * IllegalStateException if it is a genuine conflict (DELETED, or
+     * processingStatus PROCESSING/READY/anything but FAILED); returns null
+     * only for the one state retryProcessing() should actually act on:
+     * processingStatus=FAILED (uploadStatus is necessarily READY at that
+     * point - DELETED is checked first, and no other uploadStatus is
+     * reachable once processingStatus has ever left NOT_REQUIRED/PENDING,
+     * since claimForProcessing()'s own WHERE clause requires
+     * uploadStatus=READY and uploadStatus never transitions away from READY
+     * except to DELETED).
+     */
+    private MediaResponse classifyForRetry(DiagnosticMedia media) {
+        if (media.getUploadStatus() == UploadStatus.DELETED) {
+            throw new IllegalStateException("Медиафайл удалён, повторная обработка недоступна: " + media.getId());
+        }
+        if (media.getProcessingStatus() == ProcessingStatus.PENDING) {
+            return MediaResponse.fromDomain(media);
+        }
+        if (media.getProcessingStatus() == ProcessingStatus.PROCESSING) {
+            throw new IllegalStateException("Медиафайл сейчас обрабатывается, повторная обработка недоступна: " + media.getId());
+        }
+        if (media.getProcessingStatus() == ProcessingStatus.READY) {
+            throw new IllegalStateException("Медиафайл уже успешно обработан, повторная обработка недоступна: " + media.getId());
+        }
+        if (media.getProcessingStatus() != ProcessingStatus.FAILED) {
+            throw new IllegalStateException("Повторная обработка доступна только для видео в статусе FAILED. Текущий статус: "
+                    + media.getProcessingStatus());
+        }
+        return null;
     }
 
     private void processOne(DiagnosticMedia candidate) {
