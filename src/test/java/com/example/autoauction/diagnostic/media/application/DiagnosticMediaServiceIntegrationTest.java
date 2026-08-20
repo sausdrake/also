@@ -32,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -499,6 +500,164 @@ class DiagnosticMediaServiceIntegrationTest {
 
             assertThatThrownBy(() -> mediaService.getReadUrl(mediaId, s.ownerId(), false))
                     .isInstanceOf(IllegalStateException.class);
+        }
+    }
+
+    // ==================== Thumbnail Read URL (MEDIA-3.4 Phase 11) ====================
+
+    @Nested
+    @DisplayName("Thumbnail Read URL")
+    class ThumbnailReadUrlTests {
+
+        /** Directly constructs a VIDEO row in the desired state - claim/process/finalize is Phase 6's concern, not this test's. */
+        private Long videoMedia(Setup s, ProcessingStatus processingStatus, String thumbnailStorageKey) {
+            DiagnosticMedia media = new DiagnosticMedia();
+            media.setDiagnosticRequestId(s.requestId());
+            media.setInspectionItemId(s.itemId());
+            media.setUploaderId(s.diagnosticId());
+            media.setStorageKey("diagnostic-media/" + s.requestId() + "/" + UUID.randomUUID() + ".mp4");
+            media.setMediaType(MediaType.VIDEO);
+            media.setMimeType("video/mp4");
+            media.setSizeBytes((long) VALID_MP4.length);
+            media.setSortOrder(0);
+            media.setUploadStatus(UploadStatus.READY);
+            media.setProcessingStatus(processingStatus);
+            media.setThumbnailStorageKey(thumbnailStorageKey);
+            return mediaRepository.save(media).getId();
+        }
+
+        private String thumbnailKey(Long requestId) {
+            return "diagnostic-media-thumbnail/" + requestId + "/" + UUID.randomUUID() + ".jpg";
+        }
+
+        @Test
+        @DisplayName("Владелец, назначенный диагност и админ получают ссылку на превью")
+        void ownerDiagnosticianAdmin_Succeed() {
+            Setup s = setUpStandard(false, true);
+            String key = thumbnailKey(s.requestId());
+            Long mediaId = videoMedia(s, ProcessingStatus.READY, key);
+
+            MediaReadUrlResponse asOwner = mediaService.getThumbnailReadUrl(mediaId, s.ownerId(), false);
+            MediaReadUrlResponse asDiagnostician = mediaService.getThumbnailReadUrl(mediaId, s.diagnosticId(), false);
+            MediaReadUrlResponse asAdmin = mediaService.getThumbnailReadUrl(mediaId, 999_999L, true);
+
+            assertThat(asOwner.url()).contains(key);
+            assertThat(asDiagnostician.url()).contains(key);
+            assertThat(asAdmin.url()).contains(key);
+        }
+
+        @Test
+        @DisplayName("Посторонний пользователь отклонён (SecurityException, как у getReadUrl)")
+        void unrelatedUser_Rejected() {
+            Setup s = setUpStandard(false, true);
+            Long mediaId = videoMedia(s, ProcessingStatus.READY, thumbnailKey(s.requestId()));
+            Long strangerId = createUser("stranger-thumb");
+
+            assertThatThrownBy(() -> mediaService.getThumbnailReadUrl(mediaId, strangerId, false))
+                    .isInstanceOf(SecurityException.class);
+        }
+
+        @Test
+        @DisplayName("thumbnailStorageKey == null -> IllegalStateException (409), не NPE")
+        void nullThumbnailKey_ThrowsIllegalState_NotNpe() {
+            Setup s = setUpStandard(false, true);
+            Long mediaId = videoMedia(s, ProcessingStatus.PENDING, null);
+
+            assertThatThrownBy(() -> mediaService.getThumbnailReadUrl(mediaId, s.ownerId(), false))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        @DisplayName("Копипаст-защита: URL построен из thumbnailStorageKey, а не storageKey")
+        void copyPasteGuard_UsesThumbnailKeyNotOriginalKey() {
+            Setup s = setUpStandard(false, true);
+            String thumbKey = thumbnailKey(s.requestId());
+            Long mediaId = videoMedia(s, ProcessingStatus.READY, thumbKey);
+            DiagnosticMedia saved = mediaRepository.findById(mediaId).orElseThrow();
+
+            MediaReadUrlResponse response = mediaService.getThumbnailReadUrl(mediaId, s.ownerId(), false);
+
+            assertThat(response.url()).contains(thumbKey);
+            assertThat(response.url()).doesNotContain(saved.getStorageKey());
+        }
+
+        @Test
+        @DisplayName("Используется существующий diagnostic.media.read-url-ttl-minutes (то же значение, что и у getReadUrl)")
+        void usesExistingReadUrlTtl_SameAsOriginalMediaEndpoint() {
+            Setup s = setUpStandard(true, true);
+            MediaIntentResponse intent = mediaService.createIntent(
+                    s.requestId(), s.itemId(), s.diagnosticId(), MediaType.PHOTO, "image/jpeg", VALID_JPEG.length);
+            DiagnosticMedia photoMedia = mediaRepository.findById(intent.mediaId()).orElseThrow();
+            storageClient.simulateUpload(photoMedia.getStorageKey(), VALID_JPEG, "image/jpeg");
+            mediaService.finalize(intent.mediaId(), s.diagnosticId());
+            Long photoMediaId = intent.mediaId();
+            String thumbKey = thumbnailKey(s.requestId());
+            Long videoMediaId = videoMedia(s, ProcessingStatus.READY, thumbKey);
+
+            MediaReadUrlResponse originalUrlResponse = mediaService.getReadUrl(photoMediaId, s.ownerId(), false);
+            MediaReadUrlResponse thumbnailUrlResponse = mediaService.getThumbnailReadUrl(videoMediaId, s.ownerId(), false);
+
+            // No new/separate TTL was introduced for the thumbnail path (Phase 11 scope
+            // control forbids a new configuration property) - both calls compute
+            // Instant.now().plus(readUrlTtl) from the SAME injected field, back-to-back, so
+            // their expiresAt values must be within a couple of seconds of each other. If the
+            // thumbnail path ever used a different TTL, this gap would be minutes, not seconds.
+            java.time.Duration gap = java.time.Duration.between(originalUrlResponse.expiresAt(), thumbnailUrlResponse.expiresAt()).abs();
+            assertThat(gap).isLessThan(java.time.Duration.ofSeconds(5));
+        }
+
+        @Test
+        @DisplayName("Чтение превью не мутирует uploadStatus/processingStatus/thumbnailStorageKey")
+        void readingThumbnailUrl_DoesNotMutateState() {
+            Setup s = setUpStandard(false, true);
+            String key = thumbnailKey(s.requestId());
+            Long mediaId = videoMedia(s, ProcessingStatus.READY, key);
+
+            mediaService.getThumbnailReadUrl(mediaId, s.ownerId(), false);
+
+            DiagnosticMedia after = mediaRepository.findById(mediaId).orElseThrow();
+            assertThat(after.getUploadStatus()).isEqualTo(UploadStatus.READY);
+            assertThat(after.getProcessingStatus()).isEqualTo(ProcessingStatus.READY);
+            assertThat(after.getThumbnailStorageKey()).isEqualTo(key);
+        }
+
+        @Test
+        @DisplayName("23. Гонка с retryFailedProcessing: чтение превью само по себе не меняет processingStatus")
+        void raceWithRetry_ThumbnailReadDoesNotMutateProcessingStatus() {
+            Setup s = setUpStandard(false, true);
+            Long mediaId = videoMedia(s, ProcessingStatus.FAILED, null);
+
+            // A FAILED->PENDING retry happens "concurrently" (sequential here, per the phase's
+            // lightweight-concurrency allowance) - the read call itself must never resurrect or
+            // otherwise change processingStatus, regardless of ordering.
+            boolean retried = mediaRepository.retryFailedProcessing(mediaId);
+            assertThat(retried).isTrue();
+
+            assertThatThrownBy(() -> mediaService.getThumbnailReadUrl(mediaId, s.ownerId(), false))
+                    .isInstanceOf(IllegalStateException.class); // still no thumbnail - PENDING now, not READY+thumbnail
+
+            DiagnosticMedia after = mediaRepository.findById(mediaId).orElseThrow();
+            assertThat(after.getProcessingStatus()).isEqualTo(ProcessingStatus.PENDING); // unchanged by the read attempt
+        }
+
+        @Test
+        @DisplayName("24. Гонка с восстановлением зависшего PROCESSING: чтение превью не меняет processingStatus")
+        void raceWithStaleRecovery_ThumbnailReadDoesNotMutateProcessingStatus() {
+            Setup s = setUpStandard(false, true);
+            Long mediaId = videoMedia(s, ProcessingStatus.PENDING, null);
+            boolean claimed = mediaRepository.claimForProcessing(mediaId);
+            assertThat(claimed).isTrue();
+
+            // Thumbnail read attempted while the row is genuinely PROCESSING (pre-stale-recovery).
+            assertThatThrownBy(() -> mediaService.getThumbnailReadUrl(mediaId, s.ownerId(), false))
+                    .isInstanceOf(IllegalStateException.class);
+
+            // Stale recovery then resets it (simulating the scheduler's reconcileStale()).
+            boolean reset = mediaRepository.resetStaleProcessing(mediaId);
+            assertThat(reset).isTrue();
+
+            DiagnosticMedia after = mediaRepository.findById(mediaId).orElseThrow();
+            assertThat(after.getProcessingStatus()).isEqualTo(ProcessingStatus.PENDING); // reset succeeded, untouched by the earlier read
         }
     }
 

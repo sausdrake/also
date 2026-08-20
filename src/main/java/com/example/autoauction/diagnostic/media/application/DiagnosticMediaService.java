@@ -185,6 +185,54 @@ public class DiagnosticMediaService {
     // ==================== Read URL ====================
 
     public MediaReadUrlResponse getReadUrl(Long mediaId, Long callerUserId, boolean isAdmin) {
+        return signedReadUrl(loadAuthorizedMedia(mediaId, callerUserId, isAdmin));
+    }
+
+    /**
+     * MEDIA-3.4 Phase 11: same authorization boundary as getReadUrl() (owner/
+     * assigned diagnostician/admin), presigning thumbnailStorageKey instead
+     * of storageKey. Deliberately reuses loadAuthorizedMedia() rather than
+     * re-deriving the owner/diagnostician/admin check - a second,
+     * independently-written authorization algorithm here would risk drifting
+     * from getReadUrl()'s boundary.
+     */
+    public MediaReadUrlResponse getThumbnailReadUrl(Long mediaId, Long callerUserId, boolean isAdmin) {
+        return signedThumbnailReadUrl(loadAuthorizedMedia(mediaId, callerUserId, isAdmin));
+    }
+
+    /** Public (unauthenticated) access - the request MUST be APPROVED. Called only from PublicReportController. */
+    public MediaReadUrlResponse getReadUrlForApprovedReport(Long mediaId) {
+        return signedReadUrl(loadApprovedReportMedia(mediaId));
+    }
+
+    /**
+     * MEDIA-3.4 Phase 11: validates the exact same not-found/not-approved
+     * boundary as getReadUrlForApprovedReport() (via loadApprovedReportMedia)
+     * PLUS the same uploadStatus=READY check signedReadUrl()/
+     * signedThumbnailReadUrl() already apply - checked here too (not just
+     * inside signedThumbnailReadUrl) so PublicReportController can catch
+     * exactly this "media not visible at all" boundary and keep mapping it
+     * to its existing blanket 404, while a genuinely-visible-but-not-yet-
+     * processed thumbnail (thumbnailStorageKey == null) is left to surface
+     * as its own distinct 409 via thumbnailReadUrlFor() below - deliberately
+     * NOT collapsed into the same 404 the original-media endpoint uses for
+     * "not found"/"not approved", since it leaks no information a public,
+     * already-APPROVED-report caller doesn't already have.
+     */
+    public DiagnosticMedia loadVisibleApprovedReportMedia(Long mediaId) {
+        DiagnosticMedia media = loadApprovedReportMedia(mediaId);
+        if (media.getUploadStatus() != UploadStatus.READY) {
+            throw new IllegalStateException("Медиафайл недоступен для чтения: " + media.getUploadStatus());
+        }
+        return media;
+    }
+
+    /** Presigns the thumbnail of a media already validated by loadVisibleApprovedReportMedia(). */
+    public MediaReadUrlResponse thumbnailReadUrlFor(DiagnosticMedia media) {
+        return signedThumbnailReadUrl(media);
+    }
+
+    private DiagnosticMedia loadAuthorizedMedia(Long mediaId, Long callerUserId, boolean isAdmin) {
         DiagnosticMedia media = mediaRepository.findById(mediaId)
                 .orElseThrow(() -> new IllegalArgumentException("Медиафайл не найден: " + mediaId));
         DiagnosticRequest request = requestRepository.findById(media.getDiagnosticRequestId())
@@ -195,12 +243,10 @@ public class DiagnosticMediaService {
         if (!isAdmin && !isOwner && !isAssignedDiagnostician) {
             throw new SecurityException("Нет доступа к этому медиафайлу");
         }
-
-        return signedReadUrl(media);
+        return media;
     }
 
-    /** Public (unauthenticated) access - the request MUST be APPROVED. Called only from PublicReportController. */
-    public MediaReadUrlResponse getReadUrlForApprovedReport(Long mediaId) {
+    private DiagnosticMedia loadApprovedReportMedia(Long mediaId) {
         DiagnosticMedia media = mediaRepository.findById(mediaId)
                 .orElseThrow(() -> new IllegalArgumentException("Медиафайл не найден: " + mediaId));
         DiagnosticRequest request = requestRepository.findById(media.getDiagnosticRequestId())
@@ -209,7 +255,7 @@ public class DiagnosticMediaService {
         if (request.getStatus() != DiagnosticRequest.DiagnosticRequestStatus.APPROVED) {
             throw new IllegalStateException("Отчёт не одобрен");
         }
-        return signedReadUrl(media);
+        return media;
     }
 
     private MediaReadUrlResponse signedReadUrl(DiagnosticMedia media) {
@@ -217,6 +263,24 @@ public class DiagnosticMediaService {
             throw new IllegalStateException("Медиафайл недоступен для чтения: " + media.getUploadStatus());
         }
         URI url = storageClient.createPresignedReadUrl(media.getStorageKey(), readUrlTtl);
+        return new MediaReadUrlResponse(url.toString(), java.time.Instant.now().plus(readUrlTtl));
+    }
+
+    /**
+     * MEDIA-3.4 Phase 11: mirrors signedReadUrl() exactly except for which
+     * storage key is presigned. Re-checks uploadStatus=READY independently
+     * (not just relying on a caller having already checked it) so this
+     * method is safe to call directly, matching signedReadUrl()'s own
+     * defensive shape.
+     */
+    private MediaReadUrlResponse signedThumbnailReadUrl(DiagnosticMedia media) {
+        if (media.getUploadStatus() != UploadStatus.READY) {
+            throw new IllegalStateException("Медиафайл недоступен для чтения: " + media.getUploadStatus());
+        }
+        if (media.getThumbnailStorageKey() == null) {
+            throw new IllegalStateException("Превью недоступно для медиафайла: " + media.getId());
+        }
+        URI url = storageClient.createPresignedReadUrl(media.getThumbnailStorageKey(), readUrlTtl);
         return new MediaReadUrlResponse(url.toString(), java.time.Instant.now().plus(readUrlTtl));
     }
 

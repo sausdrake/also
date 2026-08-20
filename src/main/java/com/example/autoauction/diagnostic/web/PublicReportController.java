@@ -2,6 +2,7 @@ package com.example.autoauction.diagnostic.web;
 
 import com.example.autoauction.diagnostic.application.DiagnosticRequestService;
 import com.example.autoauction.diagnostic.media.application.DiagnosticMediaService;
+import com.example.autoauction.diagnostic.media.domain.DiagnosticMedia;
 import com.example.autoauction.diagnostic.media.web.dto.MediaReadUrlResponse;
 import com.example.autoauction.diagnostic.web.dto.DiagnosticRequestResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -64,5 +65,29 @@ public class PublicReportController {
             // silently misreported as "not found".
             return ResponseEntity.notFound().build();
         }
+    }
+
+    /**
+     * MEDIA-3.4 Phase 11: public read-URL for a processed video's thumbnail,
+     * belonging to an APPROVED report only - same visibility boundary as
+     * getMediaReadUrl() above (loadVisibleApprovedReportMedia() re-enforces
+     * not-found/not-approved/not-READY identically, mapped to the same
+     * blanket 404). Deliberately NOT collapsed into that same catch: a
+     * thumbnail that hasn't been generated yet (thumbnailStorageKey == null)
+     * is a distinct, legitimate 409 - it leaks no information a public,
+     * already-APPROVED-report caller doesn't already have, unlike "not
+     * found"/"not approved" which must stay indistinguishable from each
+     * other.
+     */
+    @GetMapping("/media/{mediaId}/thumbnail-url")
+    @Operation(summary = "Получить ссылку на превью видео одобренного отчёта")
+    public ResponseEntity<MediaReadUrlResponse> getMediaThumbnailReadUrl(@PathVariable Long mediaId) {
+        DiagnosticMedia media;
+        try {
+            media = mediaService.loadVisibleApprovedReportMedia(mediaId);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(mediaService.thumbnailReadUrlFor(media));
     }
 }

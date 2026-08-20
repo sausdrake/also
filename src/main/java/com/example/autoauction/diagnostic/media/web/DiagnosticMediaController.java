@@ -54,6 +54,17 @@ public class DiagnosticMediaController {
         return ResponseEntity.ok(mediaService.getReadUrl(mediaId, currentUser.getUserId(), isAdmin));
     }
 
+    @GetMapping("/{mediaId}/thumbnail-url")
+    @Operation(summary = "Получить короткоживущую подписанную ссылку на превью видео")
+    public ResponseEntity<MediaReadUrlResponse> getThumbnailReadUrl(
+            @PathVariable Long mediaId,
+            @CurrentUser UserPrincipal currentUser
+    ) {
+        boolean isAdmin = currentUser.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        return ResponseEntity.ok(mediaService.getThumbnailReadUrl(mediaId, currentUser.getUserId(), isAdmin));
+    }
+
     @DeleteMapping("/{mediaId}")
     @Operation(summary = "Удалить медиафайл (мягкое удаление)")
     public ResponseEntity<Void> delete(
