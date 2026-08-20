@@ -1,6 +1,8 @@
 package com.example.autoauction.diagnostic.media.infrastructure.persistence;
 
+import com.example.autoauction.diagnostic.media.domain.ProcessingStatus;
 import com.example.autoauction.diagnostic.media.domain.UploadStatus;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -50,4 +52,41 @@ public interface SpringDataDiagnosticMediaJpaRepository extends JpaRepository<Jp
     @Query("UPDATE JpaDiagnosticMediaEntity m SET m.uploadStatus = 'DELETED', m.updatedAt = :now " +
             "WHERE m.id = :id AND m.uploadStatus <> 'DELETED'")
     int softDelete(@Param("id") Long id, @Param("now") OffsetDateTime now);
+
+    // ==================== MEDIA-3.4: video processing ====================
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE JpaDiagnosticMediaEntity m SET m.processingStatus = 'PROCESSING', m.processingClaimedAt = :now, m.updatedAt = :now " +
+            "WHERE m.id = :id AND m.processingStatus = 'PENDING' AND m.uploadStatus = 'READY'")
+    int claimForProcessing(@Param("id") Long id, @Param("now") OffsetDateTime now);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE JpaDiagnosticMediaEntity m SET m.processingStatus = 'READY', " +
+            "m.durationSeconds = :durationSeconds, m.width = :width, m.height = :height, " +
+            "m.thumbnailStorageKey = :thumbnailStorageKey, m.updatedAt = :now " +
+            "WHERE m.id = :id AND m.processingStatus = 'PROCESSING' AND m.uploadStatus = 'READY'")
+    int finalizeProcessingReady(@Param("id") Long id, @Param("durationSeconds") Integer durationSeconds,
+                                 @Param("width") Integer width, @Param("height") Integer height,
+                                 @Param("thumbnailStorageKey") String thumbnailStorageKey, @Param("now") OffsetDateTime now);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE JpaDiagnosticMediaEntity m SET m.processingStatus = 'FAILED', m.updatedAt = :now " +
+            "WHERE m.id = :id AND m.processingStatus = 'PROCESSING'")
+    int markProcessingFailed(@Param("id") Long id, @Param("now") OffsetDateTime now);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE JpaDiagnosticMediaEntity m SET m.processingStatus = 'PENDING', m.updatedAt = :now " +
+            "WHERE m.id = :id AND m.processingStatus = 'PROCESSING'")
+    int resetStaleProcessing(@Param("id") Long id, @Param("now") OffsetDateTime now);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE JpaDiagnosticMediaEntity m SET m.processingStatus = 'PENDING', m.updatedAt = :now " +
+            "WHERE m.id = :id AND m.processingStatus = 'FAILED' AND m.uploadStatus = 'READY'")
+    int retryFailedProcessing(@Param("id") Long id, @Param("now") OffsetDateTime now);
+
+    List<JpaDiagnosticMediaEntity> findByUploadStatusAndProcessingStatusOrderByCreatedAtAsc(
+            UploadStatus uploadStatus, ProcessingStatus processingStatus, Pageable pageable);
+
+    List<JpaDiagnosticMediaEntity> findByProcessingStatusAndProcessingClaimedAtBeforeOrderByProcessingClaimedAtAsc(
+            ProcessingStatus processingStatus, OffsetDateTime cutoff, Pageable pageable);
 }

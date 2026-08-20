@@ -38,6 +38,9 @@ public class DiagnosticMedia {
     private Integer height;
     private String thumbnailStorageKey;
 
+    /** MEDIA-3.4: set only by the atomic PENDING -> PROCESSING claim transition. */
+    private OffsetDateTime processingClaimedAt;
+
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

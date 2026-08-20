@@ -65,6 +65,16 @@ public class JpaDiagnosticMediaEntity {
     @Column(name = "thumbnail_storage_key", length = 500)
     private String thumbnailStorageKey;
 
+    /**
+     * MEDIA-3.4: set ONLY by the atomic PENDING -> PROCESSING claim
+     * transition (see SpringDataDiagnosticMediaJpaRepository.claimForProcessing).
+     * Deliberately NOT touched by onCreate()/onUpdate() below - ordinary
+     * entity saves (e.g. DiagnosticMediaService.updateCaption/reorder) must
+     * never overwrite or fabricate a claim timestamp.
+     */
+    @Column(name = "processing_claimed_at")
+    private OffsetDateTime processingClaimedAt;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 

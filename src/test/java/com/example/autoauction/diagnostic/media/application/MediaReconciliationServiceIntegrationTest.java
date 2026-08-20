@@ -134,6 +134,24 @@ class MediaReconciliationServiceIntegrationTest {
         return mediaRepository.save(media);
     }
 
+    /** MEDIA-3.4 Phase 7: a READY VIDEO row, no thumbnail yet (mirrors what processPending() leaves before processing runs). */
+    private DiagnosticMedia createReadyVideo(RequestAndItem ctx) {
+        DiagnosticMedia media = new DiagnosticMedia();
+        media.setDiagnosticRequestId(ctx.requestId());
+        media.setInspectionItemId(ctx.itemId());
+        media.setUploaderId(ctx.uploaderId());
+        media.setStorageKey("diagnostic-media/" + ctx.requestId() + "/" + UUID.randomUUID() + ".mp4");
+        media.setMediaType(MediaType.VIDEO);
+        media.setMimeType("video/mp4");
+        media.setSizeBytes(1000L);
+        media.setSortOrder(0);
+        media.setUploadStatus(UploadStatus.READY);
+        media.setProcessingStatus(ProcessingStatus.PENDING);
+        DiagnosticMedia saved = mediaRepository.save(media);
+        storageClient.simulateUpload(saved.getStorageKey(), VALID_JPEG, "video/mp4");
+        return saved;
+    }
+
     /**
      * Test-only: createdAt is set by @PrePersist and not otherwise mutable
      * through the port (deliberately - application code never rewrites it).
@@ -208,5 +226,63 @@ class MediaReconciliationServiceIntegrationTest {
         assertThat(mediaRepository.findById(media.getId()).orElseThrow().getUploadStatus())
                 .as("a READY row with a missing object must NOT be silently mutated")
                 .isEqualTo(UploadStatus.READY);
+    }
+
+    // ==================== MEDIA-3.4 Phase 7: DELETED thumbnail cleanup ====================
+
+    @Test
+    @DisplayName("Phase7-8: DELETED VIDEO без миниатюры -> удаляется только канонический объект")
+    void deletedVideoWithoutThumbnail_CanonicalObjectCleaned() {
+        RequestAndItem ctx = createRequestAndItem();
+        DiagnosticMedia media = createReadyVideo(ctx); // thumbnailStorageKey stays null - never processed
+        mediaRepository.softDelete(media.getId());
+        assertThat(storageClient.hasObject(media.getStorageKey())).isTrue();
+
+        reconciliationService.reconcile();
+
+        assertThat(storageClient.hasObject(media.getStorageKey())).isFalse();
+        assertThat(mediaRepository.findById(media.getId()).orElseThrow().getThumbnailStorageKey()).isNull();
+    }
+
+    @Test
+    @DisplayName("Phase7-9: DELETED VIDEO с миниатюрой -> удаляются и канонический объект, и миниатюра")
+    void deletedVideoWithThumbnail_BothObjectsCleaned() {
+        RequestAndItem ctx = createRequestAndItem();
+        DiagnosticMedia media = createReadyVideo(ctx);
+        mediaRepository.claimForProcessing(media.getId());
+        String thumbnailKey = "diagnostic-media-thumbnail/" + ctx.requestId() + "/" + UUID.randomUUID() + ".jpg";
+        storageClient.simulateUpload(thumbnailKey, VALID_JPEG, "image/jpeg");
+        mediaRepository.finalizeProcessingReady(media.getId(), 10, 640, 480, thumbnailKey);
+        mediaRepository.softDelete(media.getId());
+        assertThat(storageClient.hasObject(media.getStorageKey())).isTrue();
+        assertThat(storageClient.hasObject(thumbnailKey)).isTrue();
+
+        reconciliationService.reconcile();
+
+        assertThat(storageClient.hasObject(media.getStorageKey())).isFalse();
+        assertThat(storageClient.hasObject(thumbnailKey)).isFalse();
+        assertThat(mediaRepository.findById(media.getId()).orElseThrow().getUploadStatus())
+                .isEqualTo(UploadStatus.DELETED); // tombstone retained
+    }
+
+    @Test
+    @DisplayName("Phase7-10: повторный прогон реконсиляции безопасен, когда оба объекта уже отсутствуют")
+    void reconciliation_IdempotentWhenObjectsAlreadyAbsent() {
+        RequestAndItem ctx = createRequestAndItem();
+        DiagnosticMedia media = createReadyVideo(ctx);
+        mediaRepository.claimForProcessing(media.getId());
+        String thumbnailKey = "diagnostic-media-thumbnail/" + ctx.requestId() + "/" + UUID.randomUUID() + ".jpg";
+        storageClient.simulateUpload(thumbnailKey, VALID_JPEG, "image/jpeg");
+        mediaRepository.finalizeProcessingReady(media.getId(), 10, 640, 480, thumbnailKey);
+        mediaRepository.softDelete(media.getId());
+
+        reconciliationService.reconcile(); // first run deletes both objects
+        assertThat(storageClient.hasObject(media.getStorageKey())).isFalse();
+        assertThat(storageClient.hasObject(thumbnailKey)).isFalse();
+
+        reconciliationService.reconcile(); // second run - objects already absent, must not throw
+
+        assertThat(mediaRepository.findById(media.getId()).orElseThrow().getUploadStatus())
+                .isEqualTo(UploadStatus.DELETED); // tombstone retained
     }
 }

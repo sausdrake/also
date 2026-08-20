@@ -93,12 +93,19 @@ public class MediaReconciliationService {
     }
 
     /**
-     * CASE 4/5: DELETED rows still need their R2 object removed. Deleting an
-     * already-absent object is a safe, idempotent no-op for S3-compatible
+     * CASE 4/5: DELETED rows still need their R2 object(s) removed. Deleting
+     * an already-absent object is a safe, idempotent no-op for S3-compatible
      * storage, so this can run unconditionally every cycle without tracking
      * "already cleaned up" separately - a failure here (case 5) simply means
      * the same DELETED row is retried on the next cycle; the DB tombstone
      * (uploadStatus=DELETED) is never touched either way.
+     *
+     * MEDIA-3.4 Phase 7: also deletes thumbnailStorageKey when present - a
+     * VIDEO row can have been fully processed (thumbnail generated and
+     * persisted) before being soft-deleted, in which case the thumbnail
+     * object needs the exact same best-effort cleanup as the canonical
+     * video object. Purely additive to this existing case; no new
+     * reconciliation subsystem, no bucket listing.
      */
     private void reconcileDeletedObjects() {
         List<DiagnosticMedia> deleted = mediaRepository.findByUploadStatus(UploadStatus.DELETED);
@@ -108,6 +115,14 @@ public class MediaReconciliationService {
             } catch (Exception e) {
                 log.warn("MEDIA-3.2 reconciliation: failed to delete R2 object for media {} - will retry next cycle: {}",
                         media.getId(), e.getMessage());
+            }
+            if (media.getThumbnailStorageKey() != null) {
+                try {
+                    storageClient.deleteObject(media.getThumbnailStorageKey());
+                } catch (Exception e) {
+                    log.warn("MEDIA-3.4 reconciliation: failed to delete R2 thumbnail object for media {} - will retry next cycle: {}",
+                            media.getId(), e.getMessage());
+                }
             }
         }
     }

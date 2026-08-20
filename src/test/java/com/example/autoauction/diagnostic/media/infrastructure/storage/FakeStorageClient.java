@@ -8,10 +8,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -30,6 +33,7 @@ public class FakeStorageClient implements StorageClient {
     private final Map<String, StoredObject> objects = new ConcurrentHashMap<>();
     private volatile boolean failNextPutObject = false;
     private volatile boolean failNextHeadObject = false;
+    private volatile boolean failNextDownloadToFile = false;
 
     /** Test-only: simulates the browser's direct-to-storage PUT that would follow createPresignedUpload(). */
     public void simulateUpload(String storageKey, byte[] content, String contentType) {
@@ -44,6 +48,11 @@ public class FakeStorageClient implements StorageClient {
     /** Test-only: the next headObject() call throws instead of returning (one-shot, then resets). */
     public void failNextHeadObject() {
         failNextHeadObject = true;
+    }
+
+    /** Test-only: the next downloadToFile() call throws instead of succeeding (one-shot, then resets). */
+    public void failNextDownloadToFile() {
+        failNextDownloadToFile = true;
     }
 
     /** Test-only: simulates the object being missing (e.g. deleted out-of-band, or never actually uploaded). */
@@ -105,5 +114,22 @@ public class FakeStorageClient implements StorageClient {
     @Override
     public void deleteObject(String storageKey) {
         objects.remove(storageKey);
+    }
+
+    @Override
+    public void downloadToFile(String storageKey, Path destination) {
+        if (failNextDownloadToFile) {
+            failNextDownloadToFile = false;
+            throw new RuntimeException("simulated R2 downloadToFile transport failure");
+        }
+        StoredObject obj = objects.get(storageKey);
+        if (obj == null) {
+            throw new NoSuchElementException("No such object: " + storageKey);
+        }
+        try {
+            Files.write(destination, obj.content());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 }

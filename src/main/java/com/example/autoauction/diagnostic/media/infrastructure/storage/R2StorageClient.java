@@ -26,6 +26,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Optional;
 
@@ -149,6 +150,16 @@ public class R2StorageClient implements StorageClient {
             log.warn("Failed to delete R2 object {}: {}", storageKey, e.getMessage());
             throw e;
         }
+    }
+
+    @Override
+    public void downloadToFile(String storageKey, Path destination) {
+        GetObjectRequest request = GetObjectRequest.builder()
+                .bucket(bucket)
+                .key(storageKey)
+                .build();
+        // Streams directly to disk - never buffers the object in the JVM heap.
+        s3Client.getObject(request, ResponseTransformer.toFile(destination));
     }
 
     private static URI toUri(java.net.URL url) {

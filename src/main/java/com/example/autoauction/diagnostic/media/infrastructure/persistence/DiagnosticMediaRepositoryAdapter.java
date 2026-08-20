@@ -1,10 +1,12 @@
 package com.example.autoauction.diagnostic.media.infrastructure.persistence;
 
 import com.example.autoauction.diagnostic.media.domain.DiagnosticMedia;
+import com.example.autoauction.diagnostic.media.domain.ProcessingStatus;
 import com.example.autoauction.diagnostic.media.domain.UploadStatus;
 import com.example.autoauction.diagnostic.media.domain.port.DiagnosticMediaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -109,5 +111,72 @@ public class DiagnosticMediaRepositoryAdapter implements DiagnosticMediaReposito
         for (int i = 0; i < orderedMediaIds.size(); i++) {
             jpaRepository.updateSortOrder(orderedMediaIds.get(i), i, now);
         }
+    }
+
+    // ==================== MEDIA-3.4: video processing ====================
+
+    @Override
+    public boolean claimForProcessing(Long id) {
+        int updated = jpaRepository.claimForProcessing(id, OffsetDateTime.now());
+        if (updated > 0) {
+            log.info("DiagnosticMedia {} claimed for processing (PENDING -> PROCESSING)", id);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean finalizeProcessingReady(Long id, Integer durationSeconds, Integer width, Integer height, String thumbnailStorageKey) {
+        int updated = jpaRepository.finalizeProcessingReady(id, durationSeconds, width, height, thumbnailStorageKey, OffsetDateTime.now());
+        if (updated > 0) {
+            log.info("DiagnosticMedia {} processing finalized READY (duration={}, {}x{}, thumbnail={})",
+                    id, durationSeconds, width, height, thumbnailStorageKey);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean markProcessingFailed(Long id) {
+        int updated = jpaRepository.markProcessingFailed(id, OffsetDateTime.now());
+        if (updated > 0) {
+            log.warn("DiagnosticMedia {} processing marked FAILED", id);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean resetStaleProcessing(Long id) {
+        int updated = jpaRepository.resetStaleProcessing(id, OffsetDateTime.now());
+        if (updated > 0) {
+            log.warn("DiagnosticMedia {} stale PROCESSING reset to PENDING", id);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean retryFailedProcessing(Long id) {
+        int updated = jpaRepository.retryFailedProcessing(id, OffsetDateTime.now());
+        if (updated > 0) {
+            log.info("DiagnosticMedia {} processing retry requested (FAILED -> PENDING)", id);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public List<DiagnosticMedia> findPendingProcessing(int limit) {
+        return jpaRepository.findByUploadStatusAndProcessingStatusOrderByCreatedAtAsc(
+                        UploadStatus.READY, ProcessingStatus.PENDING, PageRequest.of(0, limit))
+                .stream().map(mapper::toDomain).collect(Collectors.toList());
+    }
+
+    @Override
+    public List<DiagnosticMedia> findStaleProcessing(OffsetDateTime cutoff, int limit) {
+        return jpaRepository.findByProcessingStatusAndProcessingClaimedAtBeforeOrderByProcessingClaimedAtAsc(
+                        ProcessingStatus.PROCESSING, cutoff, PageRequest.of(0, limit))
+                .stream().map(mapper::toDomain).collect(Collectors.toList());
     }
 }
