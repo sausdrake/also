@@ -4,6 +4,8 @@ package com.example.autoauction.diagnostic.application;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.deposit.domain.DepositTransaction;
 import com.example.autoauction.deposit.domain.port.DepositRepository;
+import com.example.autoauction.diagnostic.commitment.application.SellerDiagnosticCommitmentService;
+import com.example.autoauction.diagnostic.commitment.domain.port.SellerDiagnosticCommitmentRepository;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
 import com.example.autoauction.diagnostic.domain.port.DiagnosticRequestRepository;
 import com.example.autoauction.user.domain.Role;
@@ -27,8 +29,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * R-1.2: proves against a real (H2, test-profile) database that rejecting a completed
  * diagnostic report actually releases the applicant's frozen deposit - a Mockito unit
- * test can only prove the service *called* unfreezeForDiagnosticRequest, not that the
- * FrozenDeposit row is genuinely gone and the ledger/balance are correct afterward.
+ * test can only prove the service *called* releaseCommitment, not that the
+ * SellerDiagnosticCommitment row is genuinely gone and the ledger/balance are correct
+ * afterward. PHASE 1: also proves the diagnostic-request freeze is correctly persisted in
+ * the new seller_diagnostic_commitment table and never touches deposit_frozen at all.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -49,6 +53,12 @@ class DiagnosticRejectUnfreezeIntegrationTest {
     private DepositRepository depositRepository;
 
     @Autowired
+    private SellerDiagnosticCommitmentRepository sellerDiagnosticCommitmentRepository;
+
+    @Autowired
+    private SellerDiagnosticCommitmentService sellerDiagnosticCommitmentService;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -56,7 +66,8 @@ class DiagnosticRejectUnfreezeIntegrationTest {
 
     @Test
     @DisplayName("create -> freeze -> reject: депозит разморожен, UNBLOCK-транзакция создана, " +
-            "FrozenDeposit больше не существует, blockedAmount вернулся к исходному значению")
+            "SellerDiagnosticCommitment больше не существует, FrozenDeposit никогда не затрагивался, " +
+            "blockedAmount вернулся к исходному значению")
     void createFreezeReject_UnfreezesDepositAndRemovesFrozenRecord() {
         Role userRole = roleRepository.findByName("ROLE_USER")
                 .orElseGet(() -> roleRepository.save(new Role(null, "ROLE_USER", "Обычный пользователь")));
@@ -81,11 +92,19 @@ class DiagnosticRejectUnfreezeIntegrationTest {
         DiagnosticRequest saved = diagnosticRequestRepository.save(request);
         Long requestId = saved.getId();
 
-        depositService.freezeForDiagnosticRequest(userId, requestId, depositAmount);
+        sellerDiagnosticCommitmentService.freezeCommitment(userId, requestId, depositAmount);
 
-        // Sanity check the freeze actually happened before testing the reject/unfreeze.
+        // Sanity check the freeze actually happened before testing the reject/unfreeze, AND
+        // that it went through the PHASE 1 seller-commitment table, not deposit_frozen.
         assertThat(depositService.getDepositByUserId(userId).availableBalance())
                 .isEqualByComparingTo(availableBeforeFreeze.subtract(depositAmount));
+        assertThat(sellerDiagnosticCommitmentRepository.existsByDiagnosticRequestId(requestId))
+                .as("a seller diagnostic commitment record must exist immediately after freezing")
+                .isTrue();
+        Long depositIdForFreezeCheck = depositRepository.findByUserId(userId).orElseThrow().getId();
+        assertThat(depositRepository.isFrozenForAuction(depositIdForFreezeCheck, requestId))
+                .as("the auction-side FrozenDeposit table must never be touched by a diagnostic-request freeze")
+                .isFalse();
 
         // Move the request to COMPLETED (the only status rejectReport accepts) directly via
         // the repository, mirroring how the integration test suite elsewhere sets up
@@ -107,10 +126,14 @@ class DiagnosticRejectUnfreezeIntegrationTest {
                         && t.getAmount().compareTo(depositAmount) == 0);
         assertThat(hasUnblock).as("an UNBLOCK DepositTransaction must exist for the released amount").isTrue();
 
-        // 3) No FrozenDeposit remains for this request.
+        // 3) No SellerDiagnosticCommitment remains for this request (the actual release proof
+        // under PHASE 1), and the auction-side FrozenDeposit table remains untouched throughout.
         Long depositId = depositRepository.findByUserId(userId).orElseThrow().getId();
+        assertThat(sellerDiagnosticCommitmentRepository.existsByDiagnosticRequestId(requestId))
+                .as("no seller diagnostic commitment record should remain for the rejected request")
+                .isFalse();
         assertThat(depositRepository.isFrozenForAuction(depositId, requestId))
-                .as("no FrozenDeposit row should remain for the rejected request")
+                .as("no FrozenDeposit row should exist for this request - it was never created here")
                 .isFalse();
 
         // 4) Report status actually persisted as REJECTED.

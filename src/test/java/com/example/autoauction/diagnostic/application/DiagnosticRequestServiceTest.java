@@ -1,6 +1,6 @@
 package com.example.autoauction.diagnostic.application;
 
-import com.example.autoauction.deposit.application.DepositService;
+import com.example.autoauction.diagnostic.commitment.application.SellerDiagnosticCommitmentService;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
 import com.example.autoauction.diagnostic.domain.InspectionAnswer;
 import com.example.autoauction.diagnostic.domain.InspectionGroup;
@@ -55,7 +55,7 @@ class DiagnosticRequestServiceTest {
     private InspectionAnswerRepository answerRepository;
 
     @Mock
-    private DepositService depositService;
+    private SellerDiagnosticCommitmentService sellerDiagnosticCommitmentService;
 
     @Mock
     private UserRepository userRepository;
@@ -123,7 +123,7 @@ class DiagnosticRequestServiceTest {
             when(requestRepository.findByUserId(eq(userId), any(Pageable.class))).thenReturn(emptyPage);
 
             when(requestRepository.save(any(DiagnosticRequest.class))).thenReturn(savedRequest);
-            doNothing().when(depositService).freezeForDiagnosticRequest(eq(userId), eq(requestId), any(BigDecimal.class));
+            doNothing().when(sellerDiagnosticCommitmentService).freezeCommitment(eq(userId), eq(requestId), any(BigDecimal.class));
 
             DiagnosticRequestResponse response = requestService.createRequest(createRequest, userId);
 
@@ -133,7 +133,7 @@ class DiagnosticRequestServiceTest {
             assertThat(response.getStatus()).isEqualTo("PENDING");
 
             verify(requestRepository).save(any(DiagnosticRequest.class));
-            verify(depositService).freezeForDiagnosticRequest(eq(userId), eq(requestId), any(BigDecimal.class));
+            verify(sellerDiagnosticCommitmentService).freezeCommitment(eq(userId), eq(requestId), any(BigDecimal.class));
         }
 
         @Test
@@ -844,15 +844,16 @@ class DiagnosticRequestServiceTest {
 
             requestService.rejectReport(requestId, adminId, "Недостаточно фотографий");
 
-            verify(depositService, times(1)).unfreezeForDiagnosticRequest(userId, requestId);
+            verify(sellerDiagnosticCommitmentService, times(1)).releaseCommitment(userId, requestId);
         }
 
         @Test
-        @DisplayName("2/3. Разморозка выполняется через DepositService.unfreezeForDiagnosticRequest " +
-                "(единственный легитимный механизм создания UNBLOCK-транзакции и удаления FrozenDeposit " +
-                "- см. DepositServiceTest/DepositServiceWithFrozenStorageTest, где эти инварианты уже " +
-                "проверены для самого unfreezeForDiagnosticRequest; здесь проверяется, что rejectReport " +
-                "действительно его вызывает и не мутирует депозит напрямую)")
+        @DisplayName("2/3. Разморозка выполняется через SellerDiagnosticCommitmentService.releaseCommitment " +
+                "(PHASE 1: единственный легитимный механизм освобождения seller-commitment после " +
+                "рерутинга с deposit_frozen - см. DepositServiceTest/DepositServiceWithFrozenStorageTest, " +
+                "где инварианты DepositService.unfreezeForDiagnosticRequest уже проверены отдельно; " +
+                "здесь проверяется, что rejectReport действительно вызывает releaseCommitment и не " +
+                "мутирует депозит/commitment напрямую)")
         void rejectReport_DelegatesToUnfreezeMechanism_DoesNotMutateDepositDirectly() {
             DiagnosticRequest completed = completedRequest();
             when(requestRepository.findById(requestId)).thenReturn(Optional.of(completed));
@@ -861,9 +862,9 @@ class DiagnosticRequestServiceTest {
             requestService.rejectReport(requestId, adminId, "Недостаточно фотографий");
 
             // DiagnosticRequestService must never touch Deposit/DepositRepository directly -
-            // all financial mutation stays inside DepositService.
-            verify(depositService, times(1)).unfreezeForDiagnosticRequest(anyLong(), anyLong());
-            verifyNoMoreInteractions(depositService);
+            // all financial orchestration stays inside SellerDiagnosticCommitmentService.
+            verify(sellerDiagnosticCommitmentService, times(1)).releaseCommitment(anyLong(), anyLong());
+            verifyNoMoreInteractions(sellerDiagnosticCommitmentService);
         }
 
         @Test
@@ -877,7 +878,7 @@ class DiagnosticRequestServiceTest {
             assertThatThrownBy(() -> requestService.rejectReport(requestId, adminId, "повтор"))
                     .isInstanceOf(IllegalStateException.class);
 
-            verifyNoInteractions(depositService);
+            verifyNoInteractions(sellerDiagnosticCommitmentService);
         }
 
         @Test
@@ -889,7 +890,7 @@ class DiagnosticRequestServiceTest {
             when(requestRepository.findById(requestId)).thenReturn(Optional.of(completed));
             when(requestRepository.save(any(DiagnosticRequest.class))).thenAnswer(i -> i.getArgument(0));
             doThrow(new IllegalStateException("DB unavailable"))
-                    .when(depositService).unfreezeForDiagnosticRequest(userId, requestId);
+                    .when(sellerDiagnosticCommitmentService).releaseCommitment(userId, requestId);
 
             assertThatThrownBy(() -> requestService.rejectReport(requestId, adminId, "причина"))
                     .isInstanceOf(IllegalStateException.class)
@@ -902,7 +903,7 @@ class DiagnosticRequestServiceTest {
             assertThatThrownBy(() -> requestService.rejectReport(requestId, adminId, "  "))
                     .isInstanceOf(IllegalArgumentException.class);
 
-            verifyNoInteractions(depositService);
+            verifyNoInteractions(sellerDiagnosticCommitmentService);
         }
 
         @Test
@@ -915,7 +916,7 @@ class DiagnosticRequestServiceTest {
             assertThatThrownBy(() -> requestService.rejectReport(requestId, adminId, "причина"))
                     .isInstanceOf(IllegalStateException.class);
 
-            verifyNoInteractions(depositService);
+            verifyNoInteractions(sellerDiagnosticCommitmentService);
         }
     }
 }

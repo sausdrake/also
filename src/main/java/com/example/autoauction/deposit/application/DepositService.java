@@ -332,8 +332,12 @@ public class DepositService {
         deposit.freezeForAuction(amount);
         depositRepository.save(deposit);
 
-        // Сохраняем информацию о заморозке (используем auctionId как requestId)
-        depositRepository.freezeForAuction(deposit.getId(), requestId, amount, FreezeReason.DIAGNOSTIC_REQUEST);
+        // PHASE 1 (seller commitment redesign): this method no longer persists a
+        // deposit_frozen row for the diagnostic-request case - that table's auction_id
+        // column is a real FK to auctions(id), and storing a diagnostic-request id there
+        // was a production defect (see Phase 0 / F-0.1 audit findings). The caller
+        // (SellerDiagnosticCommitmentService) now owns the correctly-typed, correctly-FK'd
+        // record; this method's sole responsibility is the Deposit ledger mutation below.
 
         // Записываем транзакцию
         DepositTransaction transaction = new DepositTransaction(
@@ -351,38 +355,34 @@ public class DepositService {
     }
 
     /**
-     * Разморозить депозит после завершения заявки (если отчёт не одобрен)
+     * Разморозить депозит после завершения заявки (если отчёт не одобрен).
+     *
+     * PHASE 1 (seller commitment redesign): the frozen amount is now supplied by the
+     * caller (SellerDiagnosticCommitmentService, which reads it from its own
+     * correctly-FK'd commitment record) rather than looked up here via the
+     * deposit_frozen table - that table's auction_id column is a real FK to auctions(id)
+     * and was never a correct home for a diagnostic-request reference (see Phase 0 / F-0.1
+     * audit findings). A missing/already-released commitment is the caller's concern to
+     * detect (via a safe no-op before this method is ever invoked) - this method is only
+     * ever called with a known, correct amount to release.
      */
     @Transactional
-    public void unfreezeForDiagnosticRequest(Long userId, Long requestId) {
-        log.info("Unfreezing deposit for user: {}, request: {}", userId, requestId);
+    public void unfreezeForDiagnosticRequest(Long userId, Long requestId, BigDecimal amount) {
+        log.info("Unfreezing deposit for user: {}, request: {}, amount: {}", userId, requestId, amount);
 
         try {
             Deposit deposit = depositRepository.findByUserId(userId)
                     .orElseThrow(() -> new IllegalArgumentException("Депозит не найден для пользователя: " + userId));
 
-            List<FrozenDeposit> frozen = depositRepository.getFrozenDepositsByDepositId(deposit.getId());
-            FrozenDeposit target = frozen.stream()
-                    .filter(f -> f.getAuctionId().equals(requestId))
-                    .findFirst()
-                    .orElse(null);
-
-            if (target == null) {
-                log.warn("No frozen amount found for request {}, user {}", requestId, userId);
-                return;
-            }
-
-            BigDecimal frozenAmount = target.getAmount();
             BigDecimal balanceBefore = deposit.getAvailableBalance();
 
-            deposit.unfreezeForAuction(frozenAmount);
-            depositRepository.unfreezeForAuction(deposit.getId(), requestId);
+            deposit.unfreezeForAuction(amount);
 
             DepositTransaction transaction = new DepositTransaction(
                     deposit.getId(),
                     userId,
                     DepositTransaction.TransactionType.UNBLOCK,
-                    frozenAmount,
+                    amount,
                     balanceBefore,
                     deposit.getAvailableBalance(),
                     "DIAGNOSTIC_" + requestId,

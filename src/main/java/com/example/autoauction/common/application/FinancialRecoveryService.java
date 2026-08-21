@@ -4,6 +4,7 @@ package com.example.autoauction.common.application;
 import com.example.autoauction.common.domain.FailedOperation;
 import com.example.autoauction.common.domain.port.FailedOperationRepository;
 import com.example.autoauction.deposit.application.DepositService;
+import com.example.autoauction.diagnostic.commitment.application.SellerDiagnosticCommitmentService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,13 +43,16 @@ public class FinancialRecoveryService {
 
     private final FailedOperationRepository failedOperationRepository;
     private final DepositService depositService;
+    private final SellerDiagnosticCommitmentService sellerDiagnosticCommitmentService;
     private final Clock clock;
 
     public FinancialRecoveryService(FailedOperationRepository failedOperationRepository,
                                     DepositService depositService,
+                                    SellerDiagnosticCommitmentService sellerDiagnosticCommitmentService,
                                     Clock clock) {
         this.failedOperationRepository = failedOperationRepository;
         this.depositService = depositService;
+        this.sellerDiagnosticCommitmentService = sellerDiagnosticCommitmentService;
         this.clock = clock;
     }
 
@@ -127,8 +131,12 @@ public class FinancialRecoveryService {
      */
     private boolean isStillRequired(FailedOperation op) {
         return switch (op.getOperationType()) {
-            case "UNFREEZE_AUCTION", "UNFREEZE_DIAGNOSTIC_REQUEST" ->
-                    depositService.isStillFrozenForAuction(op.getUserId(), op.getAuctionId());
+            case "UNFREEZE_AUCTION" -> depositService.isStillFrozenForAuction(op.getUserId(), op.getAuctionId());
+            // PHASE 1 (seller commitment redesign): routed through SellerDiagnosticCommitmentService,
+            // not DepositService - the diagnostic-request freeze no longer lives in deposit_frozen
+            // (see Phase 0 / F-0.1 audit findings), so DepositService.isStillFrozenForAuction would
+            // never find it here regardless.
+            case "UNFREEZE_DIAGNOSTIC_REQUEST" -> sellerDiagnosticCommitmentService.hasActiveCommitment(op.getAuctionId());
             case "MARK_WINNER" -> depositService.needsWinnerMark(op.getUserId(), op.getAuctionId());
             default -> {
                 log.warn("Unknown operation type '{}' for failed operation {}, cannot verify or retry",
@@ -141,7 +149,8 @@ public class FinancialRecoveryService {
     private void performRetry(FailedOperation op) {
         switch (op.getOperationType()) {
             case "UNFREEZE_AUCTION" -> depositService.unfreezeForAuction(op.getUserId(), op.getAuctionId());
-            case "UNFREEZE_DIAGNOSTIC_REQUEST" -> depositService.unfreezeForDiagnosticRequest(op.getUserId(), op.getAuctionId());
+            // PHASE 1: same rerouting as isStillRequired() above.
+            case "UNFREEZE_DIAGNOSTIC_REQUEST" -> sellerDiagnosticCommitmentService.releaseCommitment(op.getUserId(), op.getAuctionId());
             case "MARK_WINNER" -> depositService.markAsWinner(op.getUserId(), op.getAuctionId());
             default -> throw new IllegalStateException("Unknown operation type: " + op.getOperationType());
         }

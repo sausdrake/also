@@ -1,6 +1,6 @@
 package com.example.autoauction.diagnostic.application;
 
-import com.example.autoauction.deposit.application.DepositService;
+import com.example.autoauction.diagnostic.commitment.application.SellerDiagnosticCommitmentService;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
 import com.example.autoauction.vehicle.application.VehicleService;
 import com.example.autoauction.diagnostic.domain.InspectionAnswer;
@@ -42,7 +42,7 @@ public class DiagnosticRequestService {
     private final DiagnosticRequestRepository requestRepository;
     private final InspectionTemplateRepository templateRepository;
     private final InspectionAnswerRepository answerRepository;
-    private final DepositService depositService;
+    private final SellerDiagnosticCommitmentService sellerDiagnosticCommitmentService;
     private final UserRepository userRepository;
     private final VehicleService vehicleService;
     private final NotificationService notificationService;
@@ -93,7 +93,7 @@ public class DiagnosticRequestService {
         DiagnosticRequest savedRequest = requestRepository.save(request);
 
         // Замораживаем депозит с ID заявки
-        depositService.freezeForDiagnosticRequest(userId, savedRequest.getId(), depositAmount);
+        sellerDiagnosticCommitmentService.freezeCommitment(userId, savedRequest.getId(), depositAmount);
 
         log.info("Created diagnostic request: id={}, userId={}", savedRequest.getId(), userId);
         return DiagnosticRequestResponse.fromDomain(savedRequest);
@@ -368,7 +368,7 @@ public class DiagnosticRequestService {
             throw new IllegalStateException("Можно отозвать только заявку в статусе PENDING. Текущий статус: " + request.getStatus());
         }
 
-        depositService.unfreezeForDiagnosticRequest(userId, requestId);
+        sellerDiagnosticCommitmentService.releaseCommitment(userId, requestId);
 
         request.setStatus(DiagnosticRequest.DiagnosticRequestStatus.REJECTED);
         request.setRejectedReason("Отозвана пользователем");
@@ -463,7 +463,7 @@ public class DiagnosticRequestService {
         }
 
         // Разморозить депозит заявителя после одобрения
-        depositService.unfreezeForDiagnosticRequest(request.getUserId(), requestId);
+        sellerDiagnosticCommitmentService.releaseCommitment(request.getUserId(), requestId);
 
         // Автоматически создать Vehicle из данных заявки
         String diagnosticUsername = userRepository.findById(request.getAssignedTo() != null ? request.getAssignedTo() : request.getUserId())
@@ -507,7 +507,7 @@ public class DiagnosticRequestService {
         // R-1.2: отклонение отчёта должно освобождать депозит заявителя точно так же, как
         // и одобрение (approveReport) — иначе депозит остаётся замороженным навсегда без
         // какого-либо пути освобождения.
-        depositService.unfreezeForDiagnosticRequest(request.getUserId(), requestId);
+        sellerDiagnosticCommitmentService.releaseCommitment(request.getUserId(), requestId);
 
         if (request.getAssignedTo() != null) {
             try {

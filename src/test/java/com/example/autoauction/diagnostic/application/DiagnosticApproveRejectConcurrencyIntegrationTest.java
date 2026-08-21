@@ -5,6 +5,8 @@ import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.deposit.domain.Deposit;
 import com.example.autoauction.deposit.domain.DepositTransaction;
 import com.example.autoauction.deposit.domain.port.DepositRepository;
+import com.example.autoauction.diagnostic.commitment.application.SellerDiagnosticCommitmentService;
+import com.example.autoauction.diagnostic.commitment.domain.port.SellerDiagnosticCommitmentRepository;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
 import com.example.autoauction.diagnostic.domain.port.DiagnosticRequestRepository;
 import com.example.autoauction.user.domain.Role;
@@ -62,6 +64,12 @@ class DiagnosticApproveRejectConcurrencyIntegrationTest {
     private DepositRepository depositRepository;
 
     @Autowired
+    private SellerDiagnosticCommitmentRepository sellerDiagnosticCommitmentRepository;
+
+    @Autowired
+    private SellerDiagnosticCommitmentService sellerDiagnosticCommitmentService;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -93,7 +101,7 @@ class DiagnosticApproveRejectConcurrencyIntegrationTest {
         DiagnosticRequest saved = diagnosticRequestRepository.save(request);
         Long requestId = saved.getId();
 
-        depositService.freezeForDiagnosticRequest(userId, requestId, depositAmount);
+        sellerDiagnosticCommitmentService.freezeCommitment(userId, requestId, depositAmount);
 
         saved.setStatus(DiagnosticRequest.DiagnosticRequestStatus.COMPLETED);
         diagnosticRequestRepository.save(saved);
@@ -154,7 +162,9 @@ class DiagnosticApproveRejectConcurrencyIntegrationTest {
                 .count();
 
         Deposit finalDeposit = depositRepository.findByUserId(setup.userId()).orElseThrow();
-        boolean stillFrozen = depositRepository.isFrozenForAuction(finalDeposit.getId(), setup.requestId());
+        // PHASE 1: the seller-commitment freeze/release now lives in seller_diagnostic_commitment,
+        // not deposit_frozen - this is the meaningful post-race check for double-release safety.
+        boolean stillFrozen = sellerDiagnosticCommitmentRepository.existsByDiagnosticRequestId(setup.requestId());
 
         DiagnosticRequest finalRequest = diagnosticRequestRepository.findById(setup.requestId()).orElseThrow();
 
@@ -171,7 +181,7 @@ class DiagnosticApproveRejectConcurrencyIntegrationTest {
                 .as("[%s] exactly one UNBLOCK transaction must persist for this request - never zero, never two", label)
                 .isEqualTo(1L);
         assertThat(stillFrozen)
-                .as("[%s] no FrozenDeposit row may remain after the race resolves", label)
+                .as("[%s] no seller diagnostic commitment record may remain after the race resolves", label)
                 .isFalse();
         assertThat(finalDeposit.getAvailableBalance())
                 .as("[%s] the deposit must end up fully released back to its pre-freeze available balance", label)
