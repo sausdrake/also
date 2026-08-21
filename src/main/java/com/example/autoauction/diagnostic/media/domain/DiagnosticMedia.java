@@ -38,6 +38,9 @@ public class DiagnosticMedia {
     private Integer height;
     private String thumbnailStorageKey;
 
+    /** MEDIA-HARDENING-1: R2 key of a thumbnail uploaded but not yet promoted into thumbnailStorageKey. */
+    private String pendingThumbnailStorageKey;
+
     /** MEDIA-3.4: set only by the atomic PENDING -> PROCESSING claim transition. */
     private OffsetDateTime processingClaimedAt;
 

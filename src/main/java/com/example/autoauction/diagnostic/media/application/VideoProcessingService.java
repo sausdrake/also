@@ -129,6 +129,63 @@ public class VideoProcessingService {
     }
 
     /**
+     * MEDIA-HARDENING-1: recovers thumbnail objects that were successfully
+     * uploaded to R2 but whose processing attempt never reached
+     * finalizeProcessingReady() (typically because the process crashed
+     * between the two - no exception, so none of processClaimedItem()'s own
+     * compensating-delete paths ever ran). Candidates are rows whose
+     * processingStatus has since moved off PROCESSING (via failClaim(),
+     * stale-recovery, or a DELETED race) while still carrying a non-null
+     * pendingThumbnailStorageKey - findPendingThumbnailOrphans() structurally
+     * cannot return a successfully finalized row, since
+     * finalizeProcessingReady() clears this same column in the same atomic
+     * UPDATE that sets thumbnailStorageKey. Sequential, bounded, per-item
+     * isolated - identical operational discipline to reconcileStale().
+     */
+    public void reconcilePendingThumbnailOrphans(int batchSize) {
+        List<DiagnosticMedia> candidates = mediaRepository.findPendingThumbnailOrphans(batchSize);
+        for (DiagnosticMedia media : candidates) {
+            String key = media.getPendingThumbnailStorageKey();
+            if (key == null) {
+                // Defensive only - findPendingThumbnailOrphans() already filters on IS NOT NULL,
+                // so this should be unreachable in practice.
+                log.warn("VideoProcessingService: media {} - matched pending-thumbnail-orphan query but pendingThumbnailStorageKey is null, skipping",
+                        media.getId());
+                continue;
+            }
+
+            try {
+                storageClient.deleteObject(key);
+            } catch (Exception e) {
+                // Delete failed - the marker MUST remain so a later sweep can retry. Do not
+                // clear it here; clearing on a failed delete would make the object
+                // undiscoverable exactly like the crash this mechanism exists to recover from.
+                log.error("VideoProcessingService: media {} - orphan thumbnail delete of {} failed, marker retained for retry: {}",
+                        media.getId(), key, e.getMessage(), e);
+                continue;
+            }
+
+            try {
+                boolean cleared = mediaRepository.clearPendingThumbnail(media.getId(), key);
+                if (cleared) {
+                    log.info("VideoProcessingService: media {} - PENDING_THUMBNAIL_ORPHAN_RECOVERED (deleted {}, marker cleared)",
+                            media.getId(), key);
+                } else {
+                    // Expected-key guard didn't match - a newer processing attempt already
+                    // overwrote the marker with a fresh key between our read and this clear.
+                    // The object we just deleted was still the correct one for THIS key; the
+                    // newer marker is untouched and will be handled by its own future cycle.
+                    log.info("VideoProcessingService: media {} - pending thumbnail marker for {} already changed (newer attempt in progress), not cleared",
+                            media.getId(), key);
+                }
+            } catch (Exception e) {
+                log.error("VideoProcessingService: media {} - clearPendingThumbnail for {} threw after successful delete: {}",
+                        media.getId(), key, e.getMessage(), e);
+            }
+        }
+    }
+
+    /**
      * MEDIA-3.4 Phase 9: admin-triggered FAILED -> PENDING retry. Never
      * called automatically - processPending()/reconcileStale() never invoke
      * this; it exists solely for the admin HTTP endpoint. Idempotent from
@@ -282,11 +339,39 @@ public class VideoProcessingService {
 
         String thumbnailStorageKey = THUMBNAIL_KEY_PREFIX + media.getDiagnosticRequestId() + "/" + UUID.randomUUID() + ".jpg";
 
+        // MEDIA-HARDENING-1: durably record the candidate key BEFORE any R2 I/O - this is what
+        // lets a crash between here and finalizeProcessingReady() (no exception, no
+        // compensating delete ever runs) still be discovered by
+        // reconcilePendingThumbnailOrphans() once stale-PROCESSING recovery moves the row out
+        // of PROCESSING. Deliberately not guarded by "pending key currently null" (see the
+        // repository method's Javadoc) - only by processingStatus='PROCESSING'.
+        boolean declared;
+        try {
+            declared = mediaRepository.declarePendingThumbnail(media.getId(), thumbnailStorageKey);
+        } catch (Exception e) {
+            log.error("VideoProcessingService: media {} - declarePendingThumbnail threw, aborting before upload: {}",
+                    media.getId(), e.getMessage(), e);
+            return;
+        }
+        if (!declared) {
+            // Same "row already legitimately left PROCESSING" reasoning as the Case C branch
+            // below (e.g. a concurrent stale-reset raced this worker) - nothing has been
+            // uploaded yet, so there is nothing to compensate for, and calling
+            // markProcessingFailed here would incorrectly transition a row that already moved
+            // on for its own reason.
+            log.warn("VideoProcessingService: media {} - could not declare pending thumbnail (row no longer PROCESSING), aborting before upload",
+                    media.getId());
+            return;
+        }
+
         try (InputStream in = Files.newInputStream(result.thumbnailFile())) {
             storageClient.putObject(thumbnailStorageKey, in, Files.size(result.thumbnailFile()), "image/jpeg");
         } catch (Exception e) {
             // Case A: putObject's contract is all-or-nothing (throws rather than partially
-            // storing), so no compensating delete is attempted here.
+            // storing), so no compensating delete is attempted here. The pending marker is
+            // deliberately left in place - reconcilePendingThumbnailOrphans() will find it once
+            // failClaim() below moves processingStatus off PROCESSING, and its delete of a
+            // (very likely never-created) object is a safe no-op per StorageClient's contract.
             failClaim(media.getId(), "THUMBNAIL_UPLOAD_FAILED", e);
             return;
         }
@@ -316,11 +401,24 @@ public class VideoProcessingService {
             // primary failure; a compensating-delete failure must never replace/mask it.
             log.error("VideoProcessingService: media {} - DB_FINALIZATION_FAILED (threw) for thumbnail {}: {}",
                     media.getId(), thumbnailStorageKey, e.getMessage(), e);
+            boolean deleted = true;
             try {
                 storageClient.deleteObject(thumbnailStorageKey);
             } catch (Exception deleteEx) {
+                deleted = false;
                 log.error("VideoProcessingService: media {} - compensating delete of {} ALSO failed, possible orphan: {}",
                         media.getId(), thumbnailStorageKey, deleteEx.getMessage(), deleteEx);
+            }
+            if (deleted) {
+                // MEDIA-HARDENING-1: delete succeeded, so the marker is now resolved - clear it
+                // so reconcilePendingThumbnailOrphans() never re-attempts it. If the delete
+                // failed above, the marker is deliberately left so reconciliation can retry.
+                try {
+                    mediaRepository.clearPendingThumbnail(media.getId(), thumbnailStorageKey);
+                } catch (Exception clearEx) {
+                    log.error("VideoProcessingService: media {} - clearing pending thumbnail marker for {} failed: {}",
+                            media.getId(), thumbnailStorageKey, clearEx.getMessage(), clearEx);
+                }
             }
             try {
                 mediaRepository.markProcessingFailed(media.getId());
@@ -430,12 +528,25 @@ public class VideoProcessingService {
         }
     }
 
-    /** Best-effort - a delete failure is logged, never allowed to mask the caller's original failure. */
+    /**
+     * Best-effort - a delete failure is logged, never allowed to mask the caller's original
+     * failure. MEDIA-HARDENING-1: on a successful delete, also clears the pending-thumbnail
+     * marker for this key - if the delete fails, the marker is deliberately left in place so
+     * reconcilePendingThumbnailOrphans() can rediscover and retry it later; a failed delete
+     * must never be treated as if the marker were already resolved.
+     */
     private void compensatingDelete(String storageKey, Long mediaId) {
         try {
             storageClient.deleteObject(storageKey);
         } catch (Exception e) {
             log.error("VideoProcessingService: media {} - compensating delete of {} failed, possible orphan: {}",
+                    mediaId, storageKey, e.getMessage(), e);
+            return;
+        }
+        try {
+            mediaRepository.clearPendingThumbnail(mediaId, storageKey);
+        } catch (Exception e) {
+            log.error("VideoProcessingService: media {} - clearing pending thumbnail marker for {} failed after successful delete: {}",
                     mediaId, storageKey, e.getMessage(), e);
         }
     }

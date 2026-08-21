@@ -66,6 +66,18 @@ public class JpaDiagnosticMediaEntity {
     private String thumbnailStorageKey;
 
     /**
+     * MEDIA-HARDENING-1: R2 key of a thumbnail uploaded but not yet promoted
+     * into thumbnailStorageKey by a successful finalizeProcessingReady()
+     * commit. Written only by the declarePendingThumbnail() atomic UPDATE,
+     * cleared only by finalizeProcessingReady() (atomically, on success),
+     * clearPendingThumbnail() (compensating delete / orphan reconciliation),
+     * or the deleted-media cleanup sweep. Never touched by ordinary entity
+     * saves - same discipline as processingClaimedAt below.
+     */
+    @Column(name = "pending_thumbnail_storage_key", length = 500)
+    private String pendingThumbnailStorageKey;
+
+    /**
      * MEDIA-3.4: set ONLY by the atomic PENDING -> PROCESSING claim
      * transition (see SpringDataDiagnosticMediaJpaRepository.claimForProcessing).
      * Deliberately NOT touched by onCreate()/onUpdate() below - ordinary

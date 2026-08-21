@@ -63,7 +63,7 @@ public interface SpringDataDiagnosticMediaJpaRepository extends JpaRepository<Jp
     @Modifying(clearAutomatically = true)
     @Query("UPDATE JpaDiagnosticMediaEntity m SET m.processingStatus = 'READY', " +
             "m.durationSeconds = :durationSeconds, m.width = :width, m.height = :height, " +
-            "m.thumbnailStorageKey = :thumbnailStorageKey, m.updatedAt = :now " +
+            "m.thumbnailStorageKey = :thumbnailStorageKey, m.pendingThumbnailStorageKey = NULL, m.updatedAt = :now " +
             "WHERE m.id = :id AND m.processingStatus = 'PROCESSING' AND m.uploadStatus = 'READY'")
     int finalizeProcessingReady(@Param("id") Long id, @Param("durationSeconds") Integer durationSeconds,
                                  @Param("width") Integer width, @Param("height") Integer height,
@@ -89,4 +89,25 @@ public interface SpringDataDiagnosticMediaJpaRepository extends JpaRepository<Jp
 
     List<JpaDiagnosticMediaEntity> findByProcessingStatusAndProcessingClaimedAtBeforeOrderByProcessingClaimedAtAsc(
             ProcessingStatus processingStatus, OffsetDateTime cutoff, Pageable pageable);
+
+    // ==================== MEDIA-HARDENING-1: recoverable thumbnail orphans ====================
+
+    // Deliberately NOT also guarded by "pendingThumbnailStorageKey IS NULL" - a stale marker
+    // from an earlier crashed attempt must never block a fresh legitimate attempt from
+    // declaring its own key.
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE JpaDiagnosticMediaEntity m SET m.pendingThumbnailStorageKey = :thumbnailStorageKey, m.updatedAt = :now " +
+            "WHERE m.id = :id AND m.processingStatus = 'PROCESSING'")
+    int declarePendingThumbnail(@Param("id") Long id, @Param("thumbnailStorageKey") String thumbnailStorageKey,
+                                 @Param("now") OffsetDateTime now);
+
+    // The expected-key guard is the sole safeguard against an older reconciliation/cleanup
+    // attempt clearing a NEWER attempt's marker after a retry has already overwritten it.
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE JpaDiagnosticMediaEntity m SET m.pendingThumbnailStorageKey = NULL, m.updatedAt = :now " +
+            "WHERE m.id = :id AND m.pendingThumbnailStorageKey = :expectedKey")
+    int clearPendingThumbnail(@Param("id") Long id, @Param("expectedKey") String expectedKey, @Param("now") OffsetDateTime now);
+
+    List<JpaDiagnosticMediaEntity> findByPendingThumbnailStorageKeyIsNotNullAndProcessingStatusNot(
+            ProcessingStatus processingStatus, Pageable pageable);
 }

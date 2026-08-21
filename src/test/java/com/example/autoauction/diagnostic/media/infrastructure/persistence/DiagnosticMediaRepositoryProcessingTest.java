@@ -315,4 +315,146 @@ class DiagnosticMediaRepositoryProcessingTest {
             assertThat(m.getProcessingStatus()).isEqualTo(ProcessingStatus.PENDING);
         });
     }
+
+    // ==================== MEDIA-HARDENING-1: declarePendingThumbnail ====================
+
+    @Test
+    @DisplayName("declarePendingThumbnail: PROCESSING -> true, ключ сохранён")
+    void declarePendingThumbnail_Processing_SucceedsAndPersistsKey() {
+        RequestAndItem ctx = createRequestAndItem();
+        DiagnosticMedia media = createVideoMedia(ctx, UploadStatus.READY, ProcessingStatus.PROCESSING);
+
+        boolean declared = mediaRepository.declarePendingThumbnail(media.getId(), "diagnostic-media-thumbnail/x/a.jpg");
+
+        assertThat(declared).isTrue();
+        assertThat(mediaRepository.findById(media.getId()).orElseThrow().getPendingThumbnailStorageKey())
+                .isEqualTo("diagnostic-media-thumbnail/x/a.jpg");
+    }
+
+    @Test
+    @DisplayName("declarePendingThumbnail: PENDING -> false")
+    void declarePendingThumbnail_Pending_Fails() {
+        RequestAndItem ctx = createRequestAndItem();
+        DiagnosticMedia media = createVideoMedia(ctx, UploadStatus.READY, ProcessingStatus.PENDING);
+
+        boolean declared = mediaRepository.declarePendingThumbnail(media.getId(), "diagnostic-media-thumbnail/x/a.jpg");
+
+        assertThat(declared).isFalse();
+        assertThat(mediaRepository.findById(media.getId()).orElseThrow().getPendingThumbnailStorageKey()).isNull();
+    }
+
+    @Test
+    @DisplayName("declarePendingThumbnail: FAILED -> false")
+    void declarePendingThumbnail_Failed_Fails() {
+        RequestAndItem ctx = createRequestAndItem();
+        DiagnosticMedia media = createVideoMedia(ctx, UploadStatus.READY, ProcessingStatus.FAILED);
+
+        boolean declared = mediaRepository.declarePendingThumbnail(media.getId(), "diagnostic-media-thumbnail/x/a.jpg");
+
+        assertThat(declared).isFalse();
+    }
+
+    @Test
+    @DisplayName("declarePendingThumbnail: READY -> false")
+    void declarePendingThumbnail_Ready_Fails() {
+        RequestAndItem ctx = createRequestAndItem();
+        DiagnosticMedia media = createVideoMedia(ctx, UploadStatus.READY, ProcessingStatus.READY);
+
+        boolean declared = mediaRepository.declarePendingThumbnail(media.getId(), "diagnostic-media-thumbnail/x/a.jpg");
+
+        assertThat(declared).isFalse();
+    }
+
+    // ==================== MEDIA-HARDENING-1: clearPendingThumbnail ====================
+
+    @Test
+    @DisplayName("clearPendingThumbnail: совпадающий ключ -> true, маркер NULL")
+    void clearPendingThumbnail_MatchingKey_ClearsMarker() {
+        RequestAndItem ctx = createRequestAndItem();
+        DiagnosticMedia media = createVideoMedia(ctx, UploadStatus.READY, ProcessingStatus.PROCESSING);
+        mediaRepository.declarePendingThumbnail(media.getId(), "diagnostic-media-thumbnail/x/a.jpg");
+
+        boolean cleared = mediaRepository.clearPendingThumbnail(media.getId(), "diagnostic-media-thumbnail/x/a.jpg");
+
+        assertThat(cleared).isTrue();
+        assertThat(mediaRepository.findById(media.getId()).orElseThrow().getPendingThumbnailStorageKey()).isNull();
+    }
+
+    @Test
+    @DisplayName("clearPendingThumbnail: несовпадающий ключ -> false, исходный маркер не тронут")
+    void clearPendingThumbnail_WrongKey_LeavesMarkerUntouched() {
+        RequestAndItem ctx = createRequestAndItem();
+        DiagnosticMedia media = createVideoMedia(ctx, UploadStatus.READY, ProcessingStatus.PROCESSING);
+        mediaRepository.declarePendingThumbnail(media.getId(), "diagnostic-media-thumbnail/x/a.jpg");
+
+        boolean cleared = mediaRepository.clearPendingThumbnail(media.getId(), "diagnostic-media-thumbnail/x/WRONG.jpg");
+
+        assertThat(cleared).isFalse();
+        assertThat(mediaRepository.findById(media.getId()).orElseThrow().getPendingThumbnailStorageKey())
+                .isEqualTo("diagnostic-media-thumbnail/x/a.jpg");
+    }
+
+    // ==================== MEDIA-HARDENING-1: findPendingThumbnailOrphans ====================
+
+    @Test
+    @DisplayName("findPendingThumbnailOrphans: включает PENDING+маркер и FAILED+маркер, исключает PROCESSING+маркер")
+    void findPendingThumbnailOrphans_IncludesPendingAndFailed_ExcludesProcessing() {
+        RequestAndItem ctx = createRequestAndItem();
+
+        DiagnosticMedia pending = createVideoMedia(ctx, UploadStatus.READY, ProcessingStatus.PROCESSING);
+        mediaRepository.declarePendingThumbnail(pending.getId(), "diagnostic-media-thumbnail/x/pending.jpg");
+        mediaRepository.resetStaleProcessing(pending.getId()); // -> PENDING, marker survives
+
+        DiagnosticMedia failed = createVideoMedia(ctx, UploadStatus.READY, ProcessingStatus.PROCESSING);
+        mediaRepository.declarePendingThumbnail(failed.getId(), "diagnostic-media-thumbnail/x/failed.jpg");
+        mediaRepository.markProcessingFailed(failed.getId()); // -> FAILED, marker survives
+
+        DiagnosticMedia stillProcessing = createVideoMedia(ctx, UploadStatus.READY, ProcessingStatus.PROCESSING);
+        mediaRepository.declarePendingThumbnail(stillProcessing.getId(), "diagnostic-media-thumbnail/x/active.jpg");
+
+        List<DiagnosticMedia> orphans = mediaRepository.findPendingThumbnailOrphans(50);
+
+        assertThat(orphans).extracting(DiagnosticMedia::getId)
+                .contains(pending.getId(), failed.getId())
+                .doesNotContain(stillProcessing.getId());
+    }
+
+    @Test
+    @DisplayName("findPendingThumbnailOrphans: исключает READY с NULL-маркером и финализированную запись")
+    void findPendingThumbnailOrphans_ExcludesReadyRows() {
+        RequestAndItem ctx = createRequestAndItem();
+
+        DiagnosticMedia readyNoMarker = createVideoMedia(ctx, UploadStatus.READY, ProcessingStatus.READY);
+
+        DiagnosticMedia finalized = createVideoMedia(ctx, UploadStatus.READY, ProcessingStatus.PROCESSING);
+        mediaRepository.declarePendingThumbnail(finalized.getId(), "diagnostic-media-thumbnail/x/final.jpg");
+        mediaRepository.finalizeProcessingReady(finalized.getId(), 10, 640, 480, "diagnostic-media-thumbnail/x/final.jpg");
+
+        List<DiagnosticMedia> orphans = mediaRepository.findPendingThumbnailOrphans(50);
+
+        assertThat(orphans).extracting(DiagnosticMedia::getId)
+                .doesNotContain(readyNoMarker.getId(), finalized.getId());
+    }
+
+    // ==================== MEDIA-HARDENING-1: atomic finalization invariant ====================
+
+    @Test
+    @DisplayName("finalizeProcessingReady очищает pendingThumbnailStorageKey атомарно вместе с thumbnailStorageKey/READY")
+    void finalizeProcessingReady_AtomicallyClearsPendingMarker() {
+        RequestAndItem ctx = createRequestAndItem();
+        DiagnosticMedia media = createVideoMedia(ctx, UploadStatus.READY, ProcessingStatus.PROCESSING);
+        mediaRepository.declarePendingThumbnail(media.getId(), "diagnostic-media-thumbnail/x/candidate.jpg");
+
+        boolean finalized = mediaRepository.finalizeProcessingReady(
+                media.getId(), 12, 1920, 1080, "diagnostic-media-thumbnail/x/candidate.jpg");
+
+        assertThat(finalized).isTrue();
+        DiagnosticMedia after = mediaRepository.findById(media.getId()).orElseThrow();
+        assertThat(after.getProcessingStatus()).isEqualTo(ProcessingStatus.READY);
+        assertThat(after.getThumbnailStorageKey()).isEqualTo("diagnostic-media-thumbnail/x/candidate.jpg");
+        assertThat(after.getPendingThumbnailStorageKey()).isNull();
+
+        List<DiagnosticMedia> orphans = mediaRepository.findPendingThumbnailOrphans(50);
+        assertThat(orphans).extracting(DiagnosticMedia::getId).doesNotContain(media.getId());
+    }
 }

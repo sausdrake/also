@@ -99,5 +99,10 @@ public class VideoProcessingScheduler {
         } catch (Exception e) {
             log.error("Stale video-processing reconciliation sweep failed: {}", e.getMessage(), e);
         }
+        try {
+            videoProcessingService.reconcilePendingThumbnailOrphans(batchSize);
+        } catch (Exception e) {
+            log.error("Pending thumbnail orphan reconciliation sweep failed: {}", e.getMessage(), e);
+        }
     }
 }

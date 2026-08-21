@@ -26,6 +26,7 @@ public class DiagnosticMediaMapper {
         entity.setWidth(domain.getWidth());
         entity.setHeight(domain.getHeight());
         entity.setThumbnailStorageKey(domain.getThumbnailStorageKey());
+        entity.setPendingThumbnailStorageKey(domain.getPendingThumbnailStorageKey());
         entity.setProcessingClaimedAt(domain.getProcessingClaimedAt());
         entity.setCreatedAt(domain.getCreatedAt());
         entity.setUpdatedAt(domain.getUpdatedAt());
@@ -52,6 +53,7 @@ public class DiagnosticMediaMapper {
         domain.setWidth(entity.getWidth());
         domain.setHeight(entity.getHeight());
         domain.setThumbnailStorageKey(entity.getThumbnailStorageKey());
+        domain.setPendingThumbnailStorageKey(entity.getPendingThumbnailStorageKey());
         domain.setProcessingClaimedAt(entity.getProcessingClaimedAt());
         domain.setCreatedAt(entity.getCreatedAt());
         domain.setUpdatedAt(entity.getUpdatedAt());

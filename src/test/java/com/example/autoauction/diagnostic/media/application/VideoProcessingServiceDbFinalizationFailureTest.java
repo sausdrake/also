@@ -36,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 /**
@@ -148,6 +149,13 @@ class VideoProcessingServiceDbFinalizationFailureTest {
 
         when(mediaRepository.findPendingProcessing(anyInt())).thenReturn(List.of(media));
         when(mediaRepository.claimForProcessing(media.getId())).thenReturn(true);
+        // MEDIA-HARDENING-1: this @MockBean repository has no real backing store, so
+        // declarePendingThumbnail() must be stubbed to succeed - otherwise processClaimedItem()
+        // aborts BEFORE the thumbnail upload this test exists to exercise (declared=false is the
+        // "row no longer PROCESSING" abort path, not what this scenario is simulating), and the
+        // objectCount assertion below would then pass trivially for the wrong reason.
+        when(mediaRepository.declarePendingThumbnail(eq(media.getId()), any())).thenReturn(true);
+        when(mediaRepository.clearPendingThumbnail(eq(media.getId()), any())).thenReturn(true);
         when(mediaRepository.finalizeProcessingReady(anyLong(), any(), any(), any(), any()))
                 .thenThrow(new RuntimeException("simulated DB finalization failure"));
 
@@ -160,6 +168,13 @@ class VideoProcessingServiceDbFinalizationFailureTest {
         assertThat(storageClient.objectCount())
                 .as("compensating deleteObject() must remove the just-uploaded thumbnail, leaving no orphan")
                 .isEqualTo(baselineObjects);
+
+        // MEDIA-HARDENING-1: the marker declared before upload must be cleared only AFTER the
+        // compensating delete succeeded - proven here by capturing the actual declared key and
+        // verifying clearPendingThumbnail() was called with that exact same key.
+        org.mockito.ArgumentCaptor<String> declaredKey = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(mediaRepository).declarePendingThumbnail(eq(media.getId()), declaredKey.capture());
+        org.mockito.Mockito.verify(mediaRepository).clearPendingThumbnail(media.getId(), declaredKey.getValue());
     }
 
     @Test

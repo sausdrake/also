@@ -59,6 +59,11 @@ public interface DiagnosticMediaRepository {
      * Requires uploadStatus=READY - if the media was soft-deleted while a
      * worker was processing it, this returns false and the caller must not
      * publish the result (see VideoProcessingService, MEDIA-3.4 Phase 6).
+     *
+     * MEDIA-HARDENING-1: this same atomic UPDATE also clears
+     * pendingThumbnailStorageKey to NULL - the promotion from "pending" to
+     * "finalized" is one database write, not two, so a successfully
+     * finalized row can never be selected by findPendingThumbnailOrphans().
      */
     boolean finalizeProcessingReady(Long id, Integer durationSeconds, Integer width, Integer height, String thumbnailStorageKey);
 
@@ -87,4 +92,43 @@ public interface DiagnosticMediaRepository {
      * above, not a new pattern).
      */
     List<DiagnosticMedia> findStaleProcessing(OffsetDateTime cutoff, int limit);
+
+    // ==================== MEDIA-HARDENING-1: recoverable thumbnail orphans ====================
+
+    /**
+     * Atomically records the R2 key a processing attempt is about to upload
+     * a thumbnail to, BEFORE that upload happens - the durable write-ahead
+     * marker that lets a crashed attempt (no exception, no compensating
+     * delete) still be discovered after stale-PROCESSING recovery. Guarded
+     * only by processingStatus='PROCESSING' - deliberately NOT also guarded
+     * by "pending key currently null", so a fresh legitimate attempt is
+     * never blocked from declaring its own key by a stale marker a prior
+     * crashed attempt left behind (that marker is cleaned up independently
+     * by reconcilePendingThumbnailOrphans()).
+     */
+    boolean declarePendingThumbnail(Long id, String thumbnailStorageKey);
+
+    /**
+     * Atomically clears pendingThumbnailStorageKey - but ONLY if it still
+     * equals expectedKey. This expected-key guard is the sole safeguard
+     * against an older reconciliation/cleanup attempt clearing a NEWER
+     * processing attempt's marker after a retry has already overwritten it
+     * with a fresh key (declarePendingThumbnail() has no uniqueness
+     * constraint, so the column always reflects only the most recent
+     * attempt's key).
+     */
+    boolean clearPendingThumbnail(Long id, String expectedKey);
+
+    /**
+     * Bounded batch of rows with a non-null pendingThumbnailStorageKey whose
+     * processingStatus is no longer PROCESSING - i.e. processing moved on
+     * (finished, failed, or was stale-reset) without ever clearing the
+     * marker itself, meaning the R2 object it names was never referenced by
+     * a successful finalization and is a genuine orphan candidate. Cannot
+     * ever match a successfully finalized row: finalizeProcessingReady()
+     * clears this column in the SAME atomic UPDATE that sets
+     * thumbnailStorageKey. Mirrors findStaleProcessing()'s bounded-query
+     * pattern exactly.
+     */
+    List<DiagnosticMedia> findPendingThumbnailOrphans(int limit);
 }

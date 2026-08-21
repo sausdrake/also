@@ -179,4 +179,33 @@ public class DiagnosticMediaRepositoryAdapter implements DiagnosticMediaReposito
                         ProcessingStatus.PROCESSING, cutoff, PageRequest.of(0, limit))
                 .stream().map(mapper::toDomain).collect(Collectors.toList());
     }
+
+    // ==================== MEDIA-HARDENING-1: recoverable thumbnail orphans ====================
+
+    @Override
+    public boolean declarePendingThumbnail(Long id, String thumbnailStorageKey) {
+        int updated = jpaRepository.declarePendingThumbnail(id, thumbnailStorageKey, OffsetDateTime.now());
+        if (updated > 0) {
+            log.info("DiagnosticMedia {} declared pending thumbnail (key={})", id, thumbnailStorageKey);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean clearPendingThumbnail(Long id, String expectedKey) {
+        int updated = jpaRepository.clearPendingThumbnail(id, expectedKey, OffsetDateTime.now());
+        if (updated > 0) {
+            log.info("DiagnosticMedia {} pending thumbnail marker cleared (key={})", id, expectedKey);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public List<DiagnosticMedia> findPendingThumbnailOrphans(int limit) {
+        return jpaRepository.findByPendingThumbnailStorageKeyIsNotNullAndProcessingStatusNot(
+                        ProcessingStatus.PROCESSING, PageRequest.of(0, limit))
+                .stream().map(mapper::toDomain).collect(Collectors.toList());
+    }
 }

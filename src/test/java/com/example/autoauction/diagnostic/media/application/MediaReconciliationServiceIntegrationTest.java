@@ -285,4 +285,80 @@ class MediaReconciliationServiceIntegrationTest {
         assertThat(mediaRepository.findById(media.getId()).orElseThrow().getUploadStatus())
                 .isEqualTo(UploadStatus.DELETED); // tombstone retained
     }
+
+    // ==================== MEDIA-HARDENING-1: DELETED pending-thumbnail cleanup ====================
+
+    /**
+     * Test-only: pendingThumbnailStorageKey is written only by the atomic
+     * declarePendingThumbnail() (which requires processingStatus=PROCESSING),
+     * so a row that is simultaneously READY (thumbnailStorageKey already
+     * finalized) AND carrying a populated pendingThumbnailStorageKey isn't
+     * reachable through the current pipeline's public port (there is no
+     * READY-row reprocessing path). Seeds that state directly to prove
+     * reconcileDeletedObjects() cleans up each populated key column
+     * independently, regardless of how it got populated - mirrors
+     * ageMediaCreatedAt()'s existing direct-SQL test-setup pattern above.
+     */
+    private void setPendingThumbnailStorageKeyDirect(Long mediaId, String key) {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            entityManager.createNativeQuery("UPDATE diagnostic_media SET pending_thumbnail_storage_key = ?1 WHERE id = ?2")
+                    .setParameter(1, key)
+                    .setParameter(2, mediaId)
+                    .executeUpdate();
+        });
+    }
+
+    @Test
+    @DisplayName("MEDIA-HARDENING-1 A: DELETED VIDEO с миниатюрой и pending-миниатюрой -> удаляются все три R2-объекта, DB-маркер не трогается сервисом")
+    void deletedVideoWithThumbnailAndPendingThumbnail_AllThreeObjectsCleaned() {
+        RequestAndItem ctx = createRequestAndItem();
+        DiagnosticMedia media = createReadyVideo(ctx);
+        mediaRepository.claimForProcessing(media.getId());
+        String thumbnailKey = "diagnostic-media-thumbnail/" + ctx.requestId() + "/" + UUID.randomUUID() + ".jpg";
+        storageClient.simulateUpload(thumbnailKey, VALID_JPEG, "image/jpeg");
+        mediaRepository.finalizeProcessingReady(media.getId(), 10, 640, 480, thumbnailKey);
+
+        // Simulates a stale pending-thumbnail marker left over on an otherwise-finalized row -
+        // not reachable via the public port on this pipeline, seeded directly (see helper above).
+        String pendingKey = "diagnostic-media-thumbnail/" + ctx.requestId() + "/" + UUID.randomUUID() + "-pending.jpg";
+        storageClient.simulateUpload(pendingKey, VALID_JPEG, "image/jpeg");
+        setPendingThumbnailStorageKeyDirect(media.getId(), pendingKey);
+
+        mediaRepository.softDelete(media.getId());
+        assertThat(storageClient.hasObject(media.getStorageKey())).isTrue();
+        assertThat(storageClient.hasObject(thumbnailKey)).isTrue();
+        assertThat(storageClient.hasObject(pendingKey)).isTrue();
+
+        reconciliationService.reconcile();
+
+        assertThat(storageClient.hasObject(media.getStorageKey())).isFalse();
+        assertThat(storageClient.hasObject(thumbnailKey)).isFalse();
+        assertThat(storageClient.hasObject(pendingKey)).isFalse();
+        assertThat(mediaRepository.findById(media.getId()).orElseThrow().getUploadStatus())
+                .isEqualTo(UploadStatus.DELETED); // tombstone retained
+    }
+
+    @Test
+    @DisplayName("MEDIA-HARDENING-1 B: DELETED VIDEO после stale-recovery с непогашенным pending-маркером (без финализированной миниатюры) -> pending-объект удаляется, DB-маркер сервисом не очищается")
+    void deletedVideoAfterStaleRecoveryWithPendingMarker_PendingObjectCleanedMarkerUntouched() {
+        RequestAndItem ctx = createRequestAndItem();
+        DiagnosticMedia media = createReadyVideo(ctx);
+        mediaRepository.claimForProcessing(media.getId());
+        String pendingKey = "diagnostic-media-thumbnail/" + ctx.requestId() + "/" + UUID.randomUUID() + ".jpg";
+        mediaRepository.declarePendingThumbnail(media.getId(), pendingKey);
+        storageClient.simulateUpload(pendingKey, VALID_JPEG, "image/jpeg"); // upload happened before the simulated crash
+        mediaRepository.resetStaleProcessing(media.getId()); // simulated crash -> stale-claim recovery -> PENDING, marker survives
+        mediaRepository.softDelete(media.getId()); // deleted before the orphan-reconciliation sweep ever ran
+
+        assertThat(storageClient.hasObject(media.getStorageKey())).isTrue();
+        assertThat(storageClient.hasObject(pendingKey)).isTrue();
+
+        reconciliationService.reconcile();
+
+        assertThat(storageClient.hasObject(media.getStorageKey())).isFalse();
+        assertThat(storageClient.hasObject(pendingKey)).isFalse();
+        assertThat(mediaRepository.findById(media.getId()).orElseThrow().getPendingThumbnailStorageKey())
+                .as("MEDIA-HARDENING-1: MediaReconciliationService owns DELETED-row storage cleanup only - it must never clear the DB marker itself")
+                .isEqualTo(pendingKey);
+    }
 }

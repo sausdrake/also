@@ -207,6 +207,8 @@ class VideoProcessingServiceIntegrationTest {
         assertThat(after.getHeight()).isEqualTo(480);
         assertThat(after.getThumbnailStorageKey()).isNotNull().startsWith("diagnostic-media-thumbnail/");
         assertThat(storageClient.hasObject(after.getThumbnailStorageKey())).isTrue();
+        // MEDIA-HARDENING-1: successful finalization clears the pending marker atomically.
+        assertThat(after.getPendingThumbnailStorageKey()).isNull();
     }
 
     // ==================== 2: claim lost (genuine two-thread race) ====================
@@ -347,9 +349,14 @@ class VideoProcessingServiceIntegrationTest {
 
         videoProcessingService.processPending(10);
 
-        assertThat(mediaRepository.findById(media.getId()).orElseThrow().getProcessingStatus())
-                .isEqualTo(ProcessingStatus.FAILED);
+        DiagnosticMedia after = mediaRepository.findById(media.getId()).orElseThrow();
+        assertThat(after.getProcessingStatus()).isEqualTo(ProcessingStatus.FAILED);
         assertThat(storageClient.objectCount()).isEqualTo(baseline); // no thumbnail actually stored
+        // MEDIA-HARDENING-1: the marker was declared BEFORE the failed putObject and is
+        // deliberately NOT cleared here - no delete ever ran, so clearing it would make the
+        // marker inconsistent if a same-keyed object somehow existed. It is left for the orphan
+        // sweep, whose delete of this (almost certainly never-created) object is a safe no-op.
+        assertThat(after.getPendingThumbnailStorageKey()).isNotNull();
     }
 
     @Test
@@ -363,9 +370,11 @@ class VideoProcessingServiceIntegrationTest {
 
         videoProcessingService.processPending(10);
 
-        assertThat(mediaRepository.findById(media.getId()).orElseThrow().getProcessingStatus())
-                .isEqualTo(ProcessingStatus.FAILED);
+        DiagnosticMedia after = mediaRepository.findById(media.getId()).orElseThrow();
+        assertThat(after.getProcessingStatus()).isEqualTo(ProcessingStatus.FAILED);
         assertThat(storageClient.objectCount()).isEqualTo(baseline); // thumbnail was deleted after verification failed
+        // MEDIA-HARDENING-1: compensatingDelete() clears the marker only after the delete succeeds.
+        assertThat(after.getPendingThumbnailStorageKey()).isNull();
     }
 
     // ==================== 8: DB finalization returns false (real race via soft-delete) ====================
@@ -626,5 +635,113 @@ class VideoProcessingServiceIntegrationTest {
         assertThat(reset).isFalse();
         assertThat(mediaRepository.findById(media.getId()).orElseThrow().getProcessingStatus())
                 .isEqualTo(ProcessingStatus.READY); // untouched by the no-op reset
+    }
+
+    // ==================== MEDIA-HARDENING-1: pending-thumbnail marker lifecycle ====================
+
+    @Test
+    @DisplayName("HARDENING-B: PROCESSING с объявленным pending-маркером и загруженным объектом, финализация " +
+            "НЕ произошла -> stale recovery -> reconcilePendingThumbnailOrphans удаляет объект и очищает маркер")
+    void crashWindowRecovery_OrphanedThumbnailDeletedMarkerClearedAfterStaleRecovery() {
+        RequestAndItem ctx = createRequestAndItem();
+        DiagnosticMedia media = createReadyVideo(ctx);
+        mediaRepository.claimForProcessing(media.getId());
+        String candidateKey = "diagnostic-media-thumbnail/" + ctx.requestId() + "/" + UUID.randomUUID() + ".jpg";
+
+        boolean declared = mediaRepository.declarePendingThumbnail(media.getId(), candidateKey);
+        assertThat(declared).isTrue();
+        storageClient.simulateUpload(candidateKey, VIDEO_BYTES, "image/jpeg"); // upload succeeded before the simulated crash
+        // finalizeProcessingReady() is deliberately never called - this IS the crash window.
+
+        mediaRepository.resetStaleProcessing(media.getId()); // simulated crash -> stale-claim recovery, PROCESSING -> PENDING
+        assertThat(storageClient.hasObject(candidateKey)).isTrue(); // still orphaned before the sweep runs
+
+        videoProcessingService.reconcilePendingThumbnailOrphans(10);
+
+        DiagnosticMedia after = mediaRepository.findById(media.getId()).orElseThrow();
+        assertThat(storageClient.hasObject(candidateKey)).isFalse();
+        assertThat(after.getPendingThumbnailStorageKey()).isNull();
+        assertThat(after.getProcessingStatus()).isEqualTo(ProcessingStatus.PENDING); // untouched by the sweep
+        assertThat(after.getThumbnailStorageKey()).isNull(); // never finalized
+    }
+
+    @Test
+    @DisplayName("HARDENING-D: более новый ключ перекрывает маркер - устаревшая реконсиляция по старому ключу " +
+            "удаляет старый объект, но не может очистить маркер новой попытки, объект новой попытки остаётся")
+    void expectedKeyRace_OlderReconciliationCannotClearNewerMarker() {
+        RequestAndItem ctx = createRequestAndItem();
+        DiagnosticMedia media = createReadyVideo(ctx);
+        mediaRepository.claimForProcessing(media.getId());
+        String keyA = "diagnostic-media-thumbnail/" + ctx.requestId() + "/" + UUID.randomUUID() + "-a.jpg";
+        mediaRepository.declarePendingThumbnail(media.getId(), keyA);
+        storageClient.simulateUpload(keyA, VIDEO_BYTES, "image/jpeg");
+        mediaRepository.resetStaleProcessing(media.getId()); // attempt A crashes -> PENDING, marker=A
+
+        // A newer attempt legitimately re-claims the same PENDING row and overwrites the marker
+        // with its own candidate key B - this must never be blocked by attempt A's stale marker
+        // (declarePendingThumbnail() is deliberately not guarded by "pending key currently null").
+        mediaRepository.claimForProcessing(media.getId());
+        String keyB = "diagnostic-media-thumbnail/" + ctx.requestId() + "/" + UUID.randomUUID() + "-b.jpg";
+        mediaRepository.declarePendingThumbnail(media.getId(), keyB);
+        storageClient.simulateUpload(keyB, VIDEO_BYTES, "image/jpeg");
+
+        // A delayed reconciliation cycle for the now-stale keyA candidate (read before attempt B
+        // overwrote the marker) runs the exact same two steps
+        // reconcilePendingThumbnailOrphans() performs internally: unconditional delete of the
+        // object it read, then the expected-key-guarded clear - reproducing the interleaving
+        // that a single synchronous test cannot otherwise induce inside the real service call.
+        storageClient.deleteObject(keyA);
+        boolean cleared = mediaRepository.clearPendingThumbnail(media.getId(), keyA);
+
+        assertThat(cleared).isFalse();
+        assertThat(storageClient.hasObject(keyA)).isFalse(); // stale object A correctly deleted
+        assertThat(storageClient.hasObject(keyB)).isTrue(); // newer object B untouched
+        assertThat(mediaRepository.findById(media.getId()).orElseThrow().getPendingThumbnailStorageKey())
+                .isEqualTo(keyB); // newer marker survives the stale reconciliation attempt
+    }
+
+    @Test
+    @DisplayName("HARDENING-G: несколько pending-thumbnail orphan-кандидатов -> обрабатывается только ограниченная партия")
+    void reconcilePendingThumbnailOrphans_BoundedBatchOnly() {
+        RequestAndItem ctx = createRequestAndItem();
+        for (int i = 0; i < 5; i++) {
+            DiagnosticMedia media = createReadyVideo(ctx);
+            mediaRepository.claimForProcessing(media.getId());
+            String key = "diagnostic-media-thumbnail/" + ctx.requestId() + "/" + UUID.randomUUID() + ".jpg";
+            mediaRepository.declarePendingThumbnail(media.getId(), key);
+            storageClient.simulateUpload(key, VIDEO_BYTES, "image/jpeg");
+            mediaRepository.resetStaleProcessing(media.getId());
+        }
+
+        videoProcessingService.reconcilePendingThumbnailOrphans(3);
+
+        long stillPendingMarker = mediaRepository.findByRequest(ctx.requestId()).stream()
+                .filter(m -> m.getPendingThumbnailStorageKey() != null)
+                .count();
+        assertThat(stillPendingMarker).isEqualTo(2); // exactly batchSize (3) cleared, the rest untouched this cycle
+    }
+
+    @Test
+    @DisplayName("HARDENING-H: успешно финализированная запись не возвращается orphan-разверткой, миниатюра остаётся нетронутой")
+    void reconcilePendingThumbnailOrphans_NeverMutatesFinalizedRow() {
+        RequestAndItem ctx = createRequestAndItem();
+        DiagnosticMedia media = createReadyVideo(ctx);
+        videoProcessor.configureSuccess(10, 640, 480);
+
+        videoProcessingService.processPending(10);
+
+        DiagnosticMedia finalized = mediaRepository.findById(media.getId()).orElseThrow();
+        assertThat(finalized.getProcessingStatus()).isEqualTo(ProcessingStatus.READY);
+        assertThat(finalized.getPendingThumbnailStorageKey()).isNull();
+        String thumbnailKey = finalized.getThumbnailStorageKey();
+        assertThat(storageClient.hasObject(thumbnailKey)).isTrue();
+
+        videoProcessingService.reconcilePendingThumbnailOrphans(10);
+
+        DiagnosticMedia after = mediaRepository.findById(media.getId()).orElseThrow();
+        assertThat(after.getProcessingStatus()).isEqualTo(ProcessingStatus.READY);
+        assertThat(after.getThumbnailStorageKey()).isEqualTo(thumbnailKey);
+        assertThat(after.getPendingThumbnailStorageKey()).isNull();
+        assertThat(storageClient.hasObject(thumbnailKey)).isTrue(); // never touched by the orphan sweep
     }
 }

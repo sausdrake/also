@@ -164,4 +164,110 @@ class VideoProcessingSchedulerTest {
 
         verify(service, never()).retryProcessing(anyLong());
     }
+
+    // ==================== MEDIA-HARDENING-1: reconcilePendingThumbnailOrphans wiring ====================
+
+    @Test
+    @DisplayName("15 (MEDIA-HARDENING-1): планировщик вызывает reconcilePendingThumbnailOrphans(batchSize)")
+    void invokesReconcilePendingThumbnailOrphansWithConfiguredBatchSize() {
+        VideoProcessingService service = mock(VideoProcessingService.class);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+
+        scheduler.processVideos();
+
+        verify(service).reconcilePendingThumbnailOrphans(eq(EXPECTED_BATCH_SIZE));
+    }
+
+    @Test
+    @DisplayName("16 (MEDIA-HARDENING-1): один вызов processVideos() вызывает все три сервисных метода ровно один раз")
+    void singleTickInvokesAllThreeServiceMethodsExactlyOnce() {
+        VideoProcessingService service = mock(VideoProcessingService.class);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+
+        scheduler.processVideos();
+
+        verify(service, times(1)).processPending(anyInt());
+        verify(service, times(1)).reconcileStale(anyInt());
+        verify(service, times(1)).reconcilePendingThumbnailOrphans(anyInt());
+    }
+
+    @Test
+    @DisplayName("17 (MEDIA-HARDENING-1): сбой processPending перехватывается, reconcileStale и reconcilePendingThumbnailOrphans всё равно выполняются в этом же тике")
+    void processPendingThrows_ReconcileStaleAndPendingThumbnailOrphansStillRunSameTick() {
+        VideoProcessingService service = mock(VideoProcessingService.class);
+        doThrow(new RuntimeException("simulated processPending failure")).when(service).processPending(anyInt());
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+
+        scheduler.processVideos(); // must not throw
+
+        verify(service).reconcileStale(anyInt());
+        verify(service).reconcilePendingThumbnailOrphans(anyInt());
+    }
+
+    @Test
+    @DisplayName("18 (MEDIA-HARDENING-1): сбой reconcileStale перехватывается, processPending и reconcilePendingThumbnailOrphans всё равно выполняются в этом же тике")
+    void reconcileStaleThrows_ProcessPendingAndPendingThumbnailOrphansStillRunSameTick() {
+        VideoProcessingService service = mock(VideoProcessingService.class);
+        doThrow(new RuntimeException("simulated reconcileStale failure")).when(service).reconcileStale(anyInt());
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+
+        scheduler.processVideos(); // must not throw
+
+        verify(service).processPending(anyInt());
+        verify(service).reconcilePendingThumbnailOrphans(anyInt());
+    }
+
+    @Test
+    @DisplayName("19 (MEDIA-HARDENING-1): сбой reconcilePendingThumbnailOrphans перехватывается, processPending и reconcileStale всё равно выполняются в этом же тике")
+    void reconcilePendingThumbnailOrphansThrows_ProcessPendingAndReconcileStaleStillRunSameTick() {
+        VideoProcessingService service = mock(VideoProcessingService.class);
+        doThrow(new RuntimeException("simulated reconcilePendingThumbnailOrphans failure"))
+                .when(service).reconcilePendingThumbnailOrphans(anyInt());
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+
+        scheduler.processVideos(); // must not throw
+
+        verify(service).processPending(anyInt());
+        verify(service).reconcileStale(anyInt());
+    }
+
+    @Test
+    @DisplayName("20 (MEDIA-HARDENING-1): сбой reconcilePendingThumbnailOrphans не блокирует последующие тики")
+    void reconcilePendingThumbnailOrphansThrows_FutureInvocationsRemainPossible() {
+        VideoProcessingService service = mock(VideoProcessingService.class);
+        doThrow(new RuntimeException("simulated reconcilePendingThumbnailOrphans failure"))
+                .when(service).reconcilePendingThumbnailOrphans(anyInt());
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+
+        scheduler.processVideos(); // must not throw
+        scheduler.processVideos(); // a second tick must still run normally
+
+        verify(service, times(2)).processPending(anyInt());
+        verify(service, times(2)).reconcileStale(anyInt());
+        verify(service, times(2)).reconcilePendingThumbnailOrphans(anyInt());
+    }
+
+    @Test
+    @DisplayName("21 (MEDIA-HARDENING-1): сконфигурированный batchSize передаётся в reconcilePendingThumbnailOrphans, как и в остальные два вызова")
+    void sameBatchSizePassedToReconcilePendingThumbnailOrphans() {
+        VideoProcessingService service = mock(VideoProcessingService.class);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+
+        scheduler.processVideos();
+
+        verify(service).processPending(EXPECTED_BATCH_SIZE);
+        verify(service).reconcileStale(EXPECTED_BATCH_SIZE);
+        verify(service).reconcilePendingThumbnailOrphans(EXPECTED_BATCH_SIZE);
+    }
+
+    @Test
+    @DisplayName("22 (MEDIA-HARDENING-1): нестандартный сконфигурированный batchSize передаётся в reconcilePendingThumbnailOrphans")
+    void nonDefaultConfiguredBatchSizePassedToReconcilePendingThumbnailOrphans() {
+        VideoProcessingService service = mock(VideoProcessingService.class);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, 3);
+
+        scheduler.processVideos();
+
+        verify(service).reconcilePendingThumbnailOrphans(3);
+    }
 }

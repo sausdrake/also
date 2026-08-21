@@ -124,6 +124,20 @@ public class MediaReconciliationService {
                             media.getId(), e.getMessage());
                 }
             }
+            // MEDIA-HARDENING-1: a soft-deleted row can still carry an outstanding pending-
+            // thumbnail marker (declared but never finalized before deletion raced in) - clean
+            // it up here too, same best-effort pattern. Not clearing the DB marker itself: this
+            // service only owns DELETED-row storage cleanup, not marker bookkeeping - the marker
+            // column is harmless to leave populated on an already-DELETED, unreadable row (every
+            // read/orphan-sweep path already gates on uploadStatus/processingStatus first).
+            if (media.getPendingThumbnailStorageKey() != null) {
+                try {
+                    storageClient.deleteObject(media.getPendingThumbnailStorageKey());
+                } catch (Exception e) {
+                    log.warn("MEDIA-HARDENING-1 reconciliation: failed to delete R2 pending-thumbnail object for media {} - will retry next cycle: {}",
+                            media.getId(), e.getMessage());
+                }
+            }
         }
     }
 
