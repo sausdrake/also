@@ -2,6 +2,7 @@
 package com.example.autoauction.diagnostic.commitment.application;
 
 import com.example.autoauction.deposit.application.DepositService;
+import com.example.autoauction.diagnostic.commitment.domain.CommitmentStatus;
 import com.example.autoauction.diagnostic.commitment.domain.SellerDiagnosticCommitment;
 import com.example.autoauction.diagnostic.commitment.domain.port.SellerDiagnosticCommitmentRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -42,13 +43,15 @@ public class SellerDiagnosticCommitmentService {
 
     /**
      * Freezes the configured commitment amount for a newly-created diagnostic request and
-     * records the correctly-typed commitment. Shares the caller's transaction (no
-     * REQUIRES_NEW) - a freeze failure must abort the whole diagnostic-request creation,
-     * matching current behavior exactly (DiagnosticRequestService.createRequest has no
-     * try/catch around this call).
+     * records the correctly-typed commitment, snapshotting both committedAmount and
+     * diagnosticFeeAmount (PHASE 2) - neither is ever re-read from configuration after
+     * this call. Shares the caller's transaction (no REQUIRES_NEW) - a freeze failure must
+     * abort the whole diagnostic-request creation, matching current behavior exactly
+     * (DiagnosticRequestService.createRequest has no try/catch around this call).
      */
     @Transactional
-    public void freezeCommitment(Long sellerId, Long diagnosticRequestId, BigDecimal amount) {
+    public void freezeCommitment(Long sellerId, Long diagnosticRequestId,
+                                  BigDecimal committedAmount, BigDecimal diagnosticFeeAmount) {
         if (repository.existsByDiagnosticRequestId(diagnosticRequestId)) {
             throw new IllegalStateException(
                     "Seller diagnostic commitment already exists for request " + diagnosticRequestId);
@@ -58,18 +61,68 @@ public class SellerDiagnosticCommitmentService {
 
         // Mutates the Deposit ledger (balance/blockedAmount) and records the
         // DepositTransaction - DepositService remains solely responsible for that; this
-        // service never touches Deposit internals directly.
-        depositService.freezeForDiagnosticRequest(sellerId, diagnosticRequestId, amount);
+        // service never touches Deposit internals directly. Only committedAmount is a
+        // ledger concern - diagnosticFeeAmount is a commitment-only snapshot, never passed
+        // to DepositService.
+        depositService.freezeForDiagnosticRequest(sellerId, diagnosticRequestId, committedAmount);
 
         SellerDiagnosticCommitment commitment = new SellerDiagnosticCommitment();
         commitment.setDiagnosticRequestId(diagnosticRequestId);
         commitment.setDepositId(depositId);
-        commitment.setCommittedAmount(amount);
+        commitment.setCommittedAmount(committedAmount);
+        commitment.setDiagnosticFeeAmount(diagnosticFeeAmount);
+        commitment.setStatus(CommitmentStatus.FROZEN);
         commitment.setFrozenAt(OffsetDateTime.now());
         repository.save(commitment);
 
-        log.info("Seller diagnostic commitment frozen: request={}, seller={}, amount={}",
-                diagnosticRequestId, sellerId, amount);
+        log.info("Seller diagnostic commitment frozen: request={}, seller={}, committedAmount={}, diagnosticFeeAmount={}",
+                diagnosticRequestId, sellerId, committedAmount, diagnosticFeeAmount);
+    }
+
+    /**
+     * PHASE 2: transitions a commitment from FROZEN to AWAITING_FINALIZATION once the
+     * diagnostic lifecycle has concluded (report approved, or rejected with a recorded
+     * category) - marks that the financial outcome is now known-pending but NOT yet
+     * computed. Does NOT touch the Deposit ledger, does NOT release/delete the commitment,
+     * does NOT compute any fee/penalty/refund - that is exclusively a future finalization
+     * phase's responsibility. Plain @Transactional (REQUIRED, no REQUIRES_NEW): this
+     * mutates only the commitment table, never Deposit, so none of the Hibernate-session-
+     * poisoning concerns that motivate REQUIRES_NEW elsewhere in this codebase apply here;
+     * it deliberately shares the caller's transaction (approveReport/rejectReport) so a
+     * failure here rolls back the whole operation, exactly like the releaseCommitment call
+     * it replaces at those call sites.
+     *
+     * Race handling mirrors DiagnosticRequestService.bindTemplate's established precedent:
+     * a 0-rows-affected UPDATE is never silently treated as success - it is re-read and
+     * distinguished. Deliberately does NOT attempt to arbitrate DiagnosticRequest's own
+     * separate (pre-existing, out-of-scope) approve/reject race - it only ever asks "is
+     * THIS commitment now AWAITING_FINALIZATION," treating an already-transitioned
+     * commitment as an idempotent outcome, not a conflict.
+     */
+    @Transactional
+    public void markAwaitingFinalization(Long diagnosticRequestId) {
+        boolean transitioned = repository.markAwaitingFinalization(diagnosticRequestId);
+        if (transitioned) {
+            log.info("Seller diagnostic commitment for request {} transitioned FROZEN -> AWAITING_FINALIZATION",
+                    diagnosticRequestId);
+            return;
+        }
+
+        SellerDiagnosticCommitment current = repository.findByDiagnosticRequestId(diagnosticRequestId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "No seller diagnostic commitment found for request " + diagnosticRequestId));
+
+        if (current.getStatus() == CommitmentStatus.AWAITING_FINALIZATION) {
+            log.info("Seller diagnostic commitment for request {} already AWAITING_FINALIZATION - idempotent",
+                    diagnosticRequestId);
+            return;
+        }
+
+        // Only FROZEN/AWAITING_FINALIZATION exist in Phase 2 - unreachable in practice,
+        // fails closed defensively rather than silently succeeding on an unexpected status.
+        throw new IllegalStateException(
+                "Could not transition seller diagnostic commitment for request " + diagnosticRequestId
+                        + " to AWAITING_FINALIZATION - unexpected status: " + current.getStatus());
     }
 
     /**

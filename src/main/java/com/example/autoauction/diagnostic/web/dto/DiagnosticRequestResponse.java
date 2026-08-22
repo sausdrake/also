@@ -22,6 +22,7 @@ public class DiagnosticRequestResponse {
     private Long assignedTo;
     private String diagnosticName;
     private String rejectedReason;
+    private String rejectionCategory;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 
@@ -42,6 +43,7 @@ public class DiagnosticRequestResponse {
         response.setStatus(request.getStatus().name());
         response.setAssignedTo(request.getAssignedTo());
         response.setRejectedReason(request.getRejectedReason());
+        response.setRejectionCategory(request.getRejectionCategory() != null ? request.getRejectionCategory().name() : null);
         response.setCreatedAt(request.getCreatedAt());
         response.setUpdatedAt(request.getUpdatedAt());
         return response;

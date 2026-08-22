@@ -4,6 +4,7 @@ package com.example.autoauction.diagnostic.commitment.infrastructure.persistence
 import com.example.autoauction.deposit.domain.DepositStatus;
 import com.example.autoauction.deposit.infrastructure.persistence.JpaDepositEntity;
 import com.example.autoauction.deposit.infrastructure.persistence.SpringDataDepositJpaRepository;
+import com.example.autoauction.diagnostic.commitment.domain.CommitmentStatus;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
 import com.example.autoauction.diagnostic.infrastructure.persistence.JpaDiagnosticRequestEntity;
 import com.example.autoauction.diagnostic.infrastructure.persistence.SpringDataDiagnosticRequestJpaRepository;
@@ -24,6 +25,10 @@ import java.time.OffsetDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+// PHASE 2: JpaSellerDiagnosticCommitmentEntity's constructor now takes diagnosticFeeAmount and
+// status too - every construction below passes a fixed feeAmount/CommitmentStatus.FROZEN unless
+// the test is specifically about the FROZEN -> AWAITING_FINALIZATION transition itself.
 
 /**
  * PHASE 1 (seller commitment redesign): proves the new seller_diagnostic_commitment
@@ -93,7 +98,8 @@ class SellerDiagnosticCommitmentRepositoryAdapterTest {
     @DisplayName("Сохранение commitment с валидным diagnostic_request_id")
     void save_ValidDiagnosticRequestId_Persists() {
         JpaSellerDiagnosticCommitmentEntity entity = new JpaSellerDiagnosticCommitmentEntity(
-                testDiagnosticRequestId, testDepositId, new BigDecimal("10000"), OffsetDateTime.now());
+                testDiagnosticRequestId, testDepositId, new BigDecimal("10000"), new BigDecimal("4000"),
+                CommitmentStatus.FROZEN, OffsetDateTime.now());
 
         JpaSellerDiagnosticCommitmentEntity saved = commitmentJpaRepository.save(entity);
 
@@ -109,7 +115,8 @@ class SellerDiagnosticCommitmentRepositoryAdapterTest {
     @DisplayName("Commitment ссылается на корректный deposit")
     void save_ReferencesCorrectDeposit() {
         JpaSellerDiagnosticCommitmentEntity entity = new JpaSellerDiagnosticCommitmentEntity(
-                testDiagnosticRequestId, testDepositId, new BigDecimal("7500"), OffsetDateTime.now());
+                testDiagnosticRequestId, testDepositId, new BigDecimal("7500"), new BigDecimal("4000"),
+                CommitmentStatus.FROZEN, OffsetDateTime.now());
         commitmentJpaRepository.save(entity);
         entityManager.flush();
         entityManager.clear();
@@ -127,7 +134,8 @@ class SellerDiagnosticCommitmentRepositoryAdapterTest {
         assertThat(commitmentJpaRepository.existsByDiagnosticRequestId(testDiagnosticRequestId)).isFalse();
 
         JpaSellerDiagnosticCommitmentEntity entity = new JpaSellerDiagnosticCommitmentEntity(
-                testDiagnosticRequestId, testDepositId, new BigDecimal("10000"), OffsetDateTime.now());
+                testDiagnosticRequestId, testDepositId, new BigDecimal("10000"), new BigDecimal("4000"),
+                CommitmentStatus.FROZEN, OffsetDateTime.now());
         commitmentJpaRepository.save(entity);
         entityManager.flush();
         entityManager.clear();
@@ -139,7 +147,8 @@ class SellerDiagnosticCommitmentRepositoryAdapterTest {
     @DisplayName("deleteByDiagnosticRequestId удаляет запись (эквивалент release-полной заморозки)")
     void deleteByDiagnosticRequestId_RemovesRecord() {
         JpaSellerDiagnosticCommitmentEntity entity = new JpaSellerDiagnosticCommitmentEntity(
-                testDiagnosticRequestId, testDepositId, new BigDecimal("10000"), OffsetDateTime.now());
+                testDiagnosticRequestId, testDepositId, new BigDecimal("10000"), new BigDecimal("4000"),
+                CommitmentStatus.FROZEN, OffsetDateTime.now());
         commitmentJpaRepository.save(entity);
         entityManager.flush();
         entityManager.clear();
@@ -156,12 +165,14 @@ class SellerDiagnosticCommitmentRepositoryAdapterTest {
             "уникальным ограничением БД (uk_seller_diagnostic_commitment_request)")
     void save_DuplicateDiagnosticRequestId_RejectedByUniqueConstraint() {
         JpaSellerDiagnosticCommitmentEntity first = new JpaSellerDiagnosticCommitmentEntity(
-                testDiagnosticRequestId, testDepositId, new BigDecimal("10000"), OffsetDateTime.now());
+                testDiagnosticRequestId, testDepositId, new BigDecimal("10000"), new BigDecimal("4000"),
+                CommitmentStatus.FROZEN, OffsetDateTime.now());
         commitmentJpaRepository.save(first);
         entityManager.flush();
 
         JpaSellerDiagnosticCommitmentEntity duplicate = new JpaSellerDiagnosticCommitmentEntity(
-                testDiagnosticRequestId, testDepositId, new BigDecimal("5000"), OffsetDateTime.now());
+                testDiagnosticRequestId, testDepositId, new BigDecimal("5000"), new BigDecimal("4000"),
+                CommitmentStatus.FROZEN, OffsetDateTime.now());
 
         assertThatThrownBy(() -> {
             commitmentJpaRepository.save(duplicate);
@@ -174,7 +185,8 @@ class SellerDiagnosticCommitmentRepositoryAdapterTest {
             "с auction-side FrozenDeposit ни по схеме, ни по данным")
     void persistence_IndependentFromAuctionFrozenDeposit() {
         JpaSellerDiagnosticCommitmentEntity entity = new JpaSellerDiagnosticCommitmentEntity(
-                testDiagnosticRequestId, testDepositId, new BigDecimal("10000"), OffsetDateTime.now());
+                testDiagnosticRequestId, testDepositId, new BigDecimal("10000"), new BigDecimal("4000"),
+                CommitmentStatus.FROZEN, OffsetDateTime.now());
         commitmentJpaRepository.save(entity);
         entityManager.flush();
         entityManager.clear();
@@ -183,5 +195,50 @@ class SellerDiagnosticCommitmentRepositoryAdapterTest {
         // auction_id overload - this table exists purely as its own, correctly-typed
         // home; nothing here can be confused with or leak into the auction-side table.
         assertThat(commitmentJpaRepository.findByDiagnosticRequestId(testDiagnosticRequestId)).isPresent();
+    }
+
+    // PHASE 2: proves markAwaitingFinalization's atomic UPDATE...WHERE guard at the real
+    // Spring Data / JPQL level, not just via a mocked port.
+
+    @Test
+    @DisplayName("markAwaitingFinalization: FROZEN -> AWAITING_FINALIZATION, ровно одна строка затронута")
+    void markAwaitingFinalization_FrozenRow_TransitionsAndReturnsOne() {
+        JpaSellerDiagnosticCommitmentEntity entity = new JpaSellerDiagnosticCommitmentEntity(
+                testDiagnosticRequestId, testDepositId, new BigDecimal("10000"), new BigDecimal("4000"),
+                CommitmentStatus.FROZEN, OffsetDateTime.now());
+        commitmentJpaRepository.save(entity);
+        entityManager.flush();
+        entityManager.clear();
+
+        int updated = commitmentJpaRepository.markAwaitingFinalization(testDiagnosticRequestId, OffsetDateTime.now());
+        entityManager.clear();
+
+        assertThat(updated).isEqualTo(1);
+        JpaSellerDiagnosticCommitmentEntity reloaded = commitmentJpaRepository
+                .findByDiagnosticRequestId(testDiagnosticRequestId).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(CommitmentStatus.AWAITING_FINALIZATION);
+    }
+
+    @Test
+    @DisplayName("markAwaitingFinalization: уже AWAITING_FINALIZATION -> WHERE status='FROZEN' не совпадает, 0 строк")
+    void markAwaitingFinalization_AlreadyAwaitingFinalization_ReturnsZero() {
+        JpaSellerDiagnosticCommitmentEntity entity = new JpaSellerDiagnosticCommitmentEntity(
+                testDiagnosticRequestId, testDepositId, new BigDecimal("10000"), new BigDecimal("4000"),
+                CommitmentStatus.AWAITING_FINALIZATION, OffsetDateTime.now());
+        commitmentJpaRepository.save(entity);
+        entityManager.flush();
+        entityManager.clear();
+
+        int updated = commitmentJpaRepository.markAwaitingFinalization(testDiagnosticRequestId, OffsetDateTime.now());
+
+        assertThat(updated).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("markAwaitingFinalization: несуществующий diagnosticRequestId -> 0 строк, без исключения")
+    void markAwaitingFinalization_NoRow_ReturnsZeroWithoutThrowing() {
+        int updated = commitmentJpaRepository.markAwaitingFinalization(999999L, OffsetDateTime.now());
+
+        assertThat(updated).isEqualTo(0);
     }
 }

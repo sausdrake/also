@@ -3,6 +3,7 @@ package com.example.autoauction.diagnostic.commitment.application;
 
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.deposit.web.dto.DepositResponse;
+import com.example.autoauction.diagnostic.commitment.domain.CommitmentStatus;
 import com.example.autoauction.diagnostic.commitment.domain.SellerDiagnosticCommitment;
 import com.example.autoauction.diagnostic.commitment.domain.port.SellerDiagnosticCommitmentRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -43,6 +44,7 @@ class SellerDiagnosticCommitmentServiceTest {
     private final Long requestId = 100L;
     private final Long depositId = 5L;
     private final BigDecimal amount = new BigDecimal("10000");
+    private final BigDecimal feeAmount = new BigDecimal("4000");
 
     private void createService() {
         service = new SellerDiagnosticCommitmentService(repository, depositService);
@@ -50,7 +52,7 @@ class SellerDiagnosticCommitmentServiceTest {
 
     @Test
     @DisplayName("freezeCommitment: резолвит depositId через DepositService, вызывает freezeForDiagnosticRequest, " +
-            "сохраняет commitment с committedAmount - без прямой мутации Deposit")
+            "сохраняет commitment с committedAmount и diagnosticFeeAmount, статус FROZEN - без прямой мутации Deposit")
     void freezeCommitment_HappyPath_DelegatesToDepositServiceThenPersistsCommitment() {
         createService();
         when(repository.existsByDiagnosticRequestId(requestId)).thenReturn(false);
@@ -59,7 +61,7 @@ class SellerDiagnosticCommitmentServiceTest {
         when(depositService.getDepositByUserId(sellerId)).thenReturn(depositResponse);
         when(repository.save(any(SellerDiagnosticCommitment.class))).thenAnswer(i -> i.getArgument(0));
 
-        service.freezeCommitment(sellerId, requestId, amount);
+        service.freezeCommitment(sellerId, requestId, amount, feeAmount);
 
         verify(depositService).freezeForDiagnosticRequest(sellerId, requestId, amount);
 
@@ -69,9 +71,12 @@ class SellerDiagnosticCommitmentServiceTest {
         assertThat(saved.getDiagnosticRequestId()).isEqualTo(requestId);
         assertThat(saved.getDepositId()).isEqualTo(depositId);
         assertThat(saved.getCommittedAmount()).isEqualByComparingTo(amount);
+        assertThat(saved.getDiagnosticFeeAmount()).isEqualByComparingTo(feeAmount);
+        assertThat(saved.getStatus()).isEqualTo(CommitmentStatus.FROZEN);
         assertThat(saved.getFrozenAt()).isNotNull();
 
-        // The service itself never touches Deposit internals directly.
+        // The service itself never touches Deposit internals directly. diagnosticFeeAmount is a
+        // commitment-only snapshot, never passed to DepositService.
         verifyNoMoreInteractions(depositService);
     }
 
@@ -82,7 +87,7 @@ class SellerDiagnosticCommitmentServiceTest {
         createService();
         when(repository.existsByDiagnosticRequestId(requestId)).thenReturn(true);
 
-        assertThatThrownBy(() -> service.freezeCommitment(sellerId, requestId, amount))
+        assertThatThrownBy(() -> service.freezeCommitment(sellerId, requestId, amount, feeAmount))
                 .isInstanceOf(IllegalStateException.class);
 
         verifyNoInteractions(depositService);
@@ -146,5 +151,48 @@ class SellerDiagnosticCommitmentServiceTest {
 
         assertThat(result).isTrue();
         verify(repository).existsByDiagnosticRequestId(requestId);
+    }
+
+    // PHASE 2: FROZEN -> AWAITING_FINALIZATION transition
+
+    @Test
+    @DisplayName("markAwaitingFinalization: атомарный UPDATE находит FROZEN-строку -> транзитится, " +
+            "Deposit не затрагивается вовсе")
+    void markAwaitingFinalization_AtomicUpdateMatches_Transitions() {
+        createService();
+        when(repository.markAwaitingFinalization(requestId)).thenReturn(true);
+
+        service.markAwaitingFinalization(requestId);
+
+        verify(repository).markAwaitingFinalization(requestId);
+        verify(repository, never()).findByDiagnosticRequestId(any());
+        verifyNoInteractions(depositService);
+    }
+
+    @Test
+    @DisplayName("markAwaitingFinalization: атомарный UPDATE не находит строку, но commitment уже " +
+            "AWAITING_FINALIZATION -> идемпотентный успех, без исключения")
+    void markAwaitingFinalization_AlreadyTransitioned_IdempotentSuccess() {
+        createService();
+        when(repository.markAwaitingFinalization(requestId)).thenReturn(false);
+        SellerDiagnosticCommitment current = new SellerDiagnosticCommitment();
+        current.setDiagnosticRequestId(requestId);
+        current.setStatus(CommitmentStatus.AWAITING_FINALIZATION);
+        when(repository.findByDiagnosticRequestId(requestId)).thenReturn(Optional.of(current));
+
+        service.markAwaitingFinalization(requestId);
+
+        verifyNoInteractions(depositService);
+    }
+
+    @Test
+    @DisplayName("markAwaitingFinalization: commitment не найден вовсе -> IllegalStateException")
+    void markAwaitingFinalization_NotFound_Throws() {
+        createService();
+        when(repository.markAwaitingFinalization(requestId)).thenReturn(false);
+        when(repository.findByDiagnosticRequestId(requestId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.markAwaitingFinalization(requestId))
+                .isInstanceOf(IllegalStateException.class);
     }
 }

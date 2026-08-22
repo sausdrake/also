@@ -4,6 +4,7 @@ import com.example.autoauction.auth.infrastructure.security.CurrentUser;
 import com.example.autoauction.auth.domain.UserPrincipal;
 import com.example.autoauction.diagnostic.application.DiagnosticRequestService;
 import com.example.autoauction.diagnostic.application.InspectionTemplateService;
+import com.example.autoauction.diagnostic.domain.DiagnosticRejectionCategory;
 import com.example.autoauction.diagnostic.domain.InspectionGroup;
 import com.example.autoauction.diagnostic.domain.InspectionItem;
 import com.example.autoauction.diagnostic.domain.InspectionTemplate;
@@ -173,9 +174,10 @@ public class AdminDiagnosticController {
     public ResponseEntity<DiagnosticRequestResponse> rejectReport(
             @PathVariable Long id,
             @RequestParam String reason,
+            @RequestParam DiagnosticRejectionCategory category,
             @CurrentUser UserPrincipal currentUser
     ) {
-        return ResponseEntity.ok(requestService.rejectReport(id, currentUser.getUserId(), reason));
+        return ResponseEntity.ok(requestService.rejectReport(id, currentUser.getUserId(), reason, category));
     }
 
     // ==================== MEDIA-3.1B: исторический backfill шаблонов ====================

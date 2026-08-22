@@ -1,5 +1,6 @@
 package com.example.autoauction.diagnostic.infrastructure.persistence;
 
+import com.example.autoauction.diagnostic.domain.DiagnosticRejectionCategory;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -44,6 +45,11 @@ public class JpaDiagnosticRequestEntity {
 
     @Column(name = "rejected_reason", length = 1000)
     private String rejectedReason;
+
+    // PHASE 2: nullable - only set by rejectReport, never by approveReport or older rows.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "rejection_category", length = 50)
+    private DiagnosticRejectionCategory rejectionCategory;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;

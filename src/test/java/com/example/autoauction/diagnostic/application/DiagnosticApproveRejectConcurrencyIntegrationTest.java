@@ -6,7 +6,9 @@ import com.example.autoauction.deposit.domain.Deposit;
 import com.example.autoauction.deposit.domain.DepositTransaction;
 import com.example.autoauction.deposit.domain.port.DepositRepository;
 import com.example.autoauction.diagnostic.commitment.application.SellerDiagnosticCommitmentService;
+import com.example.autoauction.diagnostic.commitment.domain.CommitmentStatus;
 import com.example.autoauction.diagnostic.commitment.domain.port.SellerDiagnosticCommitmentRepository;
+import com.example.autoauction.diagnostic.domain.DiagnosticRejectionCategory;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
 import com.example.autoauction.diagnostic.domain.port.DiagnosticRequestRepository;
 import com.example.autoauction.user.domain.Role;
@@ -101,7 +103,7 @@ class DiagnosticApproveRejectConcurrencyIntegrationTest {
         DiagnosticRequest saved = diagnosticRequestRepository.save(request);
         Long requestId = saved.getId();
 
-        sellerDiagnosticCommitmentService.freezeCommitment(userId, requestId, depositAmount);
+        sellerDiagnosticCommitmentService.freezeCommitment(userId, requestId, depositAmount, new BigDecimal("4000"));
 
         saved.setStatus(DiagnosticRequest.DiagnosticRequestStatus.COMPLETED);
         diagnosticRequestRepository.save(saved);
@@ -155,6 +157,12 @@ class DiagnosticApproveRejectConcurrencyIntegrationTest {
         boolean aFailed = errA.get() != null;
         boolean bFailed = errB.get() != null;
 
+        // PHASE 2: approveReport/rejectReport no longer touch the Deposit ledger at all - they
+        // only transition the commitment FROZEN -> AWAITING_FINALIZATION. So the meaningful
+        // post-race invariants are now: (1) no UNBLOCK transaction is ever created by this race,
+        // (2) the commitment persists (never deleted), (3) it ends up in AWAITING_FINALIZATION
+        // exactly once (never lost, never duplicated - the atomic UPDATE...WHERE guard is the
+        // proof), (4) the deposit remains frozen at its post-freeze balance throughout.
         List<DepositTransaction> transactions = depositRepository.findTransactionsByUserId(setup.userId());
         long unblockCount = transactions.stream()
                 .filter(t -> t.getType() == DepositTransaction.TransactionType.UNBLOCK)
@@ -162,15 +170,14 @@ class DiagnosticApproveRejectConcurrencyIntegrationTest {
                 .count();
 
         Deposit finalDeposit = depositRepository.findByUserId(setup.userId()).orElseThrow();
-        // PHASE 1: the seller-commitment freeze/release now lives in seller_diagnostic_commitment,
-        // not deposit_frozen - this is the meaningful post-race check for double-release safety.
-        boolean stillFrozen = sellerDiagnosticCommitmentRepository.existsByDiagnosticRequestId(setup.requestId());
+        var finalCommitment = sellerDiagnosticCommitmentRepository.findByDiagnosticRequestId(setup.requestId());
 
         DiagnosticRequest finalRequest = diagnosticRequestRepository.findById(setup.requestId()).orElseThrow();
 
         System.out.printf(
-                "[%s] aFailed=%s bFailed=%s unblockCount=%d stillFrozen=%s finalStatus=%s finalAvailable=%s errA=%s errB=%s%n",
-                label, aFailed, bFailed, unblockCount, stillFrozen, finalRequest.getStatus(),
+                "[%s] aFailed=%s bFailed=%s unblockCount=%d commitmentStatus=%s finalStatus=%s finalAvailable=%s errA=%s errB=%s%n",
+                label, aFailed, bFailed, unblockCount,
+                finalCommitment.map(c -> c.getStatus().name()).orElse("MISSING"), finalRequest.getStatus(),
                 finalDeposit.getAvailableBalance(),
                 errA.get() == null ? "-" : errA.get().getClass().getSimpleName(),
                 errB.get() == null ? "-" : errB.get().getClass().getSimpleName()
@@ -178,14 +185,18 @@ class DiagnosticApproveRejectConcurrencyIntegrationTest {
 
         // Core financial invariants (must hold unconditionally):
         assertThat(unblockCount)
-                .as("[%s] exactly one UNBLOCK transaction must persist for this request - never zero, never two", label)
-                .isEqualTo(1L);
-        assertThat(stillFrozen)
-                .as("[%s] no seller diagnostic commitment record may remain after the race resolves", label)
-                .isFalse();
+                .as("[%s] PHASE 2: approve/reject must never unfreeze the deposit - that is deferred " +
+                        "to a future finalization phase", label)
+                .isEqualTo(0L);
+        assertThat(finalCommitment)
+                .as("[%s] the seller diagnostic commitment must never be deleted by approve/reject", label)
+                .isPresent();
+        assertThat(finalCommitment.orElseThrow().getStatus())
+                .as("[%s] the commitment must end up AWAITING_FINALIZATION exactly once, regardless of race outcome", label)
+                .isEqualTo(CommitmentStatus.AWAITING_FINALIZATION);
         assertThat(finalDeposit.getAvailableBalance())
-                .as("[%s] the deposit must end up fully released back to its pre-freeze available balance", label)
-                .isEqualByComparingTo(setup.availableBeforeFreeze());
+                .as("[%s] the deposit must remain frozen at its post-freeze balance - approve/reject never releases it", label)
+                .isEqualByComparingTo(setup.availableBeforeFreeze().subtract(setup.depositAmount()));
     }
 
     @RepeatedTest(5)
@@ -194,7 +205,7 @@ class DiagnosticApproveRejectConcurrencyIntegrationTest {
         Setup s = setUpCompletedRequestWithFrozenDeposit();
         runConcurrentPairAndAssertInvariants("approve+reject",
                 () -> diagnosticRequestService.approveReport(s.requestId(), 1L),
-                () -> diagnosticRequestService.rejectReport(s.requestId(), 2L, "конкурентный reject"),
+                () -> diagnosticRequestService.rejectReport(s.requestId(), 2L, "конкурентный reject", DiagnosticRejectionCategory.VEHICLE_CONDITION),
                 s);
     }
 
@@ -203,7 +214,7 @@ class DiagnosticApproveRejectConcurrencyIntegrationTest {
     void rejectAndApprove_Concurrent() {
         Setup s = setUpCompletedRequestWithFrozenDeposit();
         runConcurrentPairAndAssertInvariants("reject+approve",
-                () -> diagnosticRequestService.rejectReport(s.requestId(), 1L, "конкурентный reject"),
+                () -> diagnosticRequestService.rejectReport(s.requestId(), 1L, "конкурентный reject", DiagnosticRejectionCategory.VEHICLE_CONDITION),
                 () -> diagnosticRequestService.approveReport(s.requestId(), 2L),
                 s);
     }
@@ -213,8 +224,8 @@ class DiagnosticApproveRejectConcurrencyIntegrationTest {
     void rejectAndReject_Concurrent() {
         Setup s = setUpCompletedRequestWithFrozenDeposit();
         runConcurrentPairAndAssertInvariants("reject+reject",
-                () -> diagnosticRequestService.rejectReport(s.requestId(), 1L, "reject A"),
-                () -> diagnosticRequestService.rejectReport(s.requestId(), 2L, "reject B"),
+                () -> diagnosticRequestService.rejectReport(s.requestId(), 1L, "reject A", DiagnosticRejectionCategory.VEHICLE_CONDITION),
+                () -> diagnosticRequestService.rejectReport(s.requestId(), 2L, "reject B", DiagnosticRejectionCategory.VEHICLE_CONDITION),
                 s);
     }
 

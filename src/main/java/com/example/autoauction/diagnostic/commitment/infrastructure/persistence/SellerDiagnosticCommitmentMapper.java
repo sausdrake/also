@@ -13,6 +13,8 @@ public class SellerDiagnosticCommitmentMapper {
                 domain.getDiagnosticRequestId(),
                 domain.getDepositId(),
                 domain.getCommittedAmount(),
+                domain.getDiagnosticFeeAmount(),
+                domain.getStatus(),
                 domain.getFrozenAt()
         );
         entity.setId(domain.getId());
@@ -26,6 +28,8 @@ public class SellerDiagnosticCommitmentMapper {
         domain.setDiagnosticRequestId(entity.getDiagnosticRequestId());
         domain.setDepositId(entity.getDepositId());
         domain.setCommittedAmount(entity.getCommittedAmount());
+        domain.setDiagnosticFeeAmount(entity.getDiagnosticFeeAmount());
+        domain.setStatus(entity.getStatus());
         domain.setFrozenAt(entity.getFrozenAt());
         return domain;
     }

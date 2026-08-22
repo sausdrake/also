@@ -1,6 +1,8 @@
 package com.example.autoauction.diagnostic.application;
 
+import com.example.autoauction.admin.application.SystemSettingsService;
 import com.example.autoauction.diagnostic.commitment.application.SellerDiagnosticCommitmentService;
+import com.example.autoauction.diagnostic.domain.DiagnosticRejectionCategory;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
 import com.example.autoauction.vehicle.application.VehicleService;
 import com.example.autoauction.diagnostic.domain.InspectionAnswer;
@@ -43,6 +45,7 @@ public class DiagnosticRequestService {
     private final InspectionTemplateRepository templateRepository;
     private final InspectionAnswerRepository answerRepository;
     private final SellerDiagnosticCommitmentService sellerDiagnosticCommitmentService;
+    private final SystemSettingsService systemSettingsService;
     private final UserRepository userRepository;
     private final VehicleService vehicleService;
     private final NotificationService notificationService;
@@ -73,9 +76,15 @@ public class DiagnosticRequestService {
         if (hasPending) {
             throw new IllegalStateException("У вас уже есть активная заявка на диагностику. Дождитесь её завершения.");
         }
-        // Рассчитываем сумму заморозки (1% от оценочной стоимости)
-        // Пока используем фиксированную сумму, потом можно привязать к марке/модели
-        BigDecimal depositAmount = new BigDecimal("10000"); // 10 000 сом
+        // PHASE 2: both amounts are snapshotted at creation time from SystemSettingsService -
+        // never re-read later in the lifecycle (see SellerDiagnosticCommitment Javadoc).
+        // diagnosticFeeAmount has no authorized default (see Phase 2 resolution) - it must be
+        // explicitly configured by an administrator; getRequiredBigDecimal fails closed
+        // (missing/malformed/negative) BEFORE the request row or the commitment/Deposit
+        // ledger are touched, so an unconfigured fee never leaves behind a half-created
+        // request or freezes funds it cannot account for.
+        BigDecimal depositAmount = systemSettingsService.getBigDecimal("diagnostic_deposit_amount", new BigDecimal("10000"));
+        BigDecimal diagnosticFeeAmount = systemSettingsService.getRequiredBigDecimal("diagnostic_fee_amount");
 
         // Создаём заявку
         DiagnosticRequest request = new DiagnosticRequest();
@@ -93,7 +102,7 @@ public class DiagnosticRequestService {
         DiagnosticRequest savedRequest = requestRepository.save(request);
 
         // Замораживаем депозит с ID заявки
-        sellerDiagnosticCommitmentService.freezeCommitment(userId, savedRequest.getId(), depositAmount);
+        sellerDiagnosticCommitmentService.freezeCommitment(userId, savedRequest.getId(), depositAmount, diagnosticFeeAmount);
 
         log.info("Created diagnostic request: id={}, userId={}", savedRequest.getId(), userId);
         return DiagnosticRequestResponse.fromDomain(savedRequest);
@@ -462,8 +471,10 @@ public class DiagnosticRequestService {
             log.warn("Failed to send DIAG_REPORT_APPROVED notification: {}", e.getMessage());
         }
 
-        // Разморозить депозит заявителя после одобрения
-        sellerDiagnosticCommitmentService.releaseCommitment(request.getUserId(), requestId);
+        // PHASE 2: одобрение отчёта переводит commitment в AWAITING_FINALIZATION (не
+        // освобождает депозит - фактический исход A/B/C и разморозка/списание вычисляются
+        // отдельной, ещё не реализованной фазой финализации).
+        sellerDiagnosticCommitmentService.markAwaitingFinalization(requestId);
 
         // Автоматически создать Vehicle из данных заявки
         String diagnosticUsername = userRepository.findById(request.getAssignedTo() != null ? request.getAssignedTo() : request.getUserId())
@@ -488,9 +499,15 @@ public class DiagnosticRequestService {
      * Администратор отклоняет отчёт с причиной
      */
     @Transactional
-    public DiagnosticRequestResponse rejectReport(Long requestId, Long adminId, String reason) {
+    public DiagnosticRequestResponse rejectReport(Long requestId, Long adminId, String reason,
+                                                   DiagnosticRejectionCategory category) {
         if (reason == null || reason.isBlank()) {
             throw new IllegalArgumentException("Причина отклонения обязательна");
+        }
+        // PHASE 2: fail-closed - the eventual finalization outcome (B vs C) depends on this
+        // category, so an unrecorded rejection must never be allowed to happen silently.
+        if (category == null) {
+            throw new IllegalArgumentException("Категория отклонения обязательна");
         }
         DiagnosticRequest request = requestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена: " + requestId));
@@ -501,13 +518,15 @@ public class DiagnosticRequestService {
 
         request.setStatus(DiagnosticRequest.DiagnosticRequestStatus.REJECTED);
         request.setRejectedReason(reason);
+        request.setRejectionCategory(category);
         request.setUpdatedAt(OffsetDateTime.now());
         DiagnosticRequest saved = requestRepository.save(request);
 
-        // R-1.2: отклонение отчёта должно освобождать депозит заявителя точно так же, как
-        // и одобрение (approveReport) — иначе депозит остаётся замороженным навсегда без
-        // какого-либо пути освобождения.
-        sellerDiagnosticCommitmentService.releaseCommitment(request.getUserId(), requestId);
+        // PHASE 2: отклонение отчёта (как и одобрение) переводит commitment в
+        // AWAITING_FINALIZATION - депозит остаётся замороженным до вычисления фактического
+        // исхода (B или C) отдельной фазой финализации. R-1.2 (гарантия наличия пути
+        // разморозки) теперь обеспечивается этой будущей фазой, а не здесь.
+        sellerDiagnosticCommitmentService.markAwaitingFinalization(requestId);
 
         if (request.getAssignedTo() != null) {
             try {

@@ -7,6 +7,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Set;
 
@@ -20,6 +21,7 @@ public class SystemSettingsService {
             "commission_percent",
             "default_bid_step_percent",
             "diagnostic_deposit_amount",
+            "diagnostic_fee_amount",
             "auction_confirm_hours",
             "completed_auction_visibility_hours"
     );
@@ -54,6 +56,50 @@ public class SystemSettingsService {
             log.warn("Setting '{}' is not an integer: '{}', using default {}", key, val, defaultValue);
             return defaultValue;
         }
+    }
+
+    @Cacheable(value = "systemSettings", key = "#key")
+    @Transactional(readOnly = true)
+    public BigDecimal getBigDecimal(String key, BigDecimal defaultValue) {
+        String val = get(key);
+        if (val == null) return defaultValue;
+        try {
+            return new BigDecimal(val.trim());
+        } catch (NumberFormatException e) {
+            log.warn("Setting '{}' is not a valid decimal: '{}', using default {}", key, val, defaultValue);
+            return defaultValue;
+        }
+    }
+
+    /**
+     * Fail-closed variant for financial settings with no safe implicit default - unlike
+     * {@link #getBigDecimal}, a missing, malformed, or negative value is never silently
+     * substituted with anything (not a hardcoded fallback, not zero, not another setting's
+     * value). Callers must let this exception propagate and abort whatever operation depends
+     * on the value, before any ledger/commitment mutation. Spring's @Cacheable does not cache
+     * thrown exceptions, so a still-unconfigured setting is re-checked (and re-thrown) on
+     * every call rather than being cached as a false "not set" result.
+     */
+    @Cacheable(value = "systemSettings", key = "#key")
+    @Transactional(readOnly = true)
+    public BigDecimal getRequiredBigDecimal(String key) {
+        String val = get(key);
+        if (val == null) {
+            throw new IllegalStateException(
+                    "Обязательная настройка '" + key + "' не задана администратором");
+        }
+        BigDecimal parsed;
+        try {
+            parsed = new BigDecimal(val.trim());
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException(
+                    "Настройка '" + key + "' имеет некорректное числовое значение: '" + val + "'");
+        }
+        if (parsed.signum() < 0) {
+            throw new IllegalStateException(
+                    "Настройка '" + key + "' не может быть отрицательной: " + parsed);
+        }
+        return parsed;
     }
 
     @CacheEvict(value = "systemSettings", key = "#key")

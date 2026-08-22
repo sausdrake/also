@@ -21,6 +21,7 @@ public class DiagnosticRequestMapper {
         entity.setAssignedTo(domain.getAssignedTo());
         entity.setTemplateId(domain.getTemplateId());
         entity.setRejectedReason(domain.getRejectedReason());
+        entity.setRejectionCategory(domain.getRejectionCategory());
         entity.setCreatedAt(domain.getCreatedAt());
         entity.setUpdatedAt(domain.getUpdatedAt());
         return entity;
@@ -41,6 +42,7 @@ public class DiagnosticRequestMapper {
         domain.setAssignedTo(entity.getAssignedTo());
         domain.setTemplateId(entity.getTemplateId());
         domain.setRejectedReason(entity.getRejectedReason());
+        domain.setRejectionCategory(entity.getRejectionCategory());
         domain.setCreatedAt(entity.getCreatedAt());
         domain.setUpdatedAt(entity.getUpdatedAt());
         return domain;

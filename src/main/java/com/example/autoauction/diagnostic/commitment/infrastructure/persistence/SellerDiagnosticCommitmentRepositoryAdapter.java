@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.Optional;
 
 @Slf4j
@@ -46,5 +47,11 @@ public class SellerDiagnosticCommitmentRepositoryAdapter implements SellerDiagno
     public void deleteByDiagnosticRequestId(Long diagnosticRequestId) {
         jpaRepository.deleteByDiagnosticRequestId(diagnosticRequestId);
         log.debug("Deleted seller diagnostic commitment for request {}", diagnosticRequestId);
+    }
+
+    @Override
+    public boolean markAwaitingFinalization(Long diagnosticRequestId) {
+        int updated = jpaRepository.markAwaitingFinalization(diagnosticRequestId, OffsetDateTime.now());
+        return updated > 0;
     }
 }

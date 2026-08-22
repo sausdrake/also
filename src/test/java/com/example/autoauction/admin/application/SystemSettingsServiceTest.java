@@ -94,6 +94,69 @@ class SystemSettingsServiceTest {
         }
     }
 
+    // PHASE 2 (fail-closed resolution): getRequiredBigDecimal must never substitute anything -
+    // not a hardcoded fallback, not zero, not another setting's value - for a missing,
+    // malformed, or negative value. Every failure path throws IllegalStateException.
+    @Nested
+    @DisplayName("getRequiredBigDecimal()")
+    class GetRequiredBigDecimalTests {
+
+        @Test
+        @DisplayName("Возвращает настроенное значение")
+        void getRequiredBigDecimal_ReturnsConfiguredValue() {
+            when(jdbc.queryForObject(anyString(), eq(String.class), eq("diagnostic_fee_amount")))
+                    .thenReturn("4000");
+
+            java.math.BigDecimal result = service.getRequiredBigDecimal("diagnostic_fee_amount");
+
+            assertThat(result).isEqualByComparingTo("4000");
+        }
+
+        @Test
+        @DisplayName("Отсутствующая настройка - IllegalStateException, без подстановки значения")
+        void getRequiredBigDecimal_Missing_ThrowsIllegalStateException() {
+            when(jdbc.queryForObject(anyString(), eq(String.class), eq("diagnostic_fee_amount")))
+                    .thenThrow(new org.springframework.dao.EmptyResultDataAccessException(1));
+
+            assertThatThrownBy(() -> service.getRequiredBigDecimal("diagnostic_fee_amount"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("diagnostic_fee_amount");
+        }
+
+        @Test
+        @DisplayName("Нечисловое значение - IllegalStateException")
+        void getRequiredBigDecimal_Malformed_ThrowsIllegalStateException() {
+            when(jdbc.queryForObject(anyString(), eq(String.class), eq("diagnostic_fee_amount")))
+                    .thenReturn("not_a_number");
+
+            assertThatThrownBy(() -> service.getRequiredBigDecimal("diagnostic_fee_amount"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("diagnostic_fee_amount");
+        }
+
+        @Test
+        @DisplayName("Отрицательное значение - IllegalStateException")
+        void getRequiredBigDecimal_Negative_ThrowsIllegalStateException() {
+            when(jdbc.queryForObject(anyString(), eq(String.class), eq("diagnostic_fee_amount")))
+                    .thenReturn("-1000");
+
+            assertThatThrownBy(() -> service.getRequiredBigDecimal("diagnostic_fee_amount"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("diagnostic_fee_amount");
+        }
+
+        @Test
+        @DisplayName("Нулевое значение допустимо (не отрицательное)")
+        void getRequiredBigDecimal_Zero_IsAccepted() {
+            when(jdbc.queryForObject(anyString(), eq(String.class), eq("diagnostic_fee_amount")))
+                    .thenReturn("0");
+
+            java.math.BigDecimal result = service.getRequiredBigDecimal("diagnostic_fee_amount");
+
+            assertThat(result).isEqualByComparingTo("0");
+        }
+    }
+
     @Nested
     @DisplayName("set()")
     class SetTests {

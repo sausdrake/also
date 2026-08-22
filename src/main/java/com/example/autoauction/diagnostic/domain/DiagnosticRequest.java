@@ -17,6 +17,7 @@ public class DiagnosticRequest {
     private Long assignedTo;
     private Long templateId;
     private String rejectedReason;
+    private DiagnosticRejectionCategory rejectionCategory;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 

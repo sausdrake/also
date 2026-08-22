@@ -1,8 +1,11 @@
 // diagnostic/commitment/infrastructure/persistence/JpaSellerDiagnosticCommitmentEntity.java
 package com.example.autoauction.diagnostic.commitment.infrastructure.persistence;
 
+import com.example.autoauction.diagnostic.commitment.domain.CommitmentStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -44,6 +47,16 @@ public class JpaSellerDiagnosticCommitmentEntity {
     @Column(name = "committed_amount", nullable = false, precision = 19, scale = 2)
     private BigDecimal committedAmount;
 
+    // PHASE 2: snapshot at creation, nullable at the column level only because existing
+    // Phase 1 rows predate this field (see V29) - a NEW commitment always sets it.
+    @Column(name = "diagnostic_fee_amount", precision = 19, scale = 2)
+    private BigDecimal diagnosticFeeAmount;
+
+    // PHASE 2: commitment's own lifecycle state - see CommitmentStatus.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 30)
+    private CommitmentStatus status;
+
     @Column(name = "frozen_at", nullable = false)
     private OffsetDateTime frozenAt;
 
@@ -56,10 +69,13 @@ public class JpaSellerDiagnosticCommitmentEntity {
     protected JpaSellerDiagnosticCommitmentEntity() {}
 
     public JpaSellerDiagnosticCommitmentEntity(Long diagnosticRequestId, Long depositId,
-                                                BigDecimal committedAmount, OffsetDateTime frozenAt) {
+                                                BigDecimal committedAmount, BigDecimal diagnosticFeeAmount,
+                                                CommitmentStatus status, OffsetDateTime frozenAt) {
         this.diagnosticRequestId = diagnosticRequestId;
         this.depositId = depositId;
         this.committedAmount = committedAmount;
+        this.diagnosticFeeAmount = diagnosticFeeAmount;
+        this.status = status;
         this.frozenAt = frozenAt;
         this.createdAt = OffsetDateTime.now();
     }
@@ -68,6 +84,8 @@ public class JpaSellerDiagnosticCommitmentEntity {
     public Long getDiagnosticRequestId() { return diagnosticRequestId; }
     public Long getDepositId() { return depositId; }
     public BigDecimal getCommittedAmount() { return committedAmount; }
+    public BigDecimal getDiagnosticFeeAmount() { return diagnosticFeeAmount; }
+    public CommitmentStatus getStatus() { return status; }
     public OffsetDateTime getFrozenAt() { return frozenAt; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }
@@ -76,6 +94,8 @@ public class JpaSellerDiagnosticCommitmentEntity {
     public void setDiagnosticRequestId(Long diagnosticRequestId) { this.diagnosticRequestId = diagnosticRequestId; }
     public void setDepositId(Long depositId) { this.depositId = depositId; }
     public void setCommittedAmount(BigDecimal committedAmount) { this.committedAmount = committedAmount; }
+    public void setDiagnosticFeeAmount(BigDecimal diagnosticFeeAmount) { this.diagnosticFeeAmount = diagnosticFeeAmount; }
+    public void setStatus(CommitmentStatus status) { this.status = status; }
     public void setFrozenAt(OffsetDateTime frozenAt) { this.frozenAt = frozenAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
     public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }

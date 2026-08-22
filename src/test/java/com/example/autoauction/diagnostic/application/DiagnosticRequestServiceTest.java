@@ -1,6 +1,8 @@
 package com.example.autoauction.diagnostic.application;
 
+import com.example.autoauction.admin.application.SystemSettingsService;
 import com.example.autoauction.diagnostic.commitment.application.SellerDiagnosticCommitmentService;
+import com.example.autoauction.diagnostic.domain.DiagnosticRejectionCategory;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
 import com.example.autoauction.diagnostic.domain.InspectionAnswer;
 import com.example.autoauction.diagnostic.domain.InspectionGroup;
@@ -56,6 +58,9 @@ class DiagnosticRequestServiceTest {
 
     @Mock
     private SellerDiagnosticCommitmentService sellerDiagnosticCommitmentService;
+
+    @Mock
+    private SystemSettingsService systemSettingsService;
 
     @Mock
     private UserRepository userRepository;
@@ -123,7 +128,12 @@ class DiagnosticRequestServiceTest {
             when(requestRepository.findByUserId(eq(userId), any(Pageable.class))).thenReturn(emptyPage);
 
             when(requestRepository.save(any(DiagnosticRequest.class))).thenReturn(savedRequest);
-            doNothing().when(sellerDiagnosticCommitmentService).freezeCommitment(eq(userId), eq(requestId), any(BigDecimal.class));
+            when(systemSettingsService.getBigDecimal(eq("diagnostic_deposit_amount"), any(BigDecimal.class)))
+                    .thenReturn(new BigDecimal("10000"));
+            when(systemSettingsService.getRequiredBigDecimal(eq("diagnostic_fee_amount")))
+                    .thenReturn(new BigDecimal("4000"));
+            doNothing().when(sellerDiagnosticCommitmentService)
+                    .freezeCommitment(eq(userId), eq(requestId), any(BigDecimal.class), any(BigDecimal.class));
 
             DiagnosticRequestResponse response = requestService.createRequest(createRequest, userId);
 
@@ -133,7 +143,8 @@ class DiagnosticRequestServiceTest {
             assertThat(response.getStatus()).isEqualTo("PENDING");
 
             verify(requestRepository).save(any(DiagnosticRequest.class));
-            verify(sellerDiagnosticCommitmentService).freezeCommitment(eq(userId), eq(requestId), any(BigDecimal.class));
+            verify(sellerDiagnosticCommitmentService)
+                    .freezeCommitment(eq(userId), eq(requestId), any(BigDecimal.class), eq(new BigDecimal("4000")));
         }
 
         @Test
@@ -142,6 +153,31 @@ class DiagnosticRequestServiceTest {
             createRequest.setVin(null);
             assertThatThrownBy(() -> requestService.createRequest(createRequest, userId))
                     .isInstanceOf(Exception.class);
+        }
+
+        // PHASE 2 (fail-closed resolution): diagnostic_fee_amount has no authorized default -
+        // getRequiredBigDecimal must propagate its failure BEFORE the request row is saved and
+        // BEFORE the commitment/Deposit ledger is touched. DiagnosticRequestService doesn't
+        // care WHY getRequiredBigDecimal threw (missing/malformed/negative) - that distinction
+        // is unit-tested directly against SystemSettingsService itself.
+        @Test
+        @DisplayName("Настройка diagnostic_fee_amount не сконфигурирована - создание падает ДО " +
+                "сохранения заявки и ДО заморозки commitment")
+        void createRequest_FeeSettingNotConfigured_FailsClosedBeforeAnyMutation() {
+            Page<DiagnosticRequest> emptyPage = Page.empty();
+            when(requestRepository.findByUserId(eq(userId), any(Pageable.class))).thenReturn(emptyPage);
+            when(systemSettingsService.getBigDecimal(eq("diagnostic_deposit_amount"), any(BigDecimal.class)))
+                    .thenReturn(new BigDecimal("10000"));
+            when(systemSettingsService.getRequiredBigDecimal(eq("diagnostic_fee_amount")))
+                    .thenThrow(new IllegalStateException(
+                            "Обязательная настройка 'diagnostic_fee_amount' не задана администратором"));
+
+            assertThatThrownBy(() -> requestService.createRequest(createRequest, userId))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("diagnostic_fee_amount");
+
+            verify(requestRepository, never()).save(any());
+            verifyNoInteractions(sellerDiagnosticCommitmentService);
         }
     }
 
@@ -700,6 +736,51 @@ class DiagnosticRequestServiceTest {
         }
     }
 
+    // PHASE 2: cancelRequest is explicitly out of scope and must remain unchanged - it still
+    // calls releaseCommitment (full release), never markAwaitingFinalization. Regression guard.
+    @Nested
+    @DisplayName("Отзыв заявки пользователем (PHASE 2: должен остаться без изменений)")
+    class CancelRequestTests {
+
+        @Test
+        @DisplayName("cancelRequest вызывает releaseCommitment, а не markAwaitingFinalization")
+        void cancelRequest_StillCallsReleaseCommitment_NotMarkAwaitingFinalization() {
+            savedRequest.setStatus(DiagnosticRequest.DiagnosticRequestStatus.PENDING);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+            when(requestRepository.save(any(DiagnosticRequest.class))).thenAnswer(i -> i.getArgument(0));
+
+            requestService.cancelRequest(requestId, userId);
+
+            verify(sellerDiagnosticCommitmentService, times(1)).releaseCommitment(userId, requestId);
+            verify(sellerDiagnosticCommitmentService, never()).markAwaitingFinalization(anyLong());
+        }
+
+        @Test
+        @DisplayName("Отзыв чужой заявки - SecurityException, commitment не трогается")
+        void cancelRequest_WrongUser_ThrowsException() {
+            savedRequest.setUserId(999L);
+            savedRequest.setStatus(DiagnosticRequest.DiagnosticRequestStatus.PENDING);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+
+            assertThatThrownBy(() -> requestService.cancelRequest(requestId, userId))
+                    .isInstanceOf(SecurityException.class);
+
+            verifyNoInteractions(sellerDiagnosticCommitmentService);
+        }
+
+        @Test
+        @DisplayName("Отзыв заявки не в статусе PENDING - IllegalStateException, commitment не трогается")
+        void cancelRequest_WrongStatus_ThrowsException() {
+            savedRequest.setStatus(DiagnosticRequest.DiagnosticRequestStatus.IN_PROGRESS);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+
+            assertThatThrownBy(() -> requestService.cancelRequest(requestId, userId))
+                    .isInstanceOf(IllegalStateException.class);
+
+            verifyNoInteractions(sellerDiagnosticCommitmentService);
+        }
+    }
+
     @Nested
     @DisplayName("Получение деталей заявки для админа")
     class GetRequestDetailsTests {
@@ -812,10 +893,12 @@ class DiagnosticRequestServiceTest {
         }
     }
 
-    // R-1.2: rejectReport() must unfreeze the applicant's deposit exactly like
-    // approveReport() already does - otherwise the deposit is permanently stranded.
+    // PHASE 2: rejectReport() no longer releases the applicant's deposit (R-1.2's original
+    // "release" mechanism) - it now transitions the commitment FROZEN -> AWAITING_FINALIZATION,
+    // exactly like approveReport(). The deposit stays frozen until a future finalization phase
+    // computes the actual outcome (B or C) and only then releases/charges it.
     @Nested
-    @DisplayName("Отклонение отчёта (R-1.2)")
+    @DisplayName("Отклонение отчёта (PHASE 2)")
     class RejectReportTests {
 
         private final Long adminId = 999L;
@@ -836,63 +919,69 @@ class DiagnosticRequestServiceTest {
         }
 
         @Test
-        @DisplayName("1. rejectReport размораживает депозит заявителя")
-        void rejectReport_UnfreezesDeposit() {
+        @DisplayName("1. rejectReport переводит commitment в AWAITING_FINALIZATION, не освобождает депозит")
+        void rejectReport_TransitionsCommitmentToAwaitingFinalization() {
             DiagnosticRequest completed = completedRequest();
             when(requestRepository.findById(requestId)).thenReturn(Optional.of(completed));
             when(requestRepository.save(any(DiagnosticRequest.class))).thenAnswer(i -> i.getArgument(0));
 
-            requestService.rejectReport(requestId, adminId, "Недостаточно фотографий");
+            requestService.rejectReport(requestId, adminId, "Недостаточно фотографий", DiagnosticRejectionCategory.VEHICLE_CONDITION);
 
-            verify(sellerDiagnosticCommitmentService, times(1)).releaseCommitment(userId, requestId);
+            verify(sellerDiagnosticCommitmentService, times(1)).markAwaitingFinalization(requestId);
+            verify(sellerDiagnosticCommitmentService, never()).releaseCommitment(anyLong(), anyLong());
         }
 
         @Test
-        @DisplayName("2/3. Разморозка выполняется через SellerDiagnosticCommitmentService.releaseCommitment " +
-                "(PHASE 1: единственный легитимный механизм освобождения seller-commitment после " +
-                "рерутинга с deposit_frozen - см. DepositServiceTest/DepositServiceWithFrozenStorageTest, " +
-                "где инварианты DepositService.unfreezeForDiagnosticRequest уже проверены отдельно; " +
-                "здесь проверяется, что rejectReport действительно вызывает releaseCommitment и не " +
-                "мутирует депозит/commitment напрямую)")
-        void rejectReport_DelegatesToUnfreezeMechanism_DoesNotMutateDepositDirectly() {
+        @DisplayName("2. Категория отклонения сохраняется на заявке")
+        void rejectReport_PersistsRejectionCategory() {
             DiagnosticRequest completed = completedRequest();
             when(requestRepository.findById(requestId)).thenReturn(Optional.of(completed));
             when(requestRepository.save(any(DiagnosticRequest.class))).thenAnswer(i -> i.getArgument(0));
 
-            requestService.rejectReport(requestId, adminId, "Недостаточно фотографий");
+            DiagnosticRequestResponse response = requestService.rejectReport(
+                    requestId, adminId, "Продавец не явился", DiagnosticRejectionCategory.SELLER_VIOLATION);
 
-            // DiagnosticRequestService must never touch Deposit/DepositRepository directly -
-            // all financial orchestration stays inside SellerDiagnosticCommitmentService.
-            verify(sellerDiagnosticCommitmentService, times(1)).releaseCommitment(anyLong(), anyLong());
-            verifyNoMoreInteractions(sellerDiagnosticCommitmentService);
+            assertThat(response.getRejectionCategory()).isEqualTo("SELLER_VIOLATION");
+            ArgumentCaptor<DiagnosticRequest> captor = ArgumentCaptor.forClass(DiagnosticRequest.class);
+            verify(requestRepository).save(captor.capture());
+            assertThat(captor.getValue().getRejectionCategory()).isEqualTo(DiagnosticRejectionCategory.SELLER_VIOLATION);
+        }
+
+        @Test
+        @DisplayName("3. Отсутствие категории — IllegalArgumentException, до любых мутаций (fail-closed)")
+        void rejectReport_MissingCategory_ThrowsBeforeAnyMutation() {
+            assertThatThrownBy(() -> requestService.rejectReport(requestId, adminId, "причина", null))
+                    .isInstanceOf(IllegalArgumentException.class);
+
+            verifyNoInteractions(sellerDiagnosticCommitmentService);
+            verify(requestRepository, never()).save(any());
         }
 
         @Test
         @DisplayName("4. Повторное отклонение уже отклонённого отчёта — блокируется существующим " +
-                "guard'ом жизненного цикла (статус уже не COMPLETED), депозит не размораживается повторно")
-        void rejectReport_AlreadyRejected_BlockedByLifecycleGuard_NoDoubleUnfreeze() {
+                "guard'ом жизненного цикла (статус уже не COMPLETED)")
+        void rejectReport_AlreadyRejected_BlockedByLifecycleGuard() {
             DiagnosticRequest alreadyRejected = completedRequest();
             alreadyRejected.setStatus(DiagnosticRequest.DiagnosticRequestStatus.REJECTED);
             when(requestRepository.findById(requestId)).thenReturn(Optional.of(alreadyRejected));
 
-            assertThatThrownBy(() -> requestService.rejectReport(requestId, adminId, "повтор"))
+            assertThatThrownBy(() -> requestService.rejectReport(requestId, adminId, "повтор", DiagnosticRejectionCategory.VEHICLE_CONDITION))
                     .isInstanceOf(IllegalStateException.class);
 
             verifyNoInteractions(sellerDiagnosticCommitmentService);
         }
 
         @Test
-        @DisplayName("5. Сбой при размораживании — исключение пробрасывается наружу (откатывает всю " +
-                "транзакцию rejectReport целиком), не оставляя отчёт REJECTED с фактически ещё " +
-                "замороженным депозитом")
-        void rejectReport_UnfreezeFailure_PropagatesAndDoesNotSilentlyMarkRejected() {
+        @DisplayName("5. Сбой при переходе commitment — исключение пробрасывается наружу (откатывает всю " +
+                "транзакцию rejectReport целиком)")
+        void rejectReport_TransitionFailure_Propagates() {
             DiagnosticRequest completed = completedRequest();
             when(requestRepository.findById(requestId)).thenReturn(Optional.of(completed));
             when(requestRepository.save(any(DiagnosticRequest.class))).thenAnswer(i -> i.getArgument(0));
             doThrow(new IllegalStateException("DB unavailable"))
-                    .when(sellerDiagnosticCommitmentService).releaseCommitment(userId, requestId);
+                    .when(sellerDiagnosticCommitmentService).markAwaitingFinalization(requestId);
 
-            assertThatThrownBy(() -> requestService.rejectReport(requestId, adminId, "причина"))
+            assertThatThrownBy(() -> requestService.rejectReport(requestId, adminId, "причина", DiagnosticRejectionCategory.VEHICLE_CONDITION))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("DB unavailable");
         }
@@ -900,7 +989,7 @@ class DiagnosticRequestServiceTest {
         @Test
         @DisplayName("Пустая причина отклонения — IllegalArgumentException, депозит не трогается")
         void rejectReport_BlankReason_ThrowsBeforeAnyMutation() {
-            assertThatThrownBy(() -> requestService.rejectReport(requestId, adminId, "  "))
+            assertThatThrownBy(() -> requestService.rejectReport(requestId, adminId, "  ", DiagnosticRejectionCategory.VEHICLE_CONDITION))
                     .isInstanceOf(IllegalArgumentException.class);
 
             verifyNoInteractions(sellerDiagnosticCommitmentService);
@@ -908,12 +997,12 @@ class DiagnosticRequestServiceTest {
 
         @Test
         @DisplayName("Можно отклонить только отчёт в статусе COMPLETED")
-        void rejectReport_WrongStatus_ThrowsBeforeUnfreeze() {
+        void rejectReport_WrongStatus_ThrowsBeforeTransition() {
             DiagnosticRequest pending = completedRequest();
             pending.setStatus(DiagnosticRequest.DiagnosticRequestStatus.PENDING);
             when(requestRepository.findById(requestId)).thenReturn(Optional.of(pending));
 
-            assertThatThrownBy(() -> requestService.rejectReport(requestId, adminId, "причина"))
+            assertThatThrownBy(() -> requestService.rejectReport(requestId, adminId, "причина", DiagnosticRejectionCategory.VEHICLE_CONDITION))
                     .isInstanceOf(IllegalStateException.class);
 
             verifyNoInteractions(sellerDiagnosticCommitmentService);
