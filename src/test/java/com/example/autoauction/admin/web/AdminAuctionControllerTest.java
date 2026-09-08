@@ -63,7 +63,7 @@ class AdminAuctionControllerTest {
     private AuctionResponse auctionResponse;
     private AuctionResponse activeAuctionResponse;
     private AuctionResponse cancelledAuctionResponse;
-    private AuctionResponse completedAuctionResponse;
+    private AuctionResponse waitingForPaymentAuctionResponse;
     private final Long adminId = 1L;
 
     @BeforeEach
@@ -112,12 +112,12 @@ class AdminAuctionControllerTest {
                 false, null, null, null, 0
         );
 
-        completedAuctionResponse = new AuctionResponse(
+        waitingForPaymentAuctionResponse = new AuctionResponse(
                 1L, 1L, "BMW M5 2023",
                 new BigDecimal("1000000"), new BigDecimal("1200000"),
                 new BigDecimal("1200000"), new BigDecimal("1500000"),
                 new BigDecimal("10000"), startTime, endTime,
-                AuctionStatus.COMPLETED, 5, 3L, new BigDecimal("1200000"), adminId, now,
+                AuctionStatus.WAITING_FOR_PAYMENT, 5, 3L, new BigDecimal("1200000"), adminId, now,
                 false, null, null, null, 0
         );
     }
@@ -325,11 +325,11 @@ class AdminAuctionControllerTest {
         @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
         @DisplayName("Успешное принудительное завершение аукциона")
         void completeAuction_ShouldReturnOk() throws Exception {
-            when(adminAuctionService.completeAuction(1L, adminId)).thenReturn(completedAuctionResponse);
+            when(adminAuctionService.completeAuction(1L, adminId)).thenReturn(waitingForPaymentAuctionResponse);
 
             mockMvc.perform(post("/api/admin/auctions/1/complete"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status").value("COMPLETED"));
+                    .andExpect(jsonPath("$.status").value("WAITING_FOR_PAYMENT"));
 
             verify(adminAuctionService, times(1)).completeAuction(1L, adminId);
         }

@@ -193,7 +193,7 @@ class AuctionFinalizerTest {
             auctionFinalizer.finalizeWithBuyNow(activeAuction, winnerId, buyNowAmount);
 
             // then
-            assertThat(activeAuction.getStatus()).isEqualTo(AuctionStatus.COMPLETED);
+            assertThat(activeAuction.getStatus()).isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
             assertThat(activeAuction.getWinnerId()).isEqualTo(winnerId);
             assertThat(activeAuction.getCurrentPrice()).isEqualTo(buyNowAmount);
             assertThat(activeAuction.getWinningBid()).isEqualTo(buyNowAmount);

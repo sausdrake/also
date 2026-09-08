@@ -184,7 +184,7 @@ class AuctionFlowIntegrationTest {
         BidResponse response = bidService.buyNow(notStartedAuction.getId(), buyerId);
 
         assertThat(response.buyNowUsed()).isTrue();
-        assertThat(response.status()).isEqualTo(AuctionStatus.COMPLETED);
+        assertThat(response.status()).isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
         assertThat(response.newCurrentPrice()).isEqualTo(new BigDecimal("1500000"));
     }
 

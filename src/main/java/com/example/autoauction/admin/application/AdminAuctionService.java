@@ -72,11 +72,20 @@ public class AdminAuctionService {
         return createAndSaveAuction(request, adminId, vehicle);
     }
 
+    @SuppressWarnings("deprecation") // legacy COMPLETED auctions are treated as already-sold, per Slice 1a contract
     private void checkExistingAuctions(Long vehicleId) {
+        // Slice 1a: WAITING_FOR_PAYMENT added (transient - clears automatically once the auction
+        // resolves to SOLD/SALE_FAILED). SALE_FAILED deliberately NOT forbidden here - a failed
+        // sale must not permanently block a legitimate re-auction; vehicle eligibility/status is
+        // authoritative for that, not this auction-status guard (no new re-auction mechanism is
+        // introduced in this slice). Legacy COMPLETED is forbidden, conservatively treated the
+        // same as SOLD, since historical rows cannot prove whether a sale actually occurred.
         List<AuctionStatus> forbiddenStatuses = List.of(
                 AuctionStatus.ACTIVE,
                 AuctionStatus.CREATED,
-                AuctionStatus.SOLD
+                AuctionStatus.WAITING_FOR_PAYMENT,
+                AuctionStatus.SOLD,
+                AuctionStatus.COMPLETED
         );
 
         if (auctionRepository.existsByVehicleIdAndStatusIn(vehicleId, forbiddenStatuses)) {
@@ -88,8 +97,14 @@ public class AdminAuctionService {
             if (existingStatuses.contains(AuctionStatus.CREATED)) {
                 throw new IllegalArgumentException("Для этого автомобиля уже создан аукцион");
             }
+            if (existingStatuses.contains(AuctionStatus.WAITING_FOR_PAYMENT)) {
+                throw new IllegalArgumentException("Аукцион для этого автомобиля ожидает подтверждения продажи");
+            }
             if (existingStatuses.contains(AuctionStatus.SOLD)) {
                 throw new IllegalArgumentException("Автомобиль уже был продан на аукционе");
+            }
+            if (existingStatuses.contains(AuctionStatus.COMPLETED)) {
+                throw new IllegalArgumentException("Автомобиль уже участвовал в завершённом аукционе");
             }
         }
     }
@@ -267,7 +282,7 @@ public class AdminAuctionService {
 
         log.debug("Текущий статус аукциона: {}", auction.getStatus());
 
-        if (auction.isFinished()) {
+        if (!auction.isCancellable()) {
             throw new IllegalStateException(
                     String.format("Невозможно отменить аукцион в статусе '%s'. Только аукционы со статусами 'CREATED' или 'ACTIVE' могут быть отменены",
                             auction.getStatus()));

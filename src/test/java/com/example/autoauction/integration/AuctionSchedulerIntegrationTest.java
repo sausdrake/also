@@ -96,7 +96,7 @@ class AuctionSchedulerIntegrationTest {
 
         Auction after = auctionRepository.findById(expiredAuctionId).orElseThrow();
 
-        // Аукцион должен быть завершён
-        assertThat(after.getStatus()).isIn(AuctionStatus.EXPIRED, AuctionStatus.COMPLETED);
+        // Аукцион должен быть завершён (без ставок - EXPIRED; со ставками - ожидает подтверждения продажи)
+        assertThat(after.getStatus()).isIn(AuctionStatus.EXPIRED, AuctionStatus.WAITING_FOR_PAYMENT);
     }
 }

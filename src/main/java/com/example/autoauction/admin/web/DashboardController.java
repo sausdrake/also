@@ -30,13 +30,18 @@ public class DashboardController {
 
     @GetMapping
     @Operation(summary = "Получить статистику дашборда")
+    @SuppressWarnings("deprecation") // legacy COMPLETED auctions still count as finished, per Slice 1a contract
     public ResponseEntity<Map<String, Object>> getDashboard() {
         long totalVehicles = vehicleService.countAllVehicles();
         long totalUsers = userService.countUsers();
         long activeAuctions = auctionRepository.findByStatus(AuctionStatus.ACTIVE).size();
+        // Slice 1a: WAITING_FOR_PAYMENT is deliberately excluded - it is in-progress, not
+        // finished. SALE_FAILED and CANCELLED added; legacy COMPLETED retained as finished.
         long finishedAuctions = auctionRepository.findByStatus(AuctionStatus.COMPLETED).size()
                 + auctionRepository.findByStatus(AuctionStatus.SOLD).size()
-                + auctionRepository.findByStatus(AuctionStatus.EXPIRED).size();
+                + auctionRepository.findByStatus(AuctionStatus.SALE_FAILED).size()
+                + auctionRepository.findByStatus(AuctionStatus.EXPIRED).size()
+                + auctionRepository.findByStatus(AuctionStatus.CANCELLED).size();
         long pendingReports = diagnosticRequestService.getCompletedReports(org.springframework.data.domain.PageRequest.of(0, 1)).getTotalElements();
         long approvedReports = diagnosticRequestService.countApprovedReports();
 

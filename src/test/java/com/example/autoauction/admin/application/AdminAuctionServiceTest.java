@@ -307,7 +307,7 @@ class AdminAuctionServiceTest {
         }
 
         @ParameterizedTest
-        @EnumSource(value = AuctionStatus.class, names = {"ACTIVE", "CREATED", "SOLD"})
+        @EnumSource(value = AuctionStatus.class, names = {"ACTIVE", "CREATED", "WAITING_FOR_PAYMENT", "SOLD", "COMPLETED"})
         @DisplayName("Создание аукциона при существующем аукционе в разных статусах")
         void createAuction_WithExistingAuction_ThrowsException(AuctionStatus existingStatus) {
             // given
@@ -325,7 +325,9 @@ class AdminAuctionServiceTest {
             String expectedMessage = switch (existingStatus) {
                 case ACTIVE -> "Автомобиль уже участвует в активном аукционе";
                 case CREATED -> "Для этого автомобиля уже создан аукцион";
+                case WAITING_FOR_PAYMENT -> "Аукцион для этого автомобиля ожидает подтверждения продажи";
                 case SOLD -> "Автомобиль уже был продан на аукционе";
+                case COMPLETED -> "Автомобиль уже участвовал в завершённом аукционе";
                 default -> "";
             };
             assertTrue(exception.getMessage().contains(expectedMessage));
@@ -488,7 +490,7 @@ class AdminAuctionServiceTest {
         }
 
         @ParameterizedTest
-        @EnumSource(value = AuctionStatus.class, names = {"COMPLETED", "SOLD", "EXPIRED", "CANCELLED"})
+        @EnumSource(value = AuctionStatus.class, names = {"COMPLETED", "SOLD", "SALE_FAILED", "EXPIRED", "CANCELLED", "WAITING_FOR_PAYMENT"})
         @DisplayName("Отмена завершенного аукциона")
         void cancelAuction_WhenCompleted_ThrowsException(AuctionStatus status) {
             // given

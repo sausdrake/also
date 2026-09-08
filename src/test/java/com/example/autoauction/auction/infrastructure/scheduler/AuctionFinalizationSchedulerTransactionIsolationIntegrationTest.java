@@ -43,7 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * cross-auction leak); what matters for the Phase 5 FailedOperation decision is whether the
  * scheduler's natural retry converges safely - proven below by re-invoking finalizeAuction()
  * on the same (fresh) auction a second time and confirming no double winner-mark, no double
- * unfreeze, and eventual correct COMPLETED status.
+ * unfreeze, and eventual correct WAITING_FOR_PAYMENT status.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -182,7 +182,7 @@ class AuctionFinalizationSchedulerTransactionIsolationIntegrationTest {
 
         assertThat(bAfterFirstAttempt.getStatus())
                 .as("B's own status save must not have applied (lost the version race)")
-                .isNotEqualTo(AuctionStatus.COMPLETED);
+                .isNotEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
         boolean anyFailedOpForB = failedOperationRepository.findByStatus("PENDING").stream()
                 .anyMatch(op -> auctionBId.equals(op.getAuctionId()));
         assertThat(anyFailedOpForB)
@@ -202,8 +202,8 @@ class AuctionFinalizationSchedulerTransactionIsolationIntegrationTest {
 
     private void assertCompletedCorrectly(Long auctionId, Long winnerId, Long loserId, BigDecimal requiredDeposit) {
         Auction auction = auctionRepository.findById(auctionId).orElseThrow();
-        assertThat(auction.getStatus()).as("auction " + auctionId + " must be COMPLETED")
-                .isEqualTo(AuctionStatus.COMPLETED);
+        assertThat(auction.getStatus()).as("auction " + auctionId + " must be WAITING_FOR_PAYMENT")
+                .isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
         assertThat(auction.getWinnerId()).isEqualTo(winnerId);
 
         Deposit winnerDeposit = depositRepository.findByUserId(winnerId).orElseThrow();

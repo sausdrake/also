@@ -103,6 +103,56 @@ class AuctionTest {
     }
 
     @Test
+    void cancel_WhenWaitingForPayment_ShouldThrowException() {
+        // given
+        auction.setStatus(AuctionStatus.WAITING_FOR_PAYMENT);
+
+        // when & then
+        assertThrows(IllegalStateException.class, () -> auction.cancel());
+    }
+
+    @Test
+    void isCancellable_WhenCreated_ShouldBeTrue() {
+        assertTrue(auction.isCancellable());
+    }
+
+    @Test
+    void isCancellable_WhenActive_ShouldBeTrue() {
+        auction.start();
+        assertTrue(auction.isCancellable());
+    }
+
+    @Test
+    void isCancellable_WhenWaitingForPayment_ShouldBeFalse() {
+        auction.setStatus(AuctionStatus.WAITING_FOR_PAYMENT);
+        assertFalse(auction.isCancellable());
+    }
+
+    @Test
+    void isFinished_WhenWaitingForPayment_ShouldBeFalse() {
+        auction.setStatus(AuctionStatus.WAITING_FOR_PAYMENT);
+        assertFalse(auction.isFinished());
+    }
+
+    @Test
+    void isFinished_WhenSold_ShouldBeTrue() {
+        auction.setStatus(AuctionStatus.SOLD);
+        assertTrue(auction.isFinished());
+    }
+
+    @Test
+    void isFinished_WhenSaleFailed_ShouldBeTrue() {
+        auction.setStatus(AuctionStatus.SALE_FAILED);
+        assertTrue(auction.isFinished());
+    }
+
+    @Test
+    void isFinished_WhenLegacyCompleted_ShouldRemainTrue() {
+        auction.setStatus(AuctionStatus.COMPLETED);
+        assertTrue(auction.isFinished());
+    }
+
+    @Test
     void addBid_ShouldIncreaseCurrentPriceAndTotalBids() {
         // given
         auction.start();

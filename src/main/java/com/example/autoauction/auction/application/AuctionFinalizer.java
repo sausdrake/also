@@ -61,7 +61,7 @@ public class AuctionFinalizer {
         List<Long> participants = participantRepository.getParticipants(auction.getId());
 
         if (auction.getTotalBids() == null || auction.getTotalBids() == 0) {
-            finalStatus = AuctionStatus.EXPIRED;
+            finalStatus = AuctionStatus.EXPIRED; // no-bids branch, unaffected by Slice 1a
             log.info("Auction {} expired with no bids", auction.getId());
 
             for (Long participantId : participants) {
@@ -80,11 +80,14 @@ public class AuctionFinalizer {
                     auction.getCurrentPrice().compareTo(auction.getReservePrice()) >= 0;
 
             if (reserveMet) {
-                finalStatus = AuctionStatus.COMPLETED;
+                // Slice 1a: bidding concluding with a winner no longer means SOLD - it means the
+                // sale is now awaiting the confirmed-sale workflow (payment + handover + admin
+                // confirmation), which is outside this slice's scope.
+                finalStatus = AuctionStatus.WAITING_FOR_PAYMENT;
                 winnerId = auction.getWinnerId();
                 winningBid = auction.getWinningBid();
 
-                log.info("Auction {} completed successfully. Winner: {}, Winning bid: {}",
+                log.info("Auction {} finished bidding with a winner, awaiting payment confirmation. Winner: {}, Winning bid: {}",
                         auction.getId(), winnerId, winningBid);
 
                 if (winnerId != null) {
@@ -183,8 +186,8 @@ public class AuctionFinalizer {
 
     @Transactional
     public boolean cancelAuction(Auction auction) {
-        if (auction.isFinished()) {
-            log.debug("Auction {} is already finished with status {}, skipping cancellation", auction.getId(), auction.getStatus());
+        if (!auction.isCancellable()) {
+            log.debug("Auction {} cannot be cancelled from status {}, skipping cancellation", auction.getId(), auction.getStatus());
             return false;
         }
 
@@ -239,7 +242,9 @@ public class AuctionFinalizer {
 
         log.info("Finalizing auction {} with Buy Now by user {}", auction.getId(), winnerId);
 
-        auction.setStatus(AuctionStatus.COMPLETED);
+        // Slice 1a: Buy Now no longer produces SOLD directly - it produces the same
+        // payment-pending state as a normal auction win.
+        auction.setStatus(AuctionStatus.WAITING_FOR_PAYMENT);
         auction.setWinnerId(winnerId);
         auction.setWinningBid(buyNowAmount);
         auction.setCurrentPrice(buyNowAmount);

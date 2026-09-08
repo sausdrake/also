@@ -314,8 +314,20 @@ public class Auction {
         this.updatedAt = now();
     }
 
+    /**
+     * Slice 1a: single source of truth for "can this auction still be cancelled" -
+     * WAITING_FOR_PAYMENT and every terminal status (SOLD/SALE_FAILED/EXPIRED/CANCELLED/
+     * legacy COMPLETED) are deliberately excluded. Used by {@link #cancel()} itself and by
+     * every caller that needs to reject a cancellation attempt before invoking it, so the
+     * invariant lives in exactly one place rather than being re-derived from isFinished()
+     * (which WAITING_FOR_PAYMENT deliberately does NOT satisfy).
+     */
+    public boolean isCancellable() {
+        return this.status == AuctionStatus.CREATED || this.status == AuctionStatus.ACTIVE;
+    }
+
     public void cancel() {
-        if (this.status != AuctionStatus.CREATED && this.status != AuctionStatus.ACTIVE) {
+        if (!isCancellable()) {
             throw new IllegalStateException(
                     String.format("Невозможно отменить аукцион в статусе '%s'. Только аукционы со статусами 'CREATED' или 'ACTIVE' могут быть отменены",
                             this.status)
@@ -417,9 +429,11 @@ public class Auction {
         return this.status == AuctionStatus.ACTIVE;
     }
 
+    @SuppressWarnings("deprecation") // legacy COMPLETED rows are still finished, per Slice 1a contract
     public boolean isFinished() {
         return this.status == AuctionStatus.COMPLETED ||
                 this.status == AuctionStatus.SOLD ||
+                this.status == AuctionStatus.SALE_FAILED ||
                 this.status == AuctionStatus.EXPIRED ||
                 this.status == AuctionStatus.CANCELLED;
     }
