@@ -1,0 +1,135 @@
+package com.example.autoauction.policy.application;
+
+import com.example.autoauction.policy.domain.PolicyVersion;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * Slice 1b-1: real-persistence proof of PolicyVersionService end-to-end, including the
+ * version-number concurrency guarantee. Deliberately NOT wrapped in a class-level
+ * {@code @Transactional} - the concurrency test specifically needs each concurrent call to run
+ * in its own independent transaction, not share the test method's.
+ *
+ * Does NOT and cannot test the database-level immutability trigger
+ * (policy_version_prevent_published_mutation): this test suite runs against H2 with
+ * spring.jpa.hibernate.ddl-auto=create-drop and spring.flyway.enabled=false (see
+ * application-test.properties), so Flyway migrations - including the trigger created in
+ * V32__policy_version_foundation.sql - are never executed against the test database. The
+ * project currently has no PostgreSQL/Testcontainers integration-test infrastructure, and per
+ * the Slice 1b-1 scope, no such framework is introduced solely for this sub-slice. The trigger
+ * is exercised only against the real, Flyway-migrated PostgreSQL database - this is a known,
+ * pre-existing characteristic of this project's test setup (it already could not exercise any
+ * Postgres-specific DDL in V1-V31 either), not a gap introduced by this slice.
+ */
+@SpringBootTest
+@ActiveProfiles("test")
+@DisplayName("PolicyVersionService — Slice 1b-1 integration tests")
+class PolicyVersionServiceIntegrationTest {
+
+    @Autowired
+    private PolicyVersionService policyVersionService;
+
+    private final Long adminId = 1L;
+
+    @Test
+    @DisplayName("create() persists and can be reloaded with all fields intact")
+    void create_ShouldPersistAndReload() {
+        PolicyVersion created = policyVersionService.create(new BigDecimal("0.0250"), adminId);
+
+        assertNotNull(created.getId());
+        assertNotNull(created.getVersionNumber());
+        assertFalse(created.isPublished());
+
+        PolicyVersion reloaded = policyVersionService.getById(created.getId());
+        assertEquals(created.getId(), reloaded.getId());
+        assertEquals(created.getVersionNumber(), reloaded.getVersionNumber());
+        assertEquals(0, created.getCommissionRate().compareTo(reloaded.getCommissionRate()));
+        assertFalse(reloaded.isPublished());
+        assertEquals(adminId, reloaded.getCreatedBy());
+    }
+
+    @Test
+    @DisplayName("getById() on a non-existent id throws")
+    void getById_NonExistent_ShouldThrow() {
+        assertThrows(IllegalArgumentException.class, () -> policyVersionService.getById(-1L));
+    }
+
+    @Test
+    @DisplayName("publish() transitions an unpublished PolicyVersion to published, and it persists")
+    void publish_ShouldTransitionToPublished() {
+        PolicyVersion created = policyVersionService.create(new BigDecimal("0.03"), adminId);
+
+        PolicyVersion published = policyVersionService.publish(created.getId());
+
+        assertTrue(published.isPublished());
+        assertTrue(policyVersionService.getById(created.getId()).isPublished());
+    }
+
+    @Test
+    @DisplayName("publish() on an already-published PolicyVersion is rejected, not silently repeated")
+    void publish_WhenAlreadyPublished_ShouldThrow() {
+        PolicyVersion created = policyVersionService.create(new BigDecimal("0.03"), adminId);
+        policyVersionService.publish(created.getId());
+
+        assertThrows(IllegalStateException.class, () -> policyVersionService.publish(created.getId()));
+    }
+
+    @Test
+    @DisplayName("publish() on a non-existent id is rejected the same way as already-published")
+    void publish_NonExistent_ShouldThrow() {
+        assertThrows(IllegalStateException.class, () -> policyVersionService.publish(-1L));
+    }
+
+    @Test
+    @DisplayName("concurrent creation never assigns duplicate version numbers")
+    void concurrentCreation_ShouldNeverCollideOnVersionNumber() throws Exception {
+        int threadCount = 20;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch ready = new CountDownLatch(threadCount);
+        CountDownLatch go = new CountDownLatch(1);
+        List<Future<Long>> futures = new ArrayList<>();
+
+        try {
+            for (int i = 0; i < threadCount; i++) {
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+                    go.await();
+                    return policyVersionService.create(new BigDecimal("0.01"), adminId).getVersionNumber();
+                }));
+            }
+
+            ready.await();
+            go.countDown();
+
+            Set<Long> versionNumbers = new HashSet<>();
+            for (Future<Long> f : futures) {
+                versionNumbers.add(f.get(10, TimeUnit.SECONDS));
+            }
+
+            assertEquals(threadCount, versionNumbers.size(),
+                    "Every concurrently-created PolicyVersion must receive a distinct versionNumber");
+        } finally {
+            executor.shutdown();
+        }
+    }
+}
