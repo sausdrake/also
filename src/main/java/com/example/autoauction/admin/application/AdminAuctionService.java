@@ -226,26 +226,54 @@ public class AdminAuctionService {
     }
 
     /**
-     * Slice 1b-2: the policy-aware companion to Auction's own raw validatePrices() (which
-     * remains unchanged and still runs inside the constructor as a baseline sanity check on
-     * the seller-side numbers). This check compares the actual buyer-facing thresholds -
-     * derived via Auction's own resolver methods, the single authoritative formula - against
-     * startingPrice. Mirrors the existing raw checks exactly (reserve >= starting, buyNow >
-     * starting), just against the buyer-facing value instead of the raw stored one.
+     * Slice 1b-2 (B1 fix): the reserve-vs-startingPrice / buyNow-vs-startingPrice ordering
+     * checks used to live in Auction's own constructor (unconditionally, comparing raw values).
+     * They were moved here because the constructor cannot know, at construction time, whether
+     * the auction being built will end up policy-bound - and after this slice, reservePrice/
+     * buyNowPrice are SELLER-side amounts for a policy-bound auction while startingPrice remains
+     * buyer-facing, so comparing them directly would wrongly reject valid auctions (e.g.
+     * sellerReserve=99,000 with startingPrice=100,000 and a 2% commission yields a buyer-facing
+     * reserve of 100,980 - valid, but 99,000 < 100,000 would incorrectly fail a raw comparison).
+     *
+     * This method is called once, from createAuctionFromRequest, strictly after
+     * auction.setPolicyVersionId(...) has already been assigned - so it always takes the
+     * policy-bound branch in production today. The legacy (policyVersionId == null) branch below
+     * exists for correctness/completeness of this method as the single authoritative place this
+     * comparison happens (there is currently no code path that creates a new legacy auction), and
+     * is exercised directly by AdminAuctionServiceTest.
      */
-    private void validatePolicyAwarePrices(Auction auction, BigDecimal commissionRate) {
-        BigDecimal buyerReserve = auction.resolveBuyerFacingReservePrice(commissionRate);
-        if (buyerReserve != null && buyerReserve.compareTo(auction.getStartingPrice()) < 0) {
-            throw new IllegalArgumentException(
-                    String.format("Резервная цена для покупателя (%s) не может быть меньше стартовой цены (%s)",
-                            buyerReserve, auction.getStartingPrice()));
+    // Package-private (not private): exercised directly by AdminAuctionServiceTest for the
+    // legacy (policyVersionId == null) branch, which no current production call path reaches -
+    // createAuctionFromRequest always assigns a policy before calling this. See this method's
+    // own Javadoc above.
+    void validatePolicyAwarePrices(Auction auction, BigDecimal commissionRate) {
+        BigDecimal comparableReserve;
+        BigDecimal comparableBuyNow;
+
+        if (auction.getPolicyVersionId() == null) {
+            // Legacy: reservePrice/buyNowPrice are already on the same (buyer-facing) scale as
+            // startingPrice - compare the raw stored values directly, exactly as Auction's own
+            // constructor did before this check moved out of the domain object.
+            comparableReserve = auction.getReservePrice();
+            comparableBuyNow = auction.getBuyNowPrice();
+        } else {
+            // Policy-bound: reservePrice/buyNowPrice are seller-side - resolve the buyer-facing
+            // values via Auction's own resolver methods (the single authoritative formula) and
+            // compare those against startingPrice instead.
+            comparableReserve = auction.resolveBuyerFacingReservePrice(commissionRate);
+            comparableBuyNow = auction.resolveBuyerFacingBuyNowPrice(commissionRate);
         }
 
-        BigDecimal buyerBuyNow = auction.resolveBuyerFacingBuyNowPrice(commissionRate);
-        if (buyerBuyNow != null && buyerBuyNow.compareTo(auction.getStartingPrice()) <= 0) {
+        if (comparableReserve != null && comparableReserve.compareTo(auction.getStartingPrice()) < 0) {
             throw new IllegalArgumentException(
-                    String.format("Цена мгновенной покупки для покупателя (%s) должна быть больше стартовой цены (%s)",
-                            buyerBuyNow, auction.getStartingPrice()));
+                    String.format("Резервная цена (%s) не может быть меньше стартовой цены (%s)",
+                            comparableReserve, auction.getStartingPrice()));
+        }
+
+        if (comparableBuyNow != null && comparableBuyNow.compareTo(auction.getStartingPrice()) <= 0) {
+            throw new IllegalArgumentException(
+                    String.format("Цена мгновенной покупки (%s) должна быть больше стартовой цены (%s)",
+                            comparableBuyNow, auction.getStartingPrice()));
         }
     }
 

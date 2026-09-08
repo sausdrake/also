@@ -958,4 +958,144 @@ class AdminAuctionServiceTest {
             assertEquals(0, new BigDecimal("1575000.00").compareTo(response.buyNowPrice()));
         }
     }
+
+    @Nested
+    @DisplayName("Slice 1b-2 (B1 fix): reserve/buyNow-vs-startingPrice validation moved to the application layer")
+    class PolicyAwarePriceValidationTests {
+
+        private PolicyVersion policyAt(BigDecimal rate) {
+            return new PolicyVersion(2L, 2L, rate, true, OffsetDateTime.now(), adminId, OffsetDateTime.now());
+        }
+
+        @Test
+        @DisplayName("a) policy-bound: sellerReserve(99000) < startingPrice(100000) but buyerReserve(100980) >= startingPrice -> MUST succeed")
+        void createAuction_PolicyBound_SellerReserveBelowStartingPrice_ButBuyerFacingAboveIt_ShouldSucceed() {
+            // given: startingPrice=100,000, sellerReserve=99,000, commission=2% -> buyerReserve=100,980
+            AuctionCreateRequest request = new AuctionCreateRequest(
+                    1L, new BigDecimal("100000"), new BigDecimal("99000"), null,
+                    new BigDecimal("1000"),
+                    OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(7), null, null
+            );
+            PolicyVersion policy = policyAt(new BigDecimal("0.02"));
+            doNothing().when(auctionValidator).validateBasicRequest(any());
+            doNothing().when(auctionValidator).validateBusinessRules(any(), any());
+            when(vehicleService.getVehicleDetails(1L)).thenReturn(approvedVehicle);
+            when(auctionRepository.existsByVehicleIdAndStatusIn(eq(1L), anyList())).thenReturn(false);
+            when(policyVersionService.getCurrentPublished()).thenReturn(policy);
+            when(policyVersionService.getById(policy.getId())).thenReturn(policy);
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            // when
+            AuctionResponse response = adminAuctionService.createAuction(request, adminId);
+
+            // then: no exception, and the response shows the buyer-facing reserve
+            assertNotNull(response);
+            assertEquals(0, new BigDecimal("100980.00").compareTo(response.reservePrice()));
+        }
+
+        @Test
+        @DisplayName("b) policy-bound Buy Now: sellerBuyNow below startingPrice but buyer-facing Buy Now above it -> MUST succeed")
+        void createAuction_PolicyBound_SellerBuyNowBelowStartingPrice_ButBuyerFacingAboveIt_ShouldSucceed() {
+            // given: startingPrice=100,000, sellerBuyNow=99,000, commission=2% -> buyerBuyNow=100,980
+            AuctionCreateRequest request = new AuctionCreateRequest(
+                    1L, new BigDecimal("100000"), null, new BigDecimal("99000"),
+                    new BigDecimal("1000"),
+                    OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(7), null, null
+            );
+            PolicyVersion policy = policyAt(new BigDecimal("0.02"));
+            doNothing().when(auctionValidator).validateBasicRequest(any());
+            doNothing().when(auctionValidator).validateBusinessRules(any(), any());
+            when(vehicleService.getVehicleDetails(1L)).thenReturn(approvedVehicle);
+            when(auctionRepository.existsByVehicleIdAndStatusIn(eq(1L), anyList())).thenReturn(false);
+            when(policyVersionService.getCurrentPublished()).thenReturn(policy);
+            when(policyVersionService.getById(policy.getId())).thenReturn(policy);
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            // when
+            AuctionResponse response = adminAuctionService.createAuction(request, adminId);
+
+            // then
+            assertNotNull(response);
+            assertEquals(0, new BigDecimal("100980.00").compareTo(response.buyNowPrice()));
+        }
+
+        @Test
+        @DisplayName("c) policy-bound: buyer-facing reserve < startingPrice -> MUST reject")
+        void createAuction_PolicyBound_BuyerFacingReserveBelowStartingPrice_ShouldReject() {
+            // given: startingPrice=100,000, sellerReserve=90,000, commission=2% -> buyerReserve=91,800
+            AuctionCreateRequest request = new AuctionCreateRequest(
+                    1L, new BigDecimal("100000"), new BigDecimal("90000"), null,
+                    new BigDecimal("1000"),
+                    OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(7), null, null
+            );
+            PolicyVersion policy = policyAt(new BigDecimal("0.02"));
+            doNothing().when(auctionValidator).validateBasicRequest(any());
+            doNothing().when(auctionValidator).validateBusinessRules(any(), any());
+            when(vehicleService.getVehicleDetails(1L)).thenReturn(approvedVehicle);
+            when(auctionRepository.existsByVehicleIdAndStatusIn(eq(1L), anyList())).thenReturn(false);
+            when(policyVersionService.getCurrentPublished()).thenReturn(policy);
+
+            // when & then
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                    adminAuctionService.createAuction(request, adminId)
+            );
+            assertTrue(exception.getMessage().contains("Резервная цена"));
+            verify(auctionRepository, never()).save(any(Auction.class));
+        }
+
+        @Test
+        @DisplayName("d) policy-bound: buyer-facing Buy Now <= startingPrice -> MUST reject")
+        void createAuction_PolicyBound_BuyerFacingBuyNowAtOrBelowStartingPrice_ShouldReject() {
+            // given: startingPrice=100,000, sellerBuyNow=95,000, commission=2% -> buyerBuyNow=96,900
+            AuctionCreateRequest request = new AuctionCreateRequest(
+                    1L, new BigDecimal("100000"), null, new BigDecimal("95000"),
+                    new BigDecimal("1000"),
+                    OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(7), null, null
+            );
+            PolicyVersion policy = policyAt(new BigDecimal("0.02"));
+            doNothing().when(auctionValidator).validateBasicRequest(any());
+            doNothing().when(auctionValidator).validateBusinessRules(any(), any());
+            when(vehicleService.getVehicleDetails(1L)).thenReturn(approvedVehicle);
+            when(auctionRepository.existsByVehicleIdAndStatusIn(eq(1L), anyList())).thenReturn(false);
+            when(policyVersionService.getCurrentPublished()).thenReturn(policy);
+
+            // when & then
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                    adminAuctionService.createAuction(request, adminId)
+            );
+            assertTrue(exception.getMessage().contains("Цена мгновенной покупки"));
+            verify(auctionRepository, never()).save(any(Auction.class));
+        }
+
+        @Test
+        @DisplayName("e) legacy (policyVersionId == null): raw reserve < startingPrice -> reject (old constructor semantics preserved)")
+        void validatePolicyAwarePrices_LegacyAuction_RawReserveBelowStartingPrice_ShouldReject() {
+            // given: a legacy auction - Auction's own constructor no longer rejects this (B1 fix),
+            // so this must now be rejected by AdminAuctionService's legacy branch instead.
+            Auction legacyAuction = new Auction(1L, new BigDecimal("100000"), new BigDecimal("90000"),
+                    null, new BigDecimal("1000"), OffsetDateTime.now().plusDays(1),
+                    OffsetDateTime.now().plusDays(7), adminId);
+            assertNull(legacyAuction.getPolicyVersionId());
+
+            // when & then
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                    adminAuctionService.validatePolicyAwarePrices(legacyAuction, null)
+            );
+            assertTrue(exception.getMessage().contains("Резервная цена"));
+        }
+
+        @Test
+        @DisplayName("e) legacy (policyVersionId == null): raw buyNow <= startingPrice -> reject (old constructor semantics preserved)")
+        void validatePolicyAwarePrices_LegacyAuction_RawBuyNowAtOrBelowStartingPrice_ShouldReject() {
+            Auction legacyAuction = new Auction(1L, new BigDecimal("100000"), null,
+                    new BigDecimal("100000"), new BigDecimal("1000"), OffsetDateTime.now().plusDays(1),
+                    OffsetDateTime.now().plusDays(7), adminId);
+            assertNull(legacyAuction.getPolicyVersionId());
+
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                    adminAuctionService.validatePolicyAwarePrices(legacyAuction, null)
+            );
+            assertTrue(exception.getMessage().contains("Цена мгновенной покупки"));
+        }
+    }
 }

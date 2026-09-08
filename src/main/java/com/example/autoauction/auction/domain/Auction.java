@@ -134,6 +134,27 @@ public class Auction {
         return extensionProperties;
     }
 
+    /**
+     * Slice 1b-2 (B1 fix): deliberately scale-independent only. Before this slice,
+     * reservePrice/buyNowPrice were always directly comparable to startingPrice (same
+     * buyer-facing scale), so this constructor could safely enforce "reserve >= starting" /
+     * "buyNow > starting" itself. That is no longer true: for a policy-bound auction,
+     * reservePrice/buyNowPrice are SELLER-side amounts while startingPrice is buyer-facing, and
+     * the constructor has no way to know at this point whether the auction being built will end
+     * up policy-bound (policyVersionId is assigned afterward, via a setter, by
+     * AdminAuctionService - see setPolicyVersionId's Javadoc). Comparing a seller-side value
+     * against a buyer-facing one here would wrongly reject business-valid auctions (e.g.
+     * sellerReserve=99,000 with startingPrice=100,000 and a 2% commission yields a buyer-facing
+     * reserve of 100,980 - perfectly valid, but 99,000 < 100,000 would have thrown here).
+     *
+     * The ordering checks (reserve >= starting, buyNow > starting) are NOT removed - they still
+     * apply to every auction, legacy and policy-bound alike - they simply moved to
+     * AdminAuctionService.validatePolicyAwarePrices, the one place that actually knows which
+     * scale to compare against (raw for legacy, buyer-facing for policy-bound). Only the
+     * positivity checks below are truly scale-independent (a negative or zero price is invalid
+     * regardless of which side of the commission split it represents) and so are the only ones
+     * that legitimately belong in this constructor.
+     */
     private void validatePrices(BigDecimal startingPrice, BigDecimal reservePrice, BigDecimal buyNowPrice) {
         if (startingPrice.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Стартовая цена должна быть больше 0");
@@ -143,23 +164,11 @@ public class Auction {
             if (reservePrice.compareTo(BigDecimal.ZERO) <= 0) {
                 throw new IllegalArgumentException("Резервная цена должна быть больше 0");
             }
-            if (reservePrice.compareTo(startingPrice) < 0) {
-                throw new IllegalArgumentException(
-                        String.format("Резервная цена (%s) не может быть меньше стартовой (%s)",
-                                reservePrice, startingPrice)
-                );
-            }
         }
 
         if (buyNowPrice != null) {
             if (buyNowPrice.compareTo(BigDecimal.ZERO) <= 0) {
                 throw new IllegalArgumentException("Цена мгновенной покупки должна быть больше 0");
-            }
-            if (buyNowPrice.compareTo(startingPrice) <= 0) {
-                throw new IllegalArgumentException(
-                        String.format("Цена мгновенной покупки (%s) должна быть больше стартовой (%s)",
-                                buyNowPrice, startingPrice)
-                );
             }
         }
     }
