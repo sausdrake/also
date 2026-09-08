@@ -73,6 +73,61 @@ class AuctionTest {
     }
 
     @Test
+    void markSold_WhenWaitingForPayment_ShouldChangeStatusToSold() {
+        // given
+        auction.setStatus(AuctionStatus.WAITING_FOR_PAYMENT);
+
+        // when
+        auction.markSold();
+
+        // then
+        assertEquals(AuctionStatus.SOLD, auction.getStatus());
+        assertNotNull(auction.getUpdatedAt());
+    }
+
+    @Test
+    void markSold_WhenCreated_ShouldThrowException() {
+        assertThrows(IllegalStateException.class, () -> auction.markSold());
+    }
+
+    @Test
+    void markSold_WhenActive_ShouldThrowException() {
+        auction.setStatus(AuctionStatus.ACTIVE);
+        assertThrows(IllegalStateException.class, () -> auction.markSold());
+    }
+
+    @Test
+    void markSold_WhenAlreadySold_ShouldThrowException() {
+        auction.setStatus(AuctionStatus.SOLD);
+        assertThrows(IllegalStateException.class, () -> auction.markSold());
+    }
+
+    @Test
+    void markSold_WhenSaleFailed_ShouldThrowException() {
+        auction.setStatus(AuctionStatus.SALE_FAILED);
+        assertThrows(IllegalStateException.class, () -> auction.markSold());
+    }
+
+    @Test
+    void markSold_WhenExpired_ShouldThrowException() {
+        auction.setStatus(AuctionStatus.EXPIRED);
+        assertThrows(IllegalStateException.class, () -> auction.markSold());
+    }
+
+    @Test
+    void markSold_WhenCancelled_ShouldThrowException() {
+        auction.setStatus(AuctionStatus.CANCELLED);
+        assertThrows(IllegalStateException.class, () -> auction.markSold());
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    void markSold_WhenLegacyCompleted_ShouldThrowException() {
+        auction.setStatus(AuctionStatus.COMPLETED);
+        assertThrows(IllegalStateException.class, () -> auction.markSold());
+    }
+
+    @Test
     void cancel_WhenCreated_ShouldChangeStatusToCancelled() {
         // when
         auction.cancel();

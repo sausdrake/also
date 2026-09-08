@@ -1,0 +1,439 @@
+// auction/application/AuctionSaleCompletionIntegrationTest.java
+package com.example.autoauction.auction.application;
+
+import com.example.autoauction.auction.domain.Auction;
+import com.example.autoauction.auction.domain.AuctionStatus;
+import com.example.autoauction.auction.domain.port.AuctionRepository;
+import com.example.autoauction.sale.application.HandoverEvidenceService;
+import com.example.autoauction.sale.application.PaymentEvidenceService;
+import com.example.autoauction.sale.domain.HandoverEvidence;
+import com.example.autoauction.sale.domain.PaymentEvidence;
+import com.example.autoauction.sale.domain.port.HandoverEvidenceRepository;
+import com.example.autoauction.sale.domain.port.PaymentEvidenceRepository;
+import com.example.autoauction.sale.domain.port.SaleResolutionRepository;
+import com.example.autoauction.vehicle.domain.Vehicle;
+import com.example.autoauction.vehicle.domain.VehicleStatus;
+import com.example.autoauction.vehicle.domain.VehicleType;
+import com.example.autoauction.vehicle.domain.port.VehicleRepository;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+/**
+ * X2 (Authoritative Sale Completion): real-transaction proof of the atomic
+ * WAITING_FOR_PAYMENT -> SOLD (Auction) + IN_AUCTION -> SOLD (Vehicle) transition performed by
+ * AuctionFinalizer.completeSale(), covering the required caller shape (a pessimistic
+ * findByIdWithLock() fetch, then completeSale() on the already-locked Auction, both inside one
+ * physical transaction), every evidence-rejection path (reusing X1's own validation, not
+ * duplicating it), the atomic-rollback proof when the Vehicle transition fails, repeat
+ * completion, and genuine multi-threaded concurrent completion. Deliberately NOT class-level
+ * {@code @Transactional} - matches the TransactionTemplate-based convention already established
+ * in AuctionVehicleStartIntegrationTest/SaleEvidenceAndResolutionIntegrationTest, since several
+ * tests need real, separately-committed transactions to observe persisted state and rollbacks
+ * the way genuinely concurrent callers would.
+ */
+@SpringBootTest
+@ActiveProfiles("test")
+@DisplayName("X2: атомарность Auction.SOLD + Vehicle.SOLD при завершении продажи (интеграционный тест)")
+class AuctionSaleCompletionIntegrationTest {
+
+    @Autowired
+    private AuctionFinalizer auctionFinalizer;
+
+    @Autowired
+    private AuctionRepository auctionRepository;
+
+    @Autowired
+    private VehicleRepository vehicleRepository;
+
+    @Autowired
+    private PaymentEvidenceService paymentEvidenceService;
+
+    @Autowired
+    private HandoverEvidenceService handoverEvidenceService;
+
+    @Autowired
+    private PaymentEvidenceRepository paymentEvidenceRepository;
+
+    @Autowired
+    private HandoverEvidenceRepository handoverEvidenceRepository;
+
+    @Autowired
+    private SaleResolutionRepository saleResolutionRepository;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    private final Long resolvedBy = 1L;
+
+    private TransactionTemplate txTemplate() {
+        TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
+        txTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
+        return txTemplate;
+    }
+
+    private String shortVin(String prefix) {
+        // VIN column is VARCHAR(17) - keep well under that with a short unique numeric suffix.
+        return prefix + (System.nanoTime() % 1_000_000_000L);
+    }
+
+    private Long createInAuctionVehicle(TransactionTemplate txTemplate) {
+        return txTemplate.execute(status -> {
+            Vehicle vehicle = new Vehicle("Toyota", "Camry", 2020, shortVin("X2"),
+                    VehicleType.SEDAN, 1L, "owner");
+            vehicle.submitForReview();
+            vehicle.approve(1L, "admin");
+            vehicle.markInAuction();
+            return vehicleRepository.save(vehicle).getId();
+        });
+    }
+
+    private Long createVehicleWithStatus(TransactionTemplate txTemplate, VehicleStatus status) {
+        return txTemplate.execute(txStatus -> {
+            Vehicle vehicle = new Vehicle("Honda", "Civic", 2019, shortVin("X2"),
+                    VehicleType.SEDAN, 1L, "owner");
+            vehicle.setStatus(status);
+            return vehicleRepository.save(vehicle).getId();
+        });
+    }
+
+    private Long createWaitingForPaymentAuction(TransactionTemplate txTemplate, Long vehicleId,
+                                                 Long winnerId, BigDecimal winningBid) {
+        return txTemplate.execute(status -> {
+            OffsetDateTime now = OffsetDateTime.now();
+            Auction auction = new Auction(vehicleId, new BigDecimal("1000000"), null, null,
+                    new BigDecimal("10000"), now.minusDays(7), now.minusHours(1), 10L);
+            auction.setStatus(AuctionStatus.WAITING_FOR_PAYMENT);
+            auction.setWinnerId(winnerId);
+            auction.setWinningBid(winningBid);
+            return auctionRepository.save(auction).getId();
+        });
+    }
+
+    private Long createAuctionWithStatus(TransactionTemplate txTemplate, Long vehicleId, AuctionStatus status) {
+        return txTemplate.execute(txStatus -> {
+            OffsetDateTime now = OffsetDateTime.now();
+            Auction auction = new Auction(vehicleId, new BigDecimal("1000000"), null, null,
+                    new BigDecimal("10000"), now.plusHours(1), now.plusDays(7), 10L);
+            auction.setStatus(status);
+            return auctionRepository.save(auction).getId();
+        });
+    }
+
+    private void recordValidEvidence(TransactionTemplate txTemplate, Long auctionId, Long vehicleId,
+                                      Long winnerId, BigDecimal winningBid) {
+        txTemplate.execute(status -> paymentEvidenceService.recordPayment(auctionId, winnerId, winningBid, 1L));
+        txTemplate.execute(status -> handoverEvidenceService.recordHandover(auctionId, vehicleId, winnerId, 1L));
+    }
+
+    /** Mirrors the locked caller contract: obtain the pessimistic lock, then call completeSale()
+     *  on the already-locked Auction, both inside the same physical transaction. */
+    private void completeSaleViaLockedCaller(TransactionTemplate txTemplate, Long auctionId) {
+        txTemplate.execute(status -> {
+            Auction locked = auctionRepository.findByIdWithLock(auctionId).orElseThrow();
+            auctionFinalizer.completeSale(locked, resolvedBy);
+            return null;
+        });
+    }
+
+    // ==================== T1: happy path ====================
+
+    @Test
+    @DisplayName("T1) Happy path: валидные evidence -> Auction SOLD + Vehicle SOLD + SaleResolution SUCCESS/PENDING, всё персистентно")
+    void completeSale_ValidEvidence_PersistsSoldAuctionSoldVehicleAndSaleResolution() {
+        TransactionTemplate txTemplate = txTemplate();
+        Long vehicleId = createInAuctionVehicle(txTemplate);
+        BigDecimal winningBid = new BigDecimal("1020000.00");
+        Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
+        recordValidEvidence(txTemplate, auctionId, vehicleId, 100L, winningBid);
+
+        completeSaleViaLockedCaller(txTemplate, auctionId);
+
+        Auction persistedAuction = txTemplate.execute(status -> auctionRepository.findById(auctionId).orElseThrow());
+        Vehicle persistedVehicle = txTemplate.execute(status -> vehicleRepository.findById(vehicleId).orElseThrow());
+        var resolution = txTemplate.execute(status -> saleResolutionRepository.findByAuctionId(auctionId));
+
+        assertThat(persistedAuction.getStatus()).isEqualTo(AuctionStatus.SOLD);
+        assertThat(persistedVehicle.getStatus()).isEqualTo(VehicleStatus.SOLD);
+        assertThat(resolution).isPresent();
+        assertThat(resolution.orElseThrow().getResult().name()).isEqualTo("SUCCESS");
+        assertThat(resolution.orElseThrow().getFinancialResolutionStatus().name()).isEqualTo("PENDING");
+    }
+
+    // ==================== T2/T3: missing evidence ====================
+
+    @Test
+    @DisplayName("T2) Missing payment: отклоняется, Auction/Vehicle не меняются, SaleResolution не создаётся")
+    void completeSale_MissingPayment_RejectsWithoutMutation() {
+        TransactionTemplate txTemplate = txTemplate();
+        Long vehicleId = createInAuctionVehicle(txTemplate);
+        BigDecimal winningBid = new BigDecimal("1020000.00");
+        Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
+        txTemplate.execute(status -> handoverEvidenceService.recordHandover(auctionId, vehicleId, 100L, 1L));
+
+        assertThatThrownBy(() -> completeSaleViaLockedCaller(txTemplate, auctionId))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertNoMutationOccurred(txTemplate, auctionId, vehicleId, VehicleStatus.IN_AUCTION);
+    }
+
+    @Test
+    @DisplayName("T3) Missing handover: отклоняется, Auction/Vehicle не меняются, SaleResolution не создаётся")
+    void completeSale_MissingHandover_RejectsWithoutMutation() {
+        TransactionTemplate txTemplate = txTemplate();
+        Long vehicleId = createInAuctionVehicle(txTemplate);
+        BigDecimal winningBid = new BigDecimal("1020000.00");
+        Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
+        txTemplate.execute(status -> paymentEvidenceService.recordPayment(auctionId, 100L, winningBid, 1L));
+
+        assertThatThrownBy(() -> completeSaleViaLockedCaller(txTemplate, auctionId))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertNoMutationOccurred(txTemplate, auctionId, vehicleId, VehicleStatus.IN_AUCTION);
+    }
+
+    // ==================== T4-T7: mismatched evidence ====================
+    // Constructed directly via the repository ports, bypassing PaymentEvidenceService/
+    // HandoverEvidenceService (which would themselves reject these exact mismatches at creation
+    // time) - the same technique already established by X1's own integration test for states
+    // unreachable through the public application-service API.
+
+    @Test
+    @DisplayName("T4) Invalid payment amount: отклоняется, Auction/Vehicle не меняются, SaleResolution не создаётся")
+    void completeSale_InvalidPaymentAmount_RejectsWithoutMutation() {
+        TransactionTemplate txTemplate = txTemplate();
+        Long vehicleId = createInAuctionVehicle(txTemplate);
+        BigDecimal winningBid = new BigDecimal("1020000.00");
+        Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
+        txTemplate.execute(status -> handoverEvidenceService.recordHandover(auctionId, vehicleId, 100L, 1L));
+        OffsetDateTime now = OffsetDateTime.now();
+        txTemplate.execute(status -> paymentEvidenceRepository.save(
+                new PaymentEvidence(auctionId, 100L, new BigDecimal("1.00"), 1L, now, now)));
+
+        assertThatThrownBy(() -> completeSaleViaLockedCaller(txTemplate, auctionId))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertNoMutationOccurred(txTemplate, auctionId, vehicleId, VehicleStatus.IN_AUCTION);
+    }
+
+    @Test
+    @DisplayName("T5) Invalid payment buyer: отклоняется, Auction/Vehicle не меняются, SaleResolution не создаётся")
+    void completeSale_InvalidPaymentBuyer_RejectsWithoutMutation() {
+        TransactionTemplate txTemplate = txTemplate();
+        Long vehicleId = createInAuctionVehicle(txTemplate);
+        BigDecimal winningBid = new BigDecimal("1020000.00");
+        Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
+        txTemplate.execute(status -> handoverEvidenceService.recordHandover(auctionId, vehicleId, 100L, 1L));
+        OffsetDateTime now = OffsetDateTime.now();
+        txTemplate.execute(status -> paymentEvidenceRepository.save(
+                new PaymentEvidence(auctionId, 999L, winningBid, 1L, now, now)));
+
+        assertThatThrownBy(() -> completeSaleViaLockedCaller(txTemplate, auctionId))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertNoMutationOccurred(txTemplate, auctionId, vehicleId, VehicleStatus.IN_AUCTION);
+    }
+
+    @Test
+    @DisplayName("T6) Invalid handover vehicle: отклоняется, Auction/Vehicle не меняются, SaleResolution не создаётся")
+    void completeSale_InvalidHandoverVehicle_RejectsWithoutMutation() {
+        TransactionTemplate txTemplate = txTemplate();
+        Long vehicleId = createInAuctionVehicle(txTemplate);
+        Long otherVehicleId = createInAuctionVehicle(txTemplate);
+        BigDecimal winningBid = new BigDecimal("1020000.00");
+        Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
+        txTemplate.execute(status -> paymentEvidenceService.recordPayment(auctionId, 100L, winningBid, 1L));
+        OffsetDateTime now = OffsetDateTime.now();
+        txTemplate.execute(status -> handoverEvidenceRepository.save(
+                new HandoverEvidence(auctionId, otherVehicleId, 100L, 1L, now, now)));
+
+        assertThatThrownBy(() -> completeSaleViaLockedCaller(txTemplate, auctionId))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertNoMutationOccurred(txTemplate, auctionId, vehicleId, VehicleStatus.IN_AUCTION);
+    }
+
+    @Test
+    @DisplayName("T7) Invalid handover buyer: отклоняется, Auction/Vehicle не меняются, SaleResolution не создаётся")
+    void completeSale_InvalidHandoverBuyer_RejectsWithoutMutation() {
+        TransactionTemplate txTemplate = txTemplate();
+        Long vehicleId = createInAuctionVehicle(txTemplate);
+        BigDecimal winningBid = new BigDecimal("1020000.00");
+        Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
+        txTemplate.execute(status -> paymentEvidenceService.recordPayment(auctionId, 100L, winningBid, 1L));
+        OffsetDateTime now = OffsetDateTime.now();
+        txTemplate.execute(status -> handoverEvidenceRepository.save(
+                new HandoverEvidence(auctionId, vehicleId, 999L, 1L, now, now)));
+
+        assertThatThrownBy(() -> completeSaleViaLockedCaller(txTemplate, auctionId))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertNoMutationOccurred(txTemplate, auctionId, vehicleId, VehicleStatus.IN_AUCTION);
+    }
+
+    // ==================== T8: wrong Auction status ====================
+
+    @Test
+    @DisplayName("T8) Auction не WAITING_FOR_PAYMENT: отклоняется ДО обращения к evidence, ничего не меняется")
+    void completeSale_AuctionNotWaitingForPayment_RejectsBeforeTouchingEvidence() {
+        TransactionTemplate txTemplate = txTemplate();
+        Long vehicleId = createInAuctionVehicle(txTemplate);
+        Long auctionId = createAuctionWithStatus(txTemplate, vehicleId, AuctionStatus.ACTIVE);
+
+        assertThatThrownBy(() -> completeSaleViaLockedCaller(txTemplate, auctionId))
+                .isInstanceOf(IllegalStateException.class);
+
+        Auction persistedAuction = txTemplate.execute(status -> auctionRepository.findById(auctionId).orElseThrow());
+        Vehicle persistedVehicle = txTemplate.execute(status -> vehicleRepository.findById(vehicleId).orElseThrow());
+        assertThat(persistedAuction.getStatus()).isEqualTo(AuctionStatus.ACTIVE);
+        assertThat(persistedVehicle.getStatus()).isEqualTo(VehicleStatus.IN_AUCTION);
+        Boolean saleResolutionExists = txTemplate.execute(status -> saleResolutionRepository.existsByAuctionId(auctionId));
+        assertThat(saleResolutionExists).isFalse();
+    }
+
+    // ==================== T9: atomic rollback when Vehicle transition fails ====================
+
+    @Test
+    @DisplayName("T9) Atomicity: Vehicle не IN_AUCTION -> markAsSold бросает -> ВСЯ транзакция откатывается (Auction остаётся WAITING_FOR_PAYMENT, Vehicle - исходный статус, SaleResolution не создаётся)")
+    void completeSale_VehicleNotInAuction_WholeTransactionRollsBack() {
+        TransactionTemplate txTemplate = txTemplate();
+        // Exceptional state constructed directly, as instructed: a Vehicle that is APPROVED
+        // (not IN_AUCTION) despite its auction already being WAITING_FOR_PAYMENT with valid
+        // evidence - this cannot arise through the normal production call graph, but must still
+        // be handled safely if it ever does.
+        Long vehicleId = createVehicleWithStatus(txTemplate, VehicleStatus.APPROVED);
+        BigDecimal winningBid = new BigDecimal("1020000.00");
+        Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
+        recordValidEvidence(txTemplate, auctionId, vehicleId, 100L, winningBid);
+
+        assertThatThrownBy(() -> completeSaleViaLockedCaller(txTemplate, auctionId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Only IN_AUCTION can be sold");
+
+        // Fresh reads from separate transactions - not in-memory objects - proving the SUCCESS
+        // SaleResolution insert AND the Auction SOLD transition, both already flushed within the
+        // failed transaction before the Vehicle mutation threw, were rolled back together.
+        Auction persistedAuction = txTemplate.execute(status -> auctionRepository.findById(auctionId).orElseThrow());
+        Vehicle persistedVehicle = txTemplate.execute(status -> vehicleRepository.findById(vehicleId).orElseThrow());
+        assertThat(persistedAuction.getStatus()).isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
+        assertThat(persistedVehicle.getStatus()).isEqualTo(VehicleStatus.APPROVED);
+        Boolean saleResolutionExists = txTemplate.execute(status -> saleResolutionRepository.existsByAuctionId(auctionId));
+        assertThat(saleResolutionExists).isFalse();
+    }
+
+    // ==================== T10: repeat completion ====================
+
+    @Test
+    @DisplayName("T10) Repeat completion: первый вызов успешен, второй отклоняется; итог - Auction SOLD, Vehicle SOLD, ровно один SaleResolution")
+    void completeSale_RepeatCompletion_SecondAttemptRejectedFinalStateUnchanged() {
+        TransactionTemplate txTemplate = txTemplate();
+        Long vehicleId = createInAuctionVehicle(txTemplate);
+        BigDecimal winningBid = new BigDecimal("1020000.00");
+        Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
+        recordValidEvidence(txTemplate, auctionId, vehicleId, 100L, winningBid);
+
+        completeSaleViaLockedCaller(txTemplate, auctionId);
+
+        assertThatThrownBy(() -> completeSaleViaLockedCaller(txTemplate, auctionId))
+                .isInstanceOf(IllegalStateException.class);
+
+        Auction persistedAuction = txTemplate.execute(status -> auctionRepository.findById(auctionId).orElseThrow());
+        Vehicle persistedVehicle = txTemplate.execute(status -> vehicleRepository.findById(vehicleId).orElseThrow());
+        assertThat(persistedAuction.getStatus()).isEqualTo(AuctionStatus.SOLD);
+        assertThat(persistedVehicle.getStatus()).isEqualTo(VehicleStatus.SOLD);
+        Boolean saleResolutionExists = txTemplate.execute(status -> saleResolutionRepository.existsByAuctionId(auctionId));
+        assertThat(saleResolutionExists).isTrue();
+    }
+
+    // ==================== T11: concurrent completion ====================
+
+    @Test
+    @DisplayName("T11) Concurrent completion: два одновременных вызова на один аукцион -> ровно один успешен, итог согласован, ровно один SaleResolution")
+    void completeSale_ConcurrentCompletionAttempts_ExactlyOneSucceedsFinalStateConsistent() {
+        TransactionTemplate setupTx = txTemplate();
+        Long vehicleId = createInAuctionVehicle(setupTx);
+        BigDecimal winningBid = new BigDecimal("1020000.00");
+        Long auctionId = createWaitingForPaymentAuction(setupTx, vehicleId, 100L, winningBid);
+        recordValidEvidence(setupTx, auctionId, vehicleId, 100L, winningBid);
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CyclicBarrier barrier = new CyclicBarrier(2);
+        AtomicReference<Throwable> errA = new AtomicReference<>();
+        AtomicReference<Throwable> errB = new AtomicReference<>();
+
+        Runnable attempt = () -> completeSaleViaLockedCaller(txTemplate(), auctionId);
+        Runnable wrappedA = () -> {
+            try {
+                barrier.await(5, TimeUnit.SECONDS);
+                attempt.run();
+            } catch (Throwable t) {
+                errA.set(t);
+            }
+        };
+        Runnable wrappedB = () -> {
+            try {
+                barrier.await(5, TimeUnit.SECONDS);
+                attempt.run();
+            } catch (Throwable t) {
+                errB.set(t);
+            }
+        };
+
+        executor.submit(wrappedA);
+        executor.submit(wrappedB);
+        executor.shutdown();
+        try {
+            assertThat(executor.awaitTermination(15, TimeUnit.SECONDS)).isTrue();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        }
+
+        // Exactly one of the two attempts may fail (the loser, blocked by the Auction's
+        // pessimistic lock until the winner commits, then rejected by the WAITING_FOR_PAYMENT
+        // guard once it re-reads the now-SOLD row) - both succeeding, or both failing, would
+        // both violate the required invariant.
+        boolean aFailed = errA.get() != null;
+        boolean bFailed = errB.get() != null;
+        assertThat(aFailed ^ bFailed)
+                .as("Exactly one of the two concurrent completion attempts must fail, errA=%s, errB=%s",
+                        errA.get(), errB.get())
+                .isTrue();
+
+        TransactionTemplate readTx = txTemplate();
+        Auction persistedAuction = readTx.execute(status -> auctionRepository.findById(auctionId).orElseThrow());
+        Vehicle persistedVehicle = readTx.execute(status -> vehicleRepository.findById(vehicleId).orElseThrow());
+        assertThat(persistedAuction.getStatus()).isEqualTo(AuctionStatus.SOLD);
+        assertThat(persistedVehicle.getStatus()).isEqualTo(VehicleStatus.SOLD);
+        Boolean saleResolutionExists = readTx.execute(status -> saleResolutionRepository.existsByAuctionId(auctionId));
+        assertThat(saleResolutionExists).isTrue();
+    }
+
+    // ==================== shared assertion helper ====================
+
+    private void assertNoMutationOccurred(TransactionTemplate txTemplate, Long auctionId, Long vehicleId,
+                                           VehicleStatus expectedVehicleStatus) {
+        Auction persistedAuction = txTemplate.execute(status -> auctionRepository.findById(auctionId).orElseThrow());
+        Vehicle persistedVehicle = txTemplate.execute(status -> vehicleRepository.findById(vehicleId).orElseThrow());
+        assertThat(persistedAuction.getStatus()).isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
+        assertThat(persistedVehicle.getStatus()).isEqualTo(expectedVehicleStatus);
+        Boolean saleResolutionExists = txTemplate.execute(status -> saleResolutionRepository.existsByAuctionId(auctionId));
+        assertThat(saleResolutionExists).isFalse();
+    }
+}

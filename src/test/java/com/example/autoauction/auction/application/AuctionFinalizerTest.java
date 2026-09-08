@@ -7,6 +7,8 @@ import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.policy.application.PolicyVersionService;
 import com.example.autoauction.policy.domain.PolicyVersion;
+import com.example.autoauction.sale.application.SaleResolutionService;
+import com.example.autoauction.sale.domain.SaleResolution;
 import com.example.autoauction.vehicle.application.VehicleService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -54,6 +56,9 @@ class AuctionFinalizerTest {
 
     @Mock
     private VehicleService vehicleService;
+
+    @Mock
+    private SaleResolutionService saleResolutionService;
 
     @InjectMocks
     private AuctionFinalizer auctionFinalizer;
@@ -272,6 +277,151 @@ class AuctionFinalizerTest {
             // (this Mockito test cannot exercise a real transaction), but this proves the
             // failure is never masked and the Auction side is never persisted when Vehicle
             // fails.
+            verify(auctionRepository, never()).save(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("X2 (Authoritative Sale Completion): завершение продажи (completeSale)")
+    class CompleteSaleTests {
+
+        private Auction waitingAuction;
+        private final Long vehicleId = 5L;
+        private final Long resolvedBy = 1L;
+        private final BigDecimal winningBid = new BigDecimal("1020000");
+
+        @BeforeEach
+        void setUpWaitingAuction() {
+            waitingAuction = new Auction(
+                    vehicleId,
+                    startingPrice,
+                    new BigDecimal("1200000"),
+                    new BigDecimal("1500000"),
+                    new BigDecimal("10000"),
+                    fixedTime.minusDays(7),
+                    fixedTime.minusHours(1),
+                    sellerId,
+                    clock
+            );
+            waitingAuction.setId(3L);
+            waitingAuction.setStatus(AuctionStatus.WAITING_FOR_PAYMENT);
+            waitingAuction.setWinnerId(winnerId);
+            waitingAuction.setWinningBid(winningBid);
+        }
+
+        private SaleResolution stubSaleResolution() {
+            // Uses a fixed literal timestamp rather than OffsetDateTime.now(clock) - clock is
+            // itself a Mockito mock, and invoking it while this helper's result is still being
+            // computed as an argument to an in-progress when(...).thenReturn(...) stub (see call
+            // sites below) would interleave mock interactions mid-stub and trip Mockito's
+            // UnfinishedStubbingException.
+            return new SaleResolution(waitingAuction.getId(), resolvedBy, fixedTime, 10L, 20L, fixedTime);
+        }
+
+        @Test
+        @DisplayName("WAITING_FOR_PAYMENT -> createSuccess() выполняется ДО Auction.markSold(), которое выполняется ДО VehicleService.markAsSold(), которое выполняется ДО save (порядок обязателен)")
+        void completeSale_ValidWaitingAuction_EnforcesMandatoryOrdering() {
+            // given
+            java.util.concurrent.atomic.AtomicReference<AuctionStatus> statusAtVehicleCallTime =
+                    new java.util.concurrent.atomic.AtomicReference<>();
+            when(saleResolutionService.createSuccess(waitingAuction.getId(), resolvedBy))
+                    .thenReturn(stubSaleResolution());
+            doAnswer(inv -> {
+                // Captures Auction's status at the exact moment VehicleService is invoked -
+                // direct proof that auction.markSold() already ran, not an inference.
+                statusAtVehicleCallTime.set(waitingAuction.getStatus());
+                return null;
+            }).when(vehicleService).markAsSold(vehicleId);
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            // when
+            auctionFinalizer.completeSale(waitingAuction, resolvedBy);
+
+            // then
+            assertThat(statusAtVehicleCallTime.get())
+                    .as("auction.markSold() must have already run before VehicleService.markAsSold() is called")
+                    .isEqualTo(AuctionStatus.SOLD);
+            assertThat(waitingAuction.getStatus()).isEqualTo(AuctionStatus.SOLD);
+
+            InOrder inOrder = inOrder(saleResolutionService, vehicleService, auctionRepository);
+            inOrder.verify(saleResolutionService).createSuccess(waitingAuction.getId(), resolvedBy);
+            inOrder.verify(vehicleService).markAsSold(vehicleId);
+            inOrder.verify(auctionRepository).save(waitingAuction);
+        }
+
+        @Test
+        @DisplayName("Auction не WAITING_FOR_PAYMENT -> исключение ДО обращения к SaleResolutionService/VehicleService, save не вызывается")
+        void completeSale_AuctionNotWaitingForPayment_ThrowsBeforeTouchingCollaborators() {
+            // given
+            waitingAuction.setStatus(AuctionStatus.ACTIVE);
+
+            // when & then
+            assertThatThrownBy(() -> auctionFinalizer.completeSale(waitingAuction, resolvedBy))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Невозможно завершить продажу");
+
+            verifyNoInteractions(saleResolutionService);
+            verifyNoInteractions(vehicleService);
+            verify(auctionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Аукцион уже SOLD (повторное завершение) -> отклоняется, коллабораторы не вызываются")
+        void completeSale_AlreadySold_RejectedWithoutTouchingCollaborators() {
+            // given
+            waitingAuction.setStatus(AuctionStatus.SOLD);
+
+            // when & then
+            assertThatThrownBy(() -> auctionFinalizer.completeSale(waitingAuction, resolvedBy))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Невозможно завершить продажу");
+
+            verifyNoInteractions(saleResolutionService);
+            verifyNoInteractions(vehicleService);
+            verify(auctionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("SaleResolutionService.createSuccess() выбрасывает исключение (отсутствующая/некорректная evidence) -> распространяется наружу, VehicleService не вызывается, Auction не сохраняется")
+        void completeSale_SaleResolutionCreationFails_PropagatesAndNeverTouchesVehicleOrSaves() {
+            // given
+            when(saleResolutionService.createSuccess(waitingAuction.getId(), resolvedBy))
+                    .thenThrow(new IllegalStateException("PaymentEvidence отсутствует для аукциона " + waitingAuction.getId()));
+
+            // when & then
+            assertThatThrownBy(() -> auctionFinalizer.completeSale(waitingAuction, resolvedBy))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("PaymentEvidence отсутствует");
+
+            // Auction.markSold() must never run for this to hold - proven indirectly by
+            // asserting the in-memory status is unchanged, since createSuccess() throws before
+            // auction.markSold() is ever reached in completeSale()'s statement order.
+            assertThat(waitingAuction.getStatus()).isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
+            verifyNoInteractions(vehicleService);
+            verify(auctionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("VehicleService.markAsSold() выбрасывает исключение -> оно распространяется наружу, Auction не сохраняется")
+        void completeSale_VehicleTransitionFails_PropagatesExceptionAndNeverSavesAuction() {
+            // given
+            when(saleResolutionService.createSuccess(waitingAuction.getId(), resolvedBy))
+                    .thenReturn(stubSaleResolution());
+            doThrow(new IllegalStateException("Only IN_AUCTION can be sold"))
+                    .when(vehicleService).markAsSold(vehicleId);
+
+            // when & then
+            assertThatThrownBy(() -> auctionFinalizer.completeSale(waitingAuction, resolvedBy))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Only IN_AUCTION can be sold");
+
+            // auction.markSold() already ran in-memory before the failure (this is acceptable -
+            // see the class-level contract), but the exception is not swallowed anywhere and
+            // auctionRepository.save() (which runs after the Vehicle call) is never reached.
+            // Real transactional rollback of the in-memory markSold() effect plus the
+            // SaleResolution insert is proven separately by a dedicated integration test (this
+            // Mockito test cannot exercise a real transaction).
+            assertThat(waitingAuction.getStatus()).isEqualTo(AuctionStatus.SOLD);
             verify(auctionRepository, never()).save(any());
         }
     }

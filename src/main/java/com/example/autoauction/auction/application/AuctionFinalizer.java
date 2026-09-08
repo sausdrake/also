@@ -9,6 +9,7 @@ import com.example.autoauction.auction.web.AuctionWebSocketController;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.notification.application.NotificationService;
 import com.example.autoauction.policy.application.PolicyVersionService;
+import com.example.autoauction.sale.application.SaleResolutionService;
 import com.example.autoauction.vehicle.application.VehicleService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,7 @@ public class AuctionFinalizer {
     private final Clock clock;
     private final PolicyVersionService policyVersionService;
     private final VehicleService vehicleService;
+    private final SaleResolutionService saleResolutionService;
 
     public AuctionFinalizer(AuctionRepository auctionRepository,
                             DepositService depositService,
@@ -39,7 +41,8 @@ public class AuctionFinalizer {
                             NotificationService notificationService,
                             Clock clock,
                             PolicyVersionService policyVersionService,
-                            VehicleService vehicleService) {
+                            VehicleService vehicleService,
+                            SaleResolutionService saleResolutionService) {
         this.auctionRepository = auctionRepository;
         this.depositService = depositService;
         this.participantRepository = participantRepository;
@@ -48,6 +51,7 @@ public class AuctionFinalizer {
         this.clock = clock;
         this.policyVersionService = policyVersionService;
         this.vehicleService = vehicleService;
+        this.saleResolutionService = saleResolutionService;
     }
 
     /**
@@ -243,6 +247,64 @@ public class AuctionFinalizer {
         vehicleService.markInAuction(auction.getVehicleId());
         auctionRepository.save(auction);
         log.info("Auction {} started, vehicle {} marked IN_AUCTION", auction.getId(), auction.getVehicleId());
+    }
+
+    /**
+     * X2 (Authoritative Sale Completion): the single-auction, atomic transition
+     * WAITING_FOR_PAYMENT -> SOLD, together with its mandatory Vehicle IN_AUCTION -> SOLD
+     * counterpart. Mirrors startAuction()'s established shape and reasoning exactly: the caller
+     * (application-layer, not yet wired to any controller in this slice) is responsible for
+     * fetching {@code auction} via {@code auctionRepository.findByIdWithLock(auctionId)} BEFORE
+     * calling this method - completeSale() deliberately does NOT re-fetch or re-lock, to avoid
+     * duplicating (and potentially diverging from) the caller's own lock acquisition. This one
+     * @Transactional (REQUIRED) boundary covers the full authoritative sale: evidence
+     * validation + SaleResolution creation, the Auction transition, and the Vehicle transition
+     * all commit or roll back together.
+     *
+     * Ordering is mandatory and enforced by plain statement order, not a new guard:
+     * <ol>
+     *   <li>Guard: auction must be WAITING_FOR_PAYMENT, else throws IllegalStateException before
+     *       anything else runs - this is what makes a repeat completion (already SOLD, or any
+     *       other status) fail closed without ever touching evidence/SaleResolution/Vehicle.</li>
+     *   <li>{@link SaleResolutionService#createSuccess(Long, Long)} is called first, as a
+     *       genuine external bean call. It is plain {@code @Transactional} (default REQUIRED
+     *       propagation, not REQUIRES_NEW), so it joins THIS method's own physical transaction -
+     *       no new transaction boundary is introduced. It performs every evidence/cross-field
+     *       validation (payment/handover existence, auction-id/buyer-id/vehicle-id/amount
+     *       matching, SaleResolution cardinality) already locked for X1 - none of that is
+     *       duplicated here. If it throws, this method's transaction rolls back with nothing
+     *       persisted and Auction/Vehicle both untouched.</li>
+     *   <li>auction.markSold() runs only after step 2 succeeds - its own domain guard is
+     *       redundant with the pre-check above but kept as the same defense-in-depth pattern
+     *       already used by every other Auction transition in this class.</li>
+     *   <li>vehicleService.markAsSold(auction.getVehicleId()) runs after the Auction has already
+     *       been mutated in memory but NOT yet saved - if this throws (Vehicle not IN_AUCTION),
+     *       the whole transaction rolls back: neither the SaleResolution row nor the Auction
+     *       save become durable, satisfying the required atomic-rollback invariant
+     *       (Auction.SOLD => Vehicle.SOLD, never a partially-committed pair).</li>
+     *   <li>auctionRepository.save(auction) persists the Auction transition, relying on its
+     *       existing @Version optimistic lock exactly as every other save() in this class does.</li>
+     * </ol>
+     *
+     * No REQUIRES_NEW, no Vehicle-side locking, no compensating transaction - all deliberately
+     * out of scope for this slice; safety comes entirely from sharing one transaction plus the
+     * caller's pessimistic lock on the Auction row (identical reasoning to startAuction()).
+     */
+    @Transactional
+    public void completeSale(Auction auction, Long resolvedBy) {
+        if (auction.getStatus() != AuctionStatus.WAITING_FOR_PAYMENT) {
+            throw new IllegalStateException(
+                    String.format("Невозможно завершить продажу аукциона %d в статусе '%s'. Только аукционы со статусом 'WAITING_FOR_PAYMENT' могут быть проданы",
+                            auction.getId(), auction.getStatus())
+            );
+        }
+
+        saleResolutionService.createSuccess(auction.getId(), resolvedBy);
+        auction.markSold();
+        vehicleService.markAsSold(auction.getVehicleId());
+        auctionRepository.save(auction);
+
+        log.info("Auction {} sale completed, vehicle {} marked SOLD", auction.getId(), auction.getVehicleId());
     }
 
     @Transactional

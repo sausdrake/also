@@ -392,6 +392,26 @@ public class Auction {
     }
 
     /**
+     * X2 (Authoritative Sale Completion): the authoritative successful-sale transition -
+     * WAITING_FOR_PAYMENT -> SOLD. Deliberately not idempotent, same as start()/cancel() - a
+     * second call against an already-SOLD (or any other status) auction fails closed with this
+     * guard, by design (see AuctionFinalizer.completeSale()'s own Javadoc for why no idempotency
+     * is needed on this side either). This method does not itself validate payment/handover
+     * evidence - that precondition is enforced by the caller (AuctionFinalizer.completeSale())
+     * via SaleResolutionService.createSuccess() before this method is ever invoked.
+     */
+    public void markSold() {
+        if (this.status != AuctionStatus.WAITING_FOR_PAYMENT) {
+            throw new IllegalStateException(
+                    String.format("Невозможно завершить продажу аукциона в статусе '%s'. Только аукционы со статусом 'WAITING_FOR_PAYMENT' могут быть переведены в 'SOLD'",
+                            this.status)
+            );
+        }
+        this.status = AuctionStatus.SOLD;
+        this.updatedAt = now();
+    }
+
+    /**
      * Slice 1a: single source of truth for "can this auction still be cancelled" -
      * WAITING_FOR_PAYMENT and every terminal status (SOLD/SALE_FAILED/EXPIRED/CANCELLED/
      * legacy COMPLETED) are deliberately excluded. Used by {@link #cancel()} itself and by

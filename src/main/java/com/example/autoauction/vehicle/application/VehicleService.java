@@ -336,6 +336,25 @@ public class VehicleService {
     }
 
     /**
+     * X2 (Authoritative Sale Completion): transitions a Vehicle from IN_AUCTION to SOLD once its
+     * auction's sale has been authoritatively completed. Deliberately NOT idempotent - same
+     * reasoning as markInAuction() above: Vehicle.markAsSold()'s own guard (only IN_AUCTION ->
+     * SOLD) is preserved unchanged; a second call against an already-SOLD vehicle fails closed
+     * by design. Called exclusively from AuctionFinalizer.completeSale(), always after
+     * Auction.markSold() has already succeeded in the same transaction - see that method's own
+     * Javadoc for why a second call for the same auction can never reach this method in the
+     * first place, making idempotency unnecessary here.
+     */
+    @Transactional
+    public void markAsSold(Long vehicleId) {
+        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> new IllegalArgumentException("Автомобиль не найден: " + vehicleId));
+        vehicle.markAsSold();
+        vehicleRepository.save(vehicle);
+        log.info("Vehicle {} marked SOLD", vehicleId);
+    }
+
+    /**
      * Создать Vehicle автоматически при одобрении диагностического отчёта.
      * Данные берутся из диагностической заявки.
      */

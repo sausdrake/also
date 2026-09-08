@@ -979,4 +979,52 @@ class VehicleServiceTest {
             assertEquals(reason, vehicleCaptor.getValue().getRejectionReason());
         }
     }
+
+    // ==================== X2 (Authoritative Sale Completion): MARK AS SOLD TESTS ====================
+
+    @Nested
+    @DisplayName("X2 (Authoritative Sale Completion): markAsSold(vehicleId)")
+    class MarkAsSoldTests {
+
+        @Test
+        @DisplayName("IN_AUCTION -> SOLD: домен переводится и сохраняется")
+        void markAsSold_WhenInAuction_TransitionsAndSaves() {
+            // given
+            when(vehicleRepository.findById(5L)).thenReturn(Optional.of(inAuctionVehicle));
+            when(vehicleRepository.save(any(Vehicle.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            vehicleService.markAsSold(5L);
+
+            // then
+            assertEquals(VehicleStatus.SOLD, inAuctionVehicle.getStatus());
+            ArgumentCaptor<Vehicle> vehicleCaptor = ArgumentCaptor.forClass(Vehicle.class);
+            verify(vehicleRepository).save(vehicleCaptor.capture());
+            assertEquals(VehicleStatus.SOLD, vehicleCaptor.getValue().getStatus());
+        }
+
+        @Test
+        @DisplayName("Некорректный статус (не IN_AUCTION) -> доменное исключение распространяется, save не вызывается")
+        void markAsSold_WhenNotInAuction_PropagatesDomainExceptionAndNeverSaves() {
+            // given: approvedVehicle находится в статусе APPROVED, а не IN_AUCTION
+            when(vehicleRepository.findById(2L)).thenReturn(Optional.of(approvedVehicle));
+
+            // when & then
+            assertThrows(IllegalStateException.class, () -> vehicleService.markAsSold(2L));
+
+            verify(vehicleRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Автомобиль не найден -> IllegalArgumentException, save не вызывается")
+        void markAsSold_WhenVehicleNotFound_ThrowsIllegalArgumentException() {
+            // given
+            when(vehicleRepository.findById(999L)).thenReturn(Optional.empty());
+
+            // when & then
+            assertThrows(IllegalArgumentException.class, () -> vehicleService.markAsSold(999L));
+
+            verify(vehicleRepository, never()).save(any());
+        }
+    }
 }
