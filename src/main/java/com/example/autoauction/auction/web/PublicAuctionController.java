@@ -4,6 +4,7 @@ import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.auction.web.dto.AuctionResponse;
+import com.example.autoauction.policy.application.PolicyVersionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Slf4j
@@ -24,6 +26,19 @@ import java.util.List;
 public class PublicAuctionController {
 
     private final AuctionRepository auctionRepository;
+    private final PolicyVersionService policyVersionService;
+
+    /**
+     * Slice 1b-2: resolves the commissionRate needed to compute buyer-facing values for an
+     * already-persisted auction - null for legacy auctions, the specific immutable PolicyVersion
+     * this exact auction was created under otherwise. Never getCurrentPublished().
+     */
+    private BigDecimal resolveCommissionRate(Auction auction) {
+        if (auction.getPolicyVersionId() == null) {
+            return null;
+        }
+        return policyVersionService.getById(auction.getPolicyVersionId()).getCommissionRate();
+    }
 
     // Legacy path
     @GetMapping("/api/public/auctions")
@@ -54,7 +69,7 @@ public class PublicAuctionController {
             try {
                 AuctionStatus auctionStatus = AuctionStatus.valueOf(statusFilter.toUpperCase());
                 return auctionRepository.findByStatusWithPagination(auctionStatus, pageable)
-                        .map(AuctionResponse::fromDomain);
+                        .map(auction -> AuctionResponse.fromDomain(auction, resolveCommissionRate(auction)));
             } catch (IllegalArgumentException e) {
                 // Неизвестный статус — возвращаем ACTIVE+CREATED
             }
@@ -73,7 +88,9 @@ public class PublicAuctionController {
         List<Auction> pageContent = start >= combined.size() ? List.of() : combined.subList(start, end);
 
         return new PageImpl<>(
-                pageContent.stream().map(AuctionResponse::fromDomain).toList(),
+                pageContent.stream()
+                        .map(auction -> AuctionResponse.fromDomain(auction, resolveCommissionRate(auction)))
+                        .toList(),
                 pageable,
                 combined.size()
         );
@@ -84,6 +101,6 @@ public class PublicAuctionController {
     public AuctionResponse getAuction(@PathVariable Long id) {
         Auction auction = auctionRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Аукцион не найден: " + id));
-        return AuctionResponse.fromDomain(auction);
+        return AuctionResponse.fromDomain(auction, resolveCommissionRate(auction));
     }
 }

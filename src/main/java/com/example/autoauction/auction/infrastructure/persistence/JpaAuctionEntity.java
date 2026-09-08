@@ -40,6 +40,15 @@ public class JpaAuctionEntity {
     @Column(name = "required_deposit_amount", precision = 10, scale = 2)
     private BigDecimal requiredDepositAmount;
 
+    /**
+     * Slice 1b-2: nullable FK to policy_version(id). Null for legacy, pre-feature auctions.
+     * updatable is intentionally NOT set to false here - the field is written exactly once via
+     * the domain's own single-call-site discipline (see Auction.setPolicyVersionId's Javadoc),
+     * not enforced at this layer.
+     */
+    @Column(name = "policy_version_id")
+    private Long policyVersionId;
+
     @Column(name = "start_time", nullable = false)
     private OffsetDateTime startTime;
 
@@ -122,6 +131,9 @@ public class JpaAuctionEntity {
 
     public BigDecimal getRequiredDepositAmount() { return requiredDepositAmount; }
     public void setRequiredDepositAmount(BigDecimal requiredDepositAmount) { this.requiredDepositAmount = requiredDepositAmount; }
+
+    public Long getPolicyVersionId() { return policyVersionId; }
+    public void setPolicyVersionId(Long policyVersionId) { this.policyVersionId = policyVersionId; }
 
     public OffsetDateTime getStartTime() { return startTime; }
     public void setStartTime(OffsetDateTime startTime) { this.startTime = startTime; }

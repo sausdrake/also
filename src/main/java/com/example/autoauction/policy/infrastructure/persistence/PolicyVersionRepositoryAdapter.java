@@ -80,6 +80,11 @@ public class PolicyVersionRepositoryAdapter implements PolicyVersionRepository {
     }
 
     @Override
+    public Optional<PolicyVersion> findCurrentPublished() {
+        return jpaRepository.findFirstByPublishedTrueOrderByVersionNumberDesc().map(mapper::toDomain);
+    }
+
+    @Override
     public boolean claimPublish(Long id) {
         return jpaRepository.claimPublish(id) > 0;
     }

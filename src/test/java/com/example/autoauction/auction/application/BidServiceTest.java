@@ -8,6 +8,8 @@ import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.auction.web.AuctionWebSocketController;
 import com.example.autoauction.auction.web.dto.BidResponse;
 import com.example.autoauction.deposit.application.DepositService;
+import com.example.autoauction.policy.application.PolicyVersionService;
+import com.example.autoauction.policy.domain.PolicyVersion;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -47,6 +49,9 @@ class BidServiceTest {
 
     @Mock
     private AuctionWebSocketController webSocketController;
+
+    @Mock
+    private PolicyVersionService policyVersionService;
 
     @InjectMocks
     private BidService bidService;
@@ -560,6 +565,80 @@ class BidServiceTest {
         void placeBid_NullBidderId_ThrowsNullPointerException() {
             assertThrows(NullPointerException.class,
                     () -> bidService.placeBid(auctionId, validBid, null));
+        }
+    }
+
+    // ==================== Slice 1b-2: buyer-facing Buy Now amount ====================
+
+    @Nested
+    @DisplayName("🏷️ Buy Now — buyer-facing цена (Slice 1b-2)")
+    class PolicyVersionAwareBuyNowTests {
+
+        @Test
+        @DisplayName("Legacy аукцион (policyVersionId == null) - списывается сырая buyNowPrice, PolicyVersionService не трогается")
+        void buyNow_LegacyAuction_ChargesRawBuyNowPrice_NeverTouchesPolicyVersionService() {
+            // given
+            assertNull(createdAuction.getPolicyVersionId());
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(auctionRepository.findByIdWithLock(2L)).thenReturn(Optional.of(createdAuction));
+            when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
+            doNothing().when(depositService).freezeForAuction(bidderId1, 2L, requiredDeposit);
+
+            // when
+            BidResponse response = bidService.buyNow(2L, bidderId1);
+
+            // then
+            assertEquals(0, buyNowPrice.compareTo(response.amount()));
+            verifyNoInteractions(policyVersionService);
+            verify(auctionFinalizer, times(1)).finalizeWithBuyNow(createdAuction, bidderId1, buyNowPrice);
+        }
+
+        @Test
+        @DisplayName("Policy-bound аукцион: списывается buyer-facing цена (сырая цена * (1+commissionRate))")
+        void buyNow_PolicyBoundAuction_ChargesBuyerFacingAmount() {
+            // given: raw buyNowPrice 1,500,000 @ 2% -> 1,530,000.00 buyer-facing
+            createdAuction.setPolicyVersionId(5L);
+            PolicyVersion policyA = new PolicyVersion(5L, 1L, new BigDecimal("0.02"), true,
+                    now, sellerId, now);
+            when(policyVersionService.getById(5L)).thenReturn(policyA);
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(auctionRepository.findByIdWithLock(2L)).thenReturn(Optional.of(createdAuction));
+            when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
+            doNothing().when(depositService).freezeForAuction(bidderId1, 2L, requiredDeposit);
+
+            // when
+            BidResponse response = bidService.buyNow(2L, bidderId1);
+
+            // then: finalizer, WebSocket notification and the response all use the SAME
+            // buyer-facing amount - never the raw stored buyNowPrice
+            BigDecimal expected = new BigDecimal("1530000.00");
+            assertEquals(0, expected.compareTo(response.amount()));
+            verify(auctionFinalizer, times(1)).finalizeWithBuyNow(eq(createdAuction), eq(bidderId1),
+                    argThat(amount -> expected.compareTo(amount) == 0));
+            verify(webSocketController, times(1)).sendBuyNowNotification(eq(2L), eq(bidderId1),
+                    argThat(amount -> expected.compareTo(amount) == 0));
+        }
+
+        @Test
+        @DisplayName("Policy A -> Policy B опубликована -> Buy Now всё ещё резолвится по A, не по текущей опубликованной")
+        void buyNow_PolicyCutover_ShouldStillResolveItsOwnFixedPolicyVersion() {
+            // given: auction bound to Policy A (id=5); Policy B (id=9) has since been published
+            createdAuction.setPolicyVersionId(5L);
+            PolicyVersion policyA = new PolicyVersion(5L, 1L, new BigDecimal("0.02"), true,
+                    now, sellerId, now);
+            when(policyVersionService.getById(5L)).thenReturn(policyA);
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(auctionRepository.findByIdWithLock(2L)).thenReturn(Optional.of(createdAuction));
+            when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
+            doNothing().when(depositService).freezeForAuction(bidderId1, 2L, requiredDeposit);
+
+            // when
+            bidService.buyNow(2L, bidderId1);
+
+            // then
+            verify(policyVersionService, times(1)).getById(5L);
+            verify(policyVersionService, never()).getById(9L);
+            verify(policyVersionService, never()).getCurrentPublished();
         }
     }
 }

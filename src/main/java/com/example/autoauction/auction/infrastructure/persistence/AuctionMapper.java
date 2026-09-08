@@ -41,6 +41,7 @@ public class AuctionMapper {
         entity.setVideoUrl(domain.getVideoUrl());
         entity.setConfirmedStart(domain.isConfirmedStart());
         entity.setConfirmationDeadline(domain.getConfirmationDeadline());
+        entity.setPolicyVersionId(domain.getPolicyVersionId());
         return entity;
     }
 
@@ -77,6 +78,11 @@ public class AuctionMapper {
         auction.setConfirmedStart(entity.isConfirmedStart());
         auction.setConfirmationDeadline(entity.getConfirmationDeadline());
         auction.setRequiredDepositAmount(entity.getRequiredDepositAmount());
+        // Slice 1b-2: pure field restoration, no PolicyVersion lookup and no re-validation -
+        // reconstruction must never query the policy module (see the Slice 1b-2 architecture
+        // lock, Issue 1) and must never re-run creation-time validation against already-
+        // persisted data (Issue 5).
+        auction.setPolicyVersionId(entity.getPolicyVersionId());
         return auction;
     }
 }

@@ -8,6 +8,7 @@ import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.auction.web.AuctionWebSocketController;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.notification.application.NotificationService;
+import com.example.autoauction.policy.application.PolicyVersionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,19 +28,40 @@ public class AuctionFinalizer {
     private final AuctionWebSocketController webSocketController;
     private final NotificationService notificationService;
     private final Clock clock;
+    private final PolicyVersionService policyVersionService;
 
     public AuctionFinalizer(AuctionRepository auctionRepository,
                             DepositService depositService,
                             AuctionParticipantRepository participantRepository,
                             AuctionWebSocketController webSocketController,
                             NotificationService notificationService,
-                            Clock clock) {
+                            Clock clock,
+                            PolicyVersionService policyVersionService) {
         this.auctionRepository = auctionRepository;
         this.depositService = depositService;
         this.participantRepository = participantRepository;
         this.webSocketController = webSocketController;
         this.notificationService = notificationService;
         this.clock = clock;
+        this.policyVersionService = policyVersionService;
+    }
+
+    /**
+     * Slice 1b-2: resolves the buyer-facing reserve price this specific auction must be checked
+     * against. For a legacy auction (policyVersionId == null) this is the raw stored value
+     * unchanged. For a policy-bound auction it is resolved via THIS auction's own fixed
+     * policyVersionId - never PolicyVersionService.getCurrentPublished() - an auction's
+     * commission is fixed forever at creation time regardless of what is published later.
+     */
+    private BigDecimal resolveBuyerFacingReserve(Auction auction) {
+        if (auction.getReservePrice() == null) {
+            return null;
+        }
+        if (auction.getPolicyVersionId() == null) {
+            return auction.getReservePrice();
+        }
+        BigDecimal commissionRate = policyVersionService.getById(auction.getPolicyVersionId()).getCommissionRate();
+        return auction.resolveBuyerFacingReservePrice(commissionRate);
     }
 
     private OffsetDateTime now() {
@@ -76,8 +98,9 @@ public class AuctionFinalizer {
             }
 
         } else {
-            boolean reserveMet = auction.getReservePrice() == null ||
-                    auction.getCurrentPrice().compareTo(auction.getReservePrice()) >= 0;
+            BigDecimal buyerFacingReserve = resolveBuyerFacingReserve(auction);
+            boolean reserveMet = buyerFacingReserve == null ||
+                    auction.getCurrentPrice().compareTo(buyerFacingReserve) >= 0;
 
             if (reserveMet) {
                 // Slice 1a: bidding concluding with a winner no longer means SOLD - it means the

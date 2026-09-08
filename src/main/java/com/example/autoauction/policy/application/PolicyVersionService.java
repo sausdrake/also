@@ -52,4 +52,16 @@ public class PolicyVersionService {
         return policyVersionRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("PolicyVersion не найдена: " + id));
     }
+
+    /**
+     * Slice 1b-2: the policy new auctions must be created under. Fails closed - no fallback to
+     * a global/live setting, a hardcoded rate, or any previously-published version. Callers
+     * (auction creation) must not catch this and substitute a default.
+     */
+    @Transactional(readOnly = true)
+    public PolicyVersion getCurrentPublished() {
+        return policyVersionRepository.findCurrentPublished()
+                .orElseThrow(() -> new IllegalStateException(
+                        "Нет опубликованной ценовой политики (PolicyVersion) - создание аукциона невозможно"));
+    }
 }

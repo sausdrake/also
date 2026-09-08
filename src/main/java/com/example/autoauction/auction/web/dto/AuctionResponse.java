@@ -93,15 +93,25 @@ public record AuctionResponse(
                 createdAt, confirmedStart, mainPhotoUrl, additionalPhotoUrls, videoUrl, extensionCount, null);
     }
 
-    public static AuctionResponse fromDomain(Auction auction) {
+    /**
+     * Slice 1b-2: reservePrice/buyNowPrice below are, and always have been, buyer-facing values -
+     * the API contract's field names and meanings are unchanged. What changes is how they are
+     * computed: for a legacy auction (policyVersionId == null) Auction's own resolver methods
+     * return the raw stored value unchanged; for a policy-bound auction they apply that
+     * auction's own fixed commissionRate. commissionRate must be resolved by the caller against
+     * this specific auction's policyVersionId (never "current published") - see
+     * AdminAuctionService/PublicAuctionController's resolveCommissionRate helpers - and is
+     * ignored entirely for legacy auctions, so null is always safe to pass for those.
+     */
+    public static AuctionResponse fromDomain(Auction auction, BigDecimal commissionRate) {
         return new AuctionResponse(
                 auction.getId(),
                 auction.getVehicleId(),
                 auction.getVehicleInfo(),
                 auction.getStartingPrice(),
                 auction.getCurrentPrice(),
-                auction.getReservePrice(),
-                auction.getBuyNowPrice(),
+                auction.resolveBuyerFacingReservePrice(commissionRate),
+                auction.resolveBuyerFacingBuyNowPrice(commissionRate),
                 auction.getMinBidStep(),
                 auction.getStartTime(),
                 auction.getEndTime(),

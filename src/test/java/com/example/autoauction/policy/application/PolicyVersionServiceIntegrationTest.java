@@ -100,6 +100,30 @@ class PolicyVersionServiceIntegrationTest {
         assertThrows(IllegalStateException.class, () -> policyVersionService.publish(-1L));
     }
 
+    // ==================== Slice 1b-2: getCurrentPublished() ====================
+    //
+    // These run against the same shared, non-transactional H2 database as the rest of this test
+    // class (see the class Javadoc), so other test methods may have already published policies
+    // before or after this one runs. Assertions are therefore deliberately order-independent:
+    // they never assert an exact identity/versionNumber against "nothing else exists", only
+    // properties that hold regardless of what else has been published (isPublished()==true, and
+    // versionNumber being at least as high as the one this test itself just published, since
+    // getCurrentPublished() is defined as the highest published versionNumber).
+
+    @Test
+    @DisplayName("getCurrentPublished() returns a published PolicyVersion at least as new as one just published")
+    void getCurrentPublished_ShouldReturnAPublishedVersion_NoOlderThanOneJustPublished() {
+        PolicyVersion created = policyVersionService.create(new BigDecimal("0.04"), adminId);
+        PolicyVersion justPublished = policyVersionService.publish(created.getId());
+
+        PolicyVersion current = policyVersionService.getCurrentPublished();
+
+        assertNotNull(current);
+        assertTrue(current.isPublished());
+        assertTrue(current.getVersionNumber() >= justPublished.getVersionNumber(),
+                "getCurrentPublished() must never resolve to an older version than one already published");
+    }
+
     @Test
     @DisplayName("concurrent creation never assigns duplicate version numbers")
     void concurrentCreation_ShouldNeverCollideOnVersionNumber() throws Exception {

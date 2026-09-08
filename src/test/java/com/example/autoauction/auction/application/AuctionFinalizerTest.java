@@ -5,6 +5,8 @@ import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionParticipantRepository;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.deposit.application.DepositService;
+import com.example.autoauction.policy.application.PolicyVersionService;
+import com.example.autoauction.policy.domain.PolicyVersion;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -44,6 +46,9 @@ class AuctionFinalizerTest {
 
     @Mock
     private Clock clock;
+
+    @Mock
+    private PolicyVersionService policyVersionService;
 
     @InjectMocks
     private AuctionFinalizer auctionFinalizer;
@@ -216,6 +221,125 @@ class AuctionFinalizerTest {
             // then - статус не изменился
             assertThat(activeAuction.getStatus()).isEqualTo(AuctionStatus.COMPLETED);
             verify(auctionRepository, never()).save(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("Slice 1b-2: buyer-facing резервная цена при финализации")
+    class PolicyVersionAwareReserveTests {
+
+        @Test
+        @DisplayName("Legacy аукцион (policyVersionId == null) -> сравнение по сырой resertPrice, PolicyVersionService не трогается")
+        void finalizeAuction_LegacyAuction_ComparesRawReservePrice_NeverTouchesPolicyVersionService() {
+            // given: reservePrice=1,200,000 raw, currentPrice meets it exactly
+            assertThat(activeAuction.getPolicyVersionId()).isNull();
+            activeAuction.setTotalBids(3);
+            activeAuction.setCurrentPrice(new BigDecimal("1200000"));
+            activeAuction.setWinnerId(winnerId);
+            activeAuction.setWinningBid(new BigDecimal("1200000"));
+            when(participantRepository.getParticipants(auctionId)).thenReturn(List.of(winnerId));
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            // when
+            boolean result = auctionFinalizer.finalizeAuction(activeAuction);
+
+            // then
+            assertThat(result).isTrue();
+            assertThat(activeAuction.getStatus()).isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
+            verifyNoInteractions(policyVersionService);
+        }
+
+        @Test
+        @DisplayName("Policy-bound аукцион: currentPrice >= raw reserve, но < buyer-facing reserve -> EXPIRED (резерв не достигнут)")
+        void finalizeAuction_PolicyBound_CurrentPriceBelowBuyerFacingReserve_ShouldExpire() {
+            // given: raw reserve 1,000,000, commissionRate 2% -> buyer-facing reserve 1,020,000.00.
+            // currentPrice=1,010,000 clears the RAW reserve but not the buyer-facing one - this is
+            // exactly the scenario Slice 1b-2 must get right: finalization must compare against
+            // the buyer-facing value, not the seller-side stored one.
+            Auction policyBound = new Auction(2L, new BigDecimal("900000"), new BigDecimal("1000000"),
+                    null, new BigDecimal("10000"), fixedTime.minusHours(2), fixedTime.plusHours(2),
+                    sellerId, clock);
+            policyBound.setId(2L);
+            policyBound.setStatus(AuctionStatus.ACTIVE);
+            policyBound.setPolicyVersionId(5L);
+            policyBound.setTotalBids(1);
+            policyBound.setCurrentPrice(new BigDecimal("1010000"));
+            policyBound.setWinnerId(winnerId);
+            policyBound.setWinningBid(new BigDecimal("1010000"));
+
+            when(policyVersionService.getById(5L)).thenReturn(
+                    new PolicyVersion(5L, 1L, new BigDecimal("0.02"), true,
+                            fixedTime, sellerId, fixedTime));
+            when(participantRepository.getParticipants(2L)).thenReturn(List.of(winnerId));
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            // when
+            boolean result = auctionFinalizer.finalizeAuction(policyBound);
+
+            // then
+            assertThat(result).isTrue();
+            assertThat(policyBound.getStatus()).isEqualTo(AuctionStatus.EXPIRED);
+        }
+
+        @Test
+        @DisplayName("Policy-bound аукцион: currentPrice достигает buyer-facing reserve -> WAITING_FOR_PAYMENT")
+        void finalizeAuction_PolicyBound_CurrentPriceMeetsBuyerFacingReserve_ShouldWaitForPayment() {
+            // given: raw reserve 1,000,000 @ 2% -> buyer-facing reserve 1,020,000.00 exactly
+            Auction policyBound = new Auction(2L, new BigDecimal("900000"), new BigDecimal("1000000"),
+                    null, new BigDecimal("10000"), fixedTime.minusHours(2), fixedTime.plusHours(2),
+                    sellerId, clock);
+            policyBound.setId(2L);
+            policyBound.setStatus(AuctionStatus.ACTIVE);
+            policyBound.setPolicyVersionId(5L);
+            policyBound.setTotalBids(1);
+            policyBound.setCurrentPrice(new BigDecimal("1020000.00"));
+            policyBound.setWinnerId(winnerId);
+            policyBound.setWinningBid(new BigDecimal("1020000.00"));
+
+            when(policyVersionService.getById(5L)).thenReturn(
+                    new PolicyVersion(5L, 1L, new BigDecimal("0.02"), true,
+                            fixedTime, sellerId, fixedTime));
+            when(participantRepository.getParticipants(2L)).thenReturn(List.of(winnerId));
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            // when
+            boolean result = auctionFinalizer.finalizeAuction(policyBound);
+
+            // then
+            assertThat(result).isTrue();
+            assertThat(policyBound.getStatus()).isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
+        }
+
+        @Test
+        @DisplayName("Policy A -> Policy B опубликована -> аукцион под A всё ещё резолвится по A, не по текущей опубликованной")
+        void finalizeAuction_PolicyCutover_ShouldStillResolveItsOwnFixedPolicyVersion() {
+            // given: auction bound to Policy A (id=5). Policy B (id=9) has since been published
+            // with a different rate - the finalizer must resolve by the auction's OWN
+            // policyVersionId (5), never by "whatever is currently published".
+            Auction policyBound = new Auction(2L, new BigDecimal("900000"), new BigDecimal("1000000"),
+                    null, new BigDecimal("10000"), fixedTime.minusHours(2), fixedTime.plusHours(2),
+                    sellerId, clock);
+            policyBound.setId(2L);
+            policyBound.setStatus(AuctionStatus.ACTIVE);
+            policyBound.setPolicyVersionId(5L);
+            policyBound.setTotalBids(1);
+            policyBound.setCurrentPrice(new BigDecimal("1020000.00"));
+            policyBound.setWinnerId(winnerId);
+            policyBound.setWinningBid(new BigDecimal("1020000.00"));
+
+            when(policyVersionService.getById(5L)).thenReturn(
+                    new PolicyVersion(5L, 1L, new BigDecimal("0.02"), true,
+                            fixedTime, sellerId, fixedTime));
+            when(participantRepository.getParticipants(2L)).thenReturn(List.of(winnerId));
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            // when
+            auctionFinalizer.finalizeAuction(policyBound);
+
+            // then: resolved specifically by id 5, never by "current published" and never by id 9
+            verify(policyVersionService, times(1)).getById(5L);
+            verify(policyVersionService, never()).getById(9L);
+            verify(policyVersionService, never()).getCurrentPublished();
         }
     }
 }

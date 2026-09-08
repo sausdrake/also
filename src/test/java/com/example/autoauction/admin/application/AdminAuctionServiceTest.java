@@ -6,6 +6,8 @@ import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.auction.web.dto.AuctionCreateRequest;
 import com.example.autoauction.auction.web.dto.AuctionResponse;
+import com.example.autoauction.policy.application.PolicyVersionService;
+import com.example.autoauction.policy.domain.PolicyVersion;
 import com.example.autoauction.vehicle.application.VehicleService;
 import com.example.autoauction.vehicle.domain.FuelType;
 import com.example.autoauction.vehicle.domain.VehicleStatus;
@@ -22,6 +24,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -60,12 +63,16 @@ class AdminAuctionServiceTest {
     @Mock
     private AuctionFinalizer auctionFinalizer;
 
+    @Mock
+    private PolicyVersionService policyVersionService;
+
     @InjectMocks
     private AdminAuctionService adminAuctionService;
 
     private AuctionCreateRequest validRequest;
     private VehicleResponse approvedVehicle;
     private Auction auction;
+    private PolicyVersion currentPolicy;
     private final Long adminId = 1L;
     private final Long diagnosticId = 16L;
     private final String diagnosticName = "diagnostic";
@@ -107,6 +114,15 @@ class AdminAuctionServiceTest {
                 adminId
         );
         auction.setId(1L);
+
+        // Slice 1b-2: a published PolicyVersion, used by every test whose scenario reaches
+        // AdminAuctionService.createAuctionFromRequest (fail-closed - createAuction must never
+        // proceed without one). Not stubbed globally in this @BeforeEach on purpose: several
+        // tests below throw before reaching that point (validator/vehicle/existing-auction
+        // rejections), and MockitoExtension's strict stubbing would flag an unused global stub
+        // as UnnecessaryStubbingException - see BidServiceTest's setUp() for the same convention.
+        currentPolicy = new PolicyVersion(1L, 1L, new BigDecimal("0.05"), true,
+                OffsetDateTime.now(), adminId, OffsetDateTime.now());
     }
 
     @Nested
@@ -121,6 +137,7 @@ class AdminAuctionServiceTest {
             doNothing().when(auctionValidator).validateBusinessRules(any(), any());
             when(vehicleService.getVehicleDetails(1L)).thenReturn(approvedVehicle);
             when(auctionRepository.existsByVehicleIdAndStatusIn(eq(1L), anyList())).thenReturn(false);
+            when(policyVersionService.getCurrentPublished()).thenReturn(currentPolicy);
             when(auctionRepository.save(any(Auction.class))).thenReturn(auction);
 
             // when
@@ -342,6 +359,7 @@ class AdminAuctionServiceTest {
             doNothing().when(auctionValidator).validateBusinessRules(any(), any());
             when(vehicleService.getVehicleDetails(1L)).thenReturn(approvedVehicle);
             when(auctionRepository.existsByVehicleIdAndStatusIn(eq(1L), anyList())).thenReturn(false);
+            when(policyVersionService.getCurrentPublished()).thenReturn(currentPolicy);
             when(auctionRepository.save(any(Auction.class)))
                     .thenThrow(new DataIntegrityViolationException("Duplicate entry for vehicle_id"));
 
@@ -750,6 +768,7 @@ class AdminAuctionServiceTest {
             doNothing().when(auctionValidator).validateBusinessRules(any(), any());
             when(vehicleService.getVehicleDetails(1L)).thenReturn(approvedVehicle);
             when(auctionRepository.existsByVehicleIdAndStatusIn(eq(1L), anyList())).thenReturn(false);
+            when(policyVersionService.getCurrentPublished()).thenReturn(currentPolicy);
             when(auctionRepository.save(any(Auction.class))).thenReturn(auction);
 
             // when
@@ -778,6 +797,7 @@ class AdminAuctionServiceTest {
             doNothing().when(auctionValidator).validateBusinessRules(any(), any());
             when(vehicleService.getVehicleDetails(1L)).thenReturn(approvedVehicle);
             when(auctionRepository.existsByVehicleIdAndStatusIn(eq(1L), anyList())).thenReturn(false);
+            when(policyVersionService.getCurrentPublished()).thenReturn(currentPolicy);
             when(auctionRepository.save(any(Auction.class))).thenReturn(auction);
 
             // when
@@ -804,6 +824,7 @@ class AdminAuctionServiceTest {
             doNothing().when(auctionValidator).validateBusinessRules(any(), any());
             when(vehicleService.getVehicleDetails(1L)).thenReturn(approvedVehicle);
             when(auctionRepository.existsByVehicleIdAndStatusIn(eq(1L), anyList())).thenReturn(false);
+            when(policyVersionService.getCurrentPublished()).thenReturn(currentPolicy);
             when(auctionRepository.save(any(Auction.class))).thenReturn(auction);
 
             // when
@@ -831,6 +852,7 @@ class AdminAuctionServiceTest {
             doNothing().when(auctionValidator).validateBusinessRules(any(), any());
             when(vehicleService.getVehicleDetails(1L)).thenReturn(approvedVehicle);
             when(auctionRepository.existsByVehicleIdAndStatusIn(eq(1L), anyList())).thenReturn(false);
+            when(policyVersionService.getCurrentPublished()).thenReturn(currentPolicy);
             when(auctionRepository.save(any(Auction.class))).thenReturn(auction);
 
             // when
@@ -858,6 +880,7 @@ class AdminAuctionServiceTest {
             doNothing().when(auctionValidator).validateBusinessRules(any(), any());
             when(vehicleService.getVehicleDetails(1L)).thenReturn(approvedVehicle);
             when(auctionRepository.existsByVehicleIdAndStatusIn(eq(1L), anyList())).thenReturn(false);
+            when(policyVersionService.getCurrentPublished()).thenReturn(currentPolicy);
             when(auctionRepository.save(any(Auction.class))).thenReturn(auction);
 
             // when
@@ -866,6 +889,73 @@ class AdminAuctionServiceTest {
             // then
             assertNotNull(response);
             verify(auctionRepository, times(1)).save(any(Auction.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("Slice 1b-2: привязка аукциона к PolicyVersion")
+    class PolicyVersionBindingTests {
+
+        @Test
+        @DisplayName("Нет опубликованной ценовой политики — createAuction fail closed, IllegalStateException")
+        void createAuction_NoPolicyPublished_ShouldFailClosed() {
+            // given
+            doNothing().when(auctionValidator).validateBasicRequest(any());
+            doNothing().when(auctionValidator).validateBusinessRules(any(), any());
+            when(vehicleService.getVehicleDetails(1L)).thenReturn(approvedVehicle);
+            when(auctionRepository.existsByVehicleIdAndStatusIn(eq(1L), anyList())).thenReturn(false);
+            when(policyVersionService.getCurrentPublished())
+                    .thenThrow(new IllegalStateException("Нет опубликованной ценовой политики"));
+
+            // when & then: no silent fallback to a default/global commission rate
+            assertThrows(IllegalStateException.class, () ->
+                    adminAuctionService.createAuction(validRequest, adminId)
+            );
+            verify(auctionRepository, never()).save(any(Auction.class));
+        }
+
+        @Test
+        @DisplayName("Новый аукцион привязывается к id текущей опубликованной PolicyVersion")
+        void createAuction_ShouldBindToCurrentPublishedPolicyVersionId() {
+            // given
+            doNothing().when(auctionValidator).validateBasicRequest(any());
+            doNothing().when(auctionValidator).validateBusinessRules(any(), any());
+            when(vehicleService.getVehicleDetails(1L)).thenReturn(approvedVehicle);
+            when(auctionRepository.existsByVehicleIdAndStatusIn(eq(1L), anyList())).thenReturn(false);
+            when(policyVersionService.getCurrentPublished()).thenReturn(currentPolicy);
+            when(policyVersionService.getById(currentPolicy.getId())).thenReturn(currentPolicy);
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            // when
+            adminAuctionService.createAuction(validRequest, adminId);
+
+            // then: the client cannot influence this - AuctionCreateRequest has no
+            // policyVersionId/commissionRate field, it is resolved purely server-side
+            ArgumentCaptor<Auction> captor = ArgumentCaptor.forClass(Auction.class);
+            verify(auctionRepository).save(captor.capture());
+            assertEquals(currentPolicy.getId(), captor.getValue().getPolicyVersionId());
+        }
+
+        @Test
+        @DisplayName("Ответ на создание отражает buyer-facing цену, вычисленную по конкретной PolicyVersion аукциона")
+        void createAuction_ResponseShouldReflectBuyerFacingPriceForBoundPolicy() {
+            // given: sellerAmount 1,000,000 reserve @ 5% commission -> 1,050,000.00 exact
+            doNothing().when(auctionValidator).validateBasicRequest(any());
+            doNothing().when(auctionValidator).validateBusinessRules(any(), any());
+            when(vehicleService.getVehicleDetails(1L)).thenReturn(approvedVehicle);
+            when(auctionRepository.existsByVehicleIdAndStatusIn(eq(1L), anyList())).thenReturn(false);
+            when(policyVersionService.getCurrentPublished()).thenReturn(currentPolicy);
+            // response mapping resolves the rate via getById(policyVersionId), never
+            // getCurrentPublished() again - this is the call the response path actually makes
+            when(policyVersionService.getById(currentPolicy.getId())).thenReturn(currentPolicy);
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            // when
+            AuctionResponse response = adminAuctionService.createAuction(validRequest, adminId);
+
+            // then
+            assertEquals(0, new BigDecimal("1260000.00").compareTo(response.reservePrice()));
+            assertEquals(0, new BigDecimal("1575000.00").compareTo(response.buyNowPrice()));
         }
     }
 }

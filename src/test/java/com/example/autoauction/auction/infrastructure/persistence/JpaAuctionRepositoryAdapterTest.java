@@ -113,6 +113,33 @@ class JpaAuctionRepositoryAdapterTest {
     }
 
     @Test
+    @DisplayName("Slice 1b-2: policyVersionId не задан (legacy) — сохраняется и читается как null")
+    void save_LegacyAuction_PolicyVersionIdShouldRoundTripAsNull() {
+        Auction auction = buildAuction();
+
+        Auction saved = auctionRepository.save(auction);
+        Optional<Auction> loaded = auctionRepository.findById(saved.getId());
+
+        assertThat(saved.getPolicyVersionId()).isNull();
+        assertThat(loaded).isPresent();
+        assertThat(loaded.get().getPolicyVersionId()).isNull();
+    }
+
+    @Test
+    @DisplayName("Slice 1b-2: policyVersionId сохраняется и читается без запроса к PolicyVersion")
+    void save_PolicyBoundAuction_PolicyVersionIdShouldRoundTrip() {
+        Auction auction = buildAuction();
+        auction.setPolicyVersionId(7L);
+
+        Auction saved = auctionRepository.save(auction);
+        Optional<Auction> loaded = auctionRepository.findById(saved.getId());
+
+        assertThat(saved.getPolicyVersionId()).isEqualTo(7L);
+        assertThat(loaded).isPresent();
+        assertThat(loaded.get().getPolicyVersionId()).isEqualTo(7L);
+    }
+
+    @Test
     @DisplayName("Сохранение с confirmedStart — поле сохраняется корректно")
     void save_ShouldPersistConfirmedStart() {
         Auction auction = buildAuction();

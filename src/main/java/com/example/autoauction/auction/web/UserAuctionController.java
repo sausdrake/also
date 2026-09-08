@@ -2,11 +2,13 @@ package com.example.autoauction.auction.web;
 
 import com.example.autoauction.auth.domain.UserPrincipal;
 import com.example.autoauction.auth.infrastructure.security.CurrentUser;
+import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.auction.web.dto.AuctionResponse;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.deposit.domain.DepositTransaction;
 import com.example.autoauction.deposit.web.dto.DepositTransactionResponse;
+import com.example.autoauction.policy.application.PolicyVersionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +18,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -27,6 +30,19 @@ public class UserAuctionController {
 
     private final AuctionRepository auctionRepository;
     private final DepositService depositService;
+    private final PolicyVersionService policyVersionService;
+
+    /**
+     * Slice 1b-2: resolves the commissionRate needed to compute buyer-facing values for an
+     * already-persisted auction - null for legacy auctions, the specific immutable PolicyVersion
+     * this exact auction was created under otherwise. Never getCurrentPublished().
+     */
+    private BigDecimal resolveCommissionRate(Auction auction) {
+        if (auction.getPolicyVersionId() == null) {
+            return null;
+        }
+        return policyVersionService.getById(auction.getPolicyVersionId()).getCommissionRate();
+    }
 
     @GetMapping("/won")
     @PreAuthorize("isAuthenticated()")
@@ -39,7 +55,7 @@ public class UserAuctionController {
         return auctionRepository.findByWinnerId(
                 principal.getUserId(),
                 PageRequest.of(page, size, Sort.by("id").descending())
-        ).map(AuctionResponse::fromDomain);
+        ).map(auction -> AuctionResponse.fromDomain(auction, resolveCommissionRate(auction)));
     }
 
     @GetMapping("/participated")
@@ -56,7 +72,7 @@ public class UserAuctionController {
         if (auctionIds.isEmpty()) return List.of();
 
         return auctionRepository.findAllById(auctionIds).stream()
-                .map(AuctionResponse::fromDomain)
+                .map(auction -> AuctionResponse.fromDomain(auction, resolveCommissionRate(auction)))
                 .sorted((a, b) -> Long.compare(b.id(), a.id()))
                 .collect(Collectors.toList());
     }

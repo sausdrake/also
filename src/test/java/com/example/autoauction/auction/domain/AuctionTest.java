@@ -225,4 +225,126 @@ class AuctionTest {
         assertEquals(vehicleInfo, auction.getVehicleInfo());
         assertNotNull(auction.getUpdatedAt());
     }
+
+    // ==================== Slice 1b-2: policyVersionId + buyer-facing price resolution ====================
+
+    @Test
+    void policyVersionId_DefaultsToNull() {
+        assertNull(auction.getPolicyVersionId());
+    }
+
+    @Test
+    void setPolicyVersionId_ShouldSetValueAndTouchUpdatedAt() {
+        // given
+        var before = auction.getUpdatedAt();
+
+        // when
+        auction.setPolicyVersionId(42L);
+
+        // then
+        assertEquals(42L, auction.getPolicyVersionId());
+        assertNotNull(auction.getUpdatedAt());
+        assertTrue(!auction.getUpdatedAt().isBefore(before));
+    }
+
+    @Test
+    void resolveBuyerFacingReservePrice_LegacyAuction_ReturnsRawValueUnchanged() {
+        // given: policyVersionId is null (legacy auction, grandfathered)
+        assertNull(auction.getPolicyVersionId());
+
+        // when
+        BigDecimal result = auction.resolveBuyerFacingReservePrice(new BigDecimal("0.05"));
+
+        // then: commissionRate is completely ignored for a legacy auction
+        assertEquals(0, reservePrice.compareTo(result));
+    }
+
+    @Test
+    void resolveBuyerFacingBuyNowPrice_LegacyAuction_ReturnsRawValueUnchanged() {
+        assertNull(auction.getPolicyVersionId());
+
+        BigDecimal result = auction.resolveBuyerFacingBuyNowPrice(new BigDecimal("0.05"));
+
+        assertEquals(0, buyNowPrice.compareTo(result));
+    }
+
+    @Test
+    void resolveBuyerFacingReservePrice_NullReservePrice_ReturnsNullRegardlessOfPolicyBinding() {
+        // given
+        auction.setPolicyVersionId(1L);
+        Auction noReserve = new Auction(vehicleId, startingPrice, null, buyNowPrice, minBidStep,
+                startTime, endTime, createdBy);
+        noReserve.setPolicyVersionId(1L);
+
+        // when & then
+        assertNull(noReserve.resolveBuyerFacingReservePrice(new BigDecimal("0.05")));
+    }
+
+    @Test
+    void resolveBuyerFacingBuyNowPrice_NullBuyNowPrice_ReturnsNullRegardlessOfPolicyBinding() {
+        Auction noBuyNow = new Auction(vehicleId, startingPrice, reservePrice, null, minBidStep,
+                startTime, endTime, createdBy);
+        noBuyNow.setPolicyVersionId(1L);
+
+        assertNull(noBuyNow.resolveBuyerFacingBuyNowPrice(new BigDecimal("0.05")));
+    }
+
+    @Test
+    void resolveBuyerFacingReservePrice_PolicyBound_AppliesCommissionMarkup() {
+        // given: 1,000,000 seller-side @ 2% commission -> 1,020,000.00 buyer-facing, exact
+        Auction policyBound = new Auction(vehicleId, new BigDecimal("1000000"),
+                new BigDecimal("1000000"), null, minBidStep, startTime, endTime, createdBy);
+        policyBound.setPolicyVersionId(7L);
+
+        // when
+        BigDecimal result = policyBound.resolveBuyerFacingReservePrice(new BigDecimal("0.02"));
+
+        // then
+        assertEquals(0, new BigDecimal("1020000.00").compareTo(result));
+        assertEquals(2, result.scale());
+    }
+
+    @Test
+    void resolveBuyerFacingBuyNowPrice_PolicyBound_RoundsHalfUp_UpwardCase() {
+        // given: 333,333 seller-side @ 2.5% commission -> 341,666.325 -> HALF_UP -> 341,666.33
+        Auction policyBound = new Auction(vehicleId, new BigDecimal("300000"), null,
+                new BigDecimal("333333"), minBidStep, startTime, endTime, createdBy);
+        policyBound.setPolicyVersionId(7L);
+
+        // when
+        BigDecimal result = policyBound.resolveBuyerFacingBuyNowPrice(new BigDecimal("0.025"));
+
+        // then
+        assertEquals(0, new BigDecimal("341666.33").compareTo(result));
+    }
+
+    @Test
+    void resolveBuyerFacingBuyNowPrice_PolicyBound_RoundsHalfUp_DownwardCase() {
+        // given: 100 seller-side @ 2.001% commission -> 102.001 -> HALF_UP -> 102.00 (rounds down)
+        Auction policyBound = new Auction(vehicleId, new BigDecimal("50"), null,
+                new BigDecimal("100"), minBidStep, startTime, endTime, createdBy);
+        policyBound.setPolicyVersionId(7L);
+
+        // when
+        BigDecimal result = policyBound.resolveBuyerFacingBuyNowPrice(new BigDecimal("0.02001"));
+
+        // then
+        assertEquals(0, new BigDecimal("102.00").compareTo(result));
+    }
+
+    @Test
+    void resolveBuyerFacingReservePrice_PolicyBound_NullCommissionRate_ThrowsNullPointerException() {
+        // given: policy-bound auction must never silently default a missing commissionRate
+        auction.setPolicyVersionId(1L);
+
+        // when & then
+        assertThrows(NullPointerException.class, () -> auction.resolveBuyerFacingReservePrice(null));
+    }
+
+    @Test
+    void resolveBuyerFacingBuyNowPrice_PolicyBound_NullCommissionRate_ThrowsNullPointerException() {
+        auction.setPolicyVersionId(1L);
+
+        assertThrows(NullPointerException.class, () -> auction.resolveBuyerFacingBuyNowPrice(null));
+    }
 }

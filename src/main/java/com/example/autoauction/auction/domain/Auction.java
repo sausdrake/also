@@ -23,6 +23,20 @@ public class Auction {
     private BigDecimal minBidStep;
 
     /**
+     * Slice 1b-2: reference to the immutable PolicyVersion this auction was created under.
+     * {@code null} means a legacy, pre-feature auction, grandfathered under the old semantics
+     * where {@link #reservePrice}/{@link #buyNowPrice} are themselves already buyer-facing.
+     * Non-null means a policy-bound auction, where {@link #reservePrice}/{@link #buyNowPrice}
+     * store the SELLER-side amount, and the buyer-facing value must be derived via
+     * {@link #resolveBuyerFacingReservePrice(BigDecimal)}/{@link #resolveBuyerFacingBuyNowPrice(BigDecimal)}.
+     * commissionRate itself is deliberately NOT stored here (no denormalized copy) - every
+     * consumer resolves it fresh via the immutable PolicyVersion referenced by this id, which
+     * can never change once published (see the Slice 1b-2 architecture lock for why
+     * denormalization was rejected).
+     */
+    private Long policyVersionId;
+
+    /**
      * Фиксированная сумма депозита, требуемая для участия в ЭТОМ аукционе, задаётся
      * администратором индивидуально для каждого лота (НЕ процент от startingPrice).
      * Nullable для обратной совместимости с уже существующими записями аукционов,
@@ -169,6 +183,7 @@ public class Auction {
     public BigDecimal getReservePrice() { return reservePrice; }
     public BigDecimal getBuyNowPrice() { return buyNowPrice; }
     public BigDecimal getMinBidStep() { return minBidStep; }
+    public Long getPolicyVersionId() { return policyVersionId; }
     public BigDecimal getRequiredDepositAmount() { return requiredDepositAmount; }
     public OffsetDateTime getStartTime() { return startTime; }
     public OffsetDateTime getEndTime() { return endTime; }
@@ -270,6 +285,59 @@ public class Auction {
         }
         this.requiredDepositAmount = requiredDepositAmount;
         this.updatedAt = now();
+    }
+
+    /**
+     * Slice 1b-2: plain setter, matching this class's existing single-call-site discipline
+     * (see {@link #setRequiredDepositAmount}'s own Javadoc for the identical pattern) rather
+     * than a stricter no-setter design - the only legitimate call sites in the entire codebase
+     * are (1) AdminAuctionService, exactly once, immediately after constructing a brand-new
+     * auction and resolving its PolicyVersion, and (2) AuctionMapper.toDomain(), exactly once,
+     * restoring the persisted value when reconstructing an existing auction. Business rule:
+     * once assigned, this value must NEVER be reassigned - no business operation in this
+     * codebase calls this method a second time on the same auction, but that is a documented
+     * discipline, not a structurally-enforced one, consistent with the level of protection
+     * every other similarly-critical field on this class (winnerId, winningBid,
+     * requiredDepositAmount) already has.
+     */
+    public void setPolicyVersionId(Long policyVersionId) {
+        this.policyVersionId = policyVersionId;
+        this.updatedAt = now();
+    }
+
+    /**
+     * Slice 1b-2: buyer-facing reserve. For a legacy auction ({@link #policyVersionId} null),
+     * {@link #reservePrice} is already buyer-facing and is returned unchanged - commissionRate
+     * is never dereferenced in this branch. For a policy-bound auction, {@link #reservePrice}
+     * is the seller amount, and commissionRate (resolved by the caller from this auction's own
+     * immutable PolicyVersion - never a live/global setting) is required, not optional.
+     */
+    public BigDecimal resolveBuyerFacingReservePrice(BigDecimal commissionRate) {
+        if (reservePrice == null) return null;
+        if (policyVersionId == null) return reservePrice;
+        Objects.requireNonNull(commissionRate, "commissionRate обязателен для policy-bound аукциона");
+        return applyCommissionMarkup(reservePrice, commissionRate);
+    }
+
+    /**
+     * Slice 1b-2: buyer-facing Buy Now amount. Same legacy/policy-bound split as
+     * {@link #resolveBuyerFacingReservePrice(BigDecimal)}.
+     */
+    public BigDecimal resolveBuyerFacingBuyNowPrice(BigDecimal commissionRate) {
+        if (buyNowPrice == null) return null;
+        if (policyVersionId == null) return buyNowPrice;
+        Objects.requireNonNull(commissionRate, "commissionRate обязателен для policy-bound аукциона");
+        return applyCommissionMarkup(buyNowPrice, commissionRate);
+    }
+
+    /**
+     * Single authoritative markup calculation, used by both resolver methods above - the only
+     * place `sellerAmount * (1 + commissionRate)` is ever computed in this codebase. scale=2,
+     * HALF_UP, per the locked monetary rounding rule. No floating-point arithmetic.
+     */
+    private static BigDecimal applyCommissionMarkup(BigDecimal sellerAmount, BigDecimal commissionRate) {
+        return sellerAmount.multiply(BigDecimal.ONE.add(commissionRate))
+                .setScale(2, RoundingMode.HALF_UP);
     }
 
     public void setClock(Clock clock) {

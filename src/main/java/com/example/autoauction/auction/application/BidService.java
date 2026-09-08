@@ -9,6 +9,7 @@ import com.example.autoauction.auction.web.AuctionWebSocketController;
 import com.example.autoauction.auction.web.dto.BidResponse;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.notification.application.NotificationService;
+import com.example.autoauction.policy.application.PolicyVersionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -32,6 +33,7 @@ public class BidService {
     private final RateLimitService rateLimitService;
     private final AuctionWebSocketController webSocketController;
     private final NotificationService notificationService;
+    private final PolicyVersionService policyVersionService;
 
     public BidService(AuctionRepository auctionRepository,
                       DepositService depositService,
@@ -39,7 +41,8 @@ public class BidService {
                       AuctionFinalizer auctionFinalizer,
                       RateLimitService rateLimitService,
                       AuctionWebSocketController webSocketController,
-                      NotificationService notificationService) {
+                      NotificationService notificationService,
+                      PolicyVersionService policyVersionService) {
         this.auctionRepository = auctionRepository;
         this.depositService = depositService;
         this.participantRepository = participantRepository;
@@ -47,7 +50,23 @@ public class BidService {
         this.rateLimitService = rateLimitService;
         this.webSocketController = webSocketController;
         this.notificationService = notificationService;
+        this.policyVersionService = policyVersionService;
         log.info("BidService initialized with WebSocket and Notification support");
+    }
+
+    /**
+     * Slice 1b-2: resolves the buyer-facing Buy Now amount that must actually be charged for
+     * THIS auction - the raw stored value unchanged for a legacy auction, or the value computed
+     * against this auction's own fixed policyVersionId for a policy-bound one. Never
+     * PolicyVersionService.getCurrentPublished() - an auction's commission is fixed forever at
+     * creation time.
+     */
+    private BigDecimal resolveBuyerFacingBuyNowPrice(Auction auction) {
+        if (auction.getPolicyVersionId() == null) {
+            return auction.getBuyNowPrice();
+        }
+        BigDecimal commissionRate = policyVersionService.getById(auction.getPolicyVersionId()).getCommissionRate();
+        return auction.resolveBuyerFacingBuyNowPrice(commissionRate);
     }
 
     @Transactional
@@ -109,14 +128,16 @@ public class BidService {
 
         participantRepository.registerParticipant(auctionId, buyerId, requiredDeposit);
 
-        auctionFinalizer.finalizeWithBuyNow(auction, buyerId, auction.getBuyNowPrice());
+        BigDecimal buyerFacingBuyNowPrice = resolveBuyerFacingBuyNowPrice(auction);
+
+        auctionFinalizer.finalizeWithBuyNow(auction, buyerId, buyerFacingBuyNowPrice);
 
         // ✅ Отправляем WebSocket уведомление о Buy Now
-        webSocketController.sendBuyNowNotification(auctionId, buyerId, auction.getBuyNowPrice());
+        webSocketController.sendBuyNowNotification(auctionId, buyerId, buyerFacingBuyNowPrice);
         webSocketController.sendAuctionUpdate(auction, "BUY_NOW");
 
         log.info("Аукцион {} завершен по Buy Now. Покупатель: {}", auctionId, buyerId);
-        return BidResponse.fromDomain(auction, auction.getBuyNowPrice(), true, false);
+        return BidResponse.fromDomain(auction, buyerFacingBuyNowPrice, true, false);
     }
 
     @Transactional

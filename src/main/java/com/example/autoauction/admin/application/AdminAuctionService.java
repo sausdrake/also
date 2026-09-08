@@ -9,6 +9,8 @@ import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.auction.web.dto.AuctionCreateRequest;
 import com.example.autoauction.auction.web.dto.AuctionResponse;
 import com.example.autoauction.deposit.application.DepositService;
+import com.example.autoauction.policy.application.PolicyVersionService;
+import com.example.autoauction.policy.domain.PolicyVersion;
 import com.example.autoauction.user.application.UserService;
 import com.example.autoauction.vehicle.application.VehicleService;
 import com.example.autoauction.vehicle.domain.VehicleStatus;
@@ -39,6 +41,7 @@ public class AdminAuctionService {
     private final AuctionParticipantRepository participantRepository;
     private final DepositService depositService;
     private final UserService userService;
+    private final PolicyVersionService policyVersionService;
 
     public AdminAuctionService(AuctionRepository auctionRepository,
                                VehicleService vehicleService,
@@ -47,7 +50,8 @@ public class AdminAuctionService {
                                SystemSettingsService settingsService,
                                AuctionParticipantRepository participantRepository,
                                DepositService depositService,
-                               UserService userService) {
+                               UserService userService,
+                               PolicyVersionService policyVersionService) {
         this.auctionFinalizer = auctionFinalizer;
         this.auctionRepository = auctionRepository;
         this.vehicleService = vehicleService;
@@ -56,6 +60,7 @@ public class AdminAuctionService {
         this.participantRepository = participantRepository;
         this.depositService = depositService;
         this.userService = userService;
+        this.policyVersionService = policyVersionService;
         log.info("AdminAuctionService инициализирован");
     }
 
@@ -119,7 +124,7 @@ public class AdminAuctionService {
             }
             log.info("Аукцион успешно создан! ID: {}, vehicleId: {}, статус: {}",
                     saved.getId(), saved.getVehicleId(), saved.getStatus());
-            return AuctionResponse.fromDomain(saved);
+            return AuctionResponse.fromDomain(saved, resolveCommissionRate(saved));
 
         } catch (DataIntegrityViolationException e) {
             log.error("Конфликт при создании аукциона для vehicleId: {}", request.vehicleId());
@@ -149,7 +154,7 @@ public class AdminAuctionService {
         }
 
         auctionFinalizer.finalizeAuction(auction);
-        return AuctionResponse.fromDomain(auction);
+        return AuctionResponse.fromDomain(auction, resolveCommissionRate(auction));
     }
 
     private VehicleResponse getValidatedVehicle(Long vehicleId) {
@@ -208,7 +213,54 @@ public class AdminAuctionService {
             auction.setAdditionalPhotoUrls(request.additionalPhotoUrls());
         }
 
+        // Slice 1b-2: every NEW auction is bound to the currently published PolicyVersion.
+        // Fail closed (PolicyVersionService.getCurrentPublished() throws) if none is published -
+        // never falls back to a live/global setting, a hardcoded rate, or a previous version.
+        // The client cannot influence this: AuctionCreateRequest has no policyVersionId or
+        // commissionRate field to bind to.
+        PolicyVersion currentPolicy = policyVersionService.getCurrentPublished();
+        auction.setPolicyVersionId(currentPolicy.getId());
+        validatePolicyAwarePrices(auction, currentPolicy.getCommissionRate());
+
         return auction;
+    }
+
+    /**
+     * Slice 1b-2: the policy-aware companion to Auction's own raw validatePrices() (which
+     * remains unchanged and still runs inside the constructor as a baseline sanity check on
+     * the seller-side numbers). This check compares the actual buyer-facing thresholds -
+     * derived via Auction's own resolver methods, the single authoritative formula - against
+     * startingPrice. Mirrors the existing raw checks exactly (reserve >= starting, buyNow >
+     * starting), just against the buyer-facing value instead of the raw stored one.
+     */
+    private void validatePolicyAwarePrices(Auction auction, BigDecimal commissionRate) {
+        BigDecimal buyerReserve = auction.resolveBuyerFacingReservePrice(commissionRate);
+        if (buyerReserve != null && buyerReserve.compareTo(auction.getStartingPrice()) < 0) {
+            throw new IllegalArgumentException(
+                    String.format("Резервная цена для покупателя (%s) не может быть меньше стартовой цены (%s)",
+                            buyerReserve, auction.getStartingPrice()));
+        }
+
+        BigDecimal buyerBuyNow = auction.resolveBuyerFacingBuyNowPrice(commissionRate);
+        if (buyerBuyNow != null && buyerBuyNow.compareTo(auction.getStartingPrice()) <= 0) {
+            throw new IllegalArgumentException(
+                    String.format("Цена мгновенной покупки для покупателя (%s) должна быть больше стартовой цены (%s)",
+                            buyerBuyNow, auction.getStartingPrice()));
+        }
+    }
+
+    /**
+     * Slice 1b-2: resolves the commissionRate needed to compute buyer-facing values for an
+     * already-persisted auction - null for legacy auctions (Auction's own resolver methods
+     * short-circuit before touching it), the specific immutable PolicyVersion this exact
+     * auction was created under otherwise. Never getCurrentPublished() - an existing auction's
+     * commission is fixed forever at creation time, regardless of what is published later.
+     */
+    private BigDecimal resolveCommissionRate(Auction auction) {
+        if (auction.getPolicyVersionId() == null) {
+            return null;
+        }
+        return policyVersionService.getById(auction.getPolicyVersionId()).getCommissionRate();
     }
 
     // ============ ОБНОВЛЁННЫЕ МЕТОДЫ С ПАГИНАЦИЕЙ ============
@@ -216,7 +268,8 @@ public class AdminAuctionService {
     @Transactional(readOnly = true)
     public Page<AuctionResponse> getAllAuctions(Pageable pageable) {
         log.debug("=== ПОЛУЧЕНИЕ ВСЕХ АУКЦИОНОВ С ПАГИНАЦИЕЙ ===");
-        return auctionRepository.findAllWithPagination(pageable).map(AuctionResponse::fromDomain);
+        return auctionRepository.findAllWithPagination(pageable)
+                .map(auction -> AuctionResponse.fromDomain(auction, resolveCommissionRate(auction)));
     }
 
     // Старый метод для обратной совместимости (если нужен)
@@ -224,7 +277,7 @@ public class AdminAuctionService {
     public List<AuctionResponse> getAllAuctions() {
         log.debug("=== ПОЛУЧЕНИЕ ВСЕХ АУКЦИОНОВ ===");
         return auctionRepository.findAll().stream()
-                .map(AuctionResponse::fromDomain)
+                .map(auction -> AuctionResponse.fromDomain(auction, resolveCommissionRate(auction)))
                 .collect(Collectors.toList());
     }
 
@@ -235,7 +288,7 @@ public class AdminAuctionService {
                 .map(auction -> {
                     log.debug("Аукцион найден: ID={}, vehicleId={}, статус={}",
                             auction.getId(), auction.getVehicleId(), auction.getStatus());
-                    return AuctionResponse.fromDomain(auction);
+                    return AuctionResponse.fromDomain(auction, resolveCommissionRate(auction));
                 })
                 .orElseThrow(() -> {
                     log.error("Аукцион не найден: {}", id);
@@ -266,7 +319,7 @@ public class AdminAuctionService {
         if (saved == null) {
             throw new IllegalStateException("Не удалось сохранить аукцион после запуска");
         }
-        return AuctionResponse.fromDomain(saved);
+        return AuctionResponse.fromDomain(saved, resolveCommissionRate(saved));
     }
 
     @Transactional
@@ -291,7 +344,7 @@ public class AdminAuctionService {
         auctionFinalizer.cancelAuction(auction);
         log.info("Аукцион отменен, новый статус: {}", auction.getStatus());
 
-        return AuctionResponse.fromDomain(auction);
+        return AuctionResponse.fromDomain(auction, resolveCommissionRate(auction));
     }
 
     // Обновлённый метод с пагинацией
@@ -300,7 +353,7 @@ public class AdminAuctionService {
         try {
             AuctionStatus auctionStatus = AuctionStatus.valueOf(status.toUpperCase());
             return auctionRepository.findByStatusWithPagination(auctionStatus, pageable)
-                    .map(AuctionResponse::fromDomain);
+                    .map(auction -> AuctionResponse.fromDomain(auction, resolveCommissionRate(auction)));
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Неверный статус аукциона: " + status);
         }
@@ -312,7 +365,7 @@ public class AdminAuctionService {
         try {
             AuctionStatus auctionStatus = AuctionStatus.valueOf(status.toUpperCase());
             return auctionRepository.findByStatus(auctionStatus).stream()
-                    .map(AuctionResponse::fromDomain)
+                    .map(auction -> AuctionResponse.fromDomain(auction, resolveCommissionRate(auction)))
                     .collect(Collectors.toList());
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Неверный статус аукциона: " + status);
@@ -325,7 +378,8 @@ public class AdminAuctionService {
         Auction auction = auctionRepository.findByIdWithLock(id)
                 .orElseThrow(() -> new IllegalArgumentException("Аукцион с ID " + id + " не найден"));
         auction.confirmStart(confirmHours);
-        return AuctionResponse.fromDomain(auctionRepository.save(auction));
+        Auction saved = auctionRepository.save(auction);
+        return AuctionResponse.fromDomain(saved, resolveCommissionRate(saved));
     }
 
     @Transactional
@@ -334,7 +388,8 @@ public class AdminAuctionService {
         return auctionRepository.findAllById(ids).stream()
                 .map(auction -> {
                     auction.confirmStart(confirmHours);
-                    return AuctionResponse.fromDomain(auctionRepository.save(auction));
+                    Auction saved = auctionRepository.save(auction);
+                    return AuctionResponse.fromDomain(saved, resolveCommissionRate(saved));
                 })
                 .collect(Collectors.toList());
     }
@@ -343,7 +398,7 @@ public class AdminAuctionService {
     public List<AuctionResponse> getAuctionsByVehicleId(Long vehicleId) {
         log.debug("=== ПОЛУЧЕНИЕ АУКЦИОНОВ ПО ID АВТОМОБИЛЯ: {} ===", vehicleId);
         return auctionRepository.findByVehicleId(vehicleId).stream()
-                .map(AuctionResponse::fromDomain)
+                .map(auction -> AuctionResponse.fromDomain(auction, resolveCommissionRate(auction)))
                 .collect(Collectors.toList());
     }
 
