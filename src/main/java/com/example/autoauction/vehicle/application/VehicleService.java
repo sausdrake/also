@@ -317,6 +317,25 @@ public class VehicleService {
     }
 
     /**
+     * Vehicle Auction-State Wiring: transitions a Vehicle from APPROVED to IN_AUCTION when its
+     * auction actually starts. Deliberately NOT idempotent - Vehicle.markInAuction()'s own
+     * guard (only APPROVED -> IN_AUCTION) is preserved unchanged; a second call against an
+     * already-IN_AUCTION vehicle fails closed by design. Called exclusively from
+     * AuctionFinalizer.startAuction(), always after Auction.start() has already succeeded in
+     * the same transaction - see that method's own Javadoc for why a second call for the same
+     * auction can never reach this method in the first place, making idempotency unnecessary
+     * here.
+     */
+    @Transactional
+    public void markInAuction(Long vehicleId) {
+        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> new IllegalArgumentException("Автомобиль не найден: " + vehicleId));
+        vehicle.markInAuction();
+        vehicleRepository.save(vehicle);
+        log.info("Vehicle {} marked IN_AUCTION", vehicleId);
+    }
+
+    /**
      * Создать Vehicle автоматически при одобрении диагностического отчёта.
      * Данные берутся из диагностической заявки.
      */

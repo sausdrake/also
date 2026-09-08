@@ -11,7 +11,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -73,9 +72,22 @@ public class AuctionCompletionScheduler {
         log.info("Finalized {} expired auctions", count);
     }
 
-    /** Каждую минуту: запускаем подтверждённые CREATED-аукционы, у которых startTime <= now */
+    /**
+     * Каждую минуту: запускаем подтверждённые CREATED-аукционы, у которых startTime <= now.
+     *
+     * Vehicle Auction-State Wiring: deliberately NOT @Transactional at this level, for the
+     * same R-3 reason as completeExpiredAuctions()/cancelUnconfirmedAuctions() above -
+     * AuctionFinalizer.startAuction() is independently @Transactional (REQUIRED) and is called
+     * here as a genuine external bean call, so each auction (and its atomic Vehicle
+     * APPROVED->IN_AUCTION transition) gets its own physical transaction. Without this, every
+     * startAuction() call in the loop would join the SAME physical transaction under the
+     * previous method-level @Transactional, and one auction's optimistic-lock conflict on
+     * save() could mark that shared transaction rollback-only, silently reverting every other
+     * auction already started in the same invocation - the exact defect already fixed for the
+     * two sibling methods (see AuctionCompletionSchedulerTransactionIsolationIntegrationTest /
+     * AuctionFinalizationSchedulerTransactionIsolationIntegrationTest), now closed here too.
+     */
     @Scheduled(fixedDelay = 60_000)
-    @Transactional
     public void startConfirmedAuctions() {
         OffsetDateTime now = OffsetDateTime.now();
         List<Auction> ready = auctionRepository.findConfirmedAuctionsReadyToStart(now);
@@ -84,8 +96,7 @@ public class AuctionCompletionScheduler {
 
         for (Auction auction : ready) {
             try {
-                auction.start();
-                auctionRepository.save(auction);
+                auctionFinalizer.startAuction(auction);
                 log.info("Auction {} auto-started (confirmed)", auction.getId());
             } catch (Exception e) {
                 log.error("Failed to auto-start auction {}: {}", auction.getId(), e.getMessage());

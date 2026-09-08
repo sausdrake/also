@@ -340,14 +340,19 @@ public class AdminAuctionService {
         }
 
         log.debug("Текущий статус аукциона: {}", auction.getStatus());
-        auction.start();
+        // Vehicle Auction-State Wiring: delegates the actual CREATED->ACTIVE transition (and
+        // the atomic Vehicle APPROVED->IN_AUCTION transition that must accompany it) to
+        // AuctionFinalizer.startAuction, the single shared owner of this logic - matching how
+        // cancelAuction()/completeAuction() below already delegate to auctionFinalizer instead
+        // of duplicating transition logic here. The ACTIVE pre-check above is kept exactly as
+        // it was (not folded into the shared method) to preserve this method's existing,
+        // test-verified "Аукцион уже запущен" message specifically for that one status - every
+        // other invalid status still falls through to Auction.start()'s own generic message,
+        // unchanged.
+        auctionFinalizer.startAuction(auction);
         log.info("Аукцион запущен, новый статус: {}", auction.getStatus());
 
-        Auction saved = auctionRepository.save(auction);
-        if (saved == null) {
-            throw new IllegalStateException("Не удалось сохранить аукцион после запуска");
-        }
-        return AuctionResponse.fromDomain(saved, resolveCommissionRate(saved));
+        return AuctionResponse.fromDomain(auction, resolveCommissionRate(auction));
     }
 
     @Transactional

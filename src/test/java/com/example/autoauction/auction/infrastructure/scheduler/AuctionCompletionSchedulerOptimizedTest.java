@@ -137,11 +137,15 @@ class AuctionCompletionSchedulerOptimizedTest {
 
         when(auctionRepository.findConfirmedAuctionsReadyToStart(any(OffsetDateTime.class)))
                 .thenReturn(List.of(confirmed));
-        when(auctionRepository.save(any())).thenReturn(confirmed);
 
         scheduler.startConfirmedAuctions();
 
+        // Vehicle Auction-State Wiring: the scheduler now delegates the actual start (and its
+        // atomic Vehicle transition) to AuctionFinalizer.startAuction() - matching how
+        // cancelUnconfirmedAuctions() above delegates to cancelAuction() - rather than calling
+        // auction.start()+auctionRepository.save() directly.
         verify(auctionRepository).findConfirmedAuctionsReadyToStart(any(OffsetDateTime.class));
-        verify(auctionRepository).save(confirmed);
+        verify(auctionFinalizer).startAuction(confirmed);
+        verify(auctionRepository, never()).save(any());
     }
 }

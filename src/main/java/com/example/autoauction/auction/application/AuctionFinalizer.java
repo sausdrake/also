@@ -9,6 +9,7 @@ import com.example.autoauction.auction.web.AuctionWebSocketController;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.notification.application.NotificationService;
 import com.example.autoauction.policy.application.PolicyVersionService;
+import com.example.autoauction.vehicle.application.VehicleService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,7 @@ public class AuctionFinalizer {
     private final NotificationService notificationService;
     private final Clock clock;
     private final PolicyVersionService policyVersionService;
+    private final VehicleService vehicleService;
 
     public AuctionFinalizer(AuctionRepository auctionRepository,
                             DepositService depositService,
@@ -36,7 +38,8 @@ public class AuctionFinalizer {
                             AuctionWebSocketController webSocketController,
                             NotificationService notificationService,
                             Clock clock,
-                            PolicyVersionService policyVersionService) {
+                            PolicyVersionService policyVersionService,
+                            VehicleService vehicleService) {
         this.auctionRepository = auctionRepository;
         this.depositService = depositService;
         this.participantRepository = participantRepository;
@@ -44,6 +47,7 @@ public class AuctionFinalizer {
         this.notificationService = notificationService;
         this.clock = clock;
         this.policyVersionService = policyVersionService;
+        this.vehicleService = vehicleService;
     }
 
     /**
@@ -205,6 +209,40 @@ public class AuctionFinalizer {
 
         log.info("Auction {} finalized with status: {}", auction.getId(), finalStatus);
         return true;
+    }
+
+    /**
+     * Vehicle Auction-State Wiring: the single-auction, atomic Auction+Vehicle transition for
+     * CREATED -> ACTIVE. Called from both production paths that ever call Auction.start()
+     * (AdminAuctionService.startAuction, which fetches with a pessimistic lock via
+     * findByIdWithLock before calling this; AuctionCompletionScheduler.startConfirmedAuctions,
+     * which passes an Auction from its own unlocked bulk read) - each call gets its own
+     * independent transaction, since neither caller wraps this call in an ambient transaction
+     * of its own spanning multiple auctions. This mirrors the R-3 precedent already
+     * established for finalizeAuction/cancelAuction, called the same way from
+     * completeExpiredAuctions/cancelUnconfirmedAuctions.
+     *
+     * Ordering is mandatory and enforced by plain statement order, not a new guard:
+     * auction.start() runs first and throws its own existing IllegalStateException, unchanged,
+     * if the auction is not CREATED - vehicleService.markInAuction() is never reached in that
+     * case. Vehicle.markInAuction() is deliberately left non-idempotent (its own existing
+     * guard, unchanged) - a second start attempt against an already-ACTIVE auction fails at
+     * the very first line, before ever touching Vehicle, so no idempotency is needed on the
+     * Vehicle side to satisfy that requirement.
+     *
+     * Both mutations and both saves happen inside this one @Transactional (REQUIRED) boundary:
+     * a failure on either side - the domain guard throwing, or either save() throwing (e.g. an
+     * optimistic-lock conflict on Auction's own @Version) - rolls back the whole transaction,
+     * so Auction and Vehicle can never diverge. No REQUIRES_NEW, no Vehicle-side locking - both
+     * deliberately out of scope for this slice; safety comes entirely from sharing one
+     * transaction plus Auction's existing @Version check.
+     */
+    @Transactional
+    public void startAuction(Auction auction) {
+        auction.start();
+        vehicleService.markInAuction(auction.getVehicleId());
+        auctionRepository.save(auction);
+        log.info("Auction {} started, vehicle {} marked IN_AUCTION", auction.getId(), auction.getVehicleId());
     }
 
     @Transactional

@@ -380,7 +380,15 @@ class AdminAuctionServiceTest {
         void startAuction_WhenCreated_ShouldSucceed() {
             // given
             when(auctionRepository.findByIdWithLock(1L)).thenReturn(Optional.of(auction));
-            when(auctionRepository.save(any(Auction.class))).thenReturn(auction);
+            // Vehicle Auction-State Wiring: startAuction now delegates the actual transition to
+            // AuctionFinalizer.startAuction (mocked here) - matching the existing
+            // cancelAuction()-delegation tests' pattern below, the mock must actually invoke
+            // Auction.start() on the passed-in object to observe the real status change.
+            doAnswer(inv -> {
+                Auction a = inv.getArgument(0);
+                a.start();
+                return null;
+            }).when(auctionFinalizer).startAuction(any(Auction.class));
 
             // when
             AuctionResponse response = adminAuctionService.startAuction(1L, adminId);
@@ -388,7 +396,7 @@ class AdminAuctionServiceTest {
             // then
             assertEquals(AuctionStatus.ACTIVE, response.status());
             verify(auctionRepository, times(1)).findByIdWithLock(1L);
-            verify(auctionRepository, times(1)).save(any(Auction.class));
+            verify(auctionFinalizer, times(1)).startAuction(auction);
         }
 
         @ParameterizedTest
@@ -410,6 +418,17 @@ class AdminAuctionServiceTest {
             auctionWithInvalidStatus.setStatus(status);
 
             when(auctionRepository.findByIdWithLock(1L)).thenReturn(Optional.of(auctionWithInvalidStatus));
+            if (status != AuctionStatus.ACTIVE) {
+                // AdminAuctionService's own ACTIVE pre-check short-circuits before ever
+                // delegating to AuctionFinalizer.startAuction - only non-ACTIVE statuses reach
+                // the delegated call, whose mock must actually invoke Auction.start() so its
+                // own generic-message guard can throw exactly as before this slice.
+                doAnswer(inv -> {
+                    Auction a = inv.getArgument(0);
+                    a.start();
+                    return null;
+                }).when(auctionFinalizer).startAuction(any(Auction.class));
+            }
 
             // when & then
             IllegalStateException exception = assertThrows(IllegalStateException.class, () ->

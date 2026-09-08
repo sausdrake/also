@@ -7,11 +7,13 @@ import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.policy.application.PolicyVersionService;
 import com.example.autoauction.policy.domain.PolicyVersion;
+import com.example.autoauction.vehicle.application.VehicleService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -49,6 +51,9 @@ class AuctionFinalizerTest {
 
     @Mock
     private PolicyVersionService policyVersionService;
+
+    @Mock
+    private VehicleService vehicleService;
 
     @InjectMocks
     private AuctionFinalizer auctionFinalizer;
@@ -175,6 +180,99 @@ class AuctionFinalizerTest {
             verify(auctionRepository, never()).save(any());
             verify(participantRepository, never()).clearParticipants(anyLong());
             verifyNoInteractions(depositService);
+        }
+    }
+
+    @Nested
+    @DisplayName("Vehicle Auction-State Wiring: запуск аукциона (startAuction)")
+    class StartAuctionTests {
+
+        private Auction createdAuction;
+        private final Long vehicleId = 5L;
+
+        @BeforeEach
+        void setUpCreatedAuction() {
+            createdAuction = new Auction(
+                    vehicleId,
+                    startingPrice,
+                    new BigDecimal("1200000"),
+                    new BigDecimal("1500000"),
+                    new BigDecimal("10000"),
+                    fixedTime.plusHours(1),
+                    fixedTime.plusDays(7),
+                    sellerId,
+                    clock
+            );
+            createdAuction.setId(2L);
+        }
+
+        @Test
+        @DisplayName("CREATED auction -> Auction.start() выполняется ДО VehicleService.markInAuction(), которое выполняется ДО save (порядок обязателен)")
+        void startAuction_ValidCreatedAuction_EnforcesMandatoryOrdering() {
+            // given
+            java.util.concurrent.atomic.AtomicReference<AuctionStatus> statusAtVehicleCallTime =
+                    new java.util.concurrent.atomic.AtomicReference<>();
+            doAnswer(inv -> {
+                // Captures Auction's status at the exact moment VehicleService is invoked -
+                // direct proof that Auction.start() already ran, not an inference.
+                statusAtVehicleCallTime.set(createdAuction.getStatus());
+                return null;
+            }).when(vehicleService).markInAuction(vehicleId);
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            // when
+            auctionFinalizer.startAuction(createdAuction);
+
+            // then
+            assertThat(statusAtVehicleCallTime.get())
+                    .as("Auction.start() must have already run before VehicleService.markInAuction() is called")
+                    .isEqualTo(AuctionStatus.ACTIVE);
+            assertThat(createdAuction.getStatus()).isEqualTo(AuctionStatus.ACTIVE);
+
+            InOrder inOrder = inOrder(vehicleService, auctionRepository);
+            inOrder.verify(vehicleService).markInAuction(vehicleId);
+            inOrder.verify(auctionRepository).save(createdAuction);
+        }
+
+        @Test
+        @DisplayName("Уже ACTIVE auction -> Auction.start() бросает ДО обращения к VehicleService (non-idempotent, guard сохранён)")
+        void startAuction_AlreadyActiveAuction_ThrowsBeforeTouchingVehicle() {
+            // given
+            createdAuction.setStatus(AuctionStatus.ACTIVE);
+
+            // when & then
+            assertThatThrownBy(() -> auctionFinalizer.startAuction(createdAuction))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Невозможно запустить аукцион");
+
+            // Vehicle.markInAuction() must never be reached for a second start attempt - this
+            // is exactly what makes idempotency on the Vehicle side unnecessary (locked
+            // decisions 2 and 3): the Auction guard alone prevents a repeat call.
+            verifyNoInteractions(vehicleService);
+            verify(auctionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("VehicleService.markInAuction() выбрасывает исключение -> оно распространяется наружу, Auction не сохраняется")
+        void startAuction_VehicleTransitionFails_PropagatesExceptionAndNeverSavesAuction() {
+            // given
+            doThrow(new IllegalStateException("Only APPROVED can be moved to auction"))
+                    .when(vehicleService).markInAuction(vehicleId);
+
+            // when & then
+            assertThatThrownBy(() -> auctionFinalizer.startAuction(createdAuction))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Only APPROVED can be moved to auction");
+
+            // Auction.start() already ran in-memory before the failure, but the exception is
+            // not swallowed anywhere (not into a FailedOperation, not logged-and-continued) -
+            // it propagates straight out, and auctionRepository.save() (which runs after the
+            // Vehicle call) is never reached. Real transactional rollback of the in-memory
+            // Auction.start() effect is proven separately by a dedicated integration test
+            // (this Mockito test cannot exercise a real transaction), but this proves the
+            // failure is never masked and the Auction side is never persisted when Vehicle
+            // fails.
+            verify(auctionRepository, never()).save(any());
         }
     }
 
