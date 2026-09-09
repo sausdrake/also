@@ -97,6 +97,20 @@ public class SaleCommitmentResolutionOrchestrator {
         BigDecimal feeAmount = (outcome == FinalizationOutcome.B)
                 ? commitment.getDiagnosticFeeAmount()
                 : BigDecimal.ZERO;
+
+        // X3-D corrective: mirrors SellerDiagnosticCommitmentFinalizationService.finalizeAsOutcomeB's
+        // own guard exactly (same invariant, same exception type, same position - before any
+        // refund/finalizedAt computation, before the claim, before any ledger mutation). Not
+        // merely "insurance against a hypothetical future regression": committedAmount and
+        // diagnosticFeeAmount are two independently admin-configured SystemSettings values with
+        // no cross-field validation at creation time, so this is a real, currently-reachable
+        // misconfiguration this orchestrator must not silently propagate into a negative refund.
+        if (feeAmount.compareTo(committedAmount) > 0) {
+            throw new IllegalStateException(
+                    "Commitment " + sellerDiagnosticCommitmentId + " has diagnosticFeeAmount (" + feeAmount +
+                            ") exceeding committedAmount (" + committedAmount + ") - refusing to finalize");
+        }
+
         BigDecimal penaltyAmount = BigDecimal.ZERO;
         BigDecimal refundAmount = committedAmount.subtract(feeAmount);
         OffsetDateTime finalizedAt = OffsetDateTime.now();

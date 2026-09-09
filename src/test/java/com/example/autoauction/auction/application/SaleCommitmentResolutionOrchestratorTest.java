@@ -95,6 +95,20 @@ class SaleCommitmentResolutionOrchestratorTest {
             verify(depositService).chargeForDiagnosticRequest(DEPOSIT_ID, DIAGNOSTIC_REQUEST_ID,
                     new BigDecimal("10000"), new BigDecimal("4000"));
         }
+
+        @Test
+        @DisplayName("X3-D corrective (C1): diagnosticFeeAmount > committedAmount -> IllegalStateException, no claim, no ledger mutation")
+        void resolve_OutcomeB_FeeExceedsCommittedAmount_FailsClosedBeforeClaim() {
+            commitment.setDiagnosticFeeAmount(new BigDecimal("15000")); // > committedAmount (10000)
+            when(commitmentRepository.findById(COMMITMENT_ID)).thenReturn(Optional.of(commitment));
+
+            assertThatThrownBy(() -> orchestrator.resolve(COMMITMENT_ID, FinalizationOutcome.B))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("exceeding committedAmount");
+
+            verify(commitmentRepository, never()).finalize(any(), any(), any(), any(), any());
+            verifyNoInteractions(depositService);
+        }
     }
 
     @Nested

@@ -43,6 +43,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * X3-D: real-database, end-to-end proof that resolving an Auction's sale outcome
@@ -67,6 +68,8 @@ class SaleCommitmentResolutionIntegrationTest {
     private AuctionFinalizer auctionFinalizer;
     @Autowired
     private SaleFailureResolutionOrchestrator saleFailureResolutionOrchestrator;
+    @Autowired
+    private com.example.autoauction.admin.application.AdminAuctionService adminAuctionService;
     @Autowired
     private SaleCommitmentResolutionOrchestrator saleCommitmentResolutionOrchestrator;
     @Autowired
@@ -379,6 +382,111 @@ class SaleCommitmentResolutionIntegrationTest {
         assertThat(resolution.getFinancialResolutionStatus()).isEqualTo(FinancialResolutionStatus.PENDING);
     }
 
+    // ==================== C1: fail-closed accounting guard (real DB) ====================
+
+    @Test
+    @DisplayName("X3-D corrective (C1): diagnosticFeeAmount > committedAmount -> fail closed, commitment stays AWAITING_FINALIZATION, no ledger mutation, no partial Auction/Vehicle/SaleResolution state")
+    void resolveSaleFailure_OutcomeB_FeeExceedsCommittedAmount_FailsClosedWithFullRollback() {
+        // freezeCommitment() itself has no cross-field validation preventing this (confirmed by
+        // discovery: committedAmount/diagnosticFeeAmount are two independently admin-configured
+        // SystemSettings values) - constructed here through the REAL production service call,
+        // not by bypassing it.
+        Setup setup = approveAndGetVehicleWithCommitment(new BigDecimal("10000"), new BigDecimal("15000"));
+        long winnerId = uniqueWinnerId();
+        Long auctionId = createWaitingForPaymentAuctionWithCommitment(setup.vehicleId(), setup.commitmentId(), winnerId, new BigDecimal("1020000"));
+        freezeAndMarkWinner(winnerId, auctionId, new BigDecimal("50000"));
+
+        assertThatThrownBy(() -> txTemplate().execute(status -> {
+            Auction locked = auctionRepository.findByIdWithLock(auctionId).orElseThrow();
+            saleFailureResolutionOrchestrator.resolveSaleFailure(locked, SaleResolutionResult.B, null, "no-sale", 1L);
+            return null;
+        })).isInstanceOf(IllegalStateException.class).hasMessageContaining("exceeding committedAmount");
+
+        // Fresh reads, outside the failed transaction - full rollback proof.
+        Auction persistedAuction = auctionRepository.findById(auctionId).orElseThrow();
+        assertThat(persistedAuction.getStatus()).isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
+
+        Vehicle persistedVehicle = vehicleRepository.findById(setup.vehicleId()).orElseThrow();
+        assertThat(persistedVehicle.getStatus()).isEqualTo(com.example.autoauction.vehicle.domain.VehicleStatus.IN_AUCTION);
+
+        SellerDiagnosticCommitment commitment = sellerDiagnosticCommitmentRepository.findById(setup.commitmentId()).orElseThrow();
+        assertThat(commitment.getStatus()).isEqualTo(CommitmentStatus.AWAITING_FINALIZATION);
+        assertThat(commitment.getFinalizationOutcome()).isNull();
+
+        assertThat(saleResolutionRepository.findByAuctionId(auctionId)).isEmpty();
+
+        Deposit winnerDeposit = depositRepository.findByUserId(winnerId).orElseThrow();
+        assertThat(winnerDeposit.getBlockedAmount()).isEqualByComparingTo("50000");
+    }
+
+    // ==================== C3: commitment in the wrong state (FROZEN) ====================
+
+    @Test
+    @DisplayName("X3-D corrective (C3): commitment FROZEN (not yet AWAITING_FINALIZATION) -> fail closed, no ledger mutation, no partial Auction/Vehicle/SaleResolution state")
+    void resolveSaleFailure_CommitmentStillFrozen_FailsClosedWithFullRollback() {
+        // A commitment left at its natural creation-time status (FROZEN) - never approved or
+        // rejected, so markAwaitingFinalization never ran. Attached to an independently-created
+        // manual vehicle/auction (not the vehicle this diagnostic request actually belongs to) -
+        // deliberately constructing a state X3-C's own creation-time eligibility check would
+        // never itself allow, specifically to prove SaleCommitmentResolutionOrchestrator's own
+        // independent AWAITING_FINALIZATION-only defense, not a realistic linkage.
+        long sellerId = 900_000L + (System.nanoTime() % 100_000L);
+        txTemplate().execute(status -> {
+            depositService.createDeposit(sellerId, new BigDecimal("50000"));
+            return null;
+        });
+        Long requestId = txTemplate().execute(status -> {
+            DiagnosticRequest request = new DiagnosticRequest();
+            request.setUserId(sellerId);
+            request.setBrand("BMW");
+            request.setModel("X5");
+            request.setYear(2022);
+            request.setVin("X3DFROZEN" + (System.nanoTime() % 100000000L));
+            request.setDepositFrozen(new BigDecimal("10000"));
+            request.setStatus(DiagnosticRequest.DiagnosticRequestStatus.PENDING);
+            request.setCreatedAt(OffsetDateTime.now());
+            request.setUpdatedAt(OffsetDateTime.now());
+            return diagnosticRequestRepository.save(request).getId();
+        });
+        Long frozenCommitmentId = txTemplate().execute(status -> {
+            sellerDiagnosticCommitmentService.freezeCommitment(sellerId, requestId, new BigDecimal("10000"), new BigDecimal("4000"));
+            return sellerDiagnosticCommitmentRepository.findByDiagnosticRequestId(requestId).orElseThrow().getId();
+        });
+        SellerDiagnosticCommitment frozen = sellerDiagnosticCommitmentRepository.findById(frozenCommitmentId).orElseThrow();
+        assertThat(frozen.getStatus()).isEqualTo(CommitmentStatus.FROZEN);
+
+        Vehicle manual = new Vehicle("Lada", "Vesta", 2022, "X3DFROZ" + (System.nanoTime() % 100000L),
+                com.example.autoauction.vehicle.domain.VehicleType.SEDAN, 1L, "diagnostic");
+        manual.submitForReview();
+        manual.approve(999L, "admin");
+        manual.markInAuction();
+        Long vehicleId = txTemplate().execute(status -> vehicleRepository.save(manual).getId());
+
+        long winnerId = uniqueWinnerId();
+        Long auctionId = createWaitingForPaymentAuctionWithCommitment(vehicleId, frozenCommitmentId, winnerId, new BigDecimal("1020000"));
+        freezeAndMarkWinner(winnerId, auctionId, new BigDecimal("50000"));
+
+        assertThatThrownBy(() -> txTemplate().execute(status -> {
+            Auction locked = auctionRepository.findByIdWithLock(auctionId).orElseThrow();
+            saleFailureResolutionOrchestrator.resolveSaleFailure(locked, SaleResolutionResult.B, null, "no-sale", 1L);
+            return null;
+        })).isInstanceOf(IllegalStateException.class).hasMessageContaining("не готов к финализации");
+
+        Auction persistedAuction = auctionRepository.findById(auctionId).orElseThrow();
+        assertThat(persistedAuction.getStatus()).isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
+
+        Vehicle persistedVehicle = vehicleRepository.findById(vehicleId).orElseThrow();
+        assertThat(persistedVehicle.getStatus()).isEqualTo(com.example.autoauction.vehicle.domain.VehicleStatus.IN_AUCTION);
+
+        SellerDiagnosticCommitment stillFrozen = sellerDiagnosticCommitmentRepository.findById(frozenCommitmentId).orElseThrow();
+        assertThat(stillFrozen.getStatus()).isEqualTo(CommitmentStatus.FROZEN);
+
+        assertThat(saleResolutionRepository.findByAuctionId(auctionId)).isEmpty();
+
+        Deposit winnerDeposit = depositRepository.findByUserId(winnerId).orElseThrow();
+        assertThat(winnerDeposit.getBlockedAmount()).isEqualByComparingTo("50000");
+    }
+
     // ==================== Coexistence with diagnostic-rejection trigger ====================
 
     @Test
@@ -459,5 +567,106 @@ class SaleCommitmentResolutionIntegrationTest {
                         && ("DIAGNOSTIC_" + setup.requestId()).equals(t.getReference()))
                 .count();
         assertThat(refundTransactions).isEqualTo(1);
+    }
+
+    // ==================== C4: releaseWinner status-guard matrix (real DB) ====================
+
+    /** A plain, commitment-less auction (unrelated to X3-D's own commitment-linkage concern -
+     *  releaseWinner's guard is status-only) with a real winner + real frozen deposit, in the
+     *  given status, ready for adminAuctionService.releaseWinner(auctionId). */
+    private Long createAuctionWithStatusAndFrozenWinner(AuctionStatus status, Long winnerId, BigDecimal amount) {
+        Vehicle manual = new Vehicle("Lada", "Vesta", 2022, "X3DRW" + (System.nanoTime() % 100000000L),
+                com.example.autoauction.vehicle.domain.VehicleType.SEDAN, 1L, "diagnostic");
+        manual.submitForReview();
+        manual.approve(999L, "admin");
+        manual.markInAuction();
+        Long vehicleId = txTemplate().execute(s -> vehicleRepository.save(manual).getId());
+
+        Long auctionId = txTemplate().execute(s -> {
+            OffsetDateTime now = OffsetDateTime.now();
+            Auction auction = new Auction(vehicleId, new BigDecimal("1000000"), null, null,
+                    new BigDecimal("10000"), now.minusDays(7), now.minusHours(1), 10L);
+            auction.setStatus(status);
+            auction.setWinnerId(winnerId);
+            auction.setWinningBid(new BigDecimal("1020000"));
+            return auctionRepository.save(auction).getId();
+        });
+
+        freezeAndMarkWinner(winnerId, auctionId, amount);
+        return auctionId;
+    }
+
+    @Test
+    @DisplayName("X3-D corrective (C4): releaseWinner rejects ACTIVE - deposit stays frozen")
+    void releaseWinner_Active_RejectedDepositUntouched() {
+        long winnerId = uniqueWinnerId();
+        Long auctionId = createAuctionWithStatusAndFrozenWinner(AuctionStatus.ACTIVE, winnerId, new BigDecimal("50000"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> adminAuctionService.releaseWinner(auctionId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("исход ещё не определён");
+
+        Deposit deposit = depositRepository.findByUserId(winnerId).orElseThrow();
+        assertThat(deposit.getBlockedAmount()).isEqualByComparingTo("50000");
+    }
+
+    @Test
+    @DisplayName("X3-D corrective (C4): releaseWinner rejects WAITING_FOR_PAYMENT - deposit stays frozen")
+    void releaseWinner_WaitingForPayment_RejectedDepositUntouched() {
+        long winnerId = uniqueWinnerId();
+        Long auctionId = createAuctionWithStatusAndFrozenWinner(AuctionStatus.WAITING_FOR_PAYMENT, winnerId, new BigDecimal("50000"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> adminAuctionService.releaseWinner(auctionId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("исход ещё не определён");
+
+        Deposit deposit = depositRepository.findByUserId(winnerId).orElseThrow();
+        assertThat(deposit.getBlockedAmount()).isEqualByComparingTo("50000");
+    }
+
+    @Test
+    @DisplayName("X3-D corrective (C4): releaseWinner preserves existing behavior for legacy COMPLETED - deposit released")
+    @SuppressWarnings("deprecation")
+    void releaseWinner_LegacyCompleted_AllowedDepositReleased() {
+        long winnerId = uniqueWinnerId();
+        Long auctionId = createAuctionWithStatusAndFrozenWinner(AuctionStatus.COMPLETED, winnerId, new BigDecimal("50000"));
+
+        txTemplate().execute(s -> {
+            adminAuctionService.releaseWinner(auctionId);
+            return null;
+        });
+
+        Deposit deposit = depositRepository.findByUserId(winnerId).orElseThrow();
+        assertThat(deposit.getBlockedAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    @DisplayName("X3-D corrective (C4): releaseWinner preserves existing behavior for SOLD - deposit released")
+    void releaseWinner_Sold_AllowedDepositReleased() {
+        long winnerId = uniqueWinnerId();
+        Long auctionId = createAuctionWithStatusAndFrozenWinner(AuctionStatus.SOLD, winnerId, new BigDecimal("50000"));
+
+        txTemplate().execute(s -> {
+            adminAuctionService.releaseWinner(auctionId);
+            return null;
+        });
+
+        Deposit deposit = depositRepository.findByUserId(winnerId).orElseThrow();
+        assertThat(deposit.getBlockedAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    @DisplayName("X3-D corrective (C4): releaseWinner preserves existing behavior for SALE_FAILED - deposit released")
+    void releaseWinner_SaleFailed_AllowedDepositReleased() {
+        long winnerId = uniqueWinnerId();
+        Long auctionId = createAuctionWithStatusAndFrozenWinner(AuctionStatus.SALE_FAILED, winnerId, new BigDecimal("50000"));
+
+        txTemplate().execute(s -> {
+            adminAuctionService.releaseWinner(auctionId);
+            return null;
+        });
+
+        Deposit deposit = depositRepository.findByUserId(winnerId).orElseThrow();
+        assertThat(deposit.getBlockedAmount()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 }
