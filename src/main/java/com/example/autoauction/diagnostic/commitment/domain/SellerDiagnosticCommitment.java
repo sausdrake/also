@@ -22,6 +22,15 @@ import java.time.OffsetDateTime;
  * settlement field remain out-of-aggregate scope, deliberately not introduced here - see
  * the Phase 3 business-rule freeze for why commission/payment belong to a separate
  * Settlement concern, never to this entity.
+ *
+ * X3-E: adds policyVersionId - the PolicyVersion published at the moment
+ * freezeCommitment() ran, snapshotted once and never re-read or reassigned afterward. This
+ * is the diagnostic/commitment-stage policy reference, deliberately independent from
+ * Auction.policyVersionId (its own, separately-snapshotted-at-auction-creation-time
+ * reference) - the two are allowed to diverge (locked X3-E business decision) and are never
+ * synchronized. Nullable at the column level only because commitments frozen before X3-E
+ * predate this field and are never backfilled - the diagnostic-stage seller-violation
+ * trigger fails closed for those rows.
  */
 @Data
 public class SellerDiagnosticCommitment {
@@ -36,4 +45,5 @@ public class SellerDiagnosticCommitment {
     private OffsetDateTime finalizedAt;
     private BigDecimal penaltyAmount;
     private BigDecimal refundAmount;
+    private Long policyVersionId;
 }

@@ -5,7 +5,9 @@ import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.deposit.application.DepositService;
+import com.example.autoauction.diagnostic.commitment.application.SellerViolationResolutionEngine;
 import com.example.autoauction.diagnostic.commitment.domain.FinalizationOutcome;
+import com.example.autoauction.diagnostic.commitment.domain.TriggerSource;
 import com.example.autoauction.sale.application.SaleResolutionService;
 import com.example.autoauction.sale.domain.FaultParty;
 import com.example.autoauction.sale.domain.SaleResolution;
@@ -14,6 +16,8 @@ import com.example.autoauction.vehicle.application.VehicleService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 /**
  * X3-A (SALE_FAILED outcomes) / X3-D (seller commitment consequence): the single authoritative
@@ -59,17 +63,20 @@ public class SaleFailureResolutionOrchestrator {
     private final SaleResolutionService saleResolutionService;
     private final DepositService depositService;
     private final SaleCommitmentResolutionOrchestrator saleCommitmentResolutionOrchestrator;
+    private final SellerViolationResolutionEngine sellerViolationResolutionEngine;
 
     public SaleFailureResolutionOrchestrator(AuctionRepository auctionRepository,
                                               VehicleService vehicleService,
                                               SaleResolutionService saleResolutionService,
                                               DepositService depositService,
-                                              SaleCommitmentResolutionOrchestrator saleCommitmentResolutionOrchestrator) {
+                                              SaleCommitmentResolutionOrchestrator saleCommitmentResolutionOrchestrator,
+                                              SellerViolationResolutionEngine sellerViolationResolutionEngine) {
         this.auctionRepository = auctionRepository;
         this.vehicleService = vehicleService;
         this.saleResolutionService = saleResolutionService;
         this.depositService = depositService;
         this.saleCommitmentResolutionOrchestrator = saleCommitmentResolutionOrchestrator;
+        this.sellerViolationResolutionEngine = sellerViolationResolutionEngine;
     }
 
     /**
@@ -84,10 +91,15 @@ public class SaleFailureResolutionOrchestrator {
      */
     @Transactional
     public void resolveSaleFailure(Auction auction, SaleResolutionResult outcome, FaultParty faultParty,
-                                    String failureReason, Long resolvedBy) {
+                                    String failureReason, Long resolvedBy, List<Long> violationDefinitionIds) {
         if (outcome == SaleResolutionResult.SUCCESS) {
             throw new IllegalArgumentException(
                     "resolveSaleFailure() не принимает SUCCESS - успешная продажа обрабатывается AuctionFinalizer.completeSale()");
+        }
+        // X3-E: violationDefinitionIds is exclusively a C concept - any non-empty value for
+        // B/BUYER_FAULT/PLATFORM_FAULT is a caller error, rejected before touching anything.
+        if (outcome != SaleResolutionResult.C && violationDefinitionIds != null && !violationDefinitionIds.isEmpty()) {
+            throw new IllegalArgumentException("violationDefinitionIds допустим только для outcome=C");
         }
         if (auction.getStatus() != AuctionStatus.WAITING_FOR_PAYMENT) {
             throw new IllegalStateException(
@@ -119,15 +131,24 @@ public class SaleFailureResolutionOrchestrator {
             default -> throw new IllegalArgumentException("Неподдерживаемый outcome для resolveSaleFailure: " + outcome);
         }
 
-        // X3-D: seller commitment consequence + financialResolutionStatus, for the outcomes
-        // this slice supports (B, BUYER_FAULT, PLATFORM_FAULT). Outcome C is explicitly
-        // excluded here - no seller-violation policy exists yet, so financialResolutionStatus
-        // deliberately stays PENDING and the commitment (if any) stays AWAITING_FINALIZATION,
-        // both honestly reflecting that C's seller consequence remains unresolved pending that
-        // future slice. Uses ONLY auction.getSellerDiagnosticCommitmentId() - never
-        // Vehicle/DiagnosticRequest/VIN/latest-commitment re-resolution.
-        if (outcome != SaleResolutionResult.C) {
-            if (auction.getSellerDiagnosticCommitmentId() != null) {
+        // X3-D/X3-E: seller commitment consequence + financialResolutionStatus, for every
+        // outcome this method supports - B/BUYER_FAULT/PLATFORM_FAULT resolve via the existing
+        // SaleCommitmentResolutionOrchestrator (A/B only); C (X3-E) resolves via the shared
+        // SellerViolationResolutionEngine, using Auction.policyVersionId as its policy
+        // snapshot (locked X3-E business decision - the post-auction trigger's own reference,
+        // deliberately independent from SellerDiagnosticCommitment.policyVersionId). Uses
+        // ONLY auction.getSellerDiagnosticCommitmentId() - never Vehicle/DiagnosticRequest/
+        // VIN/latest-commitment re-resolution.
+        if (auction.getSellerDiagnosticCommitmentId() != null) {
+            if (outcome == SaleResolutionResult.C) {
+                if (violationDefinitionIds == null || violationDefinitionIds.isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "violationDefinitionIds обязателен для Outcome C, когда у аукциона есть seller commitment");
+                }
+                sellerViolationResolutionEngine.resolve(auction.getSellerDiagnosticCommitmentId(),
+                        auction.getPolicyVersionId(), violationDefinitionIds, resolvedBy,
+                        TriggerSource.SALE_FAILED_C, auction.getId());
+            } else {
                 FinalizationOutcome commitmentOutcome = (outcome == SaleResolutionResult.B)
                         ? FinalizationOutcome.B
                         : FinalizationOutcome.A;
@@ -138,9 +159,7 @@ public class SaleFailureResolutionOrchestrator {
 
         auctionRepository.save(auction);
 
-        if (outcome != SaleResolutionResult.C) {
-            saleResolutionService.markFinancialResolutionDone(resolution.getId());
-        }
+        saleResolutionService.markFinancialResolutionDone(resolution.getId());
 
         log.info("Auction {} resolved as SALE_FAILED: outcome={}, faultParty={}, vehicle={}, winner={}",
                 auction.getId(), outcome, faultParty, vehicleId, winnerId);

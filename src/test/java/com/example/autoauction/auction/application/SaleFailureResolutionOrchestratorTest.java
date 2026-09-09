@@ -5,7 +5,9 @@ import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.deposit.application.DepositService;
+import com.example.autoauction.diagnostic.commitment.application.SellerViolationResolutionEngine;
 import com.example.autoauction.diagnostic.commitment.domain.FinalizationOutcome;
+import com.example.autoauction.diagnostic.commitment.domain.TriggerSource;
 import com.example.autoauction.sale.application.SaleResolutionService;
 import com.example.autoauction.sale.domain.FaultParty;
 import com.example.autoauction.sale.domain.SaleResolution;
@@ -46,6 +48,9 @@ class SaleFailureResolutionOrchestratorTest {
     @Mock
     private SaleCommitmentResolutionOrchestrator saleCommitmentResolutionOrchestrator;
 
+    @Mock
+    private SellerViolationResolutionEngine sellerViolationResolutionEngine;
+
     @InjectMocks
     private SaleFailureResolutionOrchestrator orchestrator;
 
@@ -85,7 +90,7 @@ class SaleFailureResolutionOrchestratorTest {
         @DisplayName("outcome=SUCCESS -> IllegalArgumentException до обращения к коллабораторам")
         void resolveSaleFailure_Success_RejectedBeforeTouchingCollaborators() {
             assertThatThrownBy(() -> orchestrator.resolveSaleFailure(
-                    waitingAuction, SaleResolutionResult.SUCCESS, null, null, resolvedBy))
+                    waitingAuction, SaleResolutionResult.SUCCESS, null, null, resolvedBy, null))
                     .isInstanceOf(IllegalArgumentException.class);
 
             verifyNoInteractions(saleResolutionService, vehicleService, depositService);
@@ -98,7 +103,7 @@ class SaleFailureResolutionOrchestratorTest {
             waitingAuction.setStatus(AuctionStatus.ACTIVE);
 
             assertThatThrownBy(() -> orchestrator.resolveSaleFailure(
-                    waitingAuction, SaleResolutionResult.B, null, null, resolvedBy))
+                    waitingAuction, SaleResolutionResult.B, null, null, resolvedBy, null))
                     .isInstanceOf(IllegalStateException.class);
 
             verifyNoInteractions(saleResolutionService, vehicleService, depositService);
@@ -111,7 +116,7 @@ class SaleFailureResolutionOrchestratorTest {
             waitingAuction.setStatus(AuctionStatus.SALE_FAILED);
 
             assertThatThrownBy(() -> orchestrator.resolveSaleFailure(
-                    waitingAuction, SaleResolutionResult.B, null, null, resolvedBy))
+                    waitingAuction, SaleResolutionResult.B, null, null, resolvedBy, null))
                     .isInstanceOf(IllegalStateException.class);
 
             verifyNoInteractions(saleResolutionService, vehicleService, depositService);
@@ -130,7 +135,7 @@ class SaleFailureResolutionOrchestratorTest {
                     .thenReturn(stubResolution(SaleResolutionResult.B, null));
             when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            orchestrator.resolveSaleFailure(waitingAuction, SaleResolutionResult.B, null, null, resolvedBy);
+            orchestrator.resolveSaleFailure(waitingAuction, SaleResolutionResult.B, null, null, resolvedBy, null);
 
             assertThat(waitingAuction.getStatus()).isEqualTo(AuctionStatus.SALE_FAILED);
 
@@ -161,7 +166,7 @@ class SaleFailureResolutionOrchestratorTest {
                     .thenReturn(stubResolution(SaleResolutionResult.BUYER_FAULT, FaultParty.BUYER));
             when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            orchestrator.resolveSaleFailure(waitingAuction, SaleResolutionResult.BUYER_FAULT, FaultParty.BUYER, null, resolvedBy);
+            orchestrator.resolveSaleFailure(waitingAuction, SaleResolutionResult.BUYER_FAULT, FaultParty.BUYER, null, resolvedBy, null);
 
             verify(vehicleService, times(1)).returnToApproved(vehicleId);
             verify(depositService, times(1)).confiscateToPlatform(waitingAuction.getId(), winnerId);
@@ -184,7 +189,7 @@ class SaleFailureResolutionOrchestratorTest {
                     .thenReturn(stubResolution(SaleResolutionResult.PLATFORM_FAULT, FaultParty.PLATFORM));
             when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            orchestrator.resolveSaleFailure(waitingAuction, SaleResolutionResult.PLATFORM_FAULT, FaultParty.PLATFORM, null, resolvedBy);
+            orchestrator.resolveSaleFailure(waitingAuction, SaleResolutionResult.PLATFORM_FAULT, FaultParty.PLATFORM, null, resolvedBy, null);
 
             verify(vehicleService, times(1)).markNeedsRediagnostic(vehicleId);
             verify(depositService, times(1)).unblockForSaleFailure(waitingAuction.getId(), winnerId);
@@ -200,34 +205,67 @@ class SaleFailureResolutionOrchestratorTest {
     class OutcomeCTests {
 
         @Test
-        @DisplayName("C -> markNeedsRediagnostic + unblockForSaleFailure (никогда confiscateToPlatform)")
+        @DisplayName("C -> markNeedsRediagnostic + unblockForSaleFailure (никогда confiscateToPlatform); " +
+                "нет commitment -> financialResolutionStatus всё равно DONE (нечего разрешать)")
         void resolveSaleFailure_OutcomeC_DispatchesRediagnosticAndUnblock() {
+            SaleResolution resolution = new SaleResolution(9L, waitingAuction.getId(), SaleResolutionResult.C,
+                    null, FaultParty.SELLER, resolvedBy, fixedTime, null, null,
+                    com.example.autoauction.sale.domain.FinancialResolutionStatus.PENDING, fixedTime);
             when(saleResolutionService.createFailure(waitingAuction.getId(), SaleResolutionResult.C,
                     FaultParty.SELLER, null, resolvedBy))
-                    .thenReturn(stubResolution(SaleResolutionResult.C, FaultParty.SELLER));
+                    .thenReturn(resolution);
             when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            orchestrator.resolveSaleFailure(waitingAuction, SaleResolutionResult.C, FaultParty.SELLER, null, resolvedBy);
+            orchestrator.resolveSaleFailure(waitingAuction, SaleResolutionResult.C, FaultParty.SELLER, null, resolvedBy, null);
 
             verify(vehicleService, times(1)).markNeedsRediagnostic(vehicleId);
             verify(depositService, times(1)).unblockForSaleFailure(waitingAuction.getId(), winnerId);
             verify(vehicleService, never()).returnToApproved(any());
             verify(depositService, never()).confiscateToPlatform(any(), any());
+            verifyNoInteractions(sellerViolationResolutionEngine);
+            verify(saleResolutionService, times(1)).markFinancialResolutionDone(9L);
         }
 
         @Test
-        @DisplayName("X3-D: C никогда не финализирует commitment и никогда не переводит financialResolutionStatus в DONE (даже если commitment существует)")
-        void resolveSaleFailure_OutcomeC_NeverTouchesCommitmentOrFinancialStatus() {
+        @DisplayName("X3-E: C + commitment существует, но violationDefinitionIds не передан -> IllegalArgumentException до обращения к engine")
+        void resolveSaleFailure_OutcomeC_WithCommitmentNoViolationIds_ThrowsBeforeTouchingEngine() {
             waitingAuction.setSellerDiagnosticCommitmentId(777L);
             when(saleResolutionService.createFailure(waitingAuction.getId(), SaleResolutionResult.C,
                     FaultParty.SELLER, null, resolvedBy))
                     .thenReturn(stubResolution(SaleResolutionResult.C, FaultParty.SELLER));
+
+            assertThatThrownBy(() -> orchestrator.resolveSaleFailure(
+                    waitingAuction, SaleResolutionResult.C, FaultParty.SELLER, null, resolvedBy, null))
+                    .isInstanceOf(IllegalArgumentException.class);
+
+            verifyNoInteractions(sellerViolationResolutionEngine);
+            verify(auctionRepository, never()).save(any());
+            verify(saleResolutionService, never()).markFinancialResolutionDone(any());
+        }
+
+        @Test
+        @DisplayName("X3-E: C + commitment существует + violationDefinitionIds передан -> resolve через SellerViolationResolutionEngine " +
+                "с Auction.policyVersionId, затем save + markFinancialResolutionDone (порядок обязателен)")
+        void resolveSaleFailure_OutcomeC_WithCommitmentAndViolationIds_ResolvesViaEngine() {
+            waitingAuction.setSellerDiagnosticCommitmentId(777L);
+            waitingAuction.setPolicyVersionId(42L);
+            java.util.List<Long> violationIds = java.util.List.of(1L, 2L);
+            SaleResolution resolution = new SaleResolution(9L, waitingAuction.getId(), SaleResolutionResult.C,
+                    null, FaultParty.SELLER, resolvedBy, fixedTime, null, null,
+                    com.example.autoauction.sale.domain.FinancialResolutionStatus.PENDING, fixedTime);
+            when(saleResolutionService.createFailure(waitingAuction.getId(), SaleResolutionResult.C,
+                    FaultParty.SELLER, null, resolvedBy))
+                    .thenReturn(resolution);
             when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            orchestrator.resolveSaleFailure(waitingAuction, SaleResolutionResult.C, FaultParty.SELLER, null, resolvedBy);
+            orchestrator.resolveSaleFailure(waitingAuction, SaleResolutionResult.C, FaultParty.SELLER, null, resolvedBy, violationIds);
 
+            InOrder inOrder = inOrder(sellerViolationResolutionEngine, auctionRepository, saleResolutionService);
+            inOrder.verify(sellerViolationResolutionEngine).resolve(777L, 42L, violationIds, resolvedBy,
+                    TriggerSource.SALE_FAILED_C, waitingAuction.getId());
+            inOrder.verify(auctionRepository).save(waitingAuction);
+            inOrder.verify(saleResolutionService).markFinancialResolutionDone(9L);
             verifyNoInteractions(saleCommitmentResolutionOrchestrator);
-            verify(saleResolutionService, never()).markFinancialResolutionDone(any());
         }
     }
 
@@ -246,7 +284,7 @@ class SaleFailureResolutionOrchestratorTest {
                     .thenReturn(resolution);
             when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            orchestrator.resolveSaleFailure(waitingAuction, SaleResolutionResult.B, null, null, resolvedBy);
+            orchestrator.resolveSaleFailure(waitingAuction, SaleResolutionResult.B, null, null, resolvedBy, null);
 
             InOrder inOrder = inOrder(saleCommitmentResolutionOrchestrator, auctionRepository, saleResolutionService);
             inOrder.verify(saleCommitmentResolutionOrchestrator).resolve(777L, FinalizationOutcome.B);
@@ -265,7 +303,7 @@ class SaleFailureResolutionOrchestratorTest {
                     FaultParty.BUYER, null, resolvedBy)).thenReturn(resolution);
             when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            orchestrator.resolveSaleFailure(waitingAuction, SaleResolutionResult.BUYER_FAULT, FaultParty.BUYER, null, resolvedBy);
+            orchestrator.resolveSaleFailure(waitingAuction, SaleResolutionResult.BUYER_FAULT, FaultParty.BUYER, null, resolvedBy, null);
 
             verify(saleCommitmentResolutionOrchestrator).resolve(777L, FinalizationOutcome.A);
             verify(saleResolutionService).markFinancialResolutionDone(9L);
@@ -282,7 +320,7 @@ class SaleFailureResolutionOrchestratorTest {
                     FaultParty.PLATFORM, null, resolvedBy)).thenReturn(resolution);
             when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            orchestrator.resolveSaleFailure(waitingAuction, SaleResolutionResult.PLATFORM_FAULT, FaultParty.PLATFORM, null, resolvedBy);
+            orchestrator.resolveSaleFailure(waitingAuction, SaleResolutionResult.PLATFORM_FAULT, FaultParty.PLATFORM, null, resolvedBy, null);
 
             verify(saleCommitmentResolutionOrchestrator).resolve(777L, FinalizationOutcome.A);
             verify(saleResolutionService).markFinancialResolutionDone(9L);
@@ -300,7 +338,7 @@ class SaleFailureResolutionOrchestratorTest {
                     .thenThrow(new IllegalStateException("SaleResolution уже существует для аукциона 3"));
 
             assertThatThrownBy(() -> orchestrator.resolveSaleFailure(
-                    waitingAuction, SaleResolutionResult.B, null, null, resolvedBy))
+                    waitingAuction, SaleResolutionResult.B, null, null, resolvedBy, null))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("уже существует");
 
@@ -318,7 +356,7 @@ class SaleFailureResolutionOrchestratorTest {
                     .when(vehicleService).returnToApproved(vehicleId);
 
             assertThatThrownBy(() -> orchestrator.resolveSaleFailure(
-                    waitingAuction, SaleResolutionResult.B, null, null, resolvedBy))
+                    waitingAuction, SaleResolutionResult.B, null, null, resolvedBy, null))
                     .isInstanceOf(IllegalStateException.class);
 
             // auction.markSaleFailed() already ran in-memory before the failure (acceptable -
@@ -337,7 +375,7 @@ class SaleFailureResolutionOrchestratorTest {
                     .when(depositService).unblockForSaleFailure(any(), any());
 
             assertThatThrownBy(() -> orchestrator.resolveSaleFailure(
-                    waitingAuction, SaleResolutionResult.B, null, null, resolvedBy))
+                    waitingAuction, SaleResolutionResult.B, null, null, resolvedBy, null))
                     .isInstanceOf(IllegalStateException.class);
 
             verify(vehicleService, times(1)).returnToApproved(vehicleId);
@@ -355,7 +393,7 @@ class SaleFailureResolutionOrchestratorTest {
                     .when(saleCommitmentResolutionOrchestrator).resolve(777L, FinalizationOutcome.B);
 
             assertThatThrownBy(() -> orchestrator.resolveSaleFailure(
-                    waitingAuction, SaleResolutionResult.B, null, null, resolvedBy))
+                    waitingAuction, SaleResolutionResult.B, null, null, resolvedBy, null))
                     .isInstanceOf(IllegalStateException.class);
 
             verify(vehicleService, times(1)).returnToApproved(vehicleId);

@@ -89,6 +89,15 @@ class AuctionCommitmentLinkageIntegrationTest {
      * the commitment (AWAITING_FINALIZATION) actually exist afterward.
      */
     private Setup approveAndGetVehicleWithCommitment() {
+        // X3-E: freezeCommitment() (called below) now snapshots the currently published
+        // PolicyVersion's id and fails closed if none exists - publish one unconditionally
+        // here so every caller of this helper (not only those that go on to create an
+        // Auction) satisfies that precondition. Calling publishPolicyVersion() again later in
+        // a given test (several already do, for the Auction-creation policy snapshot) is
+        // harmless - it just publishes another version, and findCurrentPublished() always
+        // resolves the latest.
+        publishPolicyVersion();
+
         Role userRole = roleRepository.findByName("ROLE_USER")
                 .orElseGet(() -> roleRepository.save(new Role(null, "ROLE_USER", "Обычный пользователь")));
         User seller = new User(null, "x3c" + System.nanoTime(), "x3c" + System.nanoTime() + "@test.com",

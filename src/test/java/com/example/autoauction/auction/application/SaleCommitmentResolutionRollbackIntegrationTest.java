@@ -16,11 +16,14 @@ import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
 import com.example.autoauction.diagnostic.domain.port.DiagnosticRequestRepository;
 import com.example.autoauction.sale.application.HandoverEvidenceService;
 import com.example.autoauction.sale.application.PaymentEvidenceService;
+import com.example.autoauction.sale.domain.FaultParty;
 import com.example.autoauction.sale.domain.SaleResolutionResult;
 import com.example.autoauction.sale.domain.port.SaleResolutionRepository;
 import com.example.autoauction.vehicle.domain.Vehicle;
 import com.example.autoauction.vehicle.domain.VehicleStatus;
 import com.example.autoauction.vehicle.domain.port.VehicleRepository;
+import com.example.autoauction.policy.application.PolicyVersionService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -100,6 +103,19 @@ class SaleCommitmentResolutionRollbackIntegrationTest {
     private SaleResolutionRepository saleResolutionRepository;
     @Autowired
     private PlatformTransactionManager transactionManager;
+    @Autowired
+    private PolicyVersionService policyVersionService;
+    @Autowired
+    private com.example.autoauction.policy.infrastructure.persistence.SpringDataViolationDefinitionJpaRepository violationDefinitionJpaRepository;
+    @Autowired
+    private com.example.autoauction.diagnostic.commitment.domain.port.SellerViolationResolutionRepository sellerViolationResolutionRepository;
+
+    // X3-E: freezeCommitment() now snapshots the currently published PolicyVersion's id and
+    // fails closed if none exists.
+    @BeforeEach
+    void publishPolicyVersion() {
+        policyVersionService.publish(policyVersionService.create(new BigDecimal("0.02"), 1L).getId());
+    }
 
     private TransactionTemplate txTemplate() {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
@@ -202,6 +218,22 @@ class SaleCommitmentResolutionRollbackIntegrationTest {
         return 600_000L + (System.nanoTime() % 100_000L);
     }
 
+    private record PolicyWithViolation(Long policyVersionId, Long violationDefinitionId) {}
+
+    /** Mirrors SaleCommitmentResolutionIntegrationTest's own fixture exactly - seeds one
+     *  ViolationDefinition directly via JPA (Flyway's V37 seed never runs under the H2 test
+     *  profile) and publishes it under a fresh PolicyVersion. */
+    private PolicyWithViolation publishPolicyWithOneViolation(String code, BigDecimal percentageValue) {
+        Long violationDefinitionId = violationDefinitionJpaRepository.save(
+                new com.example.autoauction.policy.infrastructure.persistence.JpaViolationDefinitionEntity(
+                        code, "test fixture", OffsetDateTime.now())).getId();
+        Long policyVersionId = policyVersionService.create(new BigDecimal("0.02"), 1L).getId();
+        policyVersionService.updateDraftViolation(policyVersionId, violationDefinitionId,
+                com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE, percentageValue);
+        policyVersionService.publish(policyVersionId);
+        return new PolicyWithViolation(policyVersionId, violationDefinitionId);
+    }
+
     @Test
     @DisplayName("Path A (completeSale/SUCCESS): commitment claim succeeds, chargeForDiagnosticRequest fails -> whole transaction rolls back")
     void completeSale_FailureAfterCommitmentClaim_RollsBackEverything() {
@@ -259,7 +291,7 @@ class SaleCommitmentResolutionRollbackIntegrationTest {
 
         assertThatThrownBy(() -> txTemplate().execute(status -> {
             Auction locked = auctionRepository.findByIdWithLock(auctionId).orElseThrow();
-            saleFailureResolutionOrchestrator.resolveSaleFailure(locked, SaleResolutionResult.B, null, "no-sale", 1L);
+            saleFailureResolutionOrchestrator.resolveSaleFailure(locked, SaleResolutionResult.B, null, "no-sale", 1L, null);
             return null;
         })).isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("injected test failure");
@@ -279,5 +311,74 @@ class SaleCommitmentResolutionRollbackIntegrationTest {
         assertThat(commitment.getStatus()).isEqualTo(CommitmentStatus.AWAITING_FINALIZATION);
         assertThat(commitment.getFinalizationOutcome()).isNull();
         assertThat(commitment.getFinalizedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("X3-E corrective (BLOCKER 2): Path C (resolveSaleFailure/C): commitment claim succeeds, " +
+            "chargeSellerViolationPenalty fails AFTER the claim -> the ENTIRE production transaction rolls back")
+    void resolveSaleFailure_OutcomeC_FailureAfterCommitmentClaim_RollsBackEverything() {
+        PolicyWithViolation policy = publishPolicyWithOneViolation("X3E_ROLLBACK_TEST_VIOLATION", new BigDecimal("30"));
+
+        Setup setup = approveAndGetVehicleWithCommitment(new BigDecimal("10000"), new BigDecimal("4000"));
+        long winnerId = uniqueWinnerId();
+        Long auctionId = createWaitingForPaymentAuctionWithCommitment(setup.vehicleId(), setup.commitmentId(), winnerId, new BigDecimal("1020000"));
+        freezeAndMarkWinner(winnerId, auctionId, new BigDecimal("50000"));
+        txTemplate().execute(status -> {
+            Auction auction = auctionRepository.findById(auctionId).orElseThrow();
+            auction.setPolicyVersionId(policy.policyVersionId());
+            auctionRepository.save(auction);
+            return null;
+        });
+
+        // Injected AFTER the commitment's own claim-first UPDATE has already run (proven by the
+        // Hibernate SQL debug log showing the UPDATE ... WHERE status = 'AWAITING_FINALIZATION'
+        // execute before this exception fires) - scoped to exactly this seller's deposit/request,
+        // exactly mirroring Path A/B's own C2 precedent, never a mocked finalize().
+        doThrow(new RuntimeException("X3-E corrective (BLOCKER 2): injected test failure after commitment claim"))
+                .when(depositService)
+                .chargeSellerViolationPenalty(eq(setup.depositId()), eq(setup.requestId()), any(), any(), any());
+
+        assertThatThrownBy(() -> txTemplate().execute(status -> {
+            Auction locked = auctionRepository.findByIdWithLock(auctionId).orElseThrow();
+            saleFailureResolutionOrchestrator.resolveSaleFailure(locked, SaleResolutionResult.C, FaultParty.SELLER,
+                    "violation", 1L, java.util.List.of(policy.violationDefinitionId()));
+            return null;
+        })).isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("injected test failure");
+
+        // Fresh reads, outside the failed transaction.
+        Auction persistedAuction = auctionRepository.findById(auctionId).orElseThrow();
+        assertThat(persistedAuction.getStatus())
+                .as("Auction must still be WAITING_FOR_PAYMENT - the SALE_FAILED transition rolled back")
+                .isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
+
+        Vehicle persistedVehicle = vehicleRepository.findById(setup.vehicleId()).orElseThrow();
+        assertThat(persistedVehicle.getStatus())
+                .as("Vehicle must still be IN_AUCTION, never NEEDS_REDIAGNOSTIC from the failed transaction")
+                .isEqualTo(VehicleStatus.IN_AUCTION);
+
+        Deposit winnerDeposit = depositRepository.findByUserId(winnerId).orElseThrow();
+        assertThat(winnerDeposit.getBlockedAmount()).isEqualByComparingTo("50000");
+
+        assertThat(saleResolutionRepository.findByAuctionId(auctionId))
+                .as("no SaleResolution must exist - financialResolutionStatus was never persisted as DONE")
+                .isEmpty();
+
+        SellerDiagnosticCommitment commitment = sellerDiagnosticCommitmentRepository.findById(setup.commitmentId()).orElseThrow();
+        assertThat(commitment.getStatus()).isEqualTo(CommitmentStatus.AWAITING_FINALIZATION);
+        assertThat(commitment.getFinalizationOutcome()).isNull();
+        assertThat(commitment.getFinalizedAt()).isNull();
+        assertThat(commitment.getPenaltyAmount()).isNull();
+        assertThat(commitment.getRefundAmount()).isNull();
+
+        assertThat(sellerViolationResolutionRepository.findBySellerDiagnosticCommitmentId(setup.commitmentId()))
+                .as("no SellerViolationResolution (and transitively no SellerViolationResolutionItem) must exist")
+                .isEmpty();
+
+        var transactions = depositRepository.findTransactionsByUserId(
+                depositRepository.findById(setup.depositId()).orElseThrow().getUserId());
+        assertThat(transactions)
+                .as("no seller penalty CHARGE or UNBLOCK transaction must exist")
+                .noneMatch(t -> t.getDescription() != null && t.getDescription().contains("штрафа за нарушение"));
     }
 }

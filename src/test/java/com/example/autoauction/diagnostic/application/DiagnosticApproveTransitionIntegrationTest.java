@@ -13,6 +13,8 @@ import com.example.autoauction.user.domain.Role;
 import com.example.autoauction.user.domain.User;
 import com.example.autoauction.user.domain.port.RoleRepository;
 import com.example.autoauction.user.domain.port.UserRepository;
+import com.example.autoauction.policy.application.PolicyVersionService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -72,6 +74,18 @@ class DiagnosticApproveTransitionIntegrationTest {
 
     @Autowired
     private RoleRepository roleRepository;
+
+    @Autowired
+    private PolicyVersionService policyVersionService;
+
+    // X3-E: freezeCommitment() now snapshots the currently published PolicyVersion's id and
+    // fails closed if none exists - every test in this class calls freezeCommitment(), so one
+    // is published here, inside the same per-test transaction (rolled back with everything
+    // else afterward).
+    @BeforeEach
+    void publishPolicyVersion() {
+        policyVersionService.publish(policyVersionService.create(new BigDecimal("0.02"), 1L).getId());
+    }
 
     @Test
     @DisplayName("create -> freeze -> approve: commitment переходит в AWAITING_FINALIZATION, депозит " +

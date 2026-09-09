@@ -166,7 +166,12 @@ class SaleFailureResolutionIntegrationTest {
                                          SaleResolutionResult outcome, FaultParty faultParty) {
         txTemplate.execute(status -> {
             Auction locked = auctionRepository.findByIdWithLock(auctionId).orElseThrow();
-            orchestrator.resolveSaleFailure(locked, outcome, faultParty, null, resolvedBy);
+            // X3-E: violationDefinitionIds is null here - none of this file's fixtures ever
+            // set sellerDiagnosticCommitmentId on the Auction, so the engine is never invoked
+            // for any outcome (including C) regardless, exactly mirroring how B/BUYER_FAULT/
+            // PLATFORM_FAULT already skip SaleCommitmentResolutionOrchestrator when no
+            // commitment exists - see resolveSaleFailure_OutcomeC_PersistsExpectedState below.
+            orchestrator.resolveSaleFailure(locked, outcome, faultParty, null, resolvedBy, null);
             return null;
         });
     }
@@ -268,6 +273,12 @@ class SaleFailureResolutionIntegrationTest {
         assertThat(deposit.getBlockedAmount()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(resolution.orElseThrow().getResult()).isEqualTo(SaleResolutionResult.C);
         assertThat(resolution.orElseThrow().getFaultParty()).isEqualTo(FaultParty.SELLER);
+        // X3-E: no commitment exists for this auction (sellerDiagnosticCommitmentId is never
+        // set by this file's fixtures) - C now behaves exactly like B/BUYER_FAULT/PLATFORM_FAULT
+        // do when no commitment exists: nothing left to resolve financially, so
+        // financialResolutionStatus goes straight to DONE instead of staying PENDING forever.
+        assertThat(resolution.orElseThrow().getFinancialResolutionStatus())
+                .isEqualTo(com.example.autoauction.sale.domain.FinancialResolutionStatus.DONE);
     }
 
     // ==================== Vehicle failure rollback ====================

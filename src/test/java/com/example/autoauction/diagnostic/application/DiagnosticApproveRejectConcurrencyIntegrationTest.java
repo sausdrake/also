@@ -15,6 +15,8 @@ import com.example.autoauction.user.domain.Role;
 import com.example.autoauction.user.domain.User;
 import com.example.autoauction.user.domain.port.RoleRepository;
 import com.example.autoauction.user.domain.port.UserRepository;
+import com.example.autoauction.policy.application.PolicyVersionService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.RepeatedTest;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -76,6 +78,17 @@ class DiagnosticApproveRejectConcurrencyIntegrationTest {
 
     @Autowired
     private RoleRepository roleRepository;
+
+    @Autowired
+    private PolicyVersionService policyVersionService;
+
+    // X3-E: freezeCommitment() now snapshots the currently published PolicyVersion's id and
+    // fails closed if none exists. No @Transactional on this class (real concurrent
+    // threads/transactions) - each repetition simply publishes another version, harmless.
+    @BeforeEach
+    void publishPolicyVersion() {
+        policyVersionService.publish(policyVersionService.create(new BigDecimal("0.02"), 1L).getId());
+    }
 
     private record Setup(Long userId, Long requestId, BigDecimal depositAmount, BigDecimal availableBeforeFreeze) {}
 

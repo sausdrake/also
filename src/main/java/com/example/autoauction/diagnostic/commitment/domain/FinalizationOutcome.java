@@ -25,10 +25,18 @@ package com.example.autoauction.diagnostic.commitment.domain;
  * rejection trigger, SaleCommitmentResolutionOrchestrator for the Auction-outcome trigger) -
  * both converge on this same value and the same underlying claim-first UPDATE.
  *
- * C is explicitly NOT added here yet - it requires an authorized ViolationPolicy that does
- * not exist yet. Adding it prematurely as an unused value would misrepresent it as available.
+ * C (X3-E): the commitment's diagnostic cycle concluded with the seller found in violation of
+ * a platform rule. penaltyAmount/refundAmount reflect the CAPPED, AGGREGATE result across
+ * every violation selected for this resolution (see
+ * {@link SellerViolationResolution}/{@link SellerViolationResolutionItem} for the auditable,
+ * uncapped per-violation breakdown - the cap is never allocated back down to individual
+ * violations). Reachable via two independent triggers - a post-auction SALE_FAILED/C
+ * (SaleFailureResolutionOrchestrator) or a pre-auction diagnostic-rejection SELLER_VIOLATION
+ * category - both converging on the same SellerViolationResolutionEngine and the same
+ * underlying claim-first UPDATE, mirroring how B already converges from two triggers.
  */
 public enum FinalizationOutcome {
     A,
-    B
+    B,
+    C
 }

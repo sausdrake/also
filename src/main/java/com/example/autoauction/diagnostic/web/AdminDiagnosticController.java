@@ -5,6 +5,13 @@ import com.example.autoauction.auth.domain.UserPrincipal;
 import com.example.autoauction.diagnostic.application.DiagnosticRequestService;
 import com.example.autoauction.diagnostic.application.InspectionTemplateService;
 import com.example.autoauction.diagnostic.commitment.application.SellerDiagnosticCommitmentFinalizationService;
+import com.example.autoauction.diagnostic.commitment.application.SellerViolationResolutionEngine;
+import com.example.autoauction.diagnostic.commitment.domain.SellerDiagnosticCommitment;
+import com.example.autoauction.diagnostic.commitment.domain.SellerViolationResolution;
+import com.example.autoauction.diagnostic.commitment.domain.SellerViolationResolutionItem;
+import com.example.autoauction.diagnostic.commitment.domain.TriggerSource;
+import com.example.autoauction.diagnostic.commitment.domain.port.SellerDiagnosticCommitmentRepository;
+import com.example.autoauction.diagnostic.commitment.domain.port.SellerViolationResolutionRepository;
 import com.example.autoauction.diagnostic.domain.DiagnosticRejectionCategory;
 import com.example.autoauction.diagnostic.domain.InspectionGroup;
 import com.example.autoauction.diagnostic.domain.InspectionItem;
@@ -13,6 +20,8 @@ import com.example.autoauction.diagnostic.web.dto.DiagnosticRequestResponse;
 import com.example.autoauction.diagnostic.web.dto.InspectionGroupDto;
 import com.example.autoauction.diagnostic.web.dto.InspectionItemDto;
 import com.example.autoauction.diagnostic.web.dto.InspectionTemplateDto;
+import com.example.autoauction.diagnostic.web.dto.SellerViolationResolutionRequest;
+import com.example.autoauction.diagnostic.web.dto.SellerViolationResolutionResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -39,6 +48,9 @@ public class AdminDiagnosticController {
     private final SellerDiagnosticCommitmentFinalizationService finalizationService;
     private final com.example.autoauction.diagnostic.media.application.LegacyMediaMigrationService legacyMediaMigrationService;
     private final com.example.autoauction.diagnostic.media.application.VideoProcessingService videoProcessingService;
+    private final SellerDiagnosticCommitmentRepository sellerDiagnosticCommitmentRepository;
+    private final SellerViolationResolutionEngine sellerViolationResolutionEngine;
+    private final SellerViolationResolutionRepository sellerViolationResolutionRepository;
 
     // ==================== Шаблоны ====================
 
@@ -234,6 +246,59 @@ public class AdminDiagnosticController {
     public ResponseEntity<DiagnosticRequestResponse> retryFinalization(@PathVariable Long id) {
         finalizationService.finalizeAsOutcomeB(id);
         return ResponseEntity.ok(requestService.getRequestDetails(id));
+    }
+
+    // ==================== X3-E: seller-violation resolution (SELLER_VIOLATION rejection) ====================
+
+    /**
+     * X3-E: resolves the seller-violation financial consequence for a request already
+     * rejected with category SELLER_VIOLATION - a SEPARATE, later admin action from
+     * rejectReport() itself (locked X3-E decision, mirroring Outcome B's own reject-first/
+     * finalize-separately precedent and this controller's own /retry-finalization shape
+     * exactly). No Auction is required or consulted - the policy snapshot used here is
+     * SellerDiagnosticCommitment.policyVersionId (taken at freezeCommitment() time), never
+     * Auction.policyVersionId (locked X3-E decision - the two snapshot points are
+     * intentionally independent).
+     *
+     * Admin selects only violationDefinitionIds - the server resolves penaltyType/penaltyValue
+     * from the policy snapshot; no arbitrary percentage/amount/severity is ever accepted here.
+     *
+     * Retryable/recoverable, exactly like /retry-finalization: a failure here leaves the
+     * commitment durably AWAITING_FINALIZATION and this same endpoint can be called again -
+     * the underlying claim-first UPDATE is the only idempotency guard, not duplicated here.
+     */
+    @PostMapping("/reports/{requestId}/seller-violation-resolution")
+    @Operation(summary = "Resolve the seller-violation financial consequence for a SELLER_VIOLATION-rejected request (admin-triggered, retryable)")
+    public ResponseEntity<SellerViolationResolutionResponse> resolveSellerViolation(
+            @PathVariable Long requestId,
+            @RequestBody SellerViolationResolutionRequest request,
+            @CurrentUser UserPrincipal currentUser
+    ) {
+        SellerDiagnosticCommitment commitment = sellerDiagnosticCommitmentRepository
+                .findByDiagnosticRequestId(requestId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "SellerDiagnosticCommitment не найден для заявки: " + requestId));
+        if (commitment.getPolicyVersionId() == null) {
+            throw new IllegalStateException(
+                    "Commitment " + commitment.getId() + " не имеет policyVersionId (создан до X3-E) - " +
+                            "финансовое разрешение нарушения невозможно");
+        }
+
+        sellerViolationResolutionEngine.resolve(commitment.getId(), commitment.getPolicyVersionId(),
+                request.violationDefinitionIds(), currentUser.getUserId(), TriggerSource.DIAGNOSTIC_REJECTION, null);
+
+        SellerViolationResolution resolution = sellerViolationResolutionRepository
+                .findBySellerDiagnosticCommitmentId(commitment.getId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "SellerViolationResolution не найден после успешного resolve для commitment " + commitment.getId()));
+        java.util.List<Long> appliedViolationIds = sellerViolationResolutionRepository
+                .findItemsByResolutionId(resolution.getId()).stream()
+                .map(SellerViolationResolutionItem::getViolationDefinitionId)
+                .toList();
+
+        return ResponseEntity.ok(new SellerViolationResolutionResponse(
+                commitment.getId(), appliedViolationIds, resolution.getRawPenaltyAmount(),
+                resolution.getAppliedPenaltyAmount(), resolution.getRefundAmount(), resolution.getResolvedAt()));
     }
 
     // ==================== MEDIA-3.1B: исторический backfill шаблонов ====================

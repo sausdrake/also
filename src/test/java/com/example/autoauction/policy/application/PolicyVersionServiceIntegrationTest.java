@@ -40,6 +40,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * is exercised only against the real, Flyway-migrated PostgreSQL database - this is a known,
  * pre-existing characteristic of this project's test setup (it already could not exercise any
  * Postgres-specific DDL in V1-V31 either), not a gap introduced by this slice.
+ *
+ * X3-E corrective (BLOCKER 5): the same limitation applies identically to V38's sibling
+ * trigger (policy_version_violation_prevent_published_mutation) - it too is pure Flyway SQL
+ * with no JPA-annotation equivalent, so it cannot be exercised here either. What CAN be, and
+ * is, proven here: (1) PolicyVersionViolation's own domain-constructor validation (percentage/
+ * fixed-amount bounds - see PolicyVersionViolationTest), (2) the UNIQUE(policy_version_id,
+ * violation_definition_id) constraint, which IS mirrored at the JPA-annotation level on
+ * JpaPolicyVersionViolationEntity (same deliberate double-declaration precedent as
+ * JpaSellerDiagnosticCommitmentEntity's own uniqueConstraints - see that class's Javadoc) and
+ * therefore DOES apply under ddl-auto=create-drop, and (3) PolicyVersionService's own
+ * application-level published-check in updateDraftViolation (see PolicyVersionServiceTest).
+ * Only the DB trigger's enforcement of published-row immutability itself is untestable here -
+ * defense-in-depth beyond the already-tested application-level check, exactly mirroring
+ * policy_version's own accepted, pre-existing gap.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -48,6 +62,12 @@ class PolicyVersionServiceIntegrationTest {
 
     @Autowired
     private PolicyVersionService policyVersionService;
+
+    @Autowired
+    private com.example.autoauction.policy.domain.port.PolicyVersionViolationRepository policyVersionViolationRepository;
+
+    @Autowired
+    private com.example.autoauction.policy.infrastructure.persistence.SpringDataViolationDefinitionJpaRepository violationDefinitionJpaRepository;
 
     private final Long adminId = 1L;
 
@@ -155,5 +175,73 @@ class PolicyVersionServiceIntegrationTest {
         } finally {
             executor.shutdown();
         }
+    }
+
+    // ==================== X3-E corrective (BLOCKER 5): policy completeness / validity ====================
+
+    @Test
+    @DisplayName("X3-E: duplicate (policyVersionId, violationDefinitionId) configuration is impossible - " +
+            "DB UNIQUE constraint rejects a raw duplicate insert even bypassing the service's own upsert logic")
+    void policyVersionViolation_DuplicateConfiguration_RejectedByUniqueConstraint() {
+        Long violationDefinitionId = violationDefinitionJpaRepository.save(
+                new com.example.autoauction.policy.infrastructure.persistence.JpaViolationDefinitionEntity(
+                        "X3E_DUPLICATE_TEST_" + System.nanoTime(), "test fixture", java.time.OffsetDateTime.now())).getId();
+        try {
+            PolicyVersion draft = policyVersionService.create(new BigDecimal("0.02"), adminId);
+
+            // First insert succeeds (id=null forces a fresh INSERT, bypassing
+            // PolicyVersionService.updateDraftViolation's own find-first-then-upsert logic -
+            // this proves the DB constraint itself, not merely the service's own discipline).
+            policyVersionViolationRepository.save(new com.example.autoauction.policy.domain.PolicyVersionViolation(
+                    draft.getId(), violationDefinitionId, com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE,
+                    new BigDecimal("50"), java.time.OffsetDateTime.now()));
+
+            assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () ->
+                    policyVersionViolationRepository.save(new com.example.autoauction.policy.domain.PolicyVersionViolation(
+                            draft.getId(), violationDefinitionId, com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE,
+                            new BigDecimal("99"), java.time.OffsetDateTime.now())));
+        } finally {
+            // This test's draft is deliberately never published (it exercises the raw
+            // repository, not a full publish cycle) - its ViolationDefinition would otherwise
+            // remain a permanently unconfigured catalogue entry for the rest of this shared,
+            // non-transactional H2 database's lifetime, breaking every OTHER test's publish()
+            // call for the remainder of this JVM's test run. Clean it up explicitly, exactly
+            // as this test found the catalogue.
+            violationDefinitionJpaRepository.deleteById(violationDefinitionId);
+        }
+    }
+
+    @Test
+    @DisplayName("X3-E: unknown ViolationDefinition id is rejected by updateDraftViolation before any write")
+    void updateDraftViolation_UnknownViolationDefinition_Rejected() {
+        PolicyVersion draft = policyVersionService.create(new BigDecimal("0.02"), adminId);
+
+        assertThrows(IllegalArgumentException.class, () -> policyVersionService.updateDraftViolation(
+                draft.getId(), -999L, com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE, new BigDecimal("50")));
+    }
+
+    @Test
+    @DisplayName("X3-E: complete, valid configuration for every catalogue entry currently in the shared test " +
+            "database -> publish succeeds end-to-end (real DB)")
+    void publish_CompleteRealConfiguration_SucceedsEndToEnd() {
+        // Seeds one more definition (never deletes any other test's rows - this shared,
+        // non-transactional H2 database may already carry ViolationDefinition rows from other
+        // test classes in the same fork) and then configures EVERY currently-existing
+        // definition on this draft, whatever the full current set happens to be - proving the
+        // completeness check against the real catalogue as it actually stands, not a
+        // hand-picked subset.
+        violationDefinitionJpaRepository.save(
+                new com.example.autoauction.policy.infrastructure.persistence.JpaViolationDefinitionEntity(
+                        "X3E_COMPLETE_TEST_" + System.nanoTime(), "test fixture", java.time.OffsetDateTime.now()));
+
+        PolicyVersion draft = policyVersionService.create(new BigDecimal("0.02"), adminId);
+        for (var definition : violationDefinitionJpaRepository.findAll()) {
+            policyVersionService.updateDraftViolation(draft.getId(), definition.getId(),
+                    com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE, new BigDecimal("100"));
+        }
+
+        PolicyVersion published = policyVersionService.publish(draft.getId());
+
+        assertTrue(published.isPublished());
     }
 }

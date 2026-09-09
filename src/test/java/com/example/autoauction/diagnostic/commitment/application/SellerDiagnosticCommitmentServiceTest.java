@@ -6,6 +6,8 @@ import com.example.autoauction.deposit.web.dto.DepositResponse;
 import com.example.autoauction.diagnostic.commitment.domain.CommitmentStatus;
 import com.example.autoauction.diagnostic.commitment.domain.SellerDiagnosticCommitment;
 import com.example.autoauction.diagnostic.commitment.domain.port.SellerDiagnosticCommitmentRepository;
+import com.example.autoauction.policy.application.PolicyVersionService;
+import com.example.autoauction.policy.domain.PolicyVersion;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,16 +40,30 @@ class SellerDiagnosticCommitmentServiceTest {
     @Mock
     private DepositService depositService;
 
+    @Mock
+    private PolicyVersionService policyVersionService;
+
     private SellerDiagnosticCommitmentService service;
 
     private final Long sellerId = 1L;
     private final Long requestId = 100L;
     private final Long depositId = 5L;
+    private final Long policyVersionId = 9L;
     private final BigDecimal amount = new BigDecimal("10000");
     private final BigDecimal feeAmount = new BigDecimal("4000");
 
     private void createService() {
-        service = new SellerDiagnosticCommitmentService(repository, depositService);
+        service = new SellerDiagnosticCommitmentService(repository, depositService, policyVersionService);
+    }
+
+    /**
+     * X3-E: freezeCommitment() now resolves and snapshots the currently published
+     * PolicyVersion's id - every freezeCommitment test needs this stubbed.
+     */
+    private void stubCurrentPublishedPolicy() {
+        PolicyVersion published = new PolicyVersion(policyVersionId, 1L, new BigDecimal("0.02"), true,
+                OffsetDateTime.now(), 1L, OffsetDateTime.now());
+        when(policyVersionService.getCurrentPublished()).thenReturn(published);
     }
 
     @Test
@@ -55,6 +71,7 @@ class SellerDiagnosticCommitmentServiceTest {
             "сохраняет commitment с committedAmount и diagnosticFeeAmount, статус FROZEN - без прямой мутации Deposit")
     void freezeCommitment_HappyPath_DelegatesToDepositServiceThenPersistsCommitment() {
         createService();
+        stubCurrentPublishedPolicy();
         when(repository.existsByDiagnosticRequestId(requestId)).thenReturn(false);
         DepositResponse depositResponse = new DepositResponse(depositId, sellerId,
                 new BigDecimal("50000"), BigDecimal.ZERO, new BigDecimal("50000"), null, OffsetDateTime.now());
@@ -74,6 +91,7 @@ class SellerDiagnosticCommitmentServiceTest {
         assertThat(saved.getDiagnosticFeeAmount()).isEqualByComparingTo(feeAmount);
         assertThat(saved.getStatus()).isEqualTo(CommitmentStatus.FROZEN);
         assertThat(saved.getFrozenAt()).isNotNull();
+        assertThat(saved.getPolicyVersionId()).isEqualTo(policyVersionId);
 
         // The service itself never touches Deposit internals directly. diagnosticFeeAmount is a
         // commitment-only snapshot, never passed to DepositService.

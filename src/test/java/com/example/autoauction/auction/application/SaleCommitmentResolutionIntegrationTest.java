@@ -25,6 +25,8 @@ import com.example.autoauction.sale.domain.SaleResolutionResult;
 import com.example.autoauction.sale.domain.port.SaleResolutionRepository;
 import com.example.autoauction.vehicle.domain.Vehicle;
 import com.example.autoauction.vehicle.domain.port.VehicleRepository;
+import com.example.autoauction.policy.application.PolicyVersionService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +38,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -98,6 +101,43 @@ class SaleCommitmentResolutionIntegrationTest {
     private SaleResolutionRepository saleResolutionRepository;
     @Autowired
     private PlatformTransactionManager transactionManager;
+    @Autowired
+    private PolicyVersionService policyVersionService;
+    @Autowired
+    private com.example.autoauction.policy.infrastructure.persistence.SpringDataViolationDefinitionJpaRepository violationDefinitionJpaRepository;
+    @Autowired
+    private com.example.autoauction.diagnostic.commitment.application.SellerViolationResolutionEngine sellerViolationResolutionEngine;
+    @Autowired
+    private com.example.autoauction.diagnostic.commitment.domain.port.SellerViolationResolutionRepository sellerViolationResolutionRepository;
+
+    // X3-E: freezeCommitment() now snapshots the currently published PolicyVersion's id and
+    // fails closed if none exists.
+    @BeforeEach
+    void publishPolicyVersion() {
+        policyVersionService.publish(policyVersionService.create(new BigDecimal("0.02"), 1L).getId());
+    }
+
+    /**
+     * X3-E test fixture: seeds one ViolationDefinition row directly via the JPA layer
+     * (bypassing ViolationDefinitionRepository, which is deliberately read-only in production -
+     * this project's test profile has Flyway disabled, so V37's catalogue seed never runs
+     * against the test database, same disclosed limitation as policy_version_counter's own
+     * self-healing fallback), configures it under a NEW PolicyVersion draft with the given
+     * PERCENTAGE penalty, and publishes it - returning the new PolicyVersion's id, which
+     * becomes "current" (highest versionNumber) from this point on.
+     */
+    private record PolicyWithViolation(Long policyVersionId, Long violationDefinitionId) {}
+
+    private PolicyWithViolation publishPolicyWithOneViolation(String code, BigDecimal percentageValue) {
+        Long violationDefinitionId = violationDefinitionJpaRepository.save(
+                new com.example.autoauction.policy.infrastructure.persistence.JpaViolationDefinitionEntity(
+                        code, "test fixture", OffsetDateTime.now())).getId();
+        Long policyVersionId = policyVersionService.create(new BigDecimal("0.02"), 1L).getId();
+        policyVersionService.updateDraftViolation(policyVersionId, violationDefinitionId,
+                com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE, percentageValue);
+        policyVersionService.publish(policyVersionId);
+        return new PolicyWithViolation(policyVersionId, violationDefinitionId);
+    }
 
     private TransactionTemplate txTemplate() {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
@@ -252,7 +292,7 @@ class SaleCommitmentResolutionIntegrationTest {
 
         txTemplate().execute(status -> {
             Auction locked = auctionRepository.findByIdWithLock(auctionId).orElseThrow();
-            saleFailureResolutionOrchestrator.resolveSaleFailure(locked, SaleResolutionResult.B, null, "no-sale", 1L);
+            saleFailureResolutionOrchestrator.resolveSaleFailure(locked, SaleResolutionResult.B, null, "no-sale", 1L, null);
             return null;
         });
 
@@ -282,7 +322,7 @@ class SaleCommitmentResolutionIntegrationTest {
 
         txTemplate().execute(status -> {
             Auction locked = auctionRepository.findByIdWithLock(auctionId).orElseThrow();
-            saleFailureResolutionOrchestrator.resolveSaleFailure(locked, SaleResolutionResult.BUYER_FAULT, FaultParty.BUYER, "no-show", 1L);
+            saleFailureResolutionOrchestrator.resolveSaleFailure(locked, SaleResolutionResult.BUYER_FAULT, FaultParty.BUYER, "no-show", 1L, null);
             return null;
         });
 
@@ -310,7 +350,7 @@ class SaleCommitmentResolutionIntegrationTest {
 
         txTemplate().execute(status -> {
             Auction locked = auctionRepository.findByIdWithLock(auctionId).orElseThrow();
-            saleFailureResolutionOrchestrator.resolveSaleFailure(locked, SaleResolutionResult.PLATFORM_FAULT, FaultParty.PLATFORM, "bad diagnosis", 1L);
+            saleFailureResolutionOrchestrator.resolveSaleFailure(locked, SaleResolutionResult.PLATFORM_FAULT, FaultParty.PLATFORM, "bad diagnosis", 1L, null);
             return null;
         });
 
@@ -348,7 +388,7 @@ class SaleCommitmentResolutionIntegrationTest {
         txTemplate().execute(status -> {
             Auction locked = auctionRepository.findByIdWithLock(auctionId).orElseThrow();
             assertThat(locked.getSellerDiagnosticCommitmentId()).isNull();
-            saleFailureResolutionOrchestrator.resolveSaleFailure(locked, SaleResolutionResult.B, null, "no-sale", 1L);
+            saleFailureResolutionOrchestrator.resolveSaleFailure(locked, SaleResolutionResult.B, null, "no-sale", 1L, null);
             return null;
         });
 
@@ -359,27 +399,77 @@ class SaleCommitmentResolutionIntegrationTest {
         assertThat(winnerDeposit.getBlockedAmount()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
-    // ==================== Outcome C: never touches commitment/financialResolutionStatus ====================
+    // ==================== Outcome C (X3-E): resolves via SellerViolationResolutionEngine ====================
 
     @Test
-    @DisplayName("C: commitment остаётся AWAITING_FINALIZATION, financialResolutionStatus остаётся PENDING (даже с реальным commitment)")
-    void resolveSaleFailure_OutcomeC_LeavesCommitmentAndStatusUntouched() {
+    @DisplayName("X3-E: C + real commitment + violationDefinitionIds -> commitment FINALIZED/C with correct " +
+            "penalty/refund, financialResolutionStatus DONE, ledger charged with the dedicated seller-violation reason")
+    void resolveSaleFailure_OutcomeC_WithCommitmentAndViolationIds_ResolvesViaEngine() {
+        PolicyWithViolation policy = publishPolicyWithOneViolation("X3E_TEST_VIOLATION", new BigDecimal("30"));
+
+        Setup setup = approveAndGetVehicleWithCommitment(new BigDecimal("10000"), new BigDecimal("4000"));
+        long winnerId = uniqueWinnerId();
+        Long auctionId = createWaitingForPaymentAuctionWithCommitment(setup.vehicleId(), setup.commitmentId(), winnerId, new BigDecimal("1020000"));
+        freezeAndMarkWinner(winnerId, auctionId, new BigDecimal("50000"));
+        // Mirrors what AdminAuctionService.createAuction would have snapshotted at creation -
+        // this test builds the Auction manually (see createWaitingForPaymentAuctionWithCommitment),
+        // so its own policyVersionId is set explicitly here instead.
+        txTemplate().execute(status -> {
+            Auction auction = auctionRepository.findById(auctionId).orElseThrow();
+            auction.setPolicyVersionId(policy.policyVersionId());
+            auctionRepository.save(auction);
+            return null;
+        });
+
+        txTemplate().execute(status -> {
+            Auction locked = auctionRepository.findByIdWithLock(auctionId).orElseThrow();
+            saleFailureResolutionOrchestrator.resolveSaleFailure(locked, SaleResolutionResult.C, FaultParty.SELLER,
+                    "violation", 1L, java.util.List.of(policy.violationDefinitionId()));
+            return null;
+        });
+
+        SellerDiagnosticCommitment commitment = sellerDiagnosticCommitmentRepository.findById(setup.commitmentId()).orElseThrow();
+        assertThat(commitment.getStatus()).isEqualTo(CommitmentStatus.FINALIZED);
+        assertThat(commitment.getFinalizationOutcome()).isEqualTo(FinalizationOutcome.C);
+        // 30% of the original frozen committedAmount (10000), never the remaining balance.
+        assertThat(commitment.getPenaltyAmount()).isEqualByComparingTo("3000.00");
+        assertThat(commitment.getRefundAmount()).isEqualByComparingTo("7000.00");
+
+        SaleResolution resolution = saleResolutionRepository.findByAuctionId(auctionId).orElseThrow();
+        assertThat(resolution.getFinancialResolutionStatus()).isEqualTo(FinancialResolutionStatus.DONE);
+
+        Vehicle vehicle = vehicleRepository.findById(setup.vehicleId()).orElseThrow();
+        assertThat(vehicle.getStatus()).isEqualTo(com.example.autoauction.vehicle.domain.VehicleStatus.NEEDS_REDIAGNOSTIC);
+
+        var transactions = depositRepository.findTransactionsByUserId(setup.sellerId());
+        assertThat(transactions)
+                .as("seller ledger must use the dedicated seller-violation description, never chargeForDiagnosticRequest's " +
+                        "diagnostic-commission wording")
+                .anyMatch(t -> t.getType() == com.example.autoauction.deposit.domain.DepositTransaction.TransactionType.CHARGE
+                        && t.getDescription().contains("штрафа за нарушение продавцом"));
+    }
+
+    @Test
+    @DisplayName("X3-E: C + real commitment но violationDefinitionIds не передан -> IllegalArgumentException, " +
+            "commitment остаётся AWAITING_FINALIZATION, вся транзакция откатывается")
+    void resolveSaleFailure_OutcomeC_WithCommitmentNoViolationIds_FailsClosedWithFullRollback() {
         Setup setup = approveAndGetVehicleWithCommitment(new BigDecimal("10000"), new BigDecimal("4000"));
         long winnerId = uniqueWinnerId();
         Long auctionId = createWaitingForPaymentAuctionWithCommitment(setup.vehicleId(), setup.commitmentId(), winnerId, new BigDecimal("1020000"));
         freezeAndMarkWinner(winnerId, auctionId, new BigDecimal("50000"));
 
-        txTemplate().execute(status -> {
+        assertThatThrownBy(() -> txTemplate().execute(status -> {
             Auction locked = auctionRepository.findByIdWithLock(auctionId).orElseThrow();
-            saleFailureResolutionOrchestrator.resolveSaleFailure(locked, SaleResolutionResult.C, FaultParty.SELLER, "violation", 1L);
+            saleFailureResolutionOrchestrator.resolveSaleFailure(locked, SaleResolutionResult.C, FaultParty.SELLER,
+                    "violation", 1L, null);
             return null;
-        });
+        })).isInstanceOf(IllegalArgumentException.class);
 
+        Auction auction = auctionRepository.findById(auctionId).orElseThrow();
+        assertThat(auction.getStatus()).isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
         SellerDiagnosticCommitment commitment = sellerDiagnosticCommitmentRepository.findById(setup.commitmentId()).orElseThrow();
         assertThat(commitment.getStatus()).isEqualTo(CommitmentStatus.AWAITING_FINALIZATION);
-
-        SaleResolution resolution = saleResolutionRepository.findByAuctionId(auctionId).orElseThrow();
-        assertThat(resolution.getFinancialResolutionStatus()).isEqualTo(FinancialResolutionStatus.PENDING);
+        assertThat(saleResolutionRepository.findByAuctionId(auctionId)).isEmpty();
     }
 
     // ==================== C1: fail-closed accounting guard (real DB) ====================
@@ -398,7 +488,7 @@ class SaleCommitmentResolutionIntegrationTest {
 
         assertThatThrownBy(() -> txTemplate().execute(status -> {
             Auction locked = auctionRepository.findByIdWithLock(auctionId).orElseThrow();
-            saleFailureResolutionOrchestrator.resolveSaleFailure(locked, SaleResolutionResult.B, null, "no-sale", 1L);
+            saleFailureResolutionOrchestrator.resolveSaleFailure(locked, SaleResolutionResult.B, null, "no-sale", 1L, null);
             return null;
         })).isInstanceOf(IllegalStateException.class).hasMessageContaining("exceeding committedAmount");
 
@@ -468,7 +558,7 @@ class SaleCommitmentResolutionIntegrationTest {
 
         assertThatThrownBy(() -> txTemplate().execute(status -> {
             Auction locked = auctionRepository.findByIdWithLock(auctionId).orElseThrow();
-            saleFailureResolutionOrchestrator.resolveSaleFailure(locked, SaleResolutionResult.B, null, "no-sale", 1L);
+            saleFailureResolutionOrchestrator.resolveSaleFailure(locked, SaleResolutionResult.B, null, "no-sale", 1L, null);
             return null;
         })).isInstanceOf(IllegalStateException.class).hasMessageContaining("не готов к финализации");
 
@@ -668,5 +758,127 @@ class SaleCommitmentResolutionIntegrationTest {
 
         Deposit deposit = depositRepository.findByUserId(winnerId).orElseThrow();
         assertThat(deposit.getBlockedAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    // ==================== X3-E corrective (BLOCKER 3): real-DB concurrency proof ====================
+
+    @Test
+    @DisplayName("X3-E corrective (BLOCKER 3): two concurrent SellerViolationResolutionEngine.resolve() calls " +
+            "against the SAME commitment, SAME violation set -> exactly one claim succeeds, exactly one " +
+            "SellerViolationResolution exists, exactly one financial charge, no double charge, no duplicate audit")
+    void resolve_ConcurrentAttemptsSameCommitmentSameViolations_ExactlyOneSucceeds() throws Exception {
+        PolicyWithViolation policy = publishPolicyWithOneViolation("X3E_CONCURRENCY_TEST_VIOLATION", new BigDecimal("40"));
+        Setup setup = approveAndGetVehicleWithCommitment(new BigDecimal("10000"), new BigDecimal("4000"));
+
+        CyclicBarrier barrier = new CyclicBarrier(2);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        java.util.concurrent.atomic.AtomicReference<Throwable> errA = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<Throwable> errB = new java.util.concurrent.atomic.AtomicReference<>();
+
+        Runnable attempt = () -> txTemplate().execute(status -> {
+            sellerViolationResolutionEngine.resolve(setup.commitmentId(), policy.policyVersionId(),
+                    List.of(policy.violationDefinitionId()), 1L,
+                    com.example.autoauction.diagnostic.commitment.domain.TriggerSource.DIAGNOSTIC_REJECTION, null);
+            return null;
+        });
+        Runnable wrappedA = () -> {
+            try {
+                barrier.await(5, TimeUnit.SECONDS);
+                attempt.run();
+            } catch (Throwable t) {
+                errA.set(t);
+            }
+        };
+        Runnable wrappedB = () -> {
+            try {
+                barrier.await(5, TimeUnit.SECONDS);
+                attempt.run();
+            } catch (Throwable t) {
+                errB.set(t);
+            }
+        };
+
+        executor.submit(wrappedA);
+        executor.submit(wrappedB);
+        executor.shutdown();
+        assertThat(executor.awaitTermination(15, TimeUnit.SECONDS)).isTrue();
+
+        // Both may legitimately observe success here: whichever thread's UPDATE loses the
+        // race re-reads and finds the commitment already FINALIZED/C with this SAME violation
+        // set - the engine's own documented idempotent-no-op path, not an error. What must be
+        // exactly-once is the durable side effects below, never "which thread threw."
+        SellerDiagnosticCommitment commitment = sellerDiagnosticCommitmentRepository.findById(setup.commitmentId()).orElseThrow();
+        assertThat(commitment.getStatus()).isEqualTo(CommitmentStatus.FINALIZED);
+        assertThat(commitment.getFinalizationOutcome()).isEqualTo(FinalizationOutcome.C);
+        assertThat(commitment.getPenaltyAmount()).isEqualByComparingTo("4000.00");
+        assertThat(commitment.getRefundAmount()).isEqualByComparingTo("6000.00");
+
+        assertThat(sellerViolationResolutionRepository.findBySellerDiagnosticCommitmentId(setup.commitmentId()))
+                .as("exactly one SellerViolationResolution must exist")
+                .isPresent();
+        Long resolutionId = sellerViolationResolutionRepository
+                .findBySellerDiagnosticCommitmentId(setup.commitmentId()).orElseThrow().getId();
+        assertThat(sellerViolationResolutionRepository.findItemsByResolutionId(resolutionId))
+                .as("exactly one SellerViolationResolutionItem must exist - no duplicate audit row")
+                .hasSize(1);
+
+        Long sellerDepositId = commitment.getDepositId();
+        Long sellerUserId = depositRepository.findById(sellerDepositId).orElseThrow().getUserId();
+        var transactions = depositRepository.findTransactionsByUserId(sellerUserId);
+        long chargeCount = transactions.stream()
+                .filter(t -> t.getDescription() != null && t.getDescription().contains("штрафа за нарушение")
+                        && t.getType() == com.example.autoauction.deposit.domain.DepositTransaction.TransactionType.CHARGE)
+                .count();
+        assertThat(chargeCount).as("exactly one seller-penalty CHARGE transaction - no double charge").isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("X3-E corrective (BLOCKER 3): conflicting retry - already FINALIZED/C with violation set {A}, " +
+            "retried with a DIFFERENT violation set {B} -> fails closed, durable state from the first resolution unchanged")
+    void resolve_ConflictingRetryDifferentViolationSet_FailsClosedStateUnchanged() {
+        // Both violations configured on the SAME draft BEFORE it is published - a
+        // PolicyVersionViolation cannot be added once its parent is published (immutable),
+        // so both ids must resolve against one shared policyVersionId from the start.
+        Long violationAId = violationDefinitionJpaRepository.save(
+                new com.example.autoauction.policy.infrastructure.persistence.JpaViolationDefinitionEntity(
+                        "X3E_CONFLICT_TEST_A", "test fixture", OffsetDateTime.now())).getId();
+        Long violationBId = violationDefinitionJpaRepository.save(
+                new com.example.autoauction.policy.infrastructure.persistence.JpaViolationDefinitionEntity(
+                        "X3E_CONFLICT_TEST_B", "test fixture", OffsetDateTime.now())).getId();
+        Long policyVersionId = policyVersionService.create(new BigDecimal("0.02"), 1L).getId();
+        policyVersionService.updateDraftViolation(policyVersionId, violationAId,
+                com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE, new BigDecimal("20"));
+        policyVersionService.updateDraftViolation(policyVersionId, violationBId,
+                com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE, new BigDecimal("50"));
+        policyVersionService.publish(policyVersionId);
+
+        Setup setup = approveAndGetVehicleWithCommitment(new BigDecimal("10000"), new BigDecimal("4000"));
+
+        txTemplate().execute(status -> {
+            sellerViolationResolutionEngine.resolve(setup.commitmentId(), policyVersionId,
+                    List.of(violationAId), 1L,
+                    com.example.autoauction.diagnostic.commitment.domain.TriggerSource.DIAGNOSTIC_REJECTION, null);
+            return null;
+        });
+
+        SellerDiagnosticCommitment afterFirst = sellerDiagnosticCommitmentRepository.findById(setup.commitmentId()).orElseThrow();
+        assertThat(afterFirst.getStatus()).isEqualTo(CommitmentStatus.FINALIZED);
+        assertThat(afterFirst.getPenaltyAmount()).isEqualByComparingTo("2000.00");
+
+        assertThatThrownBy(() -> txTemplate().execute(status -> {
+            sellerViolationResolutionEngine.resolve(setup.commitmentId(), policyVersionId,
+                    List.of(violationBId), 1L,
+                    com.example.autoauction.diagnostic.commitment.domain.TriggerSource.DIAGNOSTIC_REJECTION, null);
+            return null;
+        })).isInstanceOf(IllegalStateException.class);
+
+        SellerDiagnosticCommitment afterConflict = sellerDiagnosticCommitmentRepository.findById(setup.commitmentId()).orElseThrow();
+        assertThat(afterConflict.getPenaltyAmount())
+                .as("penalty from the first, successful resolution must remain unchanged after the conflicting retry")
+                .isEqualByComparingTo("2000.00");
+        assertThat(sellerViolationResolutionRepository.findItemsByResolutionId(
+                        sellerViolationResolutionRepository.findBySellerDiagnosticCommitmentId(setup.commitmentId()).orElseThrow().getId()))
+                .as("only the first resolution's item must exist - the conflicting retry never persisted anything")
+                .hasSize(1);
     }
 }

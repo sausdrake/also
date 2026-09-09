@@ -5,6 +5,7 @@ import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.diagnostic.commitment.domain.CommitmentStatus;
 import com.example.autoauction.diagnostic.commitment.domain.SellerDiagnosticCommitment;
 import com.example.autoauction.diagnostic.commitment.domain.port.SellerDiagnosticCommitmentRepository;
+import com.example.autoauction.policy.application.PolicyVersionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -34,11 +35,14 @@ public class SellerDiagnosticCommitmentService {
 
     private final SellerDiagnosticCommitmentRepository repository;
     private final DepositService depositService;
+    private final PolicyVersionService policyVersionService;
 
     public SellerDiagnosticCommitmentService(SellerDiagnosticCommitmentRepository repository,
-                                             DepositService depositService) {
+                                             DepositService depositService,
+                                             PolicyVersionService policyVersionService) {
         this.repository = repository;
         this.depositService = depositService;
+        this.policyVersionService = policyVersionService;
     }
 
     /**
@@ -48,6 +52,16 @@ public class SellerDiagnosticCommitmentService {
      * this call. Shares the caller's transaction (no REQUIRES_NEW) - a freeze failure must
      * abort the whole diagnostic-request creation, matching current behavior exactly
      * (DiagnosticRequestService.createRequest has no try/catch around this call).
+     *
+     * X3-E: also snapshots the currently published PolicyVersion's id onto the commitment -
+     * the diagnostic/commitment-stage policy reference used by the diagnostic-rejection
+     * SELLER_VIOLATION trigger (deliberately independent from Auction.policyVersionId, its
+     * own separately-snapshotted-at-auction-creation-time reference - locked X3-E business
+     * decision, the two are allowed to diverge). Fails closed (propagates
+     * PolicyVersionService.getCurrentPublished()'s IllegalStateException, aborting the whole
+     * freeze/diagnostic-request creation) if no PolicyVersion has ever been published -
+     * mirrors AdminAuctionService's own existing fail-closed convention for
+     * Auction.policyVersionId (V33).
      */
     @Transactional
     public void freezeCommitment(Long sellerId, Long diagnosticRequestId,
@@ -58,6 +72,7 @@ public class SellerDiagnosticCommitmentService {
         }
 
         Long depositId = depositService.getDepositByUserId(sellerId).id();
+        Long policyVersionId = policyVersionService.getCurrentPublished().getId();
 
         // Mutates the Deposit ledger (balance/blockedAmount) and records the
         // DepositTransaction - DepositService remains solely responsible for that; this
@@ -73,10 +88,11 @@ public class SellerDiagnosticCommitmentService {
         commitment.setDiagnosticFeeAmount(diagnosticFeeAmount);
         commitment.setStatus(CommitmentStatus.FROZEN);
         commitment.setFrozenAt(OffsetDateTime.now());
+        commitment.setPolicyVersionId(policyVersionId);
         repository.save(commitment);
 
-        log.info("Seller diagnostic commitment frozen: request={}, seller={}, committedAmount={}, diagnosticFeeAmount={}",
-                diagnosticRequestId, sellerId, committedAmount, diagnosticFeeAmount);
+        log.info("Seller diagnostic commitment frozen: request={}, seller={}, committedAmount={}, diagnosticFeeAmount={}, policyVersionId={}",
+                diagnosticRequestId, sellerId, committedAmount, diagnosticFeeAmount, policyVersionId);
     }
 
     /**

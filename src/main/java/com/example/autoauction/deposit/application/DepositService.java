@@ -474,6 +474,83 @@ public class DepositService {
     }
 
     /**
+     * X3-E: charges a seller's frozen diagnostic commitment for an Outcome-C (seller
+     * violation) penalty and refunds any remainder - structurally identical to
+     * {@link #chargeForDiagnosticRequest} (same {@link Deposit#chargeFromFrozen} primitive,
+     * same CHARGE-then-UNBLOCK transaction pair, same balanceBefore/balanceAfter recording
+     * convention) but with its OWN, accurate descriptions. Deliberately NOT a call to
+     * chargeForDiagnosticRequest itself - that method's description text ("Удержание
+     * диагностической комиссии...", "diagnostic commission withholding") would be factually
+     * wrong for a seller-violation penalty charge, misrepresenting it in an immutable
+     * financial audit trail (see the X3-E final scope report, Phase 2 #1 / section 9 -
+     * "do NOT reuse chargeForDiagnosticRequest() verbatim").
+     *
+     * X3-E corrective: {@code auctionId} is an explicit, separate parameter - NEVER the
+     * diagnosticRequestId. {@code DepositTransaction.auctionId} is a genuine Auction identity
+     * field (see {@code confiscateToPlatform}/{@code unblockForSaleFailure}, which always pass
+     * a real auction id there) and must never be overloaded with a different domain identity.
+     * The two triggers that call this method resolve it differently: the post-auction
+     * SALE_FAILED_C trigger passes the real {@code Auction.getId()}; the pre-auction
+     * DIAGNOSTIC_REJECTION trigger passes {@code null} - no Auction exists at that stage and
+     * none is fabricated. The diagnostic-request identity remains represented exactly where
+     * the existing ledger model already represents it for this kind of charge - the
+     * {@code reference} string ("DIAGNOSTIC_" + diagnosticRequestId, matching
+     * chargeForDiagnosticRequest's own convention) - never conflated with auctionId.
+     *
+     * No platform wallet/treasury credit is created here or anywhere else (locked X3-E MVP
+     * platform-accounting decision) - this only ever reduces the seller's own frozen
+     * collateral, exactly mirroring how confiscateToPlatform only ever reduces the buyer's own
+     * balance.
+     */
+    @Transactional
+    public void chargeSellerViolationPenalty(Long depositId, Long diagnosticRequestId, Long auctionId,
+                                              BigDecimal totalFrozen, BigDecimal chargeAmount) {
+        log.info("Charging seller violation penalty: deposit={}, request={}, auction={}, totalFrozen={}, chargeAmount={}",
+                depositId, diagnosticRequestId, auctionId, totalFrozen, chargeAmount);
+
+        Deposit deposit = depositRepository.findById(depositId)
+                .orElseThrow(() -> new IllegalArgumentException("Депозит не найден: " + depositId));
+
+        Long userId = deposit.getUserId();
+        BigDecimal rawBalanceBefore = deposit.getBalance();
+        BigDecimal availableBefore = deposit.getAvailableBalance();
+
+        deposit.chargeFromFrozen(totalFrozen, chargeAmount);
+        depositRepository.save(deposit);
+
+        BigDecimal rawBalanceAfter = deposit.getBalance();
+        BigDecimal availableAfter = deposit.getAvailableBalance();
+
+        if (chargeAmount.compareTo(BigDecimal.ZERO) > 0) {
+            DepositTransaction charge = new DepositTransaction(
+                    deposit.getId(), userId,
+                    DepositTransaction.TransactionType.CHARGE,
+                    chargeAmount, rawBalanceBefore, rawBalanceAfter,
+                    "DIAGNOSTIC_" + diagnosticRequestId,
+                    "Удержание штрафа за нарушение продавцом условий сделки по заявке #" + diagnosticRequestId
+            );
+            charge.setAuctionId(auctionId);
+            depositRepository.saveTransaction(charge);
+        }
+
+        BigDecimal refund = totalFrozen.subtract(chargeAmount);
+        if (refund.compareTo(BigDecimal.ZERO) > 0) {
+            DepositTransaction unblock = new DepositTransaction(
+                    deposit.getId(), userId,
+                    DepositTransaction.TransactionType.UNBLOCK,
+                    refund, availableBefore, availableAfter,
+                    "DIAGNOSTIC_" + diagnosticRequestId,
+                    "Возврат остатка после применения штрафа за нарушение по заявке #" + diagnosticRequestId
+            );
+            unblock.setAuctionId(auctionId);
+            depositRepository.saveTransaction(unblock);
+        }
+
+        log.info("Seller violation penalty charge complete for request {}: balance={}, blockedAmount={}",
+                diagnosticRequestId, deposit.getBalance(), deposit.getBlockedAmount());
+    }
+
+    /**
      * @param requiredAmount фиксированная сумма депозита, требуемая для конкретного аукциона
      *                       (auction.getRequiredDepositAmount()) — НЕ стартовая цена и не процент от неё.
      */

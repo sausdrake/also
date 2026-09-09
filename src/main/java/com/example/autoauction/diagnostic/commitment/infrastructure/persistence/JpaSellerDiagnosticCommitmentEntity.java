@@ -76,6 +76,11 @@ public class JpaSellerDiagnosticCommitmentEntity {
     @Column(name = "refund_amount", precision = 19, scale = 2)
     private BigDecimal refundAmount;
 
+    // X3-E: diagnostic/commitment-stage policy snapshot, taken once at freezeCommitment() -
+    // nullable only because pre-X3-E rows predate this column and are never backfilled.
+    @Column(name = "policy_version_id")
+    private Long policyVersionId;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -107,6 +112,7 @@ public class JpaSellerDiagnosticCommitmentEntity {
     public OffsetDateTime getFinalizedAt() { return finalizedAt; }
     public BigDecimal getPenaltyAmount() { return penaltyAmount; }
     public BigDecimal getRefundAmount() { return refundAmount; }
+    public Long getPolicyVersionId() { return policyVersionId; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }
 
@@ -121,6 +127,7 @@ public class JpaSellerDiagnosticCommitmentEntity {
     public void setFinalizedAt(OffsetDateTime finalizedAt) { this.finalizedAt = finalizedAt; }
     public void setPenaltyAmount(BigDecimal penaltyAmount) { this.penaltyAmount = penaltyAmount; }
     public void setRefundAmount(BigDecimal refundAmount) { this.refundAmount = refundAmount; }
+    public void setPolicyVersionId(Long policyVersionId) { this.policyVersionId = policyVersionId; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
     public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

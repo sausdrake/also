@@ -26,6 +26,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -1008,6 +1009,108 @@ class DepositServiceTest {
 
             verify(depositRepository, never()).save(any());
             verify(depositRepository, never()).saveTransaction(any());
+        }
+    }
+
+    // ==================== X3-E corrective: chargeSellerViolationPenalty ledger reference ====================
+
+    @Nested
+    @DisplayName("X3-E corrective (BLOCKER 1): chargeSellerViolationPenalty() — ledger reference correctness")
+    class ChargeSellerViolationPenaltyTests {
+
+        private final Long requestId = 700L;
+        private final Long realAuctionId = 900L;
+
+        private Deposit depositFor(BigDecimal balance, BigDecimal blocked) {
+            Deposit d = new Deposit(userId, balance);
+            d.setId(depositId);
+            if (blocked.compareTo(BigDecimal.ZERO) > 0) {
+                d.freezeForAuction(blocked);
+            }
+            return d;
+        }
+
+        @Test
+        @DisplayName("SALE_FAILED_C (real auctionId passed): CHARGE and UNBLOCK both carry the real Auction id, " +
+                "never the diagnosticRequestId")
+        void chargeSellerViolationPenalty_WithAuctionId_ChargeAndUnblockReferenceRealAuction() {
+            Deposit deposit = depositFor(new BigDecimal("20000"), new BigDecimal("10000"));
+            when(depositRepository.findById(depositId)).thenReturn(Optional.of(deposit));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            depositService.chargeSellerViolationPenalty(depositId, requestId, realAuctionId,
+                    new BigDecimal("10000"), new BigDecimal("4000"));
+
+            ArgumentCaptor<DepositTransaction> captor = ArgumentCaptor.forClass(DepositTransaction.class);
+            verify(depositRepository, times(2)).saveTransaction(captor.capture());
+            List<DepositTransaction> saved = captor.getAllValues();
+
+            DepositTransaction charge = saved.stream()
+                    .filter(t -> t.getType() == DepositTransaction.TransactionType.CHARGE).findFirst().orElseThrow();
+            DepositTransaction unblock = saved.stream()
+                    .filter(t -> t.getType() == DepositTransaction.TransactionType.UNBLOCK).findFirst().orElseThrow();
+
+            assertEquals(realAuctionId, charge.getAuctionId());
+            assertEquals(realAuctionId, unblock.getAuctionId());
+            assertNotEquals(requestId, charge.getAuctionId());
+        }
+
+        @Test
+        @DisplayName("DIAGNOSTIC_REJECTION (auctionId=null passed): CHARGE and UNBLOCK both have auctionId=null - " +
+                "no fabricated Auction id is ever created")
+        void chargeSellerViolationPenalty_NullAuctionId_ChargeAndUnblockHaveNoFakeAuctionId() {
+            Deposit deposit = depositFor(new BigDecimal("20000"), new BigDecimal("10000"));
+            when(depositRepository.findById(depositId)).thenReturn(Optional.of(deposit));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            depositService.chargeSellerViolationPenalty(depositId, requestId, null,
+                    new BigDecimal("10000"), new BigDecimal("4000"));
+
+            ArgumentCaptor<DepositTransaction> captor = ArgumentCaptor.forClass(DepositTransaction.class);
+            verify(depositRepository, times(2)).saveTransaction(captor.capture());
+            List<DepositTransaction> saved = captor.getAllValues();
+
+            assertThat(saved).allSatisfy(t -> assertThat(t.getAuctionId()).isNull());
+        }
+
+        @Test
+        @DisplayName("diagnosticRequestId remains represented via reference (\"DIAGNOSTIC_\" + requestId) " +
+                "regardless of whether a real auctionId is present")
+        void chargeSellerViolationPenalty_ReferenceAlwaysCarriesDiagnosticRequestId() {
+            Deposit deposit = depositFor(new BigDecimal("20000"), new BigDecimal("10000"));
+            when(depositRepository.findById(depositId)).thenReturn(Optional.of(deposit));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            depositService.chargeSellerViolationPenalty(depositId, requestId, realAuctionId,
+                    new BigDecimal("10000"), new BigDecimal("4000"));
+
+            ArgumentCaptor<DepositTransaction> captor = ArgumentCaptor.forClass(DepositTransaction.class);
+            verify(depositRepository, times(2)).saveTransaction(captor.capture());
+            assertThat(captor.getAllValues()).allSatisfy(t ->
+                    assertThat(t.getReference()).isEqualTo("DIAGNOSTIC_" + requestId));
+        }
+
+        @Test
+        @DisplayName("Description text is the dedicated seller-violation wording, never chargeForDiagnosticRequest's " +
+                "diagnostic-commission wording")
+        void chargeSellerViolationPenalty_UsesDedicatedDescription_NeverDiagnosticFeeWording() {
+            Deposit deposit = depositFor(new BigDecimal("20000"), new BigDecimal("10000"));
+            when(depositRepository.findById(depositId)).thenReturn(Optional.of(deposit));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            depositService.chargeSellerViolationPenalty(depositId, requestId, realAuctionId,
+                    new BigDecimal("10000"), new BigDecimal("4000"));
+
+            ArgumentCaptor<DepositTransaction> captor = ArgumentCaptor.forClass(DepositTransaction.class);
+            verify(depositRepository, times(2)).saveTransaction(captor.capture());
+            assertThat(captor.getAllValues()).allSatisfy(t -> {
+                assertThat(t.getDescription()).doesNotContain("диагностической комиссии");
+                assertThat(t.getDescription()).contains("штрафа за нарушение");
+            });
         }
     }
 
