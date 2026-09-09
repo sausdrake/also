@@ -9,7 +9,8 @@ import java.time.OffsetDateTime;
 
 @Slf4j
 @Entity
-@Table(name = "auctions")
+@Table(name = "auctions",
+        uniqueConstraints = @UniqueConstraint(columnNames = "seller_diagnostic_commitment_id"))
 public class JpaAuctionEntity {
 
     @Id
@@ -48,6 +49,15 @@ public class JpaAuctionEntity {
      */
     @Column(name = "policy_version_id")
     private Long policyVersionId;
+
+    /**
+     * X3-C: nullable FK to seller_diagnostic_commitment(id), UNIQUE. Null only for legacy,
+     * pre-X3-C auctions. updatable is intentionally NOT set to false here - the field is
+     * written exactly once via the domain's own single-call-site discipline (see
+     * Auction.setSellerDiagnosticCommitmentId's Javadoc), not enforced at this layer.
+     */
+    @Column(name = "seller_diagnostic_commitment_id")
+    private Long sellerDiagnosticCommitmentId;
 
     @Column(name = "start_time", nullable = false)
     private OffsetDateTime startTime;
@@ -134,6 +144,9 @@ public class JpaAuctionEntity {
 
     public Long getPolicyVersionId() { return policyVersionId; }
     public void setPolicyVersionId(Long policyVersionId) { this.policyVersionId = policyVersionId; }
+
+    public Long getSellerDiagnosticCommitmentId() { return sellerDiagnosticCommitmentId; }
+    public void setSellerDiagnosticCommitmentId(Long sellerDiagnosticCommitmentId) { this.sellerDiagnosticCommitmentId = sellerDiagnosticCommitmentId; }
 
     public OffsetDateTime getStartTime() { return startTime; }
     public void setStartTime(OffsetDateTime startTime) { this.startTime = startTime; }

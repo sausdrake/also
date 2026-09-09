@@ -33,6 +33,8 @@ public interface SpringDataAuctionJpaRepository extends JpaRepository<JpaAuction
 
     boolean existsByVehicleIdAndStatusIn(Long vehicleId, List<AuctionStatus> statuses);
 
+    boolean existsBySellerDiagnosticCommitmentId(Long sellerDiagnosticCommitmentId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM JpaAuctionEntity a WHERE a.id = :id")
     Optional<JpaAuctionEntity> findByIdWithLock(@Param("id") Long id);

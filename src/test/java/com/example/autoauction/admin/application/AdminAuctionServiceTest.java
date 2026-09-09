@@ -1,5 +1,6 @@
 package com.example.autoauction.admin.application;
 
+import com.example.autoauction.auction.application.AuctionCommitmentResolver;
 import com.example.autoauction.auction.application.AuctionFinalizer;
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
@@ -25,6 +26,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -66,8 +68,13 @@ class AdminAuctionServiceTest {
     @Mock
     private PolicyVersionService policyVersionService;
 
+    @Mock
+    private AuctionCommitmentResolver auctionCommitmentResolver;
+
     @InjectMocks
     private AdminAuctionService adminAuctionService;
+
+    private static final Long DEFAULT_COMMITMENT_ID = 500L;
 
     private AuctionCreateRequest validRequest;
     private VehicleResponse approvedVehicle;
@@ -123,6 +130,15 @@ class AdminAuctionServiceTest {
         // as UnnecessaryStubbingException - see BidServiceTest's setUp() for the same convention.
         currentPolicy = new PolicyVersion(1L, 1L, new BigDecimal("0.05"), true,
                 OffsetDateTime.now(), adminId, OffsetDateTime.now());
+
+        // X3-C: lenient default so every test that happens to reach past checkExistingAuctions
+        // gets a valid commitment id without having to stub it individually - matching this
+        // class's existing convention of NOT stubbing globally with a strict when() for calls
+        // several tests never reach (see currentPolicy's own comment above). lenient() is
+        // required here specifically because, unlike currentPolicy (a plain field, stubbed
+        // per-test), this IS a mock call that MockitoExtension's strict stubbing would flag as
+        // unnecessary for every test that throws before reaching this point.
+        lenient().when(auctionCommitmentResolver.resolveEligibleCommitment(anyLong())).thenReturn(DEFAULT_COMMITMENT_ID);
     }
 
     @Nested
@@ -154,6 +170,71 @@ class AdminAuctionServiceTest {
             verify(auctionRepository, times(1)).existsByVehicleIdAndStatusIn(eq(1L), anyList());
             verify(auctionValidator, times(1)).validateBasicRequest(any());
             verify(auctionValidator, times(1)).validateBusinessRules(any(), any());
+        }
+
+        @Test
+        @DisplayName("X3-C: резолвер вызывается с правильным vehicleId, результат записывается в снимок Auction")
+        void createAuction_ResolvesCommitmentAndStoresImmutableSnapshot() {
+            // given
+            doNothing().when(auctionValidator).validateBasicRequest(any());
+            doNothing().when(auctionValidator).validateBusinessRules(any(), any());
+            when(vehicleService.getVehicleDetails(1L)).thenReturn(approvedVehicle);
+            when(auctionRepository.existsByVehicleIdAndStatusIn(eq(1L), anyList())).thenReturn(false);
+            when(policyVersionService.getCurrentPublished()).thenReturn(currentPolicy);
+            when(policyVersionService.getById(currentPolicy.getId())).thenReturn(currentPolicy);
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            adminAuctionService.createAuction(validRequest, adminId);
+
+            // then
+            verify(auctionCommitmentResolver, times(1)).resolveEligibleCommitment(1L);
+            ArgumentCaptor<Auction> auctionCaptor = ArgumentCaptor.forClass(Auction.class);
+            verify(auctionRepository).save(auctionCaptor.capture());
+            assertEquals(DEFAULT_COMMITMENT_ID, auctionCaptor.getValue().getSellerDiagnosticCommitmentId());
+        }
+
+        @Test
+        @DisplayName("X3-C: резолвер отклоняет (нет eligible commitment) -> Auction не создаётся")
+        void createAuction_CommitmentResolutionFails_NoAuctionCreated() {
+            // given
+            doNothing().when(auctionValidator).validateBasicRequest(any());
+            doNothing().when(auctionValidator).validateBusinessRules(any(), any());
+            when(vehicleService.getVehicleDetails(1L)).thenReturn(approvedVehicle);
+            when(auctionRepository.existsByVehicleIdAndStatusIn(eq(1L), anyList())).thenReturn(false);
+            when(auctionCommitmentResolver.resolveEligibleCommitment(1L))
+                    .thenThrow(new IllegalArgumentException("Для диагностической заявки нет seller diagnostic commitment"));
+
+            // when & then
+            assertThrows(IllegalArgumentException.class, () ->
+                    adminAuctionService.createAuction(validRequest, adminId));
+
+            verify(auctionRepository, never()).save(any(Auction.class));
+            // и резолвер вызывается ПОСЛЕ уже существующих проверок (checkExistingAuctions),
+            // не до них - порядок сохранён
+            verify(auctionRepository, times(1)).existsByVehicleIdAndStatusIn(eq(1L), anyList());
+        }
+
+        @Test
+        @DisplayName("X3-C: резолвер вызывается после checkExistingAuctions и до auctionRepository.save")
+        void createAuction_ResolverCalledBetweenExistingAuctionCheckAndSave() {
+            // given
+            doNothing().when(auctionValidator).validateBasicRequest(any());
+            doNothing().when(auctionValidator).validateBusinessRules(any(), any());
+            when(vehicleService.getVehicleDetails(1L)).thenReturn(approvedVehicle);
+            when(auctionRepository.existsByVehicleIdAndStatusIn(eq(1L), anyList())).thenReturn(false);
+            when(policyVersionService.getCurrentPublished()).thenReturn(currentPolicy);
+            when(policyVersionService.getById(currentPolicy.getId())).thenReturn(currentPolicy);
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            adminAuctionService.createAuction(validRequest, adminId);
+
+            // then
+            InOrder inOrder = inOrder(auctionRepository, auctionCommitmentResolver);
+            inOrder.verify(auctionRepository).existsByVehicleIdAndStatusIn(eq(1L), anyList());
+            inOrder.verify(auctionCommitmentResolver).resolveEligibleCommitment(1L);
+            inOrder.verify(auctionRepository).save(any(Auction.class));
         }
 
         @ParameterizedTest

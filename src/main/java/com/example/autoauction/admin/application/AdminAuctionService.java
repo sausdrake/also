@@ -1,6 +1,7 @@
 // admin/application/AdminAuctionService.java
 package com.example.autoauction.admin.application;
 
+import com.example.autoauction.auction.application.AuctionCommitmentResolver;
 import com.example.autoauction.auction.application.AuctionFinalizer;
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
@@ -42,6 +43,7 @@ public class AdminAuctionService {
     private final DepositService depositService;
     private final UserService userService;
     private final PolicyVersionService policyVersionService;
+    private final AuctionCommitmentResolver auctionCommitmentResolver;
 
     public AdminAuctionService(AuctionRepository auctionRepository,
                                VehicleService vehicleService,
@@ -51,7 +53,8 @@ public class AdminAuctionService {
                                AuctionParticipantRepository participantRepository,
                                DepositService depositService,
                                UserService userService,
-                               PolicyVersionService policyVersionService) {
+                               PolicyVersionService policyVersionService,
+                               AuctionCommitmentResolver auctionCommitmentResolver) {
         this.auctionFinalizer = auctionFinalizer;
         this.auctionRepository = auctionRepository;
         this.vehicleService = vehicleService;
@@ -61,6 +64,7 @@ public class AdminAuctionService {
         this.depositService = depositService;
         this.userService = userService;
         this.policyVersionService = policyVersionService;
+        this.auctionCommitmentResolver = auctionCommitmentResolver;
         log.info("AdminAuctionService инициализирован");
     }
 
@@ -74,7 +78,14 @@ public class AdminAuctionService {
         auctionValidator.validateBusinessRules(request, vehicle);
         checkExistingAuctions(request.vehicleId());
 
-        return createAndSaveAuction(request, adminId, vehicle);
+        // X3-C: a NEW Auction must never be persisted without an eligible commitment -
+        // resolved and validated BEFORE the Auction is constructed, inside this same
+        // transaction, so a resolution failure leaves no partial state whatsoever. Historical
+        // NULL remains possible only for rows that predate this rule (never for anything
+        // created through this method).
+        Long sellerDiagnosticCommitmentId = auctionCommitmentResolver.resolveEligibleCommitment(request.vehicleId());
+
+        return createAndSaveAuction(request, adminId, vehicle, sellerDiagnosticCommitmentId);
     }
 
     @SuppressWarnings("deprecation") // legacy COMPLETED auctions are treated as already-sold, per Slice 1a contract
@@ -114,8 +125,9 @@ public class AdminAuctionService {
         }
     }
 
-    private AuctionResponse createAndSaveAuction(AuctionCreateRequest request, Long adminId, VehicleResponse vehicle) {
-        Auction auction = createAuctionFromRequest(request, adminId, vehicle);
+    private AuctionResponse createAndSaveAuction(AuctionCreateRequest request, Long adminId, VehicleResponse vehicle,
+                                                   Long sellerDiagnosticCommitmentId) {
+        Auction auction = createAuctionFromRequest(request, adminId, vehicle, sellerDiagnosticCommitmentId);
 
         try {
             Auction saved = auctionRepository.save(auction);
@@ -186,7 +198,8 @@ public class AdminAuctionService {
         return vehicle;
     }
 
-    private Auction createAuctionFromRequest(AuctionCreateRequest request, Long adminId, VehicleResponse vehicle) {
+    private Auction createAuctionFromRequest(AuctionCreateRequest request, Long adminId, VehicleResponse vehicle,
+                                              Long sellerDiagnosticCommitmentId) {
         Auction auction = new Auction(
                 request.vehicleId(),
                 request.startingPrice(),
@@ -201,6 +214,11 @@ public class AdminAuctionService {
         String vehicleInfo = String.format("%s %s %d (VIN: %s)",
                 vehicle.brand(), vehicle.model(), vehicle.year(), vehicle.vin());
         auction.setVehicleInfo(vehicleInfo);
+
+        // X3-C: immutable snapshot, assigned exactly once, here - never re-derived later from
+        // Vehicle's current diagnosticRequestId pointer. See Auction.setSellerDiagnosticCommitmentId's
+        // Javadoc for the single-call-site discipline.
+        auction.setSellerDiagnosticCommitmentId(sellerDiagnosticCommitmentId);
 
         if (request.requiredDepositAmount() != null) {
             auction.setRequiredDepositAmount(request.requiredDepositAmount());

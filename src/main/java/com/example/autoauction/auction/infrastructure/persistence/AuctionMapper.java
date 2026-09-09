@@ -42,6 +42,7 @@ public class AuctionMapper {
         entity.setConfirmedStart(domain.isConfirmedStart());
         entity.setConfirmationDeadline(domain.getConfirmationDeadline());
         entity.setPolicyVersionId(domain.getPolicyVersionId());
+        entity.setSellerDiagnosticCommitmentId(domain.getSellerDiagnosticCommitmentId());
         return entity;
     }
 
@@ -83,6 +84,9 @@ public class AuctionMapper {
         // lock, Issue 1) and must never re-run creation-time validation against already-
         // persisted data (Issue 5).
         auction.setPolicyVersionId(entity.getPolicyVersionId());
+        // X3-C: pure field restoration, same discipline as policyVersionId above - no
+        // commitment-module lookup, no re-resolution against Vehicle's current pointer.
+        auction.setSellerDiagnosticCommitmentId(entity.getSellerDiagnosticCommitmentId());
         return auction;
     }
 }

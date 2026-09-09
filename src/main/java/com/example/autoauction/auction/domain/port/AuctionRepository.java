@@ -60,4 +60,10 @@ public interface AuctionRepository {
 
     // Активные аукционы, завершающиеся в заданном временном окне
     List<Auction> findActiveEndingBetween(java.time.OffsetDateTime from, java.time.OffsetDateTime to);
+
+    // X3-C: application-level pre-check used by AuctionCommitmentResolver to reject a
+    // commitment already linked to another auction with a clear error before attempting to
+    // persist. The DB UNIQUE constraint on seller_diagnostic_commitment_id is the final,
+    // authoritative backstop for the concurrent-creation race this check cannot itself close.
+    boolean existsBySellerDiagnosticCommitmentId(Long sellerDiagnosticCommitmentId);
 }

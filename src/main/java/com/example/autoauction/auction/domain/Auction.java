@@ -37,6 +37,17 @@ public class Auction {
     private Long policyVersionId;
 
     /**
+     * X3-C: immutable snapshot of the SellerDiagnosticCommitment this auction was resolved
+     * against at creation (via AuctionCommitmentResolver), NEVER re-derived from Vehicle's
+     * current diagnosticRequestId pointer afterward - that pointer can move on to a later
+     * diagnostic cycle while this auction's own backing commitment stays fixed forever. {@code
+     * null} means a legacy, pre-X3-C auction - the application layer (AdminAuctionService)
+     * fails a NEW auction closed before construction if no eligible commitment resolves, so
+     * null is never assigned here by any current production path for a newly-created auction.
+     */
+    private Long sellerDiagnosticCommitmentId;
+
+    /**
      * Фиксированная сумма депозита, требуемая для участия в ЭТОМ аукционе, задаётся
      * администратором индивидуально для каждого лота (НЕ процент от startingPrice).
      * Nullable для обратной совместимости с уже существующими записями аукционов,
@@ -193,6 +204,7 @@ public class Auction {
     public BigDecimal getBuyNowPrice() { return buyNowPrice; }
     public BigDecimal getMinBidStep() { return minBidStep; }
     public Long getPolicyVersionId() { return policyVersionId; }
+    public Long getSellerDiagnosticCommitmentId() { return sellerDiagnosticCommitmentId; }
     public BigDecimal getRequiredDepositAmount() { return requiredDepositAmount; }
     public OffsetDateTime getStartTime() { return startTime; }
     public OffsetDateTime getEndTime() { return endTime; }
@@ -311,6 +323,27 @@ public class Auction {
      */
     public void setPolicyVersionId(Long policyVersionId) {
         this.policyVersionId = policyVersionId;
+        this.updatedAt = now();
+    }
+
+    /**
+     * X3-C: plain setter, matching this class's existing single-call-site discipline (see
+     * {@link #setPolicyVersionId}'s Javadoc for the identical pattern) rather than a constructor
+     * parameter - changing the constructor would ripple into every existing test call site
+     * across the codebase for a field most of them have no reason to care about. The only
+     * legitimate call sites are (1) AdminAuctionService, exactly once, immediately after
+     * AuctionCommitmentResolver resolves the eligible commitment for a brand-new auction, and
+     * (2) AuctionMapper.toDomain(), exactly once, restoring the persisted value when
+     * reconstructing an existing auction. Business rule: once assigned to a persisted auction,
+     * this value must NEVER be reassigned, cleared, or re-derived from Vehicle's current
+     * diagnosticRequestId - no business operation in this codebase calls this method a second
+     * time on the same auction. That is a documented discipline, not a structurally-enforced
+     * one at the domain layer (the DB UNIQUE constraint on this column is the structural
+     * backstop against a commitment being claimed by two auctions - see the X3-C architecture
+     * re-lock).
+     */
+    public void setSellerDiagnosticCommitmentId(Long sellerDiagnosticCommitmentId) {
+        this.sellerDiagnosticCommitmentId = sellerDiagnosticCommitmentId;
         this.updatedAt = now();
     }
 

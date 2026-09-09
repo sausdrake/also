@@ -357,6 +357,27 @@ class AuctionTest {
         assertTrue(!auction.getUpdatedAt().isBefore(before));
     }
 
+    // ==================== X3-C: sellerDiagnosticCommitmentId ====================
+
+    @Test
+    void sellerDiagnosticCommitmentId_DefaultsToNull() {
+        assertNull(auction.getSellerDiagnosticCommitmentId());
+    }
+
+    @Test
+    void setSellerDiagnosticCommitmentId_ShouldSetValueAndTouchUpdatedAt() {
+        // given
+        var before = auction.getUpdatedAt();
+
+        // when
+        auction.setSellerDiagnosticCommitmentId(99L);
+
+        // then
+        assertEquals(99L, auction.getSellerDiagnosticCommitmentId());
+        assertNotNull(auction.getUpdatedAt());
+        assertTrue(!auction.getUpdatedAt().isBefore(before));
+    }
+
     @Test
     void resolveBuyerFacingReservePrice_LegacyAuction_ReturnsRawValueUnchanged() {
         // given: policyVersionId is null (legacy auction, grandfathered)

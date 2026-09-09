@@ -11,7 +11,8 @@ import java.time.OffsetDateTime;
 
 @Slf4j
 @Entity
-@Table(name = "vehicles")
+@Table(name = "vehicles",
+        uniqueConstraints = @UniqueConstraint(columnNames = "diagnostic_request_id"))
 public class JpaVehicleEntity {
 
     @Id
@@ -64,6 +65,11 @@ public class JpaVehicleEntity {
 
     @Column(name = "diagnostic_name")
     private String diagnosticName;
+
+    // X3-C: see Vehicle.diagnosticRequestId's field Javadoc. Nullable - historical/manual
+    // vehicles predate or fall outside this relationship.
+    @Column(name = "diagnostic_request_id")
+    private Long diagnosticRequestId;
 
     @Column(name = "admin_id")
     private Long adminId;
@@ -137,6 +143,9 @@ public class JpaVehicleEntity {
 
     public String getDiagnosticName() { return diagnosticName; }
     public void setDiagnosticName(String diagnosticName) { this.diagnosticName = diagnosticName; }
+
+    public Long getDiagnosticRequestId() { return diagnosticRequestId; }
+    public void setDiagnosticRequestId(Long diagnosticRequestId) { this.diagnosticRequestId = diagnosticRequestId; }
 
     public Long getAdminId() { return adminId; }
     public void setAdminId(Long adminId) { this.adminId = adminId; }

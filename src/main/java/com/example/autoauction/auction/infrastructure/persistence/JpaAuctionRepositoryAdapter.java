@@ -136,6 +136,12 @@ public class JpaAuctionRepositoryAdapter implements AuctionRepository {
 
     @Override
     @Transactional(readOnly = true)
+    public boolean existsBySellerDiagnosticCommitmentId(Long sellerDiagnosticCommitmentId) {
+        return jpaRepository.existsBySellerDiagnosticCommitmentId(sellerDiagnosticCommitmentId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<AuctionStatus> findStatusesByVehicleId(Long vehicleId) {
         return jpaRepository.findByVehicleId(vehicleId).stream()
                 .map(JpaAuctionEntity::getStatus)

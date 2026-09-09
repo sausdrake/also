@@ -1121,4 +1121,62 @@ class VehicleServiceTest {
             verify(vehicleRepository, never()).save(any());
         }
     }
+
+    @Nested
+    @DisplayName("X3-C: createFromDiagnosticRequest(...) - diagnosticRequestId write")
+    class CreateFromDiagnosticRequestTests {
+
+        @Test
+        @DisplayName("Новый VIN -> создаёт Vehicle и сохраняет diagnosticRequestId из аргумента")
+        void createFromDiagnosticRequest_NewVin_SavesDiagnosticRequestId() {
+            // given
+            when(vehicleRepository.existsByVin("WBSDE91070CZ12345")).thenReturn(false);
+            when(vehicleRepository.save(any(Vehicle.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            vehicleService.createFromDiagnosticRequest(
+                    77L, "BMW", "M5", 2023, "WBSDE91070CZ12345",
+                    diagnosticId, diagnosticName, 1L, "admin"
+            );
+
+            // then
+            ArgumentCaptor<Vehicle> vehicleCaptor = ArgumentCaptor.forClass(Vehicle.class);
+            verify(vehicleRepository).save(vehicleCaptor.capture());
+            assertEquals(77L, vehicleCaptor.getValue().getDiagnosticRequestId());
+            assertEquals(VehicleStatus.APPROVED, vehicleCaptor.getValue().getStatus());
+        }
+
+        @Test
+        @DisplayName("VIN уже существует -> существующий Vehicle возвращается НЕТРОНУТЫМ, save не вызывается, diagnosticRequestId не обновляется")
+        void createFromDiagnosticRequest_ExistingVin_DoesNotTouchExistingVehicleOrCallSave() {
+            // given: existing vehicle (approvedVehicle, VIN WDD2132891A123456) already has a
+            // DIFFERENT (earlier) diagnosticRequestId
+            approvedVehicle.setDiagnosticRequestId(1L);
+            when(vehicleRepository.existsByVin("WDD2132891A123456")).thenReturn(true);
+            when(vehicleRepository.findByVin("WDD2132891A123456")).thenReturn(Optional.of(approvedVehicle));
+
+            // when: a second, later DiagnosticRequest (id=99) is approved for the same VIN
+            vehicleService.createFromDiagnosticRequest(
+                    99L, "Mercedes", "E63", 2023, "WDD2132891A123456",
+                    diagnosticId, diagnosticName, 1L, "admin"
+            );
+
+            // then: deliberately NOT a re-diagnostic pointer update (out of scope for X3-C) -
+            // the existing vehicle keeps its original (now stale) diagnosticRequestId=1, and no
+            // save() is ever invoked for this branch.
+            assertEquals(1L, approvedVehicle.getDiagnosticRequestId());
+            verify(vehicleRepository, never()).save(any(Vehicle.class));
+        }
+
+        @Test
+        @DisplayName("Вручную созданный Vehicle (без diagnosticRequestId) -> NULL остаётся допустимым")
+        void manuallyCreatedVehicle_DiagnosticRequestIdDefaultsToNull() {
+            Vehicle manualVehicle = createTestVehicle(
+                    42L, "Lada", "Vesta", 2022, "XTA21230010123456",
+                    VehicleType.SEDAN, diagnosticId, diagnosticName, VehicleStatus.DRAFT
+            );
+
+            assertNull(manualVehicle.getDiagnosticRequestId());
+        }
+    }
 }

@@ -24,6 +24,23 @@ public class Vehicle {
     private Long diagnosticId;
     private String diagnosticName;
 
+    /**
+     * X3-C: the DiagnosticRequest that represents this Vehicle's CURRENT diagnostic cycle -
+     * the authoritative pointer used by AuctionCommitmentResolver to deterministically find
+     * the eligible SellerDiagnosticCommitment for a new Auction. Null for legacy/manual
+     * vehicles that predate this relationship (or were created outside the diagnostic-request
+     * workflow) - such a vehicle remains auction-ineligible until some future commitment-
+     * producing workflow establishes this link (explicitly out of scope here, per the X3-C
+     * business-decision lock on the manual-vehicle path).
+     *
+     * Written exactly once today, by VehicleService.createFromDiagnosticRequest's create
+     * branch, at Vehicle creation. There is currently no second writer - the re-diagnostic
+     * workflow that would update this pointer on a later cycle does not exist yet and is out
+     * of scope for X3-C (see that method's own Javadoc for the VIN-dedup branch this
+     * deliberately does NOT touch).
+     */
+    private Long diagnosticRequestId;
+
     // Кто одобрил (админ)
     private Long adminId;
     private String adminName;
@@ -67,6 +84,7 @@ public class Vehicle {
     public VehicleStatus getStatus() { return status; }
     public Long getDiagnosticId() { return diagnosticId; }
     public String getDiagnosticName() { return diagnosticName; }
+    public Long getDiagnosticRequestId() { return diagnosticRequestId; }
     public Long getAdminId() { return adminId; }
     public String getAdminName() { return adminName; }
     public String getRejectionReason() { return rejectionReason; }
@@ -191,5 +209,14 @@ public class Vehicle {
 
     public void setReviewedAt(OffsetDateTime reviewedAt) {
         this.reviewedAt = reviewedAt;
+    }
+
+    /**
+     * X3-C: see {@link #diagnosticRequestId}'s field Javadoc for the single-writer discipline.
+     * Plain setter, matching this class's existing convention (setAdminId, setRejectionReason)
+     * rather than a guarded business method - this is a reference fact, not a state machine.
+     */
+    public void setDiagnosticRequestId(Long diagnosticRequestId) {
+        this.diagnosticRequestId = diagnosticRequestId;
     }
 }

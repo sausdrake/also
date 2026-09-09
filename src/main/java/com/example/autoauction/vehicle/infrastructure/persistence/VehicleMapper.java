@@ -28,6 +28,7 @@ public class VehicleMapper {
         entity.setStatus(domain.getStatus());
         entity.setDiagnosticId(domain.getDiagnosticId());
         entity.setDiagnosticName(domain.getDiagnosticName());
+        entity.setDiagnosticRequestId(domain.getDiagnosticRequestId());
         entity.setAdminId(domain.getAdminId());
         entity.setAdminName(domain.getAdminName());
         entity.setRejectionReason(domain.getRejectionReason());
@@ -52,6 +53,7 @@ public class VehicleMapper {
         );
 
         vehicle.setId(entity.getId());
+        vehicle.setDiagnosticRequestId(entity.getDiagnosticRequestId());
         vehicle.setLicensePlate(entity.getLicensePlate());
         vehicle.setColor(entity.getColor());
         vehicle.setMileage(entity.getMileage());

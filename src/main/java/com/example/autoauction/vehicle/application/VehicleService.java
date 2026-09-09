@@ -396,6 +396,12 @@ public class VehicleService {
             Long adminId, String adminName) {
 
         // Если VIN уже зарегистрирован — возвращаем существующий автомобиль
+        // X3-C: deliberately left untouched - does NOT update diagnosticRequestId on the
+        // existing Vehicle. Updating it here would be building the re-diagnostic pointer-
+        // update workflow, explicitly out of scope for X3-C (see the architecture re-lock's
+        // disclosed CONCERN on this exact branch). A vehicle that reaches this branch keeps
+        // whichever diagnosticRequestId it already has (possibly stale), and AuctionCommitmentResolver
+        // fails closed rather than silently re-deriving a newer one.
         if (vehicleRepository.existsByVin(vin)) {
             log.warn("Vehicle with VIN {} already exists, skipping creation", vin);
             return vehicleRepository.findByVin(vin)
@@ -409,6 +415,11 @@ public class VehicleService {
         // Сразу переводим в APPROVED (отчёт уже одобрен)
         vehicle.submitForReview();
         vehicle.approve(adminId, adminName);
+        // X3-C: this IS the single, authoritative write of Vehicle.diagnosticRequestId - only
+        // in this create branch, never in the VIN-dedup branch above (which deliberately
+        // returns the existing Vehicle untouched - see that branch's own comment and the
+        // X3-C architecture re-lock for why it stays that way).
+        vehicle.setDiagnosticRequestId(diagnosticRequestId);
 
         Vehicle saved = vehicleRepository.save(vehicle);
         log.info("Vehicle created from diagnostic request {}: id={}, vin={}", diagnosticRequestId, saved.getId(), vin);
