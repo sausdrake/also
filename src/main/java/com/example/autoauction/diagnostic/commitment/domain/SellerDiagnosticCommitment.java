@@ -14,9 +14,14 @@ import java.time.OffsetDateTime;
  * PHASE 2: adds diagnosticFeeAmount (a second snapshot, alongside committedAmount) and
  * status (the commitment's own lifecycle state - see CommitmentStatus). Both
  * committedAmount and diagnosticFeeAmount are assigned exactly once, at creation, and are
- * never re-read from configuration afterward. penaltyAmount/refundAmount/
- * penaltyPolicyRef/finalizedAt and any commission/payment/settlement field remain
- * Phase 3+/out-of-aggregate scope, deliberately not introduced here.
+ * never re-read from configuration afterward.
+ *
+ * PHASE 3B: adds finalizationOutcome/finalizedAt/penaltyAmount/refundAmount, populated
+ * exactly once when the commitment transitions AWAITING_FINALIZATION -> FINALIZED. Only
+ * Outcome B is computed in this phase. penaltyPolicyRef and any commission/payment/
+ * settlement field remain out-of-aggregate scope, deliberately not introduced here - see
+ * the Phase 3 business-rule freeze for why commission/payment belong to a separate
+ * Settlement concern, never to this entity.
  */
 @Data
 public class SellerDiagnosticCommitment {
@@ -27,4 +32,8 @@ public class SellerDiagnosticCommitment {
     private BigDecimal diagnosticFeeAmount;
     private CommitmentStatus status;
     private OffsetDateTime frozenAt;
+    private FinalizationOutcome finalizationOutcome;
+    private OffsetDateTime finalizedAt;
+    private BigDecimal penaltyAmount;
+    private BigDecimal refundAmount;
 }

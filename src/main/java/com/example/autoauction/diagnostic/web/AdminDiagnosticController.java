@@ -4,6 +4,7 @@ import com.example.autoauction.auth.infrastructure.security.CurrentUser;
 import com.example.autoauction.auth.domain.UserPrincipal;
 import com.example.autoauction.diagnostic.application.DiagnosticRequestService;
 import com.example.autoauction.diagnostic.application.InspectionTemplateService;
+import com.example.autoauction.diagnostic.commitment.application.SellerDiagnosticCommitmentFinalizationService;
 import com.example.autoauction.diagnostic.domain.DiagnosticRejectionCategory;
 import com.example.autoauction.diagnostic.domain.InspectionGroup;
 import com.example.autoauction.diagnostic.domain.InspectionItem;
@@ -35,6 +36,7 @@ public class AdminDiagnosticController {
 
     private final InspectionTemplateService templateService;
     private final DiagnosticRequestService requestService;
+    private final SellerDiagnosticCommitmentFinalizationService finalizationService;
     private final com.example.autoauction.diagnostic.media.application.LegacyMediaMigrationService legacyMediaMigrationService;
     private final com.example.autoauction.diagnostic.media.application.VideoProcessingService videoProcessingService;
 
@@ -177,7 +179,61 @@ public class AdminDiagnosticController {
             @RequestParam DiagnosticRejectionCategory category,
             @CurrentUser UserPrincipal currentUser
     ) {
-        return ResponseEntity.ok(requestService.rejectReport(id, currentUser.getUserId(), reason, category));
+        DiagnosticRequestResponse response = requestService.rejectReport(id, currentUser.getUserId(), reason, category);
+
+        // PHASE 3B: intentionally a SEPARATE call, not nested inside rejectReport's own
+        // transaction - AdminDiagnosticController is itself not @Transactional, so by the
+        // time this line runs, rejectReport's transaction has already fully committed
+        // (REJECTED status + AWAITING_FINALIZATION durably persisted). finalizeAsOutcomeB
+        // therefore starts its own genuinely separate transaction (Spring's REQUIRED
+        // propagation creates a new one when none is active). A finalization failure here
+        // must never undo the admin's already-valid rejection decision - caught and logged,
+        // mirroring the existing best-effort style already used a few lines away in
+        // approveReport's vehicle-auto-creation step. Only VEHICLE_CONDITION maps to
+        // Outcome B in this phase; SELLER_VIOLATION intentionally stays AWAITING_FINALIZATION
+        // (Outcome C is not implemented).
+        //
+        // PHASE 3B corrective slice: deliberately KEEPING this try/catch exactly as-is - its
+        // reasoning (a ledger hiccup must never undo an already-valid admin decision) is
+        // unaffected by the new /retry-finalization endpoint below. A caught failure here is
+        // no longer a dead end: it leaves the commitment durably AWAITING_FINALIZATION,
+        // visible and recoverable via that endpoint - this comment records that this was an
+        // active decision, not an oversight.
+        if (category == DiagnosticRejectionCategory.VEHICLE_CONDITION) {
+            try {
+                finalizationService.finalizeAsOutcomeB(id);
+            } catch (Exception e) {
+                log.error("Outcome B finalization failed for request {} after successful rejection: {}",
+                        id, e.getMessage(), e);
+            }
+        }
+
+        return ResponseEntity.ok(response);
+    }
+
+    // ==================== PHASE 3B: ручной retry финализации Outcome B ====================
+
+    /**
+     * PHASE 3B corrective slice: manual admin recovery for a commitment left durably
+     * AWAITING_FINALIZATION because the best-effort finalization attempt inside
+     * rejectReport() failed (transient/infrastructure problem) and was only caught and
+     * logged there - never rolled back the rejection itself. Mirrors
+     * /media/{id}/retry-processing's exact shape: no try/catch here - a genuine failure
+     * (not-found, not-eligible, unexpected state) propagates to GlobalExceptionHandler
+     * (IllegalArgumentException -&gt; 404/400, IllegalStateException -&gt; 409), exactly like
+     * every other admin action in this controller.
+     *
+     * Safe to call repeatedly: finalizeAsOutcomeB's own atomic claim-first mechanism is the
+     * only idempotency guard - this endpoint does not duplicate it. Eligibility
+     * (rejectionCategory == VEHICLE_CONDITION) is enforced inside finalizeAsOutcomeB itself,
+     * not here - this method performs no business logic beyond invoking the application
+     * service and returning the request's current state.
+     */
+    @PostMapping("/reports/{id}/retry-finalization")
+    @Operation(summary = "Retry Outcome B financial finalization for a VEHICLE_CONDITION rejection (admin-triggered, idempotent)")
+    public ResponseEntity<DiagnosticRequestResponse> retryFinalization(@PathVariable Long id) {
+        finalizationService.finalizeAsOutcomeB(id);
+        return ResponseEntity.ok(requestService.getRequestDetails(id));
     }
 
     // ==================== MEDIA-3.1B: исторический backfill шаблонов ====================

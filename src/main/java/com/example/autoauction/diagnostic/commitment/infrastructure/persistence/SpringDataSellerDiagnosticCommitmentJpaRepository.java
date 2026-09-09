@@ -1,12 +1,14 @@
 // diagnostic/commitment/infrastructure/persistence/SpringDataSellerDiagnosticCommitmentJpaRepository.java
 package com.example.autoauction.diagnostic.commitment.infrastructure.persistence;
 
+import com.example.autoauction.diagnostic.commitment.domain.FinalizationOutcome;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 
@@ -37,4 +39,23 @@ public interface SpringDataSellerDiagnosticCommitmentJpaRepository
     @Query("UPDATE JpaSellerDiagnosticCommitmentEntity c SET c.status = 'AWAITING_FINALIZATION', c.updatedAt = :now " +
             "WHERE c.diagnosticRequestId = :diagnosticRequestId AND c.status = 'FROZEN'")
     int markAwaitingFinalization(@Param("diagnosticRequestId") Long diagnosticRequestId, @Param("now") OffsetDateTime now);
+
+    // PHASE 3B: atomic AWAITING_FINALIZATION -> FINALIZED transition. Same WHERE-guarded
+    // shape and same flushAutomatically=true requirement as markAwaitingFinalization above -
+    // this query, too, is expected to run in a transaction where a plain DiagnosticRequest
+    // save() (or, if the trigger-timing design ever changes, some other same-transaction
+    // write) may already be pending; without flushAutomatically=true, clearAutomatically=true
+    // would silently discard it. financialOutcome/penaltyAmount/refundAmount are only ever
+    // written together with this single claim - never independently - so there is no path
+    // where the status says FINALIZED but these fields are still null, or vice versa.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE JpaSellerDiagnosticCommitmentEntity c SET c.status = 'FINALIZED', " +
+            "c.finalizationOutcome = :outcome, c.finalizedAt = :finalizedAt, " +
+            "c.penaltyAmount = :penaltyAmount, c.refundAmount = :refundAmount, c.updatedAt = :finalizedAt " +
+            "WHERE c.diagnosticRequestId = :diagnosticRequestId AND c.status = 'AWAITING_FINALIZATION'")
+    int finalize(@Param("diagnosticRequestId") Long diagnosticRequestId,
+                 @Param("outcome") FinalizationOutcome outcome,
+                 @Param("penaltyAmount") BigDecimal penaltyAmount,
+                 @Param("refundAmount") BigDecimal refundAmount,
+                 @Param("finalizedAt") OffsetDateTime finalizedAt);
 }

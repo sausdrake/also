@@ -18,6 +18,10 @@ public class SellerDiagnosticCommitmentMapper {
                 domain.getFrozenAt()
         );
         entity.setId(domain.getId());
+        entity.setFinalizationOutcome(domain.getFinalizationOutcome());
+        entity.setFinalizedAt(domain.getFinalizedAt());
+        entity.setPenaltyAmount(domain.getPenaltyAmount());
+        entity.setRefundAmount(domain.getRefundAmount());
         return entity;
     }
 
@@ -31,6 +35,10 @@ public class SellerDiagnosticCommitmentMapper {
         domain.setDiagnosticFeeAmount(entity.getDiagnosticFeeAmount());
         domain.setStatus(entity.getStatus());
         domain.setFrozenAt(entity.getFrozenAt());
+        domain.setFinalizationOutcome(entity.getFinalizationOutcome());
+        domain.setFinalizedAt(entity.getFinalizedAt());
+        domain.setPenaltyAmount(entity.getPenaltyAmount());
+        domain.setRefundAmount(entity.getRefundAmount());
         return domain;
     }
 }

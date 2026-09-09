@@ -5,6 +5,7 @@ import com.example.autoauction.deposit.domain.DepositStatus;
 import com.example.autoauction.deposit.infrastructure.persistence.JpaDepositEntity;
 import com.example.autoauction.deposit.infrastructure.persistence.SpringDataDepositJpaRepository;
 import com.example.autoauction.diagnostic.commitment.domain.CommitmentStatus;
+import com.example.autoauction.diagnostic.commitment.domain.FinalizationOutcome;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
 import com.example.autoauction.diagnostic.infrastructure.persistence.JpaDiagnosticRequestEntity;
 import com.example.autoauction.diagnostic.infrastructure.persistence.SpringDataDiagnosticRequestJpaRepository;
@@ -238,6 +239,83 @@ class SellerDiagnosticCommitmentRepositoryAdapterTest {
     @DisplayName("markAwaitingFinalization: несуществующий diagnosticRequestId -> 0 строк, без исключения")
     void markAwaitingFinalization_NoRow_ReturnsZeroWithoutThrowing() {
         int updated = commitmentJpaRepository.markAwaitingFinalization(999999L, OffsetDateTime.now());
+
+        assertThat(updated).isEqualTo(0);
+    }
+
+    // PHASE 3B: proves finalize's atomic UPDATE...WHERE guard at the real Spring Data / JPQL
+    // level, mirroring markAwaitingFinalization's own proof above exactly one transition later.
+
+    @Test
+    @DisplayName("finalize: AWAITING_FINALIZATION -> FINALIZED, поля outcome/finalizedAt/penalty/refund персистятся вместе")
+    void finalize_AwaitingFinalizationRow_TransitionsAndPersistsFields() {
+        JpaSellerDiagnosticCommitmentEntity entity = new JpaSellerDiagnosticCommitmentEntity(
+                testDiagnosticRequestId, testDepositId, new BigDecimal("10000"), new BigDecimal("4000"),
+                CommitmentStatus.AWAITING_FINALIZATION, OffsetDateTime.now());
+        commitmentJpaRepository.save(entity);
+        entityManager.flush();
+        entityManager.clear();
+
+        OffsetDateTime finalizedAt = OffsetDateTime.now();
+        int updated = commitmentJpaRepository.finalize(testDiagnosticRequestId, FinalizationOutcome.B,
+                BigDecimal.ZERO, new BigDecimal("6000"), finalizedAt);
+        entityManager.clear();
+
+        assertThat(updated).isEqualTo(1);
+        JpaSellerDiagnosticCommitmentEntity reloaded = commitmentJpaRepository
+                .findByDiagnosticRequestId(testDiagnosticRequestId).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(CommitmentStatus.FINALIZED);
+        assertThat(reloaded.getFinalizationOutcome()).isEqualTo(FinalizationOutcome.B);
+        assertThat(reloaded.getPenaltyAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(reloaded.getRefundAmount()).isEqualByComparingTo("6000");
+        assertThat(reloaded.getFinalizedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("finalize: заявка ещё FROZEN (не AWAITING_FINALIZATION) -> WHERE не совпадает, 0 строк")
+    void finalize_StillFrozen_ReturnsZero() {
+        JpaSellerDiagnosticCommitmentEntity entity = new JpaSellerDiagnosticCommitmentEntity(
+                testDiagnosticRequestId, testDepositId, new BigDecimal("10000"), new BigDecimal("4000"),
+                CommitmentStatus.FROZEN, OffsetDateTime.now());
+        commitmentJpaRepository.save(entity);
+        entityManager.flush();
+        entityManager.clear();
+
+        int updated = commitmentJpaRepository.finalize(testDiagnosticRequestId, FinalizationOutcome.B,
+                BigDecimal.ZERO, new BigDecimal("6000"), OffsetDateTime.now());
+
+        assertThat(updated).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("finalize: уже FINALIZED -> 0 строк, повторный вызов не переписывает поля")
+    void finalize_AlreadyFinalized_ReturnsZero() {
+        JpaSellerDiagnosticCommitmentEntity entity = new JpaSellerDiagnosticCommitmentEntity(
+                testDiagnosticRequestId, testDepositId, new BigDecimal("10000"), new BigDecimal("4000"),
+                CommitmentStatus.AWAITING_FINALIZATION, OffsetDateTime.now());
+        commitmentJpaRepository.save(entity);
+        entityManager.flush();
+        entityManager.clear();
+
+        OffsetDateTime firstFinalizedAt = OffsetDateTime.now();
+        commitmentJpaRepository.finalize(testDiagnosticRequestId, FinalizationOutcome.B,
+                BigDecimal.ZERO, new BigDecimal("6000"), firstFinalizedAt);
+        entityManager.clear();
+
+        int updated = commitmentJpaRepository.finalize(testDiagnosticRequestId, FinalizationOutcome.B,
+                BigDecimal.ZERO, new BigDecimal("9999"), OffsetDateTime.now());
+
+        assertThat(updated).isEqualTo(0);
+        JpaSellerDiagnosticCommitmentEntity reloaded = commitmentJpaRepository
+                .findByDiagnosticRequestId(testDiagnosticRequestId).orElseThrow();
+        assertThat(reloaded.getRefundAmount()).isEqualByComparingTo("6000");
+    }
+
+    @Test
+    @DisplayName("finalize: несуществующий diagnosticRequestId -> 0 строк, без исключения")
+    void finalize_NoRow_ReturnsZeroWithoutThrowing() {
+        int updated = commitmentJpaRepository.finalize(999999L, FinalizationOutcome.B,
+                BigDecimal.ZERO, new BigDecimal("6000"), OffsetDateTime.now());
 
         assertThat(updated).isEqualTo(0);
     }

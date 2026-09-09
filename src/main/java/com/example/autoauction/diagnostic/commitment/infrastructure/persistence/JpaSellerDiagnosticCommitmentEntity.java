@@ -2,6 +2,7 @@
 package com.example.autoauction.diagnostic.commitment.infrastructure.persistence;
 
 import com.example.autoauction.diagnostic.commitment.domain.CommitmentStatus;
+import com.example.autoauction.diagnostic.commitment.domain.FinalizationOutcome;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -60,6 +61,21 @@ public class JpaSellerDiagnosticCommitmentEntity {
     @Column(name = "frozen_at", nullable = false)
     private OffsetDateTime frozenAt;
 
+    // PHASE 3B: populated exactly once, when status transitions to FINALIZED. Nullable at
+    // the column level since every FROZEN/AWAITING_FINALIZATION row has none of these yet.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "finalization_outcome", length = 30)
+    private FinalizationOutcome finalizationOutcome;
+
+    @Column(name = "finalized_at")
+    private OffsetDateTime finalizedAt;
+
+    @Column(name = "penalty_amount", precision = 19, scale = 2)
+    private BigDecimal penaltyAmount;
+
+    @Column(name = "refund_amount", precision = 19, scale = 2)
+    private BigDecimal refundAmount;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -87,6 +103,10 @@ public class JpaSellerDiagnosticCommitmentEntity {
     public BigDecimal getDiagnosticFeeAmount() { return diagnosticFeeAmount; }
     public CommitmentStatus getStatus() { return status; }
     public OffsetDateTime getFrozenAt() { return frozenAt; }
+    public FinalizationOutcome getFinalizationOutcome() { return finalizationOutcome; }
+    public OffsetDateTime getFinalizedAt() { return finalizedAt; }
+    public BigDecimal getPenaltyAmount() { return penaltyAmount; }
+    public BigDecimal getRefundAmount() { return refundAmount; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }
 
@@ -97,6 +117,10 @@ public class JpaSellerDiagnosticCommitmentEntity {
     public void setDiagnosticFeeAmount(BigDecimal diagnosticFeeAmount) { this.diagnosticFeeAmount = diagnosticFeeAmount; }
     public void setStatus(CommitmentStatus status) { this.status = status; }
     public void setFrozenAt(OffsetDateTime frozenAt) { this.frozenAt = frozenAt; }
+    public void setFinalizationOutcome(FinalizationOutcome finalizationOutcome) { this.finalizationOutcome = finalizationOutcome; }
+    public void setFinalizedAt(OffsetDateTime finalizedAt) { this.finalizedAt = finalizedAt; }
+    public void setPenaltyAmount(BigDecimal penaltyAmount) { this.penaltyAmount = penaltyAmount; }
+    public void setRefundAmount(BigDecimal refundAmount) { this.refundAmount = refundAmount; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
     public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

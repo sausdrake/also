@@ -1,12 +1,14 @@
 // diagnostic/commitment/infrastructure/persistence/SellerDiagnosticCommitmentRepositoryAdapter.java
 package com.example.autoauction.diagnostic.commitment.infrastructure.persistence;
 
+import com.example.autoauction.diagnostic.commitment.domain.FinalizationOutcome;
 import com.example.autoauction.diagnostic.commitment.domain.SellerDiagnosticCommitment;
 import com.example.autoauction.diagnostic.commitment.domain.port.SellerDiagnosticCommitmentRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 
@@ -52,6 +54,13 @@ public class SellerDiagnosticCommitmentRepositoryAdapter implements SellerDiagno
     @Override
     public boolean markAwaitingFinalization(Long diagnosticRequestId) {
         int updated = jpaRepository.markAwaitingFinalization(diagnosticRequestId, OffsetDateTime.now());
+        return updated > 0;
+    }
+
+    @Override
+    public boolean finalize(Long diagnosticRequestId, FinalizationOutcome outcome,
+                             BigDecimal penaltyAmount, BigDecimal refundAmount, OffsetDateTime finalizedAt) {
+        int updated = jpaRepository.finalize(diagnosticRequestId, outcome, penaltyAmount, refundAmount, finalizedAt);
         return updated > 0;
     }
 }
