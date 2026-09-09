@@ -48,6 +48,13 @@ public class Auction {
     private Long sellerDiagnosticCommitmentId;
 
     /**
+     * X3-C CORRECTIVE: guards {@link #setSellerDiagnosticCommitmentId}, see that method's
+     * Javadoc. Not a persisted domain fact - purely an in-memory bookkeeping flag, so it is
+     * transient like {@link #clock}/{@link #extensionProperties} above.
+     */
+    private transient boolean sellerDiagnosticCommitmentIdAssigned = false;
+
+    /**
      * Фиксированная сумма депозита, требуемая для участия в ЭТОМ аукционе, задаётся
      * администратором индивидуально для каждого лота (НЕ процент от startingPrice).
      * Nullable для обратной совместимости с уже существующими записями аукционов,
@@ -327,23 +334,40 @@ public class Auction {
     }
 
     /**
-     * X3-C: plain setter, matching this class's existing single-call-site discipline (see
-     * {@link #setPolicyVersionId}'s Javadoc for the identical pattern) rather than a constructor
-     * parameter - changing the constructor would ripple into every existing test call site
-     * across the codebase for a field most of them have no reason to care about. The only
-     * legitimate call sites are (1) AdminAuctionService, exactly once, immediately after
-     * AuctionCommitmentResolver resolves the eligible commitment for a brand-new auction, and
-     * (2) AuctionMapper.toDomain(), exactly once, restoring the persisted value when
-     * reconstructing an existing auction. Business rule: once assigned to a persisted auction,
-     * this value must NEVER be reassigned, cleared, or re-derived from Vehicle's current
-     * diagnosticRequestId - no business operation in this codebase calls this method a second
-     * time on the same auction. That is a documented discipline, not a structurally-enforced
-     * one at the domain layer (the DB UNIQUE constraint on this column is the structural
-     * backstop against a commitment being claimed by two auctions - see the X3-C architecture
-     * re-lock).
+     * X3-C CORRECTIVE: structurally enforces invariant I5 (immutable commitment snapshot).
+     * This is NOT a constructor parameter - changing the constructor would ripple into every
+     * one of the ~55 existing {@code new Auction(...)} call sites across the codebase (most in
+     * modules with no reason to care about this field: sale, auth, common, integration, ...),
+     * an unjustified mass ripple for fixing one field. It is also deliberately NOT a
+     * reconstruction-only package-private method - {@link com.example.autoauction.admin.application.AdminAuctionService},
+     * the one legitimate creation-time caller, lives in a different package and must still be
+     * able to call it.
+     *
+     * Instead, this method may succeed AT MOST ONCE per Auction instance, guarded by
+     * {@link #sellerDiagnosticCommitmentIdAssigned} - covering both of this class's legitimate
+     * call sites (AdminAuctionService, once, immediately after AuctionCommitmentResolver
+     * resolves the eligible commitment for a brand-new auction; AuctionMapper.toDomain(), once,
+     * restoring the persisted value - including {@code null} for a legacy auction - when
+     * reconstructing an existing auction onto a fresh instance). Any further call on the SAME
+     * instance - regardless of whether the new value would differ from the old one - throws.
+     * This replaces the previous plain setter, whose "single call site" protection was a
+     * documented convention only (see the X3-C corrective fight that found this gap); the DB
+     * UNIQUE constraint remains the backstop against the SAME commitment being claimed by two
+     * DIFFERENT auctions, which this guard does not and cannot address on its own - the two
+     * protections are complementary, not substitutes for each other.
+     *
+     * Unlike this field, {@link #policyVersionId}/{@link #requiredDepositAmount} remain plain,
+     * convention-only setters - out of scope for this corrective fix, which targets only the
+     * one invariant (I5) the X3-C fight actually found violated.
      */
     public void setSellerDiagnosticCommitmentId(Long sellerDiagnosticCommitmentId) {
+        if (this.sellerDiagnosticCommitmentIdAssigned) {
+            throw new IllegalStateException(
+                    "sellerDiagnosticCommitmentId — неизменяемый снимок, уже назначен (" +
+                    this.sellerDiagnosticCommitmentId + "). Переназначение, очистка или замена запрещены.");
+        }
         this.sellerDiagnosticCommitmentId = sellerDiagnosticCommitmentId;
+        this.sellerDiagnosticCommitmentIdAssigned = true;
         this.updatedAt = now();
     }
 

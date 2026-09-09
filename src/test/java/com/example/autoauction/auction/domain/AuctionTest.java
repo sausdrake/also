@@ -1,6 +1,7 @@
 package com.example.autoauction.auction.domain;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -365,7 +366,8 @@ class AuctionTest {
     }
 
     @Test
-    void setSellerDiagnosticCommitmentId_ShouldSetValueAndTouchUpdatedAt() {
+    @DisplayName("X3-C CORRECTIVE: new Auction получает commitment ID ровно один раз")
+    void setSellerDiagnosticCommitmentId_FirstCall_AssignsValueAndTouchesUpdatedAt() {
         // given
         var before = auction.getUpdatedAt();
 
@@ -376,6 +378,53 @@ class AuctionTest {
         assertEquals(99L, auction.getSellerDiagnosticCommitmentId());
         assertNotNull(auction.getUpdatedAt());
         assertTrue(!auction.getUpdatedAt().isBefore(before));
+    }
+
+    @Test
+    @DisplayName("X3-C CORRECTIVE: историческая реконструкция с NULL остаётся допустимой (первый вызов, значение null)")
+    void setSellerDiagnosticCommitmentId_FirstCallWithNull_Allowed() {
+        // Mirrors AuctionMapper.toDomain() reconstructing a legacy, pre-X3-C row: the field is
+        // still unassigned on this fresh instance, so a first call restoring null must succeed,
+        // not be mistaken for "already assigned".
+        auction.setSellerDiagnosticCommitmentId(null);
+
+        assertNull(auction.getSellerDiagnosticCommitmentId());
+    }
+
+    @Test
+    @DisplayName("X3-C CORRECTIVE: invariant I5 - commitment ID не может быть reassigned через публичный Auction API")
+    void setSellerDiagnosticCommitmentId_SecondCall_ThrowsRegardlessOfValue() {
+        auction.setSellerDiagnosticCommitmentId(99L);
+
+        // reassignment to a different value
+        IllegalStateException exDifferent = assertThrows(IllegalStateException.class,
+                () -> auction.setSellerDiagnosticCommitmentId(100L));
+        assertTrue(exDifferent.getMessage().contains("99"));
+        assertEquals(99L, auction.getSellerDiagnosticCommitmentId(), "value must remain unchanged after a rejected reassignment attempt");
+
+        // "clearing" it is also a reassignment attempt, not a special-cased allowed case
+        assertThrows(IllegalStateException.class,
+                () -> auction.setSellerDiagnosticCommitmentId(null));
+        assertEquals(99L, auction.getSellerDiagnosticCommitmentId());
+
+        // re-assigning the SAME value is still rejected - "once set" means exactly one call ever
+        assertThrows(IllegalStateException.class,
+                () -> auction.setSellerDiagnosticCommitmentId(99L));
+    }
+
+    @Test
+    @DisplayName("X3-C CORRECTIVE: existing policyVersionId behavior не регрессировал (остаётся plain, independent setter)")
+    void setSellerDiagnosticCommitmentId_DoesNotAffectPolicyVersionId() {
+        auction.setPolicyVersionId(7L);
+        auction.setSellerDiagnosticCommitmentId(99L);
+
+        assertEquals(7L, auction.getPolicyVersionId());
+        assertEquals(99L, auction.getSellerDiagnosticCommitmentId());
+
+        // policyVersionId remains a plain, unguarded setter - explicitly out of scope for this
+        // corrective fix, and must still accept a second call without throwing.
+        auction.setPolicyVersionId(8L);
+        assertEquals(8L, auction.getPolicyVersionId());
     }
 
     @Test
