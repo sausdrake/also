@@ -355,6 +355,36 @@ public class VehicleService {
     }
 
     /**
+     * X3-A (SALE_FAILED outcomes B, BUYER_FAULT): returns a vehicle to the active pool after a
+     * no-fault-requiring-rediagnosis sale failure. Deliberately NOT idempotent, same reasoning
+     * as markInAuction()/markAsSold() above - called exclusively from
+     * SaleFailureResolutionOrchestrator.resolveSaleFailure(), whose own Auction-status guard
+     * structurally prevents a second call for the same auction from ever reaching this method.
+     */
+    @Transactional
+    public void returnToApproved(Long vehicleId) {
+        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> new IllegalArgumentException("Автомобиль не найден: " + vehicleId));
+        vehicle.returnToApproved();
+        vehicleRepository.save(vehicle);
+        log.info("Vehicle {} returned to APPROVED", vehicleId);
+    }
+
+    /**
+     * X3-A (SALE_FAILED outcomes PLATFORM_FAULT, C): marks a vehicle as requiring a fresh
+     * diagnostic cycle after a sale failure. Deliberately NOT idempotent - same reasoning as
+     * returnToApproved() above.
+     */
+    @Transactional
+    public void markNeedsRediagnostic(Long vehicleId) {
+        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> new IllegalArgumentException("Автомобиль не найден: " + vehicleId));
+        vehicle.markNeedsRediagnostic();
+        vehicleRepository.save(vehicle);
+        log.info("Vehicle {} marked NEEDS_REDIAGNOSTIC", vehicleId);
+    }
+
+    /**
      * Создать Vehicle автоматически при одобрении диагностического отчёта.
      * Данные берутся из диагностической заявки.
      */

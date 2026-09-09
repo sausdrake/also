@@ -230,8 +230,13 @@ class SaleEvidenceAndResolutionIntegrationTest {
     }
 
     @Test
-    @DisplayName("CHECK: result вне ('SUCCESS') отклоняется на уровне БД (native insert, минуя Java enum)")
+    @DisplayName("CHECK: result вне ('SUCCESS','B','BUYER_FAULT','PLATFORM_FAULT','C') отклоняется на уровне БД (native insert, минуя Java enum)")
     void saleResolution_InvalidResult_ViolatesCheckConstraintAtDbLevel() {
+        // X3-A: the CHECK constraint was widened (V35) to admit B/BUYER_FAULT/PLATFORM_FAULT/C
+        // alongside SUCCESS - BUYER_FAULT specifically is no longer an invalid value, so this
+        // test now uses a genuinely-still-invalid placeholder to keep proving the same DB-level
+        // guarantee (an arbitrary garbage result value is rejected) without asserting the
+        // opposite of the now-correct, intentionally-widened invariant.
         TransactionTemplate txTemplate = txTemplate();
         Long vehicleId = createApprovedVehicle(txTemplate);
         Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, new BigDecimal("1000.00"));
@@ -239,7 +244,7 @@ class SaleEvidenceAndResolutionIntegrationTest {
         assertThatThrownBy(() -> txTemplate.execute(status -> {
             jdbcTemplate.update(
                     "INSERT INTO sale_resolution (auction_id, result, resolved_by, resolved_at, financial_resolution_status, created_at) " +
-                            "VALUES (?, 'BUYER_FAULT', 1, CURRENT_TIMESTAMP, 'PENDING', CURRENT_TIMESTAMP)",
+                            "VALUES (?, 'INVALID_RESULT', 1, CURRENT_TIMESTAMP, 'PENDING', CURRENT_TIMESTAMP)",
                     auctionId);
             return null;
         })).isInstanceOf(RuntimeException.class);

@@ -138,6 +138,125 @@ class VehicleTest {
         assertEquals(VehicleStatus.SOLD, vehicle.getStatus());
     }
 
+    // ==================== X3-A: returnToApproved() ====================
+
+    @Test
+    void returnToApproved_WhenInAuction_ShouldChangeStatusToApproved() {
+        // given
+        vehicle.submitForReview();
+        vehicle.approve(adminId, adminName);
+        vehicle.markInAuction();
+
+        // when
+        vehicle.returnToApproved();
+
+        // then
+        assertEquals(VehicleStatus.APPROVED, vehicle.getStatus());
+    }
+
+    @Test
+    void returnToApproved_ShouldPreserveOriginalApprovalMetadata() {
+        // given: the original review event really happened - returnToApproved() must not
+        // re-touch adminId/adminName/reviewedAt/rejectionReason, it is not a new review.
+        vehicle.submitForReview();
+        vehicle.approve(adminId, adminName);
+        var reviewedAtBefore = vehicle.getReviewedAt();
+        vehicle.markInAuction();
+
+        // when
+        vehicle.returnToApproved();
+
+        // then
+        assertEquals(adminId, vehicle.getAdminId());
+        assertEquals(adminName, vehicle.getAdminName());
+        assertEquals(reviewedAtBefore, vehicle.getReviewedAt());
+        assertNull(vehicle.getRejectionReason());
+    }
+
+    @Test
+    void returnToApproved_WhenDraft_ShouldThrowException() {
+        assertThrows(IllegalStateException.class, () -> vehicle.returnToApproved());
+    }
+
+    @Test
+    void returnToApproved_WhenPendingReview_ShouldThrowException() {
+        vehicle.submitForReview();
+        assertThrows(IllegalStateException.class, () -> vehicle.returnToApproved());
+    }
+
+    @Test
+    void returnToApproved_WhenApproved_ShouldThrowException() {
+        vehicle.submitForReview();
+        vehicle.approve(adminId, adminName);
+        assertThrows(IllegalStateException.class, () -> vehicle.returnToApproved());
+    }
+
+    @Test
+    void returnToApproved_WhenAlreadySold_ShouldThrowException() {
+        vehicle.submitForReview();
+        vehicle.approve(adminId, adminName);
+        vehicle.markInAuction();
+        vehicle.markAsSold();
+        assertThrows(IllegalStateException.class, () -> vehicle.returnToApproved());
+    }
+
+    @Test
+    void returnToApproved_WhenNeedsFixes_ShouldThrowException() {
+        vehicle.submitForReview();
+        vehicle.reject(adminId, adminName, "Не хватает фотографий");
+        assertThrows(IllegalStateException.class, () -> vehicle.returnToApproved());
+    }
+
+    // ==================== X3-A: markNeedsRediagnostic() ====================
+
+    @Test
+    void markNeedsRediagnostic_WhenInAuction_ShouldChangeStatusToNeedsRediagnostic() {
+        // given
+        vehicle.submitForReview();
+        vehicle.approve(adminId, adminName);
+        vehicle.markInAuction();
+
+        // when
+        vehicle.markNeedsRediagnostic();
+
+        // then
+        assertEquals(VehicleStatus.NEEDS_REDIAGNOSTIC, vehicle.getStatus());
+    }
+
+    @Test
+    void markNeedsRediagnostic_WhenDraft_ShouldThrowException() {
+        assertThrows(IllegalStateException.class, () -> vehicle.markNeedsRediagnostic());
+    }
+
+    @Test
+    void markNeedsRediagnostic_WhenPendingReview_ShouldThrowException() {
+        vehicle.submitForReview();
+        assertThrows(IllegalStateException.class, () -> vehicle.markNeedsRediagnostic());
+    }
+
+    @Test
+    void markNeedsRediagnostic_WhenApproved_ShouldThrowException() {
+        vehicle.submitForReview();
+        vehicle.approve(adminId, adminName);
+        assertThrows(IllegalStateException.class, () -> vehicle.markNeedsRediagnostic());
+    }
+
+    @Test
+    void markNeedsRediagnostic_WhenAlreadySold_ShouldThrowException() {
+        vehicle.submitForReview();
+        vehicle.approve(adminId, adminName);
+        vehicle.markInAuction();
+        vehicle.markAsSold();
+        assertThrows(IllegalStateException.class, () -> vehicle.markNeedsRediagnostic());
+    }
+
+    @Test
+    void markNeedsRediagnostic_WhenNeedsFixes_ShouldThrowException() {
+        vehicle.submitForReview();
+        vehicle.reject(adminId, adminName, "Не хватает фотографий");
+        assertThrows(IllegalStateException.class, () -> vehicle.markNeedsRediagnostic());
+    }
+
     @Test
     void setLicensePlate_ShouldUpdateField() {
         // given

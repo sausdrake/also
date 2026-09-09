@@ -892,4 +892,333 @@ class DepositServiceTest {
             assertTrue(sharedDeposit.getBalance().compareTo(BigDecimal.ZERO) >= 0);
         }
     }
+
+    // ==================== PHASE 3B: chargeForDiagnosticRequest ====================
+
+    @Nested
+    @DisplayName("chargeForDiagnosticRequest() — списание из frozen commitment (Outcome B)")
+    class ChargeForDiagnosticRequestTests {
+
+        private final Long requestId = 500L;
+
+        private Deposit depositFor(BigDecimal balance, BigDecimal blocked) {
+            Deposit d = new Deposit(userId, balance);
+            d.setId(depositId);
+            if (blocked.compareTo(BigDecimal.ZERO) > 0) {
+                d.freezeForAuction(blocked);
+            }
+            return d;
+        }
+
+        @Test
+        @DisplayName("Частичный charge: одно save(), CHARGE и UNBLOCK с корректными суммами")
+        void chargeForDiagnosticRequest_PartialCharge_OneSaveCorrectTransactions() {
+            Deposit deposit = depositFor(new BigDecimal("20000"), new BigDecimal("10000"));
+            when(depositRepository.findById(depositId)).thenReturn(Optional.of(deposit));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            depositService.chargeForDiagnosticRequest(depositId, requestId, new BigDecimal("10000"), new BigDecimal("4000"));
+
+            verify(depositRepository, times(1)).save(any(Deposit.class));
+
+            ArgumentCaptor<DepositTransaction> captor = ArgumentCaptor.forClass(DepositTransaction.class);
+            verify(depositRepository, times(2)).saveTransaction(captor.capture());
+            List<DepositTransaction> saved = captor.getAllValues();
+
+            DepositTransaction charge = saved.stream()
+                    .filter(t -> t.getType() == DepositTransaction.TransactionType.CHARGE).findFirst().orElseThrow();
+            DepositTransaction unblock = saved.stream()
+                    .filter(t -> t.getType() == DepositTransaction.TransactionType.UNBLOCK).findFirst().orElseThrow();
+
+            assertEquals(0, charge.getAmount().compareTo(new BigDecimal("4000")));
+            assertEquals(0, unblock.getAmount().compareTo(new BigDecimal("6000")));
+
+            assertEquals(0, deposit.getBalance().compareTo(new BigDecimal("16000")));
+            assertEquals(0, deposit.getBlockedAmount().compareTo(BigDecimal.ZERO));
+        }
+
+        @Test
+        @DisplayName("balanceBefore/After conventions: CHARGE использует raw balance, UNBLOCK — availableBalance")
+        void chargeForDiagnosticRequest_BalanceBeforeAfterConventions() {
+            Deposit deposit = depositFor(new BigDecimal("20000"), new BigDecimal("10000"));
+            when(depositRepository.findById(depositId)).thenReturn(Optional.of(deposit));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            depositService.chargeForDiagnosticRequest(depositId, requestId, new BigDecimal("10000"), new BigDecimal("4000"));
+
+            ArgumentCaptor<DepositTransaction> captor = ArgumentCaptor.forClass(DepositTransaction.class);
+            verify(depositRepository, times(2)).saveTransaction(captor.capture());
+            List<DepositTransaction> saved = captor.getAllValues();
+
+            DepositTransaction charge = saved.stream()
+                    .filter(t -> t.getType() == DepositTransaction.TransactionType.CHARGE).findFirst().orElseThrow();
+            DepositTransaction unblock = saved.stream()
+                    .filter(t -> t.getType() == DepositTransaction.TransactionType.UNBLOCK).findFirst().orElseThrow();
+
+            // CHARGE: raw balance convention (matches WITHDRAWAL/DEPOSIT/ADMIN_ADJUSTMENT) - 20000 -> 16000
+            assertEquals(0, charge.getBalanceBefore().compareTo(new BigDecimal("20000")));
+            assertEquals(0, charge.getBalanceAfter().compareTo(new BigDecimal("16000")));
+
+            // UNBLOCK: availableBalance convention (matches unfreezeForAuction) - 10000 -> 16000
+            assertEquals(0, unblock.getBalanceBefore().compareTo(new BigDecimal("10000")));
+            assertEquals(0, unblock.getBalanceAfter().compareTo(new BigDecimal("16000")));
+        }
+
+        @Test
+        @DisplayName("fee == commitment: CHARGE полный, UNBLOCK не создаётся (refund == 0)")
+        void chargeForDiagnosticRequest_FeeEqualsCommitment_NoUnblockTransaction() {
+            Deposit deposit = depositFor(new BigDecimal("20000"), new BigDecimal("10000"));
+            when(depositRepository.findById(depositId)).thenReturn(Optional.of(deposit));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            depositService.chargeForDiagnosticRequest(depositId, requestId, new BigDecimal("10000"), new BigDecimal("10000"));
+
+            ArgumentCaptor<DepositTransaction> captor = ArgumentCaptor.forClass(DepositTransaction.class);
+            verify(depositRepository, times(1)).saveTransaction(captor.capture());
+            assertEquals(DepositTransaction.TransactionType.CHARGE, captor.getValue().getType());
+            assertEquals(0, captor.getValue().getAmount().compareTo(new BigDecimal("10000")));
+        }
+
+        @Test
+        @DisplayName("fee == 0: UNBLOCK полный, CHARGE не создаётся")
+        void chargeForDiagnosticRequest_ZeroFee_NoChargeTransaction() {
+            Deposit deposit = depositFor(new BigDecimal("20000"), new BigDecimal("10000"));
+            when(depositRepository.findById(depositId)).thenReturn(Optional.of(deposit));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            depositService.chargeForDiagnosticRequest(depositId, requestId, new BigDecimal("10000"), BigDecimal.ZERO);
+
+            ArgumentCaptor<DepositTransaction> captor = ArgumentCaptor.forClass(DepositTransaction.class);
+            verify(depositRepository, times(1)).saveTransaction(captor.capture());
+            assertEquals(DepositTransaction.TransactionType.UNBLOCK, captor.getValue().getType());
+            assertEquals(0, captor.getValue().getAmount().compareTo(new BigDecimal("10000")));
+        }
+
+        @Test
+        @DisplayName("Депозит не найден — IllegalArgumentException, без мутаций")
+        void chargeForDiagnosticRequest_DepositNotFound_Throws() {
+            when(depositRepository.findById(depositId)).thenReturn(Optional.empty());
+
+            assertThrows(IllegalArgumentException.class, () ->
+                    depositService.chargeForDiagnosticRequest(depositId, requestId, new BigDecimal("10000"), new BigDecimal("4000")));
+
+            verify(depositRepository, never()).save(any());
+            verify(depositRepository, never()).saveTransaction(any());
+        }
+    }
+
+    // ==================== X3-A (SALE_FAILED outcomes): unblockForSaleFailure ====================
+
+    @Nested
+    @DisplayName("X3-A: разблокировка депозита победителя после SALE_FAILED (unblockForSaleFailure)")
+    class UnblockForSaleFailureTests {
+
+        private FrozenDeposit winnerFrozenDeposit() {
+            FrozenDeposit frozen = new FrozenDeposit(auctionId, requiredDeposit, FreezeReason.FIRST_BID);
+            frozen.markAsWinner();
+            return frozen;
+        }
+
+        @Test
+        @DisplayName("Корректный аукцион/победитель -> успешная разблокировка, UNBLOCK-транзакция записана")
+        void unblockForSaleFailure_CorrectAuctionAndWinner_Succeeds() {
+            // given
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
+            when(depositRepository.getFrozenDepositsByDepositId(depositId))
+                    .thenReturn(List.of(winnerFrozenDeposit()));
+            when(depositRepository.save(any(Deposit.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(depositRepository.saveTransaction(any(DepositTransaction.class)))
+                    .thenAnswer(inv -> inv.getArgument(0));
+
+            // when
+            depositService.unblockForSaleFailure(auctionId, userId);
+
+            // then
+            ArgumentCaptor<Deposit> depositCaptor = ArgumentCaptor.forClass(Deposit.class);
+            verify(depositRepository, times(1)).save(depositCaptor.capture());
+            assertEquals(0, depositCaptor.getValue().getBlockedAmount().compareTo(BigDecimal.ZERO));
+            assertEquals(0, depositCaptor.getValue().getBalance().compareTo(depositAmount),
+                    "balance не должен меняться - это unblock, не confiscate");
+
+            ArgumentCaptor<DepositTransaction> txCaptor = ArgumentCaptor.forClass(DepositTransaction.class);
+            verify(depositRepository, times(1)).saveTransaction(txCaptor.capture());
+            assertEquals(DepositTransaction.TransactionType.UNBLOCK, txCaptor.getValue().getType());
+            assertEquals(0, txCaptor.getValue().getAmount().compareTo(requiredDeposit));
+
+            verify(depositRepository, times(1)).unfreezeForAuction(depositId, auctionId);
+        }
+
+        @Test
+        @DisplayName("Неверный аукцион (frozen-запись для другого аукциона) -> IllegalStateException, без мутаций")
+        void unblockForSaleFailure_WrongAuction_ThrowsWithoutMutation() {
+            // given: frozen deposit существует, но для ДРУГОГО аукциона
+            FrozenDeposit otherAuctionFrozen = new FrozenDeposit(999L, requiredDeposit, FreezeReason.FIRST_BID);
+            otherAuctionFrozen.markAsWinner();
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
+            when(depositRepository.getFrozenDepositsByDepositId(depositId))
+                    .thenReturn(List.of(otherAuctionFrozen));
+
+            // when & then
+            assertThrows(IllegalStateException.class,
+                    () -> depositService.unblockForSaleFailure(auctionId, userId));
+            verify(depositRepository, never()).save(any());
+            verify(depositRepository, never()).saveTransaction(any());
+        }
+
+        @Test
+        @DisplayName("Неверный победитель (frozen-запись не winner) -> IllegalStateException, без мутаций")
+        void unblockForSaleFailure_NotWinnerFlagged_ThrowsWithoutMutation() {
+            // given: frozen deposit для этого аукциона, но НЕ отмечен как winner
+            FrozenDeposit nonWinnerFrozen = new FrozenDeposit(auctionId, requiredDeposit, FreezeReason.FIRST_BID);
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
+            when(depositRepository.getFrozenDepositsByDepositId(depositId))
+                    .thenReturn(List.of(nonWinnerFrozen));
+
+            // when & then
+            assertThrows(IllegalStateException.class,
+                    () -> depositService.unblockForSaleFailure(auctionId, userId));
+            verify(depositRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Нет замороженного депозита победителя -> IllegalStateException, без мутаций")
+        void unblockForSaleFailure_NoFrozenDeposit_ThrowsWithoutMutation() {
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
+            when(depositRepository.getFrozenDepositsByDepositId(depositId)).thenReturn(List.of());
+
+            assertThrows(IllegalStateException.class,
+                    () -> depositService.unblockForSaleFailure(auctionId, userId));
+            verify(depositRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Уже разблокировано (повторный вызов) -> IllegalStateException, без повторной мутации")
+        void unblockForSaleFailure_AlreadyResolved_ThrowsWithoutDoubleMutation() {
+            // given: первый вызов уже удалил frozen-запись - повторный находит пустой список
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
+            when(depositRepository.getFrozenDepositsByDepositId(depositId)).thenReturn(List.of());
+
+            assertThrows(IllegalStateException.class,
+                    () -> depositService.unblockForSaleFailure(auctionId, userId));
+            verify(depositRepository, never()).save(any());
+            verify(depositRepository, never()).saveTransaction(any());
+        }
+
+        @Test
+        @DisplayName("Депозит не найден -> IllegalArgumentException")
+        void unblockForSaleFailure_DepositNotFound_ThrowsIllegalArgumentException() {
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.empty());
+
+            assertThrows(IllegalArgumentException.class,
+                    () -> depositService.unblockForSaleFailure(auctionId, userId));
+        }
+    }
+
+    // ==================== X3-A (SALE_FAILED outcome BUYER_FAULT): confiscateToPlatform ====================
+
+    @Nested
+    @DisplayName("X3-A: конфискация депозита победителя в пользу платформы (confiscateToPlatform)")
+    class ConfiscateToPlatformTests {
+
+        private FrozenDeposit winnerFrozenDeposit() {
+            FrozenDeposit frozen = new FrozenDeposit(auctionId, requiredDeposit, FreezeReason.FIRST_BID);
+            frozen.markAsWinner();
+            return frozen;
+        }
+
+        @Test
+        @DisplayName("Корректный аукцион/победитель -> balance и blockedAmount уменьшаются, CHARGE-транзакция записана")
+        void confiscateToPlatform_CorrectAuctionAndWinner_DecreasesBalanceAndBlockedAmount() {
+            // given
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
+            when(depositRepository.getFrozenDepositsByDepositId(depositId))
+                    .thenReturn(List.of(winnerFrozenDeposit()));
+            when(depositRepository.save(any(Deposit.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(depositRepository.saveTransaction(any(DepositTransaction.class)))
+                    .thenAnswer(inv -> inv.getArgument(0));
+
+            BigDecimal balanceBefore = depositWithBlocked.getBalance();
+
+            // when
+            depositService.confiscateToPlatform(auctionId, userId);
+
+            // then: никакие деньги не "создаются из воздуха" - balance уменьшается РОВНО на
+            // сконфискованную сумму, blockedAmount уменьшается на ту же сумму.
+            ArgumentCaptor<Deposit> depositCaptor = ArgumentCaptor.forClass(Deposit.class);
+            verify(depositRepository, times(1)).save(depositCaptor.capture());
+            assertEquals(0, depositCaptor.getValue().getBlockedAmount().compareTo(BigDecimal.ZERO));
+            assertEquals(0, depositCaptor.getValue().getBalance().compareTo(balanceBefore.subtract(requiredDeposit)));
+
+            ArgumentCaptor<DepositTransaction> txCaptor = ArgumentCaptor.forClass(DepositTransaction.class);
+            verify(depositRepository, times(1)).saveTransaction(txCaptor.capture());
+            assertEquals(DepositTransaction.TransactionType.CHARGE, txCaptor.getValue().getType());
+            assertEquals(0, txCaptor.getValue().getAmount().compareTo(requiredDeposit));
+
+            verify(depositRepository, times(1)).unfreezeForAuction(depositId, auctionId);
+        }
+
+        @Test
+        @DisplayName("Неверный аукцион -> IllegalStateException, без мутаций")
+        void confiscateToPlatform_WrongAuction_ThrowsWithoutMutation() {
+            FrozenDeposit otherAuctionFrozen = new FrozenDeposit(999L, requiredDeposit, FreezeReason.FIRST_BID);
+            otherAuctionFrozen.markAsWinner();
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
+            when(depositRepository.getFrozenDepositsByDepositId(depositId))
+                    .thenReturn(List.of(otherAuctionFrozen));
+
+            assertThrows(IllegalStateException.class,
+                    () -> depositService.confiscateToPlatform(auctionId, userId));
+            verify(depositRepository, never()).save(any());
+            verify(depositRepository, never()).saveTransaction(any());
+        }
+
+        @Test
+        @DisplayName("Неверный победитель (frozen-запись не winner) -> IllegalStateException, без мутаций")
+        void confiscateToPlatform_NotWinnerFlagged_ThrowsWithoutMutation() {
+            FrozenDeposit nonWinnerFrozen = new FrozenDeposit(auctionId, requiredDeposit, FreezeReason.FIRST_BID);
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
+            when(depositRepository.getFrozenDepositsByDepositId(depositId))
+                    .thenReturn(List.of(nonWinnerFrozen));
+
+            assertThrows(IllegalStateException.class,
+                    () -> depositService.confiscateToPlatform(auctionId, userId));
+            verify(depositRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Нет замороженного депозита победителя -> IllegalStateException, без мутаций")
+        void confiscateToPlatform_NoFrozenDeposit_ThrowsWithoutMutation() {
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
+            when(depositRepository.getFrozenDepositsByDepositId(depositId)).thenReturn(List.of());
+
+            assertThrows(IllegalStateException.class,
+                    () -> depositService.confiscateToPlatform(auctionId, userId));
+            verify(depositRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Уже разрешено (повторный вызов) -> IllegalStateException, без повторной мутации")
+        void confiscateToPlatform_AlreadyResolved_ThrowsWithoutDoubleMutation() {
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
+            when(depositRepository.getFrozenDepositsByDepositId(depositId)).thenReturn(List.of());
+
+            assertThrows(IllegalStateException.class,
+                    () -> depositService.confiscateToPlatform(auctionId, userId));
+            verify(depositRepository, never()).save(any());
+            verify(depositRepository, never()).saveTransaction(any());
+        }
+
+        @Test
+        @DisplayName("Депозит не найден -> IllegalArgumentException")
+        void confiscateToPlatform_DepositNotFound_ThrowsIllegalArgumentException() {
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.empty());
+
+            assertThrows(IllegalArgumentException.class,
+                    () -> depositService.confiscateToPlatform(auctionId, userId));
+        }
+    }
 }

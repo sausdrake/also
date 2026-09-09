@@ -412,6 +412,26 @@ public class Auction {
     }
 
     /**
+     * X3-A (SALE_FAILED outcomes): the authoritative failed-sale transition -
+     * WAITING_FOR_PAYMENT -> SALE_FAILED. Deliberately not idempotent, same as markSold() - a
+     * second call against an already-SALE_FAILED (or any other status) auction fails closed
+     * with this guard. This method does not itself know or validate which outcome (B/
+     * BUYER_FAULT/PLATFORM_FAULT/C) is being recorded - that classification lives entirely on
+     * the SaleResolution created by the caller (SaleFailureResolutionOrchestrator) before this
+     * method is invoked.
+     */
+    public void markSaleFailed() {
+        if (this.status != AuctionStatus.WAITING_FOR_PAYMENT) {
+            throw new IllegalStateException(
+                    String.format("Невозможно зафиксировать неудачную продажу аукциона в статусе '%s'. Только аукционы со статусом 'WAITING_FOR_PAYMENT' могут быть переведены в 'SALE_FAILED'",
+                            this.status)
+            );
+        }
+        this.status = AuctionStatus.SALE_FAILED;
+        this.updatedAt = now();
+    }
+
+    /**
      * Slice 1a: single source of truth for "can this auction still be cancelled" -
      * WAITING_FOR_PAYMENT and every terminal status (SOLD/SALE_FAILED/EXPIRED/CANCELLED/
      * legacy COMPLETED) are deliberately excluded. Used by {@link #cancel()} itself and by

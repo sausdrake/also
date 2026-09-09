@@ -13,6 +13,7 @@ public class SaleResolutionMapper {
         entity.setAuctionId(domain.getAuctionId());
         entity.setResult(domain.getResult());
         entity.setReason(domain.getReason());
+        entity.setFaultParty(domain.getFaultParty());
         entity.setResolvedBy(domain.getResolvedBy());
         entity.setResolvedAt(domain.getResolvedAt());
         entity.setPaymentEvidenceId(domain.getPaymentEvidenceId());
@@ -25,7 +26,7 @@ public class SaleResolutionMapper {
     public SaleResolution toDomain(JpaSaleResolutionEntity entity) {
         if (entity == null) return null;
         return new SaleResolution(entity.getId(), entity.getAuctionId(), entity.getResult(), entity.getReason(),
-                entity.getResolvedBy(), entity.getResolvedAt(), entity.getPaymentEvidenceId(),
+                entity.getFaultParty(), entity.getResolvedBy(), entity.getResolvedAt(), entity.getPaymentEvidenceId(),
                 entity.getHandoverEvidenceId(), entity.getFinancialResolutionStatus(), entity.getCreatedAt());
     }
 }

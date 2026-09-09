@@ -134,6 +134,35 @@ public class Vehicle {
         this.status = VehicleStatus.SOLD;
         this.updatedAt = OffsetDateTime.now();
     }
+
+    /**
+     * X3-A (SALE_FAILED outcomes B, BUYER_FAULT): the vehicle returns to the active pool with
+     * no fault requiring re-diagnosis. Deliberately does NOT touch adminId/adminName/
+     * reviewedAt/rejectionReason - those record the original PENDING_REVIEW->APPROVED review
+     * event, which genuinely happened and is not being re-performed here; only status and
+     * updatedAt change.
+     */
+    public void returnToApproved() {
+        if (this.status != VehicleStatus.IN_AUCTION) {
+            throw new IllegalStateException("Only IN_AUCTION can be returned to APPROVED");
+        }
+        this.status = VehicleStatus.APPROVED;
+        this.updatedAt = OffsetDateTime.now();
+    }
+
+    /**
+     * X3-A (SALE_FAILED outcomes PLATFORM_FAULT, C): the vehicle requires a fresh diagnostic
+     * cycle before it can be re-auctioned. The workflow that performs that cycle (a new
+     * DiagnosticRequest, independent-diagnostician assignment, eventual re-approval) is
+     * explicitly out of scope for X3-A - this method only performs the one status transition.
+     */
+    public void markNeedsRediagnostic() {
+        if (this.status != VehicleStatus.IN_AUCTION) {
+            throw new IllegalStateException("Only IN_AUCTION can require re-diagnostic");
+        }
+        this.status = VehicleStatus.NEEDS_REDIAGNOSTIC;
+        this.updatedAt = OffsetDateTime.now();
+    }
     // Добавь в класс Vehicle следующие методы:
 
     public void setStatus(VehicleStatus status) {

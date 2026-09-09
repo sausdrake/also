@@ -1027,4 +1027,98 @@ class VehicleServiceTest {
             verify(vehicleRepository, never()).save(any());
         }
     }
+
+    // ==================== X3-A (SALE_FAILED outcomes): returnToApproved / markNeedsRediagnostic ====================
+
+    @Nested
+    @DisplayName("X3-A (SALE_FAILED outcomes): returnToApproved(vehicleId)")
+    class ReturnToApprovedTests {
+
+        @Test
+        @DisplayName("IN_AUCTION -> APPROVED: домен переводится и сохраняется")
+        void returnToApproved_WhenInAuction_TransitionsAndSaves() {
+            // given
+            when(vehicleRepository.findById(5L)).thenReturn(Optional.of(inAuctionVehicle));
+            when(vehicleRepository.save(any(Vehicle.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            vehicleService.returnToApproved(5L);
+
+            // then
+            assertEquals(VehicleStatus.APPROVED, inAuctionVehicle.getStatus());
+            ArgumentCaptor<Vehicle> vehicleCaptor = ArgumentCaptor.forClass(Vehicle.class);
+            verify(vehicleRepository).save(vehicleCaptor.capture());
+            assertEquals(VehicleStatus.APPROVED, vehicleCaptor.getValue().getStatus());
+        }
+
+        @Test
+        @DisplayName("Некорректный статус (не IN_AUCTION) -> доменное исключение распространяется, save не вызывается")
+        void returnToApproved_WhenNotInAuction_PropagatesDomainExceptionAndNeverSaves() {
+            // given: approvedVehicle находится в статусе APPROVED, а не IN_AUCTION
+            when(vehicleRepository.findById(2L)).thenReturn(Optional.of(approvedVehicle));
+
+            // when & then
+            assertThrows(IllegalStateException.class, () -> vehicleService.returnToApproved(2L));
+
+            verify(vehicleRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Автомобиль не найден -> IllegalArgumentException, save не вызывается")
+        void returnToApproved_WhenVehicleNotFound_ThrowsIllegalArgumentException() {
+            // given
+            when(vehicleRepository.findById(999L)).thenReturn(Optional.empty());
+
+            // when & then
+            assertThrows(IllegalArgumentException.class, () -> vehicleService.returnToApproved(999L));
+
+            verify(vehicleRepository, never()).save(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("X3-A (SALE_FAILED outcomes): markNeedsRediagnostic(vehicleId)")
+    class MarkNeedsRediagnosticTests {
+
+        @Test
+        @DisplayName("IN_AUCTION -> NEEDS_REDIAGNOSTIC: домен переводится и сохраняется")
+        void markNeedsRediagnostic_WhenInAuction_TransitionsAndSaves() {
+            // given
+            when(vehicleRepository.findById(5L)).thenReturn(Optional.of(inAuctionVehicle));
+            when(vehicleRepository.save(any(Vehicle.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            vehicleService.markNeedsRediagnostic(5L);
+
+            // then
+            assertEquals(VehicleStatus.NEEDS_REDIAGNOSTIC, inAuctionVehicle.getStatus());
+            ArgumentCaptor<Vehicle> vehicleCaptor = ArgumentCaptor.forClass(Vehicle.class);
+            verify(vehicleRepository).save(vehicleCaptor.capture());
+            assertEquals(VehicleStatus.NEEDS_REDIAGNOSTIC, vehicleCaptor.getValue().getStatus());
+        }
+
+        @Test
+        @DisplayName("Некорректный статус (не IN_AUCTION) -> доменное исключение распространяется, save не вызывается")
+        void markNeedsRediagnostic_WhenNotInAuction_PropagatesDomainExceptionAndNeverSaves() {
+            // given: approvedVehicle находится в статусе APPROVED, а не IN_AUCTION
+            when(vehicleRepository.findById(2L)).thenReturn(Optional.of(approvedVehicle));
+
+            // when & then
+            assertThrows(IllegalStateException.class, () -> vehicleService.markNeedsRediagnostic(2L));
+
+            verify(vehicleRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Автомобиль не найден -> IllegalArgumentException, save не вызывается")
+        void markNeedsRediagnostic_WhenVehicleNotFound_ThrowsIllegalArgumentException() {
+            // given
+            when(vehicleRepository.findById(999L)).thenReturn(Optional.empty());
+
+            // when & then
+            assertThrows(IllegalArgumentException.class, () -> vehicleService.markNeedsRediagnostic(999L));
+
+            verify(vehicleRepository, never()).save(any());
+        }
+    }
 }

@@ -128,6 +128,61 @@ class AuctionTest {
     }
 
     @Test
+    void markSaleFailed_WhenWaitingForPayment_ShouldChangeStatusToSaleFailed() {
+        // given
+        auction.setStatus(AuctionStatus.WAITING_FOR_PAYMENT);
+
+        // when
+        auction.markSaleFailed();
+
+        // then
+        assertEquals(AuctionStatus.SALE_FAILED, auction.getStatus());
+        assertNotNull(auction.getUpdatedAt());
+    }
+
+    @Test
+    void markSaleFailed_WhenCreated_ShouldThrowException() {
+        assertThrows(IllegalStateException.class, () -> auction.markSaleFailed());
+    }
+
+    @Test
+    void markSaleFailed_WhenActive_ShouldThrowException() {
+        auction.setStatus(AuctionStatus.ACTIVE);
+        assertThrows(IllegalStateException.class, () -> auction.markSaleFailed());
+    }
+
+    @Test
+    void markSaleFailed_WhenSold_ShouldThrowException() {
+        auction.setStatus(AuctionStatus.SOLD);
+        assertThrows(IllegalStateException.class, () -> auction.markSaleFailed());
+    }
+
+    @Test
+    void markSaleFailed_WhenAlreadySaleFailed_ShouldThrowException() {
+        auction.setStatus(AuctionStatus.SALE_FAILED);
+        assertThrows(IllegalStateException.class, () -> auction.markSaleFailed());
+    }
+
+    @Test
+    void markSaleFailed_WhenExpired_ShouldThrowException() {
+        auction.setStatus(AuctionStatus.EXPIRED);
+        assertThrows(IllegalStateException.class, () -> auction.markSaleFailed());
+    }
+
+    @Test
+    void markSaleFailed_WhenCancelled_ShouldThrowException() {
+        auction.setStatus(AuctionStatus.CANCELLED);
+        assertThrows(IllegalStateException.class, () -> auction.markSaleFailed());
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    void markSaleFailed_WhenLegacyCompleted_ShouldThrowException() {
+        auction.setStatus(AuctionStatus.COMPLETED);
+        assertThrows(IllegalStateException.class, () -> auction.markSaleFailed());
+    }
+
+    @Test
     void cancel_WhenCreated_ShouldChangeStatusToCancelled() {
         // when
         auction.cancel();

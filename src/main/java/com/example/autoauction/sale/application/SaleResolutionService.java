@@ -3,9 +3,11 @@ package com.example.autoauction.sale.application;
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
+import com.example.autoauction.sale.domain.FaultParty;
 import com.example.autoauction.sale.domain.HandoverEvidence;
 import com.example.autoauction.sale.domain.PaymentEvidence;
 import com.example.autoauction.sale.domain.SaleResolution;
+import com.example.autoauction.sale.domain.SaleResolutionResult;
 import com.example.autoauction.sale.domain.port.HandoverEvidenceRepository;
 import com.example.autoauction.sale.domain.port.PaymentEvidenceRepository;
 import com.example.autoauction.sale.domain.port.SaleResolutionRepository;
@@ -109,6 +111,51 @@ public class SaleResolutionService {
             SaleResolution saved = saleResolutionRepository.save(resolution);
             log.info("SaleResolution SUCCESS created: auction={}, resolvedBy={}, paymentEvidence={}, handoverEvidence={}",
                     auctionId, resolvedBy, payment.getId(), handover.getId());
+            return saved;
+        } catch (DataIntegrityViolationException e) {
+            throw new IllegalStateException("SaleResolution уже существует для аукциона " + auctionId, e);
+        }
+    }
+
+    /**
+     * X3-A: the sole controlled entry point for creating a SALE_FAILED outcome resolution - B,
+     * BUYER_FAULT, PLATFORM_FAULT, or C. Mirrors createSuccess()'s validation shape
+     * (WAITING_FOR_PAYMENT required, winner required, one-resolution-per-auction enforced via
+     * existsByAuctionId + the DB's own UNIQUE(auction_id)) but is evidence-independent - a
+     * failed sale has no PaymentEvidence/HandoverEvidence requirement at all, so both evidence
+     * ids are always null for every outcome this method creates. Deliberately rejects SUCCESS
+     * (createSuccess() owns that path exclusively, unchanged by this method's addition).
+     * outcome/faultParty consistency is validated once, inside SaleResolution's own
+     * constructor - not duplicated here.
+     */
+    @Transactional
+    public SaleResolution createFailure(Long auctionId, SaleResolutionResult outcome, FaultParty faultParty,
+                                         String failureReason, Long resolvedBy) {
+        if (outcome == SaleResolutionResult.SUCCESS) {
+            throw new IllegalArgumentException("createFailure() не принимает SUCCESS - используйте createSuccess()");
+        }
+
+        Auction auction = auctionRepository.findById(auctionId)
+                .orElseThrow(() -> new IllegalArgumentException("Аукцион не найден: " + auctionId));
+
+        if (auction.getStatus() != AuctionStatus.WAITING_FOR_PAYMENT) {
+            throw new IllegalStateException(
+                    "SaleResolution можно создать только для аукциона в статусе WAITING_FOR_PAYMENT, текущий: "
+                            + auction.getStatus());
+        }
+        if (auction.getWinnerId() == null) {
+            throw new IllegalStateException("У аукциона " + auctionId + " нет победителя");
+        }
+        if (saleResolutionRepository.existsByAuctionId(auctionId)) {
+            throw new IllegalStateException("SaleResolution уже существует для аукциона " + auctionId);
+        }
+
+        SaleResolution resolution = new SaleResolution(auctionId, outcome, faultParty, failureReason,
+                resolvedBy, now(), now());
+        try {
+            SaleResolution saved = saleResolutionRepository.save(resolution);
+            log.info("SaleResolution {} created: auction={}, resolvedBy={}, faultParty={}",
+                    outcome, auctionId, resolvedBy, faultParty);
             return saved;
         } catch (DataIntegrityViolationException e) {
             throw new IllegalStateException("SaleResolution уже существует для аукциона " + auctionId, e);

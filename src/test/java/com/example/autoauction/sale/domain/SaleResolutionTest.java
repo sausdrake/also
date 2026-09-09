@@ -60,7 +60,7 @@ class SaleResolutionTest {
     @DisplayName("Реконструкция: SUCCESS без обоих evidence id отклоняется тоже (защита от повреждённых данных)")
     void reconstructionConstructor_SuccessWithoutEvidence_ThrowsIllegalArgumentException() {
         assertThrows(IllegalArgumentException.class, () ->
-                new SaleResolution(1L, auctionId, SaleResolutionResult.SUCCESS, null, resolvedBy, now,
+                new SaleResolution(1L, auctionId, SaleResolutionResult.SUCCESS, null, null, resolvedBy, now,
                         null, null, FinancialResolutionStatus.PENDING, now));
     }
 
@@ -129,5 +129,116 @@ class SaleResolutionTest {
     void resetFinancialResolutionToPending_FromPending_ThrowsIllegalStateException() {
         SaleResolution resolution = validSuccess();
         assertThrows(IllegalStateException.class, resolution::resetFinancialResolutionToPending);
+    }
+
+    // ==================== X3-A: SALE_FAILED outcomes (B, BUYER_FAULT, PLATFORM_FAULT, C) ====================
+
+    @Test
+    @DisplayName("B + faultParty=null -> валидно, evidence id отсутствуют, PENDING")
+    void constructor_OutcomeB_WithNullFaultParty_CreatesValidResolution() {
+        SaleResolution resolution = new SaleResolution(auctionId, SaleResolutionResult.B, null,
+                "Легитимная несостоявшаяся продажа", resolvedBy, now, now);
+
+        assertEquals(SaleResolutionResult.B, resolution.getResult());
+        assertNull(resolution.getFaultParty());
+        assertEquals("Легитимная несостоявшаяся продажа", resolution.getReason());
+        assertNull(resolution.getPaymentEvidenceId());
+        assertNull(resolution.getHandoverEvidenceId());
+        assertEquals(FinancialResolutionStatus.PENDING, resolution.getFinancialResolutionStatus());
+    }
+
+    @Test
+    @DisplayName("BUYER_FAULT + faultParty=BUYER -> валидно")
+    void constructor_OutcomeBuyerFault_WithMatchingFaultParty_CreatesValidResolution() {
+        SaleResolution resolution = new SaleResolution(auctionId, SaleResolutionResult.BUYER_FAULT,
+                FaultParty.BUYER, null, resolvedBy, now, now);
+
+        assertEquals(SaleResolutionResult.BUYER_FAULT, resolution.getResult());
+        assertEquals(FaultParty.BUYER, resolution.getFaultParty());
+    }
+
+    @Test
+    @DisplayName("PLATFORM_FAULT + faultParty=PLATFORM -> валидно")
+    void constructor_OutcomePlatformFault_WithMatchingFaultParty_CreatesValidResolution() {
+        SaleResolution resolution = new SaleResolution(auctionId, SaleResolutionResult.PLATFORM_FAULT,
+                FaultParty.PLATFORM, null, resolvedBy, now, now);
+
+        assertEquals(SaleResolutionResult.PLATFORM_FAULT, resolution.getResult());
+        assertEquals(FaultParty.PLATFORM, resolution.getFaultParty());
+    }
+
+    @Test
+    @DisplayName("C + faultParty=SELLER -> валидно")
+    void constructor_OutcomeC_WithMatchingFaultParty_CreatesValidResolution() {
+        SaleResolution resolution = new SaleResolution(auctionId, SaleResolutionResult.C,
+                FaultParty.SELLER, null, resolvedBy, now, now);
+
+        assertEquals(SaleResolutionResult.C, resolution.getResult());
+        assertEquals(FaultParty.SELLER, resolution.getFaultParty());
+    }
+
+    @Test
+    @DisplayName("Неверные комбинации result/faultParty отклоняются")
+    void constructor_InvalidResultFaultPartyCombinations_ThrowIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class, () ->
+                new SaleResolution(auctionId, SaleResolutionResult.B, FaultParty.BUYER, null, resolvedBy, now, now));
+        assertThrows(IllegalArgumentException.class, () ->
+                new SaleResolution(auctionId, SaleResolutionResult.B, FaultParty.PLATFORM, null, resolvedBy, now, now));
+        assertThrows(IllegalArgumentException.class, () ->
+                new SaleResolution(auctionId, SaleResolutionResult.B, FaultParty.SELLER, null, resolvedBy, now, now));
+
+        assertThrows(IllegalArgumentException.class, () ->
+                new SaleResolution(auctionId, SaleResolutionResult.BUYER_FAULT, null, null, resolvedBy, now, now));
+        assertThrows(IllegalArgumentException.class, () ->
+                new SaleResolution(auctionId, SaleResolutionResult.BUYER_FAULT, FaultParty.PLATFORM, null, resolvedBy, now, now));
+        assertThrows(IllegalArgumentException.class, () ->
+                new SaleResolution(auctionId, SaleResolutionResult.BUYER_FAULT, FaultParty.SELLER, null, resolvedBy, now, now));
+
+        assertThrows(IllegalArgumentException.class, () ->
+                new SaleResolution(auctionId, SaleResolutionResult.PLATFORM_FAULT, null, null, resolvedBy, now, now));
+        assertThrows(IllegalArgumentException.class, () ->
+                new SaleResolution(auctionId, SaleResolutionResult.PLATFORM_FAULT, FaultParty.BUYER, null, resolvedBy, now, now));
+        assertThrows(IllegalArgumentException.class, () ->
+                new SaleResolution(auctionId, SaleResolutionResult.PLATFORM_FAULT, FaultParty.SELLER, null, resolvedBy, now, now));
+
+        assertThrows(IllegalArgumentException.class, () ->
+                new SaleResolution(auctionId, SaleResolutionResult.C, null, null, resolvedBy, now, now));
+        assertThrows(IllegalArgumentException.class, () ->
+                new SaleResolution(auctionId, SaleResolutionResult.C, FaultParty.BUYER, null, resolvedBy, now, now));
+        assertThrows(IllegalArgumentException.class, () ->
+                new SaleResolution(auctionId, SaleResolutionResult.C, FaultParty.PLATFORM, null, resolvedBy, now, now));
+    }
+
+    @Test
+    @DisplayName("SUCCESS + любой faultParty != null отклоняется (реконструкция)")
+    void reconstructionConstructor_SuccessWithNonNullFaultParty_ThrowsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class, () ->
+                new SaleResolution(1L, auctionId, SaleResolutionResult.SUCCESS, null, FaultParty.BUYER, resolvedBy,
+                        now, paymentEvidenceId, handoverEvidenceId, FinancialResolutionStatus.PENDING, now));
+    }
+
+    @Test
+    @DisplayName("failureReason сохраняется и доступен через getReason()")
+    void constructor_FailureReason_IsPersistedAsReason() {
+        SaleResolution resolution = new SaleResolution(auctionId, SaleResolutionResult.C, FaultParty.SELLER,
+                "Продавец подменил комплектацию автомобиля", resolvedBy, now, now);
+
+        assertEquals("Продавец подменил комплектацию автомобиля", resolution.getReason());
+    }
+
+    @Test
+    @DisplayName("failureReason == null допустим (не обязателен)")
+    void constructor_NullFailureReason_IsAllowed() {
+        SaleResolution resolution = new SaleResolution(auctionId, SaleResolutionResult.B, null,
+                null, resolvedBy, now, now);
+
+        assertNull(resolution.getReason());
+    }
+
+    @Test
+    @DisplayName("Существующее создание SUCCESS не изменилось - faultParty всегда null")
+    void constructor_ExistingSuccessCreation_StillHasNullFaultParty() {
+        SaleResolution resolution = validSuccess();
+        assertNull(resolution.getFaultParty());
     }
 }

@@ -1,5 +1,6 @@
 package com.example.autoauction.sale.infrastructure.persistence;
 
+import com.example.autoauction.sale.domain.FaultParty;
 import com.example.autoauction.sale.domain.FinancialResolutionStatus;
 import com.example.autoauction.sale.domain.SaleResolutionResult;
 import jakarta.persistence.*;
@@ -12,12 +13,17 @@ import java.time.OffsetDateTime;
  * {@code @ManyToOne}/{@code @JoinColumn} - same convention and reasoning as
  * JpaPaymentEvidenceEntity/JpaSellerDiagnosticCommitmentEntity. All three real FKs live in
  * V34's migration SQL and are provable only against the actual Flyway-migrated schema. The
- * UNIQUE(auction_id) and both CHECK constraints below ARE mirrored at the JPA-annotation level
- * and are therefore exercised under this project's H2 test profile.
+ * UNIQUE(auction_id) and all CHECK constraints below (including the X3-A result/fault_party
+ * consistency check added in V35) ARE mirrored at the JPA-annotation level and are therefore
+ * exercised under this project's H2 test profile.
  */
 @Entity
 @Table(name = "sale_resolution")
 @Check(constraints = "result <> 'SUCCESS' OR (payment_evidence_id IS NOT NULL AND handover_evidence_id IS NOT NULL)")
+@Check(constraints = "(result = 'BUYER_FAULT' AND fault_party = 'BUYER') OR " +
+        "(result = 'PLATFORM_FAULT' AND fault_party = 'PLATFORM') OR " +
+        "(result = 'C' AND fault_party = 'SELLER') OR " +
+        "(result IN ('SUCCESS', 'B') AND fault_party IS NULL)")
 public class JpaSaleResolutionEntity {
 
     @Id
@@ -33,6 +39,10 @@ public class JpaSaleResolutionEntity {
 
     @Column(name = "reason", length = 500)
     private String reason;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "fault_party", length = 20)
+    private FaultParty faultParty;
 
     @Column(name = "resolved_by", nullable = false)
     private Long resolvedBy;
@@ -63,6 +73,8 @@ public class JpaSaleResolutionEntity {
     public void setResult(SaleResolutionResult result) { this.result = result; }
     public String getReason() { return reason; }
     public void setReason(String reason) { this.reason = reason; }
+    public FaultParty getFaultParty() { return faultParty; }
+    public void setFaultParty(FaultParty faultParty) { this.faultParty = faultParty; }
     public Long getResolvedBy() { return resolvedBy; }
     public void setResolvedBy(Long resolvedBy) { this.resolvedBy = resolvedBy; }
     public OffsetDateTime getResolvedAt() { return resolvedAt; }

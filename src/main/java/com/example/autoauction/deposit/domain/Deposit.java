@@ -77,6 +77,32 @@ public class Deposit {
         this.updatedAt = OffsetDateTime.now();
     }
 
+    /**
+     * X3-A (SALE_FAILED outcome BUYER_FAULT): permanently confiscates an already-frozen amount
+     * to the platform. Unlike {@link #unfreezeForAuction}, which only reduces blockedAmount
+     * (the money stays in balance, becoming available again), this reduces BOTH blockedAmount
+     * AND balance - the money actually leaves the account, it does not return to the buyer.
+     * Deliberately not implemented via {@link #withdraw}, which checks availableBalance - the
+     * wrong gate here, since the amount being removed is specifically the frozen portion, not
+     * the available portion.
+     */
+    public void confiscateFrozen(BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Некорректная сумма конфискации: " + amount);
+        }
+
+        if (this.blockedAmount.compareTo(amount) < 0) {
+            throw new IllegalStateException(
+                    String.format("Недостаточно заблокированных средств для конфискации. Заблокировано: %s, требуется: %s",
+                            this.blockedAmount, amount)
+            );
+        }
+
+        this.blockedAmount = this.blockedAmount.subtract(amount);
+        this.balance = this.balance.subtract(amount);
+        this.updatedAt = OffsetDateTime.now();
+    }
+
     public void deposit(BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Сумма депозита должна быть больше 0");
@@ -101,6 +127,37 @@ public class Deposit {
 
     public void unfreezeAll() {
         this.blockedAmount = BigDecimal.ZERO;
+        this.updatedAt = OffsetDateTime.now();
+    }
+
+    /**
+     * PHASE 3B: releases a fully-frozen amount (e.g. a seller diagnostic commitment),
+     * permanently deducting {@code chargeAmount} of it (a fee/penalty) from {@code balance}
+     * while returning the remainder ({@code totalFrozen - chargeAmount}) to
+     * {@code availableBalance} - a single combined mutation, not a separate unfreeze-then-
+     * withdraw pair, so no intermediate state is ever visible to a concurrent transaction.
+     * {@code chargeAmount == 0} is valid (nothing charged, full amount returned).
+     */
+    public void chargeFromFrozen(BigDecimal totalFrozen, BigDecimal chargeAmount) {
+        if (totalFrozen == null || totalFrozen.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Некорректная сумма для снятия заморозки: " + totalFrozen);
+        }
+        if (chargeAmount == null || chargeAmount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Некорректная сумма удержания: " + chargeAmount);
+        }
+        if (chargeAmount.compareTo(totalFrozen) > 0) {
+            throw new IllegalArgumentException(
+                    String.format("Сумма удержания не может превышать замороженную сумму. Удержание: %s, заморожено: %s",
+                            chargeAmount, totalFrozen));
+        }
+        if (this.blockedAmount.compareTo(totalFrozen) < 0) {
+            throw new IllegalStateException(
+                    String.format("Недостаточно заблокированных средств. Заблокировано: %s, требуется освободить: %s",
+                            this.blockedAmount, totalFrozen));
+        }
+
+        this.blockedAmount = this.blockedAmount.subtract(totalFrozen);
+        this.balance = this.balance.subtract(chargeAmount);
         this.updatedAt = OffsetDateTime.now();
     }
 

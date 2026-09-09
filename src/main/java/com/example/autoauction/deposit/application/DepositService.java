@@ -407,6 +407,73 @@ public class DepositService {
     }
 
     /**
+     * PHASE 3B: releases a seller diagnostic commitment's full frozen amount, permanently
+     * charging {@code chargeAmount} of it (the diagnostic fee for Outcome B) and returning
+     * the remainder to the seller's available balance - a single combined
+     * {@link Deposit#chargeFromFrozen} mutation plus one {@code save()}, never a separate
+     * unfreeze-then-withdraw pair (see that method's own Javadoc for why). Plain
+     * @Transactional (REQUIRED) deliberately, NOT REQUIRES_NEW: this is called from
+     * SellerDiagnosticCommitmentFinalizationService for exactly one commitment/deposit, never
+     * in a fan-out loop over multiple participants - none of the REQUIRES_NEW-plus-swallow
+     * reasoning that justifies it on unfreezeForAuction/markAsWinner applies here. A failure
+     * here must propagate and roll back the caller's whole transaction (including the
+     * commitment's own FINALIZED claim), exactly like unfreezeForDiagnosticRequest.
+     *
+     * balanceBefore/balanceAfter recording follows two DIFFERENT existing conventions,
+     * deliberately: the CHARGE transaction records raw balance (like WITHDRAWAL/DEPOSIT/
+     * ADMIN_ADJUSTMENT, since balance actually changes), while the UNBLOCK transaction
+     * records availableBalance (like every existing UNBLOCK transaction in this codebase,
+     * e.g. unfreezeForAuction) - using the wrong one for either would silently misrepresent
+     * that transaction relative to how every other row of its type is recorded.
+     */
+    @Transactional
+    public void chargeForDiagnosticRequest(Long depositId, Long requestId, BigDecimal totalFrozen, BigDecimal chargeAmount) {
+        log.info("Charging frozen diagnostic commitment: deposit={}, request={}, totalFrozen={}, chargeAmount={}",
+                depositId, requestId, totalFrozen, chargeAmount);
+
+        Deposit deposit = depositRepository.findById(depositId)
+                .orElseThrow(() -> new IllegalArgumentException("Депозит не найден: " + depositId));
+
+        Long userId = deposit.getUserId();
+        BigDecimal rawBalanceBefore = deposit.getBalance();
+        BigDecimal availableBefore = deposit.getAvailableBalance();
+
+        deposit.chargeFromFrozen(totalFrozen, chargeAmount);
+        depositRepository.save(deposit);
+
+        BigDecimal rawBalanceAfter = deposit.getBalance();
+        BigDecimal availableAfter = deposit.getAvailableBalance();
+
+        if (chargeAmount.compareTo(BigDecimal.ZERO) > 0) {
+            DepositTransaction charge = new DepositTransaction(
+                    deposit.getId(), userId,
+                    DepositTransaction.TransactionType.CHARGE,
+                    chargeAmount, rawBalanceBefore, rawBalanceAfter,
+                    "DIAGNOSTIC_" + requestId,
+                    "Удержание диагностической комиссии по заявке #" + requestId
+            );
+            charge.setAuctionId(requestId);
+            depositRepository.saveTransaction(charge);
+        }
+
+        BigDecimal refund = totalFrozen.subtract(chargeAmount);
+        if (refund.compareTo(BigDecimal.ZERO) > 0) {
+            DepositTransaction unblock = new DepositTransaction(
+                    deposit.getId(), userId,
+                    DepositTransaction.TransactionType.UNBLOCK,
+                    refund, availableBefore, availableAfter,
+                    "DIAGNOSTIC_" + requestId,
+                    "Возврат остатка заморозки по заявке #" + requestId
+            );
+            unblock.setAuctionId(requestId);
+            depositRepository.saveTransaction(unblock);
+        }
+
+        log.info("Charge complete for request {}: balance={}, blockedAmount={}",
+                requestId, deposit.getBalance(), deposit.getBlockedAmount());
+    }
+
+    /**
      * @param requiredAmount фиксированная сумма депозита, требуемая для конкретного аукциона
      *                       (auction.getRequiredDepositAmount()) — НЕ стартовая цена и не процент от неё.
      */
@@ -546,6 +613,109 @@ public class DepositService {
         } catch (Exception e) {
             log.warn("Failed to send deposit release notification to user {}: {}", userId, e.getMessage());
         }
+    }
+
+    /**
+     * X3-A (SALE_FAILED outcomes B, PLATFORM_FAULT, C): unblocks the winner's frozen deposit
+     * for an auction that failed without requiring confiscation - the money returns to the
+     * buyer's own available balance. Deliberately auction-aware AND winner-aware (the frozen
+     * row must belong to exactly this auction AND be winner-flagged) - same precondition
+     * releaseWinnerDeposit already uses, but this is NOT a reuse of that method: this one is
+     * called only from SaleFailureResolutionOrchestrator.resolveSaleFailure(), plain
+     * @Transactional (REQUIRED), deliberately NOT REQUIRES_NEW - a failure here must roll back
+     * the whole outcome resolution (Auction, SaleResolution, Vehicle included), not be isolated
+     * or swallowed the way unfreezeForAuction/markAsWinner's fan-out-over-many-participants
+     * REQUIRES_NEW is.
+     */
+    @Transactional
+    public void unblockForSaleFailure(Long auctionId, Long winnerId) {
+        log.info("Unblocking winner deposit after SALE_FAILED: auction={}, winner={}", auctionId, winnerId);
+
+        Deposit deposit = depositRepository.findByUserId(winnerId)
+                .orElseThrow(() -> new IllegalArgumentException("Депозит не найден для пользователя: " + winnerId));
+
+        FrozenDeposit target = findWinnerFrozenDeposit(deposit, auctionId);
+
+        BigDecimal frozenAmount = target.getAmount();
+        BigDecimal balanceBefore = deposit.getAvailableBalance();
+
+        deposit.unfreezeForAuction(frozenAmount);
+        depositRepository.unfreezeForAuction(deposit.getId(), auctionId);
+
+        DepositTransaction transaction = new DepositTransaction(
+                deposit.getId(),
+                winnerId,
+                DepositTransaction.TransactionType.UNBLOCK,
+                frozenAmount,
+                balanceBefore,
+                deposit.getAvailableBalance(),
+                auctionId.toString(),
+                "Разблокировка депозита победителя после неудачной продажи аукциона #" + auctionId
+        );
+        transaction.setAuctionId(auctionId);
+        depositRepository.saveTransaction(transaction);
+
+        depositRepository.save(deposit);
+        log.info("Winner deposit unblocked after SALE_FAILED for auction {}, winner {}. Amount: {}",
+                auctionId, winnerId, frozenAmount);
+    }
+
+    /**
+     * X3-A (SALE_FAILED outcome BUYER_FAULT): confiscates the winner's frozen deposit to the
+     * platform - unlike unblockForSaleFailure, the money does NOT return to the buyer's
+     * available balance; it is permanently removed from both blockedAmount and balance via
+     * {@link Deposit#confiscateFrozen}. Deliberately NOT implemented via withdraw() (which
+     * checks availableBalance - the wrong gate, since this amount is specifically the frozen
+     * portion, not the available portion) and does NOT introduce a new ledger transaction type
+     * - reuses the existing, previously-unused CHARGE type. Same transaction-propagation
+     * reasoning as unblockForSaleFailure above - plain @Transactional (REQUIRED), no
+     * REQUIRES_NEW.
+     */
+    @Transactional
+    public void confiscateToPlatform(Long auctionId, Long winnerId) {
+        log.info("Confiscating winner deposit to platform after BUYER_FAULT: auction={}, winner={}", auctionId, winnerId);
+
+        Deposit deposit = depositRepository.findByUserId(winnerId)
+                .orElseThrow(() -> new IllegalArgumentException("Депозит не найден для пользователя: " + winnerId));
+
+        FrozenDeposit target = findWinnerFrozenDeposit(deposit, auctionId);
+
+        BigDecimal frozenAmount = target.getAmount();
+        BigDecimal balanceBefore = deposit.getBalance();
+
+        deposit.confiscateFrozen(frozenAmount);
+        depositRepository.unfreezeForAuction(deposit.getId(), auctionId);
+
+        DepositTransaction transaction = new DepositTransaction(
+                deposit.getId(),
+                winnerId,
+                DepositTransaction.TransactionType.CHARGE,
+                frozenAmount,
+                balanceBefore,
+                deposit.getBalance(),
+                auctionId.toString(),
+                "Конфискация депозита победителя в пользу платформы (BUYER_FAULT), аукцион #" + auctionId
+        );
+        transaction.setAuctionId(auctionId);
+        depositRepository.saveTransaction(transaction);
+
+        depositRepository.save(deposit);
+        log.info("Winner deposit confiscated to platform for auction {}, winner {}. Amount: {}",
+                auctionId, winnerId, frozenAmount);
+    }
+
+    /**
+     * Shared winner-frozen-deposit lookup for unblockForSaleFailure/confiscateToPlatform -
+     * same precondition releaseWinnerDeposit uses inline, extracted here only because these
+     * two new X3-A methods both need it (not a change to releaseWinnerDeposit itself).
+     */
+    private FrozenDeposit findWinnerFrozenDeposit(Deposit deposit, Long auctionId) {
+        return depositRepository.getFrozenDepositsByDepositId(deposit.getId()).stream()
+                .filter(f -> f.getAuctionId().equals(auctionId) && f.isWinner())
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "Заморозка победителя для аукциона " + auctionId + " не найдена. " +
+                        "Убедитесь, что аукцион завершён и пользователь является победителем."));
     }
 
     static final BigDecimal MAX_ADJUST_AMOUNT = new BigDecimal("99999999");

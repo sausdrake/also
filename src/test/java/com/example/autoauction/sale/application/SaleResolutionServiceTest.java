@@ -3,9 +3,11 @@ package com.example.autoauction.sale.application;
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
+import com.example.autoauction.sale.domain.FaultParty;
 import com.example.autoauction.sale.domain.HandoverEvidence;
 import com.example.autoauction.sale.domain.PaymentEvidence;
 import com.example.autoauction.sale.domain.SaleResolution;
+import com.example.autoauction.sale.domain.SaleResolutionResult;
 import com.example.autoauction.sale.domain.port.HandoverEvidenceRepository;
 import com.example.autoauction.sale.domain.port.PaymentEvidenceRepository;
 import com.example.autoauction.sale.domain.port.SaleResolutionRepository;
@@ -230,6 +232,153 @@ class SaleResolutionServiceTest {
     void resetFinancialResolutionToPending_ClaimFails_ThrowsIllegalStateException() {
         when(saleResolutionRepository.resetFinancialResolutionToPending(1L)).thenReturn(false);
         assertThatThrownBy(() -> service.resetFinancialResolutionToPending(1L))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    // ==================== X3-A: createFailure ====================
+
+    @Test
+    @DisplayName("createFailure: B с faultParty=null сохраняется")
+    void createFailure_OutcomeB_Persists() {
+        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+        when(saleResolutionRepository.existsByAuctionId(auctionId)).thenReturn(false);
+        when(saleResolutionRepository.save(any(SaleResolution.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SaleResolution result = service.createFailure(auctionId, SaleResolutionResult.B, null,
+                "Легитимная несостоявшаяся продажа", resolvedBy);
+
+        assertThat(result.getResult()).isEqualTo(SaleResolutionResult.B);
+        assertThat(result.getFaultParty()).isNull();
+        assertThat(result.getReason()).isEqualTo("Легитимная несостоявшаяся продажа");
+        assertThat(result.getPaymentEvidenceId()).isNull();
+        assertThat(result.getHandoverEvidenceId()).isNull();
+        verify(saleResolutionRepository, times(1)).save(any(SaleResolution.class));
+    }
+
+    @Test
+    @DisplayName("createFailure: BUYER_FAULT с faultParty=BUYER сохраняется")
+    void createFailure_OutcomeBuyerFault_Persists() {
+        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+        when(saleResolutionRepository.existsByAuctionId(auctionId)).thenReturn(false);
+        when(saleResolutionRepository.save(any(SaleResolution.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SaleResolution result = service.createFailure(auctionId, SaleResolutionResult.BUYER_FAULT,
+                FaultParty.BUYER, null, resolvedBy);
+
+        assertThat(result.getResult()).isEqualTo(SaleResolutionResult.BUYER_FAULT);
+        assertThat(result.getFaultParty()).isEqualTo(FaultParty.BUYER);
+    }
+
+    @Test
+    @DisplayName("createFailure: PLATFORM_FAULT с faultParty=PLATFORM сохраняется")
+    void createFailure_OutcomePlatformFault_Persists() {
+        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+        when(saleResolutionRepository.existsByAuctionId(auctionId)).thenReturn(false);
+        when(saleResolutionRepository.save(any(SaleResolution.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SaleResolution result = service.createFailure(auctionId, SaleResolutionResult.PLATFORM_FAULT,
+                FaultParty.PLATFORM, null, resolvedBy);
+
+        assertThat(result.getResult()).isEqualTo(SaleResolutionResult.PLATFORM_FAULT);
+        assertThat(result.getFaultParty()).isEqualTo(FaultParty.PLATFORM);
+    }
+
+    @Test
+    @DisplayName("createFailure: C с faultParty=SELLER сохраняется")
+    void createFailure_OutcomeC_Persists() {
+        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+        when(saleResolutionRepository.existsByAuctionId(auctionId)).thenReturn(false);
+        when(saleResolutionRepository.save(any(SaleResolution.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SaleResolution result = service.createFailure(auctionId, SaleResolutionResult.C,
+                FaultParty.SELLER, null, resolvedBy);
+
+        assertThat(result.getResult()).isEqualTo(SaleResolutionResult.C);
+        assertThat(result.getFaultParty()).isEqualTo(FaultParty.SELLER);
+    }
+
+    @Test
+    @DisplayName("createFailure: SUCCESS отклоняется")
+    void createFailure_Success_ThrowsIllegalArgumentException() {
+        assertThatThrownBy(() -> service.createFailure(auctionId, SaleResolutionResult.SUCCESS, null, null, resolvedBy))
+                .isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(auctionRepository, saleResolutionRepository);
+    }
+
+    @Test
+    @DisplayName("createFailure: несуществующий аукцион отклоняется")
+    void createFailure_AuctionNotFound_ThrowsIllegalArgumentException() {
+        when(auctionRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.createFailure(999L, SaleResolutionResult.B, null, null, resolvedBy))
+                .isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(saleResolutionRepository);
+    }
+
+    @Test
+    @DisplayName("createFailure: аукцион не WAITING_FOR_PAYMENT отклоняется")
+    void createFailure_AuctionNotWaitingForPayment_ThrowsIllegalStateException() {
+        auction.setStatus(AuctionStatus.ACTIVE);
+        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+
+        assertThatThrownBy(() -> service.createFailure(auctionId, SaleResolutionResult.B, null, null, resolvedBy))
+                .isInstanceOf(IllegalStateException.class);
+        verifyNoInteractions(saleResolutionRepository);
+    }
+
+    @Test
+    @DisplayName("createFailure: у аукциона нет победителя -> отклоняется")
+    void createFailure_NoWinner_ThrowsIllegalStateException() {
+        auction.setWinnerId(null);
+        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+
+        assertThatThrownBy(() -> service.createFailure(auctionId, SaleResolutionResult.B, null, null, resolvedBy))
+                .isInstanceOf(IllegalStateException.class);
+        verifyNoInteractions(saleResolutionRepository);
+    }
+
+    @Test
+    @DisplayName("createFailure: дубликат SaleResolution отклоняется")
+    void createFailure_Duplicate_ThrowsIllegalStateException() {
+        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+        when(saleResolutionRepository.existsByAuctionId(auctionId)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.createFailure(auctionId, SaleResolutionResult.B, null, null, resolvedBy))
+                .isInstanceOf(IllegalStateException.class);
+        verify(saleResolutionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("createFailure: неверная комбинация result/faultParty отклоняется (валидация внутри SaleResolution)")
+    void createFailure_InvalidFaultPartyCombination_ThrowsIllegalArgumentException() {
+        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+        when(saleResolutionRepository.existsByAuctionId(auctionId)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.createFailure(auctionId, SaleResolutionResult.BUYER_FAULT,
+                FaultParty.SELLER, null, resolvedBy))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(saleResolutionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("createFailure: гонка на UNIQUE-ограничении переводится в явную ошибку")
+    void createFailure_ConcurrentDuplicateRace_TranslatesToIllegalStateException() {
+        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+        when(saleResolutionRepository.existsByAuctionId(auctionId)).thenReturn(false);
+        when(saleResolutionRepository.save(any(SaleResolution.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate key"));
+
+        assertThatThrownBy(() -> service.createFailure(auctionId, SaleResolutionResult.B, null, null, resolvedBy))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName("createFailure не затрагивает createSuccess - SUCCESS продолжает требовать evidence")
+    void createSuccess_StillRequiresEvidence_UnaffectedByCreateFailureAddition() {
+        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+        when(paymentEvidenceRepository.findByAuctionId(auctionId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.createSuccess(auctionId, resolvedBy))
                 .isInstanceOf(IllegalStateException.class);
     }
 }
