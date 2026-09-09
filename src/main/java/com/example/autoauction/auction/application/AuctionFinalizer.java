@@ -7,9 +7,11 @@ import com.example.autoauction.auction.domain.port.AuctionParticipantRepository;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.auction.web.AuctionWebSocketController;
 import com.example.autoauction.deposit.application.DepositService;
+import com.example.autoauction.diagnostic.commitment.domain.FinalizationOutcome;
 import com.example.autoauction.notification.application.NotificationService;
 import com.example.autoauction.policy.application.PolicyVersionService;
 import com.example.autoauction.sale.application.SaleResolutionService;
+import com.example.autoauction.sale.domain.SaleResolution;
 import com.example.autoauction.vehicle.application.VehicleService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,6 +35,7 @@ public class AuctionFinalizer {
     private final PolicyVersionService policyVersionService;
     private final VehicleService vehicleService;
     private final SaleResolutionService saleResolutionService;
+    private final SaleCommitmentResolutionOrchestrator saleCommitmentResolutionOrchestrator;
 
     public AuctionFinalizer(AuctionRepository auctionRepository,
                             DepositService depositService,
@@ -42,7 +45,8 @@ public class AuctionFinalizer {
                             Clock clock,
                             PolicyVersionService policyVersionService,
                             VehicleService vehicleService,
-                            SaleResolutionService saleResolutionService) {
+                            SaleResolutionService saleResolutionService,
+                            SaleCommitmentResolutionOrchestrator saleCommitmentResolutionOrchestrator) {
         this.auctionRepository = auctionRepository;
         this.depositService = depositService;
         this.participantRepository = participantRepository;
@@ -52,6 +56,7 @@ public class AuctionFinalizer {
         this.policyVersionService = policyVersionService;
         this.vehicleService = vehicleService;
         this.saleResolutionService = saleResolutionService;
+        this.saleCommitmentResolutionOrchestrator = saleCommitmentResolutionOrchestrator;
     }
 
     /**
@@ -299,10 +304,29 @@ public class AuctionFinalizer {
             );
         }
 
-        saleResolutionService.createSuccess(auction.getId(), resolvedBy);
+        SaleResolution resolution = saleResolutionService.createSuccess(auction.getId(), resolvedBy);
         auction.markSold();
         vehicleService.markAsSold(auction.getVehicleId());
+
+        // X3-D: Outcome A buyer-deposit consequence - reuses the existing releaseWinnerDeposit
+        // primitive (structurally identical to unblockForSaleFailure, just under its older,
+        // pre-X3-A name), not a new "unblockForSuccess" method.
+        depositService.releaseWinnerDeposit(auction.getWinnerId(), auction.getId());
+
+        // X3-D: seller commitment consequence, only if this auction has one (historical
+        // auctions may not). Uses ONLY auction.getSellerDiagnosticCommitmentId() - never
+        // Vehicle/DiagnosticRequest/VIN/latest-commitment re-resolution.
+        if (auction.getSellerDiagnosticCommitmentId() != null) {
+            saleCommitmentResolutionOrchestrator.resolve(
+                    auction.getSellerDiagnosticCommitmentId(), FinalizationOutcome.A);
+        }
+
         auctionRepository.save(auction);
+
+        // X3-D: financialResolutionStatus now reflects that every financial consequence this
+        // slice owns (buyer deposit + commitment, if any) has succeeded within this same
+        // transaction.
+        saleResolutionService.markFinancialResolutionDone(resolution.getId());
 
         log.info("Auction {} sale completed, vehicle {} marked SOLD", auction.getId(), auction.getVehicleId());
     }

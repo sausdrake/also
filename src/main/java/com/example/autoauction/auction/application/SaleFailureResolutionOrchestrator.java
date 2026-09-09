@@ -5,8 +5,10 @@ import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.deposit.application.DepositService;
+import com.example.autoauction.diagnostic.commitment.domain.FinalizationOutcome;
 import com.example.autoauction.sale.application.SaleResolutionService;
 import com.example.autoauction.sale.domain.FaultParty;
+import com.example.autoauction.sale.domain.SaleResolution;
 import com.example.autoauction.sale.domain.SaleResolutionResult;
 import com.example.autoauction.vehicle.application.VehicleService;
 import lombok.extern.slf4j.Slf4j;
@@ -14,15 +16,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * X3-A (SALE_FAILED outcomes): the single authoritative operation that resolves a
- * WAITING_FOR_PAYMENT auction as a failed sale - B, BUYER_FAULT, PLATFORM_FAULT, or C - and
- * performs its immediate Auction, Vehicle, and buyer-deposit consequences atomically. A peer
- * of {@link AuctionFinalizer}, not an extension of it: AuctionFinalizer owns the successful
- * lifecycle (start/cancel/finalize/completeSale); this class owns exactly the failed-sale
- * branch and nothing else - no commission, no seller payout, no SellerDiagnosticCommitment,
- * no PolicyVersion, no re-diagnostic workflow beyond the one Vehicle status flip, no buyer
- * blocking, no FinancialRecoveryScheduler integration. All deliberately out of scope for this
- * slice (see the X3-A architecture fight).
+ * X3-A (SALE_FAILED outcomes) / X3-D (seller commitment consequence): the single authoritative
+ * operation that resolves a WAITING_FOR_PAYMENT auction as a failed sale - B, BUYER_FAULT,
+ * PLATFORM_FAULT, or C - and performs its immediate Auction, Vehicle, buyer-deposit, and
+ * (X3-D, for B/BUYER_FAULT/PLATFORM_FAULT only) seller-commitment consequences atomically. A
+ * peer of {@link AuctionFinalizer}, not an extension of it: AuctionFinalizer owns the
+ * successful lifecycle (start/cancel/finalize/completeSale); this class owns exactly the
+ * failed-sale branch and nothing else - no commission, no seller payout, no PolicyVersion, no
+ * re-diagnostic workflow beyond the one Vehicle status flip, no buyer blocking, no
+ * FinancialRecoveryScheduler integration. All deliberately out of scope for this slice.
+ *
+ * X3-D deliberately does NOT extend to Outcome C - no seller-violation policy exists yet (see
+ * the X3-D architecture fight). C's existing Vehicle/Deposit consequences (unchanged since
+ * X3-A) still run; only the commitment/financialResolutionStatus consequence is skipped for C.
  *
  * Mirrors AuctionFinalizer.completeSale()'s exact caller contract: the caller is responsible
  * for fetching {@code auction} via {@code auctionRepository.findByIdWithLock(auctionId)}
@@ -52,15 +58,18 @@ public class SaleFailureResolutionOrchestrator {
     private final VehicleService vehicleService;
     private final SaleResolutionService saleResolutionService;
     private final DepositService depositService;
+    private final SaleCommitmentResolutionOrchestrator saleCommitmentResolutionOrchestrator;
 
     public SaleFailureResolutionOrchestrator(AuctionRepository auctionRepository,
                                               VehicleService vehicleService,
                                               SaleResolutionService saleResolutionService,
-                                              DepositService depositService) {
+                                              DepositService depositService,
+                                              SaleCommitmentResolutionOrchestrator saleCommitmentResolutionOrchestrator) {
         this.auctionRepository = auctionRepository;
         this.vehicleService = vehicleService;
         this.saleResolutionService = saleResolutionService;
         this.depositService = depositService;
+        this.saleCommitmentResolutionOrchestrator = saleCommitmentResolutionOrchestrator;
     }
 
     /**
@@ -87,7 +96,8 @@ public class SaleFailureResolutionOrchestrator {
             );
         }
 
-        saleResolutionService.createFailure(auction.getId(), outcome, faultParty, failureReason, resolvedBy);
+        SaleResolution resolution = saleResolutionService.createFailure(
+                auction.getId(), outcome, faultParty, failureReason, resolvedBy);
         auction.markSaleFailed();
 
         Long vehicleId = auction.getVehicleId();
@@ -109,7 +119,29 @@ public class SaleFailureResolutionOrchestrator {
             default -> throw new IllegalArgumentException("Неподдерживаемый outcome для resolveSaleFailure: " + outcome);
         }
 
+        // X3-D: seller commitment consequence + financialResolutionStatus, for the outcomes
+        // this slice supports (B, BUYER_FAULT, PLATFORM_FAULT). Outcome C is explicitly
+        // excluded here - no seller-violation policy exists yet, so financialResolutionStatus
+        // deliberately stays PENDING and the commitment (if any) stays AWAITING_FINALIZATION,
+        // both honestly reflecting that C's seller consequence remains unresolved pending that
+        // future slice. Uses ONLY auction.getSellerDiagnosticCommitmentId() - never
+        // Vehicle/DiagnosticRequest/VIN/latest-commitment re-resolution.
+        if (outcome != SaleResolutionResult.C) {
+            if (auction.getSellerDiagnosticCommitmentId() != null) {
+                FinalizationOutcome commitmentOutcome = (outcome == SaleResolutionResult.B)
+                        ? FinalizationOutcome.B
+                        : FinalizationOutcome.A;
+                saleCommitmentResolutionOrchestrator.resolve(
+                        auction.getSellerDiagnosticCommitmentId(), commitmentOutcome);
+            }
+        }
+
         auctionRepository.save(auction);
+
+        if (outcome != SaleResolutionResult.C) {
+            saleResolutionService.markFinancialResolutionDone(resolution.getId());
+        }
+
         log.info("Auction {} resolved as SALE_FAILED: outcome={}, faultParty={}, vehicle={}, winner={}",
                 auction.getId(), outcome, faultParty, vehicleId, winnerId);
     }

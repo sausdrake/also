@@ -493,10 +493,30 @@ public class AdminAuctionService {
         return result;
     }
 
+    /**
+     * X3-D hardening: rejects release while the auction's outcome is not yet known
+     * (ACTIVE - winnerId is only the current leading bidder, not final; WAITING_FOR_PAYMENT -
+     * the sale itself is not yet confirmed one way or the other). Releasing here would let a
+     * bidder withdraw their collateral before a later outcome (e.g. BUYER_FAULT) could ever
+     * confiscate it. Every other status - legacy COMPLETED, SOLD, SALE_FAILED, EXPIRED,
+     * CANCELLED - remains allowed exactly as before: legacy COMPLETED predates SaleResolution
+     * entirely and must keep working; SOLD/SALE_FAILED are safe because the underlying frozen
+     * row is a physical delete on first release (whether performed automatically by X3-D's own
+     * outcome resolution or manually here) - a second call against an already-released row
+     * fails closed on its own (existing "Заморозка победителя... не найдена" guard), never a
+     * silent double-release. Deliberately does NOT also require SaleResolution to exist -
+     * legacy COMPLETED rows have none and must not be locked out by such a check.
+     */
     @Transactional
     public void releaseWinner(Long auctionId) {
         Auction auction = auctionRepository.findById(auctionId)
                 .orElseThrow(() -> new IllegalArgumentException("Аукцион не найден: " + auctionId));
+        if (auction.getStatus() == AuctionStatus.ACTIVE || auction.getStatus() == AuctionStatus.WAITING_FOR_PAYMENT) {
+            throw new IllegalStateException(
+                    String.format("Невозможно освободить депозит победителя аукциона %d в статусе '%s' - исход ещё не определён",
+                            auctionId, auction.getStatus())
+            );
+        }
         Long winnerId = auction.getWinnerId();
         if (winnerId == null) {
             throw new IllegalStateException("У аукциона " + auctionId + " нет победителя");

@@ -35,6 +35,14 @@ public class SellerDiagnosticCommitmentRepositoryAdapter implements SellerDiagno
 
     @Override
     @Transactional(readOnly = true)
+    public Optional<SellerDiagnosticCommitment> findById(Long id) {
+        // JpaRepository already provides findById(Long) by inheritance - no new Spring Data
+        // method needed on SpringDataSellerDiagnosticCommitmentJpaRepository.
+        return jpaRepository.findById(id).map(mapper::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Optional<SellerDiagnosticCommitment> findByDiagnosticRequestId(Long diagnosticRequestId) {
         return jpaRepository.findByDiagnosticRequestId(diagnosticRequestId).map(mapper::toDomain);
     }

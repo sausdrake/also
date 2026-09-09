@@ -5,10 +5,13 @@ import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionParticipantRepository;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.deposit.application.DepositService;
+import com.example.autoauction.diagnostic.commitment.domain.FinalizationOutcome;
 import com.example.autoauction.policy.application.PolicyVersionService;
 import com.example.autoauction.policy.domain.PolicyVersion;
 import com.example.autoauction.sale.application.SaleResolutionService;
+import com.example.autoauction.sale.domain.FinancialResolutionStatus;
 import com.example.autoauction.sale.domain.SaleResolution;
+import com.example.autoauction.sale.domain.SaleResolutionResult;
 import com.example.autoauction.vehicle.application.VehicleService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -59,6 +62,9 @@ class AuctionFinalizerTest {
 
     @Mock
     private SaleResolutionService saleResolutionService;
+
+    @Mock
+    private SaleCommitmentResolutionOrchestrator saleCommitmentResolutionOrchestrator;
 
     @InjectMocks
     private AuctionFinalizer auctionFinalizer;
@@ -315,7 +321,8 @@ class AuctionFinalizerTest {
             // computed as an argument to an in-progress when(...).thenReturn(...) stub (see call
             // sites below) would interleave mock interactions mid-stub and trip Mockito's
             // UnfinishedStubbingException.
-            return new SaleResolution(waitingAuction.getId(), resolvedBy, fixedTime, 10L, 20L, fixedTime);
+            return new SaleResolution(99L, waitingAuction.getId(), SaleResolutionResult.SUCCESS, null, null,
+                    resolvedBy, fixedTime, 10L, 20L, FinancialResolutionStatus.PENDING, fixedTime);
         }
 
         @Test
@@ -343,10 +350,65 @@ class AuctionFinalizerTest {
                     .isEqualTo(AuctionStatus.SOLD);
             assertThat(waitingAuction.getStatus()).isEqualTo(AuctionStatus.SOLD);
 
-            InOrder inOrder = inOrder(saleResolutionService, vehicleService, auctionRepository);
+            InOrder inOrder = inOrder(saleResolutionService, vehicleService, depositService, auctionRepository);
             inOrder.verify(saleResolutionService).createSuccess(waitingAuction.getId(), resolvedBy);
             inOrder.verify(vehicleService).markAsSold(vehicleId);
+            inOrder.verify(depositService).releaseWinnerDeposit(winnerId, waitingAuction.getId());
             inOrder.verify(auctionRepository).save(waitingAuction);
+            inOrder.verify(saleResolutionService).markFinancialResolutionDone(99L);
+
+            // waitingAuction has no commitment (default null) - resolver must never be invoked.
+            verifyNoInteractions(saleCommitmentResolutionOrchestrator);
+        }
+
+        @Test
+        @DisplayName("X3-D: commitment существует -> saleCommitmentResolutionOrchestrator.resolve(id, A) вызывается перед save")
+        void completeSale_WithCommitment_ResolvesOutcomeABeforeSave() {
+            waitingAuction.setSellerDiagnosticCommitmentId(555L);
+            when(saleResolutionService.createSuccess(waitingAuction.getId(), resolvedBy))
+                    .thenReturn(stubSaleResolution());
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            auctionFinalizer.completeSale(waitingAuction, resolvedBy);
+
+            InOrder inOrder = inOrder(depositService, saleCommitmentResolutionOrchestrator, auctionRepository, saleResolutionService);
+            inOrder.verify(depositService).releaseWinnerDeposit(winnerId, waitingAuction.getId());
+            inOrder.verify(saleCommitmentResolutionOrchestrator).resolve(555L, FinalizationOutcome.A);
+            inOrder.verify(auctionRepository).save(waitingAuction);
+            inOrder.verify(saleResolutionService).markFinancialResolutionDone(99L);
+        }
+
+        @Test
+        @DisplayName("X3-D: releaseWinnerDeposit бросает -> распространяется, commitment/save/markFinancialResolutionDone не вызываются")
+        void completeSale_ReleaseWinnerDepositThrows_PropagatesWithoutCommitmentOrSave() {
+            when(saleResolutionService.createSuccess(waitingAuction.getId(), resolvedBy))
+                    .thenReturn(stubSaleResolution());
+            doThrow(new IllegalStateException("Заморозка победителя не найдена"))
+                    .when(depositService).releaseWinnerDeposit(winnerId, waitingAuction.getId());
+
+            assertThatThrownBy(() -> auctionFinalizer.completeSale(waitingAuction, resolvedBy))
+                    .isInstanceOf(IllegalStateException.class);
+
+            verifyNoInteractions(saleCommitmentResolutionOrchestrator);
+            verify(auctionRepository, never()).save(any());
+            verify(saleResolutionService, never()).markFinancialResolutionDone(any());
+        }
+
+        @Test
+        @DisplayName("X3-D: commitment-консеквенция бросает -> распространяется, save/markFinancialResolutionDone не вызываются")
+        void completeSale_CommitmentConsequenceThrows_PropagatesWithoutSaveOrMarkingDone() {
+            waitingAuction.setSellerDiagnosticCommitmentId(555L);
+            when(saleResolutionService.createSuccess(waitingAuction.getId(), resolvedBy))
+                    .thenReturn(stubSaleResolution());
+            doThrow(new IllegalStateException("Commitment 555 не готов к финализации"))
+                    .when(saleCommitmentResolutionOrchestrator).resolve(555L, FinalizationOutcome.A);
+
+            assertThatThrownBy(() -> auctionFinalizer.completeSale(waitingAuction, resolvedBy))
+                    .isInstanceOf(IllegalStateException.class);
+
+            verify(depositService, times(1)).releaseWinnerDeposit(winnerId, waitingAuction.getId());
+            verify(auctionRepository, never()).save(any());
+            verify(saleResolutionService, never()).markFinancialResolutionDone(any());
         }
 
         @Test
@@ -397,7 +459,7 @@ class AuctionFinalizerTest {
             // asserting the in-memory status is unchanged, since createSuccess() throws before
             // auction.markSold() is ever reached in completeSale()'s statement order.
             assertThat(waitingAuction.getStatus()).isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
-            verifyNoInteractions(vehicleService);
+            verifyNoInteractions(vehicleService, saleCommitmentResolutionOrchestrator);
             verify(auctionRepository, never()).save(any());
         }
 
@@ -423,6 +485,7 @@ class AuctionFinalizerTest {
             // Mockito test cannot exercise a real transaction).
             assertThat(waitingAuction.getStatus()).isEqualTo(AuctionStatus.SOLD);
             verify(auctionRepository, never()).save(any());
+            verifyNoInteractions(depositService, saleCommitmentResolutionOrchestrator);
         }
     }
 

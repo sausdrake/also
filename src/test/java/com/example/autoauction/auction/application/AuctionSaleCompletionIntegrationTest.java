@@ -4,6 +4,7 @@ package com.example.autoauction.auction.application;
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
+import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.sale.application.HandoverEvidenceService;
 import com.example.autoauction.sale.application.PaymentEvidenceService;
 import com.example.autoauction.sale.domain.HandoverEvidence;
@@ -78,6 +79,9 @@ class AuctionSaleCompletionIntegrationTest {
     private SaleResolutionRepository saleResolutionRepository;
 
     @Autowired
+    private DepositService depositService;
+
+    @Autowired
     private PlatformTransactionManager transactionManager;
 
     private final Long resolvedBy = 1L;
@@ -142,6 +146,38 @@ class AuctionSaleCompletionIntegrationTest {
         txTemplate.execute(status -> handoverEvidenceService.recordHandover(auctionId, vehicleId, winnerId, 1L));
     }
 
+    /**
+     * X3-D: completeSale() now calls depositService.releaseWinnerDeposit(winnerId, auctionId),
+     * which requires the winner to actually have a frozen deposit for this auction - mirroring
+     * the real production precondition (a bidder must have frozen collateral before ever
+     * becoming a winner in the first place). This test file's winnerId (100L, a plain literal
+     * with no FK - see the established actor-reference convention) is reused across every test
+     * method in this class, so the underlying Deposit row is created at most once (a second
+     * createDeposit() call for the same user_id would violate its UNIQUE constraint) - the
+     * try/catch below is the deliberate, minimal way to make this idempotent across test
+     * methods without restructuring every test's winnerId into a freshly-generated user, which
+     * would be a far larger, unrelated change to this file's existing fixture shape.
+     */
+    private void ensureWinnerHasFrozenDeposit(Long winnerId, Long auctionId) {
+        try {
+            txTemplate().execute(status -> {
+                depositService.createDeposit(winnerId, new BigDecimal("1000000"));
+                return null;
+            });
+        } catch (Exception e) {
+            // Deposit for this winnerId already exists (created by an earlier test method in
+            // this class) - expected and fine, reuse it.
+        }
+        txTemplate().execute(status -> {
+            depositService.freezeForAuction(winnerId, auctionId, new BigDecimal("50000"));
+            return null;
+        });
+        txTemplate().execute(status -> {
+            depositService.markAsWinner(winnerId, auctionId);
+            return null;
+        });
+    }
+
     /** Mirrors the locked caller contract: obtain the pessimistic lock, then call completeSale()
      *  on the already-locked Auction, both inside the same physical transaction. */
     private void completeSaleViaLockedCaller(TransactionTemplate txTemplate, Long auctionId) {
@@ -162,6 +198,7 @@ class AuctionSaleCompletionIntegrationTest {
         BigDecimal winningBid = new BigDecimal("1020000.00");
         Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
         recordValidEvidence(txTemplate, auctionId, vehicleId, 100L, winningBid);
+        ensureWinnerHasFrozenDeposit(100L, auctionId);
 
         completeSaleViaLockedCaller(txTemplate, auctionId);
 
@@ -173,7 +210,11 @@ class AuctionSaleCompletionIntegrationTest {
         assertThat(persistedVehicle.getStatus()).isEqualTo(VehicleStatus.SOLD);
         assertThat(resolution).isPresent();
         assertThat(resolution.orElseThrow().getResult().name()).isEqualTo("SUCCESS");
-        assertThat(resolution.orElseThrow().getFinancialResolutionStatus().name()).isEqualTo("PENDING");
+        // X3-D: financialResolutionStatus now reaches DONE within this same transaction, once
+        // the buyer-deposit consequence (and the commitment consequence, if any - this fixture
+        // has no commitment) succeeds. Pre-X3-D this stayed PENDING forever; that was always
+        // documented as "no future slice has moved it yet", not a permanent invariant.
+        assertThat(resolution.orElseThrow().getFinancialResolutionStatus().name()).isEqualTo("DONE");
     }
 
     // ==================== T2/T3: missing evidence ====================
@@ -347,6 +388,7 @@ class AuctionSaleCompletionIntegrationTest {
         BigDecimal winningBid = new BigDecimal("1020000.00");
         Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
         recordValidEvidence(txTemplate, auctionId, vehicleId, 100L, winningBid);
+        ensureWinnerHasFrozenDeposit(100L, auctionId);
 
         completeSaleViaLockedCaller(txTemplate, auctionId);
 
@@ -371,6 +413,7 @@ class AuctionSaleCompletionIntegrationTest {
         BigDecimal winningBid = new BigDecimal("1020000.00");
         Long auctionId = createWaitingForPaymentAuction(setupTx, vehicleId, 100L, winningBid);
         recordValidEvidence(setupTx, auctionId, vehicleId, 100L, winningBid);
+        ensureWinnerHasFrozenDeposit(100L, auctionId);
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
         CyclicBarrier barrier = new CyclicBarrier(2);

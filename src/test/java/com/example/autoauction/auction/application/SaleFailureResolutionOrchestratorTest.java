@@ -5,6 +5,7 @@ import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.deposit.application.DepositService;
+import com.example.autoauction.diagnostic.commitment.domain.FinalizationOutcome;
 import com.example.autoauction.sale.application.SaleResolutionService;
 import com.example.autoauction.sale.domain.FaultParty;
 import com.example.autoauction.sale.domain.SaleResolution;
@@ -41,6 +42,9 @@ class SaleFailureResolutionOrchestratorTest {
 
     @Mock
     private DepositService depositService;
+
+    @Mock
+    private SaleCommitmentResolutionOrchestrator saleCommitmentResolutionOrchestrator;
 
     @InjectMocks
     private SaleFailureResolutionOrchestrator orchestrator;
@@ -135,9 +139,13 @@ class SaleFailureResolutionOrchestratorTest {
             inOrder.verify(vehicleService).returnToApproved(vehicleId);
             inOrder.verify(depositService).unblockForSaleFailure(waitingAuction.getId(), winnerId);
             inOrder.verify(auctionRepository).save(waitingAuction);
+            inOrder.verify(saleResolutionService).markFinancialResolutionDone(isNull());
 
             verify(vehicleService, never()).markNeedsRediagnostic(any());
             verify(depositService, never()).confiscateToPlatform(any(), any());
+            // X3-D: waitingAuction has no commitment (default null) - resolver must never be
+            // invoked when there is nothing to resolve.
+            verifyNoInteractions(saleCommitmentResolutionOrchestrator);
         }
     }
 
@@ -159,6 +167,8 @@ class SaleFailureResolutionOrchestratorTest {
             verify(depositService, times(1)).confiscateToPlatform(waitingAuction.getId(), winnerId);
             verify(vehicleService, never()).markNeedsRediagnostic(any());
             verify(depositService, never()).unblockForSaleFailure(any(), any());
+            verify(saleResolutionService, times(1)).markFinancialResolutionDone(isNull());
+            verifyNoInteractions(saleCommitmentResolutionOrchestrator);
         }
     }
 
@@ -180,6 +190,8 @@ class SaleFailureResolutionOrchestratorTest {
             verify(depositService, times(1)).unblockForSaleFailure(waitingAuction.getId(), winnerId);
             verify(vehicleService, never()).returnToApproved(any());
             verify(depositService, never()).confiscateToPlatform(any(), any());
+            verify(saleResolutionService, times(1)).markFinancialResolutionDone(isNull());
+            verifyNoInteractions(saleCommitmentResolutionOrchestrator);
         }
     }
 
@@ -202,6 +214,79 @@ class SaleFailureResolutionOrchestratorTest {
             verify(vehicleService, never()).returnToApproved(any());
             verify(depositService, never()).confiscateToPlatform(any(), any());
         }
+
+        @Test
+        @DisplayName("X3-D: C никогда не финализирует commitment и никогда не переводит financialResolutionStatus в DONE (даже если commitment существует)")
+        void resolveSaleFailure_OutcomeC_NeverTouchesCommitmentOrFinancialStatus() {
+            waitingAuction.setSellerDiagnosticCommitmentId(777L);
+            when(saleResolutionService.createFailure(waitingAuction.getId(), SaleResolutionResult.C,
+                    FaultParty.SELLER, null, resolvedBy))
+                    .thenReturn(stubResolution(SaleResolutionResult.C, FaultParty.SELLER));
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            orchestrator.resolveSaleFailure(waitingAuction, SaleResolutionResult.C, FaultParty.SELLER, null, resolvedBy);
+
+            verifyNoInteractions(saleCommitmentResolutionOrchestrator);
+            verify(saleResolutionService, never()).markFinancialResolutionDone(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("X3-D: seller commitment consequence")
+    class CommitmentConsequenceTests {
+
+        @Test
+        @DisplayName("B + commitment существует -> resolve(commitmentId, B) + markFinancialResolutionDone(id)")
+        void resolveSaleFailure_OutcomeB_WithCommitment_ResolvesAsB() {
+            waitingAuction.setSellerDiagnosticCommitmentId(777L);
+            SaleResolution resolution = new SaleResolution(9L, waitingAuction.getId(), SaleResolutionResult.B,
+                    null, null, resolvedBy, fixedTime, null, null,
+                    com.example.autoauction.sale.domain.FinancialResolutionStatus.PENDING, fixedTime);
+            when(saleResolutionService.createFailure(waitingAuction.getId(), SaleResolutionResult.B, null, null, resolvedBy))
+                    .thenReturn(resolution);
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            orchestrator.resolveSaleFailure(waitingAuction, SaleResolutionResult.B, null, null, resolvedBy);
+
+            InOrder inOrder = inOrder(saleCommitmentResolutionOrchestrator, auctionRepository, saleResolutionService);
+            inOrder.verify(saleCommitmentResolutionOrchestrator).resolve(777L, FinalizationOutcome.B);
+            inOrder.verify(auctionRepository).save(waitingAuction);
+            inOrder.verify(saleResolutionService).markFinancialResolutionDone(9L);
+        }
+
+        @Test
+        @DisplayName("BUYER_FAULT + commitment существует -> resolve(commitmentId, A) - НЕ отдельное значение BUYER_FAULT")
+        void resolveSaleFailure_OutcomeBuyerFault_WithCommitment_ResolvesAsA() {
+            waitingAuction.setSellerDiagnosticCommitmentId(777L);
+            SaleResolution resolution = new SaleResolution(9L, waitingAuction.getId(), SaleResolutionResult.BUYER_FAULT,
+                    null, FaultParty.BUYER, resolvedBy, fixedTime, null, null,
+                    com.example.autoauction.sale.domain.FinancialResolutionStatus.PENDING, fixedTime);
+            when(saleResolutionService.createFailure(waitingAuction.getId(), SaleResolutionResult.BUYER_FAULT,
+                    FaultParty.BUYER, null, resolvedBy)).thenReturn(resolution);
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            orchestrator.resolveSaleFailure(waitingAuction, SaleResolutionResult.BUYER_FAULT, FaultParty.BUYER, null, resolvedBy);
+
+            verify(saleCommitmentResolutionOrchestrator).resolve(777L, FinalizationOutcome.A);
+            verify(saleResolutionService).markFinancialResolutionDone(9L);
+        }
+
+        @Test
+        @DisplayName("PLATFORM_FAULT + commitment существует -> resolve(commitmentId, A)")
+        void resolveSaleFailure_OutcomePlatformFault_WithCommitment_ResolvesAsA() {
+            waitingAuction.setSellerDiagnosticCommitmentId(777L);
+            SaleResolution resolution = new SaleResolution(9L, waitingAuction.getId(), SaleResolutionResult.PLATFORM_FAULT,
+                    null, FaultParty.PLATFORM, resolvedBy, fixedTime, null, null,
+                    com.example.autoauction.sale.domain.FinancialResolutionStatus.PENDING, fixedTime);
+            when(saleResolutionService.createFailure(waitingAuction.getId(), SaleResolutionResult.PLATFORM_FAULT,
+                    FaultParty.PLATFORM, null, resolvedBy)).thenReturn(resolution);
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            orchestrator.resolveSaleFailure(waitingAuction, SaleResolutionResult.PLATFORM_FAULT, FaultParty.PLATFORM, null, resolvedBy);
+
+            verify(saleCommitmentResolutionOrchestrator).resolve(777L, FinalizationOutcome.A);
+            verify(saleResolutionService).markFinancialResolutionDone(9L);
+        }
     }
 
     @Nested
@@ -220,7 +305,7 @@ class SaleFailureResolutionOrchestratorTest {
                     .hasMessageContaining("уже существует");
 
             assertThat(waitingAuction.getStatus()).isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
-            verifyNoInteractions(vehicleService, depositService);
+            verifyNoInteractions(vehicleService, depositService, saleCommitmentResolutionOrchestrator);
             verify(auctionRepository, never()).save(any());
         }
 
@@ -239,7 +324,7 @@ class SaleFailureResolutionOrchestratorTest {
             // auction.markSaleFailed() already ran in-memory before the failure (acceptable -
             // real transactional rollback is proven separately by the integration test).
             assertThat(waitingAuction.getStatus()).isEqualTo(AuctionStatus.SALE_FAILED);
-            verifyNoInteractions(depositService);
+            verifyNoInteractions(depositService, saleCommitmentResolutionOrchestrator);
             verify(auctionRepository, never()).save(any());
         }
 
@@ -257,6 +342,26 @@ class SaleFailureResolutionOrchestratorTest {
 
             verify(vehicleService, times(1)).returnToApproved(vehicleId);
             verify(auctionRepository, never()).save(any());
+            verifyNoInteractions(saleCommitmentResolutionOrchestrator);
+        }
+
+        @Test
+        @DisplayName("X3-D: commitment-консеквенция бросает -> распространяется, save/markFinancialResolutionDone не вызываются")
+        void resolveSaleFailure_CommitmentConsequenceThrows_PropagatesWithoutSavingOrMarkingDone() {
+            waitingAuction.setSellerDiagnosticCommitmentId(777L);
+            when(saleResolutionService.createFailure(any(), any(), any(), any(), any()))
+                    .thenReturn(stubResolution(SaleResolutionResult.B, null));
+            doThrow(new IllegalStateException("Commitment 777 не готов к финализации"))
+                    .when(saleCommitmentResolutionOrchestrator).resolve(777L, FinalizationOutcome.B);
+
+            assertThatThrownBy(() -> orchestrator.resolveSaleFailure(
+                    waitingAuction, SaleResolutionResult.B, null, null, resolvedBy))
+                    .isInstanceOf(IllegalStateException.class);
+
+            verify(vehicleService, times(1)).returnToApproved(vehicleId);
+            verify(depositService, times(1)).unblockForSaleFailure(waitingAuction.getId(), winnerId);
+            verify(auctionRepository, never()).save(any());
+            verify(saleResolutionService, never()).markFinancialResolutionDone(any());
         }
     }
 }

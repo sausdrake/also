@@ -71,6 +71,9 @@ class AdminAuctionServiceTest {
     @Mock
     private AuctionCommitmentResolver auctionCommitmentResolver;
 
+    @Mock
+    private com.example.autoauction.deposit.application.DepositService depositService;
+
     @InjectMocks
     private AdminAuctionService adminAuctionService;
 
@@ -1196,6 +1199,98 @@ class AdminAuctionServiceTest {
                     adminAuctionService.validatePolicyAwarePrices(legacyAuction, null)
             );
             assertTrue(exception.getMessage().contains("Цена мгновенной покупки"));
+        }
+    }
+
+    @Nested
+    @DisplayName("X3-D: releaseWinner(auctionId) - status guard hardening")
+    class ReleaseWinnerTests {
+
+        private Auction releaseAuction;
+        private final Long releaseAuctionId = 42L;
+        private final Long releaseWinnerId = 100L;
+
+        @BeforeEach
+        void setUpReleaseAuction() {
+            releaseAuction = new Auction(
+                    1L, new BigDecimal("1000000"), new BigDecimal("1200000"),
+                    new BigDecimal("1500000"), new BigDecimal("10000"),
+                    OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(7), adminId
+            );
+            releaseAuction.setId(releaseAuctionId);
+            releaseAuction.setWinnerId(releaseWinnerId);
+        }
+
+        @Test
+        @DisplayName("ACTIVE -> rejected before touching DepositService")
+        void releaseWinner_Active_Rejected() {
+            releaseAuction.setStatus(AuctionStatus.ACTIVE);
+            when(auctionRepository.findById(releaseAuctionId)).thenReturn(Optional.of(releaseAuction));
+
+            IllegalStateException ex = assertThrows(IllegalStateException.class,
+                    () -> adminAuctionService.releaseWinner(releaseAuctionId));
+            assertTrue(ex.getMessage().contains("исход ещё не определён"));
+
+            verifyNoInteractions(depositService);
+        }
+
+        @Test
+        @DisplayName("WAITING_FOR_PAYMENT -> rejected before touching DepositService")
+        void releaseWinner_WaitingForPayment_Rejected() {
+            releaseAuction.setStatus(AuctionStatus.WAITING_FOR_PAYMENT);
+            when(auctionRepository.findById(releaseAuctionId)).thenReturn(Optional.of(releaseAuction));
+
+            assertThrows(IllegalStateException.class,
+                    () -> adminAuctionService.releaseWinner(releaseAuctionId));
+
+            verifyNoInteractions(depositService);
+        }
+
+        @Test
+        @DisplayName("SOLD -> allowed, delegates to DepositService.releaseWinnerDeposit (preserved behavior)")
+        void releaseWinner_Sold_Allowed() {
+            releaseAuction.setStatus(AuctionStatus.SOLD);
+            when(auctionRepository.findById(releaseAuctionId)).thenReturn(Optional.of(releaseAuction));
+
+            adminAuctionService.releaseWinner(releaseAuctionId);
+
+            verify(depositService, times(1)).releaseWinnerDeposit(releaseWinnerId, releaseAuctionId);
+        }
+
+        @Test
+        @DisplayName("SALE_FAILED -> allowed, delegates to DepositService.releaseWinnerDeposit (preserved behavior)")
+        void releaseWinner_SaleFailed_Allowed() {
+            releaseAuction.setStatus(AuctionStatus.SALE_FAILED);
+            when(auctionRepository.findById(releaseAuctionId)).thenReturn(Optional.of(releaseAuction));
+
+            adminAuctionService.releaseWinner(releaseAuctionId);
+
+            verify(depositService, times(1)).releaseWinnerDeposit(releaseWinnerId, releaseAuctionId);
+        }
+
+        @Test
+        @DisplayName("Legacy COMPLETED -> allowed, delegates to DepositService.releaseWinnerDeposit (existing real-world usage preserved)")
+        @SuppressWarnings("deprecation")
+        void releaseWinner_LegacyCompleted_Allowed() {
+            releaseAuction.setStatus(AuctionStatus.COMPLETED);
+            when(auctionRepository.findById(releaseAuctionId)).thenReturn(Optional.of(releaseAuction));
+
+            adminAuctionService.releaseWinner(releaseAuctionId);
+
+            verify(depositService, times(1)).releaseWinnerDeposit(releaseWinnerId, releaseAuctionId);
+        }
+
+        @Test
+        @DisplayName("No winner -> IllegalStateException regardless of status, unchanged existing behavior")
+        void releaseWinner_NoWinner_ThrowsRegardlessOfStatus() {
+            releaseAuction.setStatus(AuctionStatus.SOLD);
+            releaseAuction.setWinnerId(null);
+            when(auctionRepository.findById(releaseAuctionId)).thenReturn(Optional.of(releaseAuction));
+
+            assertThrows(IllegalStateException.class,
+                    () -> adminAuctionService.releaseWinner(releaseAuctionId));
+
+            verifyNoInteractions(depositService);
         }
     }
 }

@@ -11,6 +11,15 @@ public interface SellerDiagnosticCommitmentRepository {
 
     SellerDiagnosticCommitment save(SellerDiagnosticCommitment commitment);
 
+    /**
+     * X3-D: the narrow, additive lookup needed to traverse Auction.sellerDiagnosticCommitmentId
+     * -> SellerDiagnosticCommitment directly by the commitment's own id, without going back
+     * through diagnosticRequestId (the only key every pre-X3-D method used). Added specifically
+     * so commitment resolution driven by an Auction outcome never needs to re-resolve through
+     * Vehicle/DiagnosticRequest to find the commitment it already has the id for.
+     */
+    Optional<SellerDiagnosticCommitment> findById(Long id);
+
     Optional<SellerDiagnosticCommitment> findByDiagnosticRequestId(Long diagnosticRequestId);
 
     boolean existsByDiagnosticRequestId(Long diagnosticRequestId);

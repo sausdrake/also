@@ -6,6 +6,7 @@ import com.example.autoauction.deposit.infrastructure.persistence.JpaDepositEnti
 import com.example.autoauction.deposit.infrastructure.persistence.SpringDataDepositJpaRepository;
 import com.example.autoauction.diagnostic.commitment.domain.CommitmentStatus;
 import com.example.autoauction.diagnostic.commitment.domain.FinalizationOutcome;
+import com.example.autoauction.diagnostic.commitment.domain.SellerDiagnosticCommitment;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
 import com.example.autoauction.diagnostic.infrastructure.persistence.JpaDiagnosticRequestEntity;
 import com.example.autoauction.diagnostic.infrastructure.persistence.SpringDataDiagnosticRequestJpaRepository;
@@ -318,5 +319,44 @@ class SellerDiagnosticCommitmentRepositoryAdapterTest {
                 BigDecimal.ZERO, new BigDecimal("6000"), OffsetDateTime.now());
 
         assertThat(updated).isEqualTo(0);
+    }
+
+    // X3-D: findById(Long) - the narrow, additive lookup needed to traverse
+    // Auction.sellerDiagnosticCommitmentId -> SellerDiagnosticCommitment directly by the
+    // commitment's own id. Tested against the adapter directly (plain `new`, both its
+    // dependencies - the JPA repository and the mapper - are trivially available in this
+    // @DataJpaTest context) rather than the raw JPA repository, since the port method itself
+    // (mapper included) is what X3-D's new orchestrator actually depends on.
+
+    @Test
+    @DisplayName("findById: существующий id -> корректно замаппленный domain-объект")
+    void findById_ExistingId_MapsCorrectly() {
+        SellerDiagnosticCommitmentRepositoryAdapter adapter =
+                new SellerDiagnosticCommitmentRepositoryAdapter(commitmentJpaRepository, new SellerDiagnosticCommitmentMapper());
+
+        JpaSellerDiagnosticCommitmentEntity entity = new JpaSellerDiagnosticCommitmentEntity(
+                testDiagnosticRequestId, testDepositId, new BigDecimal("10000"), new BigDecimal("4000"),
+                CommitmentStatus.AWAITING_FINALIZATION, OffsetDateTime.now());
+        JpaSellerDiagnosticCommitmentEntity saved = commitmentJpaRepository.save(entity);
+        entityManager.flush();
+        entityManager.clear();
+
+        SellerDiagnosticCommitment found = adapter.findById(saved.getId()).orElseThrow();
+
+        assertThat(found.getId()).isEqualTo(saved.getId());
+        assertThat(found.getDiagnosticRequestId()).isEqualTo(testDiagnosticRequestId);
+        assertThat(found.getDepositId()).isEqualTo(testDepositId);
+        assertThat(found.getCommittedAmount()).isEqualByComparingTo("10000");
+        assertThat(found.getDiagnosticFeeAmount()).isEqualByComparingTo("4000");
+        assertThat(found.getStatus()).isEqualTo(CommitmentStatus.AWAITING_FINALIZATION);
+    }
+
+    @Test
+    @DisplayName("findById: несуществующий id -> Optional.empty()")
+    void findById_NonExistentId_ReturnsEmpty() {
+        SellerDiagnosticCommitmentRepositoryAdapter adapter =
+                new SellerDiagnosticCommitmentRepositoryAdapter(commitmentJpaRepository, new SellerDiagnosticCommitmentMapper());
+
+        assertThat(adapter.findById(999999L)).isEmpty();
     }
 }
