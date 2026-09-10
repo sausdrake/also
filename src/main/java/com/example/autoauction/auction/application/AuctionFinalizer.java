@@ -296,7 +296,7 @@ public class AuctionFinalizer {
      * caller's pessimistic lock on the Auction row (identical reasoning to startAuction()).
      */
     @Transactional
-    public void completeSale(Auction auction, Long resolvedBy) {
+    public SaleResolution completeSale(Auction auction, Long resolvedBy) {
         if (auction.getStatus() != AuctionStatus.WAITING_FOR_PAYMENT) {
             throw new IllegalStateException(
                     String.format("Невозможно завершить продажу аукциона %d в статусе '%s'. Только аукционы со статусом 'WAITING_FOR_PAYMENT' могут быть проданы",
@@ -329,6 +329,7 @@ public class AuctionFinalizer {
         saleResolutionService.markFinancialResolutionDone(resolution.getId());
 
         log.info("Auction {} sale completed, vehicle {} marked SOLD", auction.getId(), auction.getVehicleId());
+        return resolution;
     }
 
     @Transactional

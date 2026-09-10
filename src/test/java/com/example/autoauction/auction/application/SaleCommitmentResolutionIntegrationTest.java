@@ -258,8 +258,8 @@ class SaleCommitmentResolutionIntegrationTest {
         BigDecimal winningBid = new BigDecimal("1020000.00");
         Long auctionId = createWaitingForPaymentAuctionWithCommitment(setup.vehicleId(), setup.commitmentId(), winnerId, winningBid);
         freezeAndMarkWinner(winnerId, auctionId, new BigDecimal("50000"));
-        txTemplate().execute(status -> paymentEvidenceService.recordPayment(auctionId, winnerId, winningBid, 1L));
-        txTemplate().execute(status -> handoverEvidenceService.recordHandover(auctionId, setup.vehicleId(), winnerId, 1L));
+        txTemplate().execute(status -> paymentEvidenceService.recordPayment(auctionId, winningBid, 1L));
+        txTemplate().execute(status -> handoverEvidenceService.recordHandover(auctionId, 1L));
 
         txTemplate().execute(status -> {
             Auction locked = auctionRepository.findByIdWithLock(auctionId).orElseThrow();

@@ -5,6 +5,7 @@ import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.sale.domain.HandoverEvidence;
 import com.example.autoauction.sale.domain.port.HandoverEvidenceRepository;
+import com.example.autoauction.sale.domain.port.PaymentEvidenceRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -22,19 +23,34 @@ import java.time.OffsetDateTime;
  *
  * Deliberately does NOT: mark Auction SOLD, mark Vehicle SOLD, release deposit, finalize
  * commitment, calculate commission, or create a SaleResolution.
+ *
+ * Slice 1 (Sale Completion &amp; Failure API) corrections:
+ * <ul>
+ *   <li>The Auction is fetched with a pessimistic write lock ({@code findByIdWithLock}) inside
+ *       this same {@code @Transactional} method - same cross-endpoint-consistency reasoning as
+ *       {@link PaymentEvidenceService#recordPayment}.</li>
+ *   <li>{@code vehicleId}/{@code buyerId} are no longer caller-supplied - both are derived from
+ *       the Auction. The client supplies neither.</li>
+ *   <li>Payment-before-handover is an invariant of this creation use case itself: a
+ *       {@link com.example.autoauction.sale.domain.PaymentEvidence} for the same auction MUST
+ *       already exist. Enforced here, not only at the controller.</li>
+ * </ul>
  */
 @Slf4j
 @Service
 public class HandoverEvidenceService {
 
     private final HandoverEvidenceRepository handoverEvidenceRepository;
+    private final PaymentEvidenceRepository paymentEvidenceRepository;
     private final AuctionRepository auctionRepository;
     private final Clock clock;
 
     public HandoverEvidenceService(HandoverEvidenceRepository handoverEvidenceRepository,
+                                    PaymentEvidenceRepository paymentEvidenceRepository,
                                     AuctionRepository auctionRepository,
                                     Clock clock) {
         this.handoverEvidenceRepository = handoverEvidenceRepository;
+        this.paymentEvidenceRepository = paymentEvidenceRepository;
         this.auctionRepository = auctionRepository;
         this.clock = clock;
     }
@@ -44,8 +60,8 @@ public class HandoverEvidenceService {
     }
 
     @Transactional
-    public HandoverEvidence recordHandover(Long auctionId, Long vehicleId, Long buyerId, Long confirmedByAdminId) {
-        Auction auction = auctionRepository.findById(auctionId)
+    public HandoverEvidence recordHandover(Long auctionId, Long confirmedByAdminId) {
+        Auction auction = auctionRepository.findByIdWithLock(auctionId)
                 .orElseThrow(() -> new IllegalArgumentException("Аукцион не найден: " + auctionId));
 
         if (auction.getStatus() != AuctionStatus.WAITING_FOR_PAYMENT) {
@@ -56,13 +72,12 @@ public class HandoverEvidenceService {
         if (auction.getWinnerId() == null) {
             throw new IllegalStateException("У аукциона " + auctionId + " нет победителя");
         }
-        if (!auction.getWinnerId().equals(buyerId)) {
-            throw new IllegalArgumentException(
-                    "buyerId (" + buyerId + ") не совпадает с победителем аукциона (" + auction.getWinnerId() + ")");
-        }
-        if (!auction.getVehicleId().equals(vehicleId)) {
-            throw new IllegalArgumentException(
-                    "vehicleId (" + vehicleId + ") не совпадает с vehicleId аукциона (" + auction.getVehicleId() + ")");
+        Long buyerId = auction.getWinnerId();
+        Long vehicleId = auction.getVehicleId();
+        if (!paymentEvidenceRepository.existsByAuctionId(auctionId)) {
+            throw new IllegalStateException(
+                    "HandoverEvidence нельзя создать без PaymentEvidence для аукциона " + auctionId
+                            + " (оплата должна предшествовать передаче)");
         }
         if (handoverEvidenceRepository.existsByAuctionId(auctionId)) {
             throw new IllegalStateException("HandoverEvidence уже существует для аукциона " + auctionId);

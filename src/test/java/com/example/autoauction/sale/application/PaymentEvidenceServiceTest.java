@@ -26,8 +26,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+/**
+ * X1, updated for Slice 1 (Sale Completion &amp; Failure API): recordPayment no longer accepts a
+ * caller-supplied buyerId (derived from Auction.winnerId) and now fetches the Auction with a
+ * pessimistic write lock (findByIdWithLock) inside its own transaction.
+ */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("PaymentEvidenceService (X1)")
+@DisplayName("PaymentEvidenceService (X1 / Slice 1)")
 class PaymentEvidenceServiceTest {
 
     @Mock
@@ -66,9 +71,9 @@ class PaymentEvidenceServiceTest {
     @Test
     @DisplayName("Несуществующий аукцион отклоняется")
     void recordPayment_AuctionNotFound_ThrowsIllegalArgumentException() {
-        when(auctionRepository.findById(999L)).thenReturn(Optional.empty());
+        when(auctionRepository.findByIdWithLock(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.recordPayment(999L, buyerId, winningBid, receivedByAdminId))
+        assertThatThrownBy(() -> service.recordPayment(999L, winningBid, receivedByAdminId))
                 .isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(paymentEvidenceRepository);
     }
@@ -77,9 +82,9 @@ class PaymentEvidenceServiceTest {
     @DisplayName("Аукцион не в WAITING_FOR_PAYMENT отклоняется")
     void recordPayment_AuctionNotWaitingForPayment_ThrowsIllegalStateException() {
         auction.setStatus(AuctionStatus.ACTIVE);
-        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+        when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(auction));
 
-        assertThatThrownBy(() -> service.recordPayment(auctionId, buyerId, winningBid, receivedByAdminId))
+        assertThatThrownBy(() -> service.recordPayment(auctionId, winningBid, receivedByAdminId))
                 .isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(paymentEvidenceRepository);
     }
@@ -88,40 +93,30 @@ class PaymentEvidenceServiceTest {
     @DisplayName("Аукцион без победителя отклоняется")
     void recordPayment_NoWinner_ThrowsIllegalStateException() {
         auction.setWinnerId(null);
-        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+        when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(auction));
 
-        assertThatThrownBy(() -> service.recordPayment(auctionId, buyerId, winningBid, receivedByAdminId))
+        assertThatThrownBy(() -> service.recordPayment(auctionId, winningBid, receivedByAdminId))
                 .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
     @DisplayName("amount не совпадает с winningBid отклоняется")
     void recordPayment_AmountMismatch_ThrowsIllegalArgumentException() {
-        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+        when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(auction));
 
-        assertThatThrownBy(() -> service.recordPayment(auctionId, buyerId, new BigDecimal("999999"), receivedByAdminId))
+        assertThatThrownBy(() -> service.recordPayment(auctionId, new BigDecimal("999999"), receivedByAdminId))
                 .isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(paymentEvidenceRepository);
     }
 
     @Test
-    @DisplayName("buyerId не совпадает с winnerId отклоняется")
-    void recordPayment_BuyerMismatch_ThrowsIllegalArgumentException() {
-        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
-
-        assertThatThrownBy(() -> service.recordPayment(auctionId, 999L, winningBid, receivedByAdminId))
-                .isInstanceOf(IllegalArgumentException.class);
-        verifyNoInteractions(paymentEvidenceRepository);
-    }
-
-    @Test
-    @DisplayName("Валидный платёж сохраняется")
+    @DisplayName("Валидный платёж сохраняется; buyerId выводится из победителя аукциона")
     void recordPayment_ValidInput_Persists() {
-        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+        when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(auction));
         when(paymentEvidenceRepository.existsByAuctionId(auctionId)).thenReturn(false);
         when(paymentEvidenceRepository.save(any(PaymentEvidence.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        PaymentEvidence result = service.recordPayment(auctionId, buyerId, winningBid, receivedByAdminId);
+        PaymentEvidence result = service.recordPayment(auctionId, winningBid, receivedByAdminId);
 
         assertThat(result.getAuctionId()).isEqualTo(auctionId);
         assertThat(result.getBuyerId()).isEqualTo(buyerId);
@@ -132,10 +127,10 @@ class PaymentEvidenceServiceTest {
     @Test
     @DisplayName("Дубликат (existsByAuctionId=true) отклоняется")
     void recordPayment_DuplicatePreCheck_ThrowsIllegalStateException() {
-        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+        when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(auction));
         when(paymentEvidenceRepository.existsByAuctionId(auctionId)).thenReturn(true);
 
-        assertThatThrownBy(() -> service.recordPayment(auctionId, buyerId, winningBid, receivedByAdminId))
+        assertThatThrownBy(() -> service.recordPayment(auctionId, winningBid, receivedByAdminId))
                 .isInstanceOf(IllegalStateException.class);
         verify(paymentEvidenceRepository, never()).save(any());
     }
@@ -143,12 +138,12 @@ class PaymentEvidenceServiceTest {
     @Test
     @DisplayName("Гонка на UNIQUE-ограничении (DataIntegrityViolationException) переводится в явную ошибку")
     void recordPayment_ConcurrentDuplicateRace_TranslatesToIllegalStateException() {
-        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+        when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(auction));
         when(paymentEvidenceRepository.existsByAuctionId(auctionId)).thenReturn(false);
         when(paymentEvidenceRepository.save(any(PaymentEvidence.class)))
                 .thenThrow(new DataIntegrityViolationException("duplicate key"));
 
-        assertThatThrownBy(() -> service.recordPayment(auctionId, buyerId, winningBid, receivedByAdminId))
+        assertThatThrownBy(() -> service.recordPayment(auctionId, winningBid, receivedByAdminId))
                 .isInstanceOf(IllegalStateException.class);
     }
 }

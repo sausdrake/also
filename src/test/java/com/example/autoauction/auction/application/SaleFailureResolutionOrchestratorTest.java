@@ -8,8 +8,10 @@ import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.diagnostic.commitment.application.SellerViolationResolutionEngine;
 import com.example.autoauction.diagnostic.commitment.domain.FinalizationOutcome;
 import com.example.autoauction.diagnostic.commitment.domain.TriggerSource;
+import com.example.autoauction.sale.application.PaymentRefundService;
 import com.example.autoauction.sale.application.SaleResolutionService;
 import com.example.autoauction.sale.domain.FaultParty;
+import com.example.autoauction.sale.domain.port.PaymentEvidenceRepository;
 import com.example.autoauction.sale.domain.SaleResolution;
 import com.example.autoauction.sale.domain.SaleResolutionResult;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,6 +52,12 @@ class SaleFailureResolutionOrchestratorTest {
 
     @Mock
     private SellerViolationResolutionEngine sellerViolationResolutionEngine;
+
+    @Mock
+    private PaymentEvidenceRepository paymentEvidenceRepository;
+
+    @Mock
+    private PaymentRefundService paymentRefundService;
 
     @InjectMocks
     private SaleFailureResolutionOrchestrator orchestrator;

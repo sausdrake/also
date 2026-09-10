@@ -5,6 +5,7 @@ import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.sale.domain.HandoverEvidence;
 import com.example.autoauction.sale.domain.port.HandoverEvidenceRepository;
+import com.example.autoauction.sale.domain.port.PaymentEvidenceRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,12 +27,21 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+/**
+ * X1, updated for Slice 1: recordHandover no longer accepts caller-supplied vehicleId/buyerId
+ * (both derived from the Auction), fetches the Auction under a pessimistic lock, and now
+ * requires a pre-existing PaymentEvidence for the same auction (payment-before-handover is an
+ * invariant of this creation use case).
+ */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("HandoverEvidenceService (X1)")
+@DisplayName("HandoverEvidenceService (X1 / Slice 1)")
 class HandoverEvidenceServiceTest {
 
     @Mock
     private HandoverEvidenceRepository handoverEvidenceRepository;
+
+    @Mock
+    private PaymentEvidenceRepository paymentEvidenceRepository;
 
     @Mock
     private AuctionRepository auctionRepository;
@@ -66,9 +76,9 @@ class HandoverEvidenceServiceTest {
     @Test
     @DisplayName("Несуществующий аукцион отклоняется")
     void recordHandover_AuctionNotFound_ThrowsIllegalArgumentException() {
-        when(auctionRepository.findById(999L)).thenReturn(Optional.empty());
+        when(auctionRepository.findByIdWithLock(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.recordHandover(999L, vehicleId, buyerId, confirmedByAdminId))
+        assertThatThrownBy(() -> service.recordHandover(999L, confirmedByAdminId))
                 .isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(handoverEvidenceRepository);
     }
@@ -77,53 +87,47 @@ class HandoverEvidenceServiceTest {
     @DisplayName("Аукцион не в WAITING_FOR_PAYMENT отклоняется")
     void recordHandover_WrongStatus_ThrowsIllegalStateException() {
         auction.setStatus(AuctionStatus.ACTIVE);
-        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+        when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(auction));
 
-        assertThatThrownBy(() -> service.recordHandover(auctionId, vehicleId, buyerId, confirmedByAdminId))
+        assertThatThrownBy(() -> service.recordHandover(auctionId, confirmedByAdminId))
                 .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
-    @DisplayName("vehicleId не совпадает с Auction.vehicleId отклоняется")
-    void recordHandover_WrongVehicle_ThrowsIllegalArgumentException() {
-        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+    @DisplayName("Отсутствие PaymentEvidence отклоняется (оплата предшествует передаче)")
+    void recordHandover_WithoutPayment_ThrowsIllegalStateException() {
+        when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(auction));
+        when(paymentEvidenceRepository.existsByAuctionId(auctionId)).thenReturn(false);
 
-        assertThatThrownBy(() -> service.recordHandover(auctionId, 999L, buyerId, confirmedByAdminId))
-                .isInstanceOf(IllegalArgumentException.class);
-        verifyNoInteractions(handoverEvidenceRepository);
+        assertThatThrownBy(() -> service.recordHandover(auctionId, confirmedByAdminId))
+                .isInstanceOf(IllegalStateException.class);
+        verify(handoverEvidenceRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("buyerId не совпадает с winnerId отклоняется")
-    void recordHandover_WrongBuyer_ThrowsIllegalArgumentException() {
-        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
-
-        assertThatThrownBy(() -> service.recordHandover(auctionId, vehicleId, 999L, confirmedByAdminId))
-                .isInstanceOf(IllegalArgumentException.class);
-        verifyNoInteractions(handoverEvidenceRepository);
-    }
-
-    @Test
-    @DisplayName("Валидная передача сохраняется")
+    @DisplayName("Валидная передача сохраняется; vehicleId/buyerId выводятся из аукциона")
     void recordHandover_ValidInput_Persists() {
-        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+        when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(auction));
+        when(paymentEvidenceRepository.existsByAuctionId(auctionId)).thenReturn(true);
         when(handoverEvidenceRepository.existsByAuctionId(auctionId)).thenReturn(false);
         when(handoverEvidenceRepository.save(any(HandoverEvidence.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        HandoverEvidence result = service.recordHandover(auctionId, vehicleId, buyerId, confirmedByAdminId);
+        HandoverEvidence result = service.recordHandover(auctionId, confirmedByAdminId);
 
         assertThat(result.getAuctionId()).isEqualTo(auctionId);
         assertThat(result.getVehicleId()).isEqualTo(vehicleId);
+        assertThat(result.getBuyerId()).isEqualTo(buyerId);
         verify(handoverEvidenceRepository, times(1)).save(any(HandoverEvidence.class));
     }
 
     @Test
     @DisplayName("Дубликат отклоняется")
     void recordHandover_Duplicate_ThrowsIllegalStateException() {
-        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+        when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(auction));
+        when(paymentEvidenceRepository.existsByAuctionId(auctionId)).thenReturn(true);
         when(handoverEvidenceRepository.existsByAuctionId(auctionId)).thenReturn(true);
 
-        assertThatThrownBy(() -> service.recordHandover(auctionId, vehicleId, buyerId, confirmedByAdminId))
+        assertThatThrownBy(() -> service.recordHandover(auctionId, confirmedByAdminId))
                 .isInstanceOf(IllegalStateException.class);
         verify(handoverEvidenceRepository, never()).save(any());
     }
@@ -131,12 +135,13 @@ class HandoverEvidenceServiceTest {
     @Test
     @DisplayName("Гонка на UNIQUE-ограничении переводится в явную ошибку")
     void recordHandover_ConcurrentDuplicateRace_TranslatesToIllegalStateException() {
-        when(auctionRepository.findById(auctionId)).thenReturn(Optional.of(auction));
+        when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(auction));
+        when(paymentEvidenceRepository.existsByAuctionId(auctionId)).thenReturn(true);
         when(handoverEvidenceRepository.existsByAuctionId(auctionId)).thenReturn(false);
         when(handoverEvidenceRepository.save(any(HandoverEvidence.class)))
                 .thenThrow(new DataIntegrityViolationException("duplicate key"));
 
-        assertThatThrownBy(() -> service.recordHandover(auctionId, vehicleId, buyerId, confirmedByAdminId))
+        assertThatThrownBy(() -> service.recordHandover(auctionId, confirmedByAdminId))
                 .isInstanceOf(IllegalStateException.class);
     }
 }

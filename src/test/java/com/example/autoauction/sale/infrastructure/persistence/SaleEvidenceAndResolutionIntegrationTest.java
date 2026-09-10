@@ -122,9 +122,9 @@ class SaleEvidenceAndResolutionIntegrationTest {
         Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
 
         PaymentEvidence payment = txTemplate.execute(status ->
-                paymentEvidenceService.recordPayment(auctionId, 100L, winningBid, 1L));
+                paymentEvidenceService.recordPayment(auctionId, winningBid, 1L));
         HandoverEvidence handover = txTemplate.execute(status ->
-                handoverEvidenceService.recordHandover(auctionId, vehicleId, 100L, 1L));
+                handoverEvidenceService.recordHandover(auctionId, 1L));
         SaleResolution resolution = txTemplate.execute(status ->
                 saleResolutionService.createSuccess(auctionId, 1L));
 

@@ -142,8 +142,8 @@ class AuctionSaleCompletionIntegrationTest {
 
     private void recordValidEvidence(TransactionTemplate txTemplate, Long auctionId, Long vehicleId,
                                       Long winnerId, BigDecimal winningBid) {
-        txTemplate.execute(status -> paymentEvidenceService.recordPayment(auctionId, winnerId, winningBid, 1L));
-        txTemplate.execute(status -> handoverEvidenceService.recordHandover(auctionId, vehicleId, winnerId, 1L));
+        txTemplate.execute(status -> paymentEvidenceService.recordPayment(auctionId, winningBid, 1L));
+        txTemplate.execute(status -> handoverEvidenceService.recordHandover(auctionId, 1L));
     }
 
     /**
@@ -226,7 +226,14 @@ class AuctionSaleCompletionIntegrationTest {
         Long vehicleId = createInAuctionVehicle(txTemplate);
         BigDecimal winningBid = new BigDecimal("1020000.00");
         Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
-        txTemplate.execute(status -> handoverEvidenceService.recordHandover(auctionId, vehicleId, 100L, 1L));
+        // Slice 1: HandoverEvidenceService now requires a pre-existing PaymentEvidence, so a
+        // handover-without-payment state can no longer be produced through the service. Construct
+        // the handover row directly via the repository port (same technique T4-T7 already use for
+        // states unreachable through the public API) so completeSale()'s own missing-payment
+        // rejection is still exercised.
+        OffsetDateTime now2 = OffsetDateTime.now();
+        txTemplate.execute(status -> handoverEvidenceRepository.save(
+                new HandoverEvidence(auctionId, vehicleId, 100L, 1L, now2, now2)));
 
         assertThatThrownBy(() -> completeSaleViaLockedCaller(txTemplate, auctionId))
                 .isInstanceOf(IllegalStateException.class);
@@ -241,7 +248,7 @@ class AuctionSaleCompletionIntegrationTest {
         Long vehicleId = createInAuctionVehicle(txTemplate);
         BigDecimal winningBid = new BigDecimal("1020000.00");
         Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
-        txTemplate.execute(status -> paymentEvidenceService.recordPayment(auctionId, 100L, winningBid, 1L));
+        txTemplate.execute(status -> paymentEvidenceService.recordPayment(auctionId, winningBid, 1L));
 
         assertThatThrownBy(() -> completeSaleViaLockedCaller(txTemplate, auctionId))
                 .isInstanceOf(IllegalStateException.class);
@@ -262,10 +269,14 @@ class AuctionSaleCompletionIntegrationTest {
         Long vehicleId = createInAuctionVehicle(txTemplate);
         BigDecimal winningBid = new BigDecimal("1020000.00");
         Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
-        txTemplate.execute(status -> handoverEvidenceService.recordHandover(auctionId, vehicleId, 100L, 1L));
+        // Slice 1: mismatched PaymentEvidence constructed directly via the repo (the service
+        // would reject the amount). It is saved BEFORE the handover-service call because handover
+        // now requires a payment row to exist first; the mismatch under test is completeSale()'s
+        // own amount cross-check, not the handover precondition.
         OffsetDateTime now = OffsetDateTime.now();
         txTemplate.execute(status -> paymentEvidenceRepository.save(
                 new PaymentEvidence(auctionId, 100L, new BigDecimal("1.00"), 1L, now, now)));
+        txTemplate.execute(status -> handoverEvidenceService.recordHandover(auctionId, 1L));
 
         assertThatThrownBy(() -> completeSaleViaLockedCaller(txTemplate, auctionId))
                 .isInstanceOf(IllegalStateException.class);
@@ -280,10 +291,13 @@ class AuctionSaleCompletionIntegrationTest {
         Long vehicleId = createInAuctionVehicle(txTemplate);
         BigDecimal winningBid = new BigDecimal("1020000.00");
         Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
-        txTemplate.execute(status -> handoverEvidenceService.recordHandover(auctionId, vehicleId, 100L, 1L));
+        // Wrong-buyer PaymentEvidence constructed directly (the service derives buyer from the
+        // winner and could never produce this); saved before the handover-service call for the
+        // same ordering reason as T4.
         OffsetDateTime now = OffsetDateTime.now();
         txTemplate.execute(status -> paymentEvidenceRepository.save(
                 new PaymentEvidence(auctionId, 999L, winningBid, 1L, now, now)));
+        txTemplate.execute(status -> handoverEvidenceService.recordHandover(auctionId, 1L));
 
         assertThatThrownBy(() -> completeSaleViaLockedCaller(txTemplate, auctionId))
                 .isInstanceOf(IllegalStateException.class);
@@ -299,7 +313,7 @@ class AuctionSaleCompletionIntegrationTest {
         Long otherVehicleId = createInAuctionVehicle(txTemplate);
         BigDecimal winningBid = new BigDecimal("1020000.00");
         Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
-        txTemplate.execute(status -> paymentEvidenceService.recordPayment(auctionId, 100L, winningBid, 1L));
+        txTemplate.execute(status -> paymentEvidenceService.recordPayment(auctionId, winningBid, 1L));
         OffsetDateTime now = OffsetDateTime.now();
         txTemplate.execute(status -> handoverEvidenceRepository.save(
                 new HandoverEvidence(auctionId, otherVehicleId, 100L, 1L, now, now)));
@@ -317,7 +331,7 @@ class AuctionSaleCompletionIntegrationTest {
         Long vehicleId = createInAuctionVehicle(txTemplate);
         BigDecimal winningBid = new BigDecimal("1020000.00");
         Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
-        txTemplate.execute(status -> paymentEvidenceService.recordPayment(auctionId, 100L, winningBid, 1L));
+        txTemplate.execute(status -> paymentEvidenceService.recordPayment(auctionId, winningBid, 1L));
         OffsetDateTime now = OffsetDateTime.now();
         txTemplate.execute(status -> handoverEvidenceRepository.save(
                 new HandoverEvidence(auctionId, vehicleId, 999L, 1L, now, now)));

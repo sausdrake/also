@@ -8,10 +8,12 @@ import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.diagnostic.commitment.application.SellerViolationResolutionEngine;
 import com.example.autoauction.diagnostic.commitment.domain.FinalizationOutcome;
 import com.example.autoauction.diagnostic.commitment.domain.TriggerSource;
+import com.example.autoauction.sale.application.PaymentRefundService;
 import com.example.autoauction.sale.application.SaleResolutionService;
 import com.example.autoauction.sale.domain.FaultParty;
 import com.example.autoauction.sale.domain.SaleResolution;
 import com.example.autoauction.sale.domain.SaleResolutionResult;
+import com.example.autoauction.sale.domain.port.PaymentEvidenceRepository;
 import com.example.autoauction.vehicle.application.VehicleService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -64,33 +66,41 @@ public class SaleFailureResolutionOrchestrator {
     private final DepositService depositService;
     private final SaleCommitmentResolutionOrchestrator saleCommitmentResolutionOrchestrator;
     private final SellerViolationResolutionEngine sellerViolationResolutionEngine;
+    private final PaymentEvidenceRepository paymentEvidenceRepository;
+    private final PaymentRefundService paymentRefundService;
 
     public SaleFailureResolutionOrchestrator(AuctionRepository auctionRepository,
                                               VehicleService vehicleService,
                                               SaleResolutionService saleResolutionService,
                                               DepositService depositService,
                                               SaleCommitmentResolutionOrchestrator saleCommitmentResolutionOrchestrator,
-                                              SellerViolationResolutionEngine sellerViolationResolutionEngine) {
+                                              SellerViolationResolutionEngine sellerViolationResolutionEngine,
+                                              PaymentEvidenceRepository paymentEvidenceRepository,
+                                              PaymentRefundService paymentRefundService) {
         this.auctionRepository = auctionRepository;
         this.vehicleService = vehicleService;
         this.saleResolutionService = saleResolutionService;
         this.depositService = depositService;
         this.saleCommitmentResolutionOrchestrator = saleCommitmentResolutionOrchestrator;
         this.sellerViolationResolutionEngine = sellerViolationResolutionEngine;
+        this.paymentEvidenceRepository = paymentEvidenceRepository;
+        this.paymentRefundService = paymentRefundService;
     }
 
     /**
      * Resolves {@code auction} (already pessimistically locked by the caller) as a failed
      * sale. Required sequence, all inside this one physical transaction: verify
-     * WAITING_FOR_PAYMENT -&gt; reject SUCCESS -&gt; create the SaleResolution failure record -&gt;
+     * WAITING_FOR_PAYMENT -&gt; reject SUCCESS -&gt; (Slice 1) if PaymentEvidence exists, create the
+     * PaymentRefundEvidence -&gt; create the SaleResolution failure record -&gt;
      * {@code auction.markSaleFailed()} -&gt; the outcome-specific Vehicle consequence -&gt; the
      * outcome-specific Deposit consequence -&gt; save the Auction. Any failure at any step rolls
-     * back everything already done in this method, including the SaleResolution insert and
-     * the in-memory Auction transition - no partial SALE_FAILED state, no orphaned
-     * SaleResolution, no stranded Vehicle/Deposit consequence is ever committed.
+     * back everything already done in this method, including the PaymentRefundEvidence and
+     * SaleResolution inserts and the in-memory Auction transition - no partial SALE_FAILED
+     * state, no orphaned refund/SaleResolution, no stranded Vehicle/Deposit consequence is
+     * ever committed.
      */
     @Transactional
-    public void resolveSaleFailure(Auction auction, SaleResolutionResult outcome, FaultParty faultParty,
+    public SaleResolution resolveSaleFailure(Auction auction, SaleResolutionResult outcome, FaultParty faultParty,
                                     String failureReason, Long resolvedBy, List<Long> violationDefinitionIds) {
         if (outcome == SaleResolutionResult.SUCCESS) {
             throw new IllegalArgumentException(
@@ -106,6 +116,18 @@ public class SaleFailureResolutionOrchestrator {
                     String.format("Невозможно зафиксировать исход продажи аукциона %d в статусе '%s'. Только аукционы со статусом 'WAITING_FOR_PAYMENT' могут быть разрешены",
                             auction.getId(), auction.getStatus())
             );
+        }
+
+        // Slice 1 (Sale Completion & Failure API): locked winning-price disposition. If the buyer
+        // has already physically paid (PaymentEvidence exists), the full winning price is returned
+        // to the buyer on EVERY failure outcome (B/BUYER_FAULT/PLATFORM_FAULT/C) - recorded as an
+        // immutable PaymentRefundEvidence in THIS same physical transaction, before the failure is
+        // finalized. PaymentRefundService owns evidence construction (amount/buyer/ids derived
+        // from the loaded PaymentEvidence, never supplied); this orchestrator only decides
+        // whether the refund is due. If no PaymentEvidence exists, there is nothing to refund and
+        // the existing failure behaviour is unchanged.
+        if (paymentEvidenceRepository.existsByAuctionId(auction.getId())) {
+            paymentRefundService.recordRefund(auction.getId(), resolvedBy);
         }
 
         SaleResolution resolution = saleResolutionService.createFailure(
@@ -163,5 +185,6 @@ public class SaleFailureResolutionOrchestrator {
 
         log.info("Auction {} resolved as SALE_FAILED: outcome={}, faultParty={}, vehicle={}, winner={}",
                 auction.getId(), outcome, faultParty, vehicleId, winnerId);
+        return resolution;
     }
 }

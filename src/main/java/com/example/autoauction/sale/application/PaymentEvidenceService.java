@@ -47,13 +47,25 @@ public class PaymentEvidenceService {
     }
 
     /**
-     * Records that {@code buyerId} paid {@code amount} for {@code auctionId}, received by
-     * {@code receivedByAdminId}. Validates every precondition explicitly - see the locked X1
-     * design - before persisting anything.
+     * Records that the auction's winning buyer paid {@code amount} for {@code auctionId},
+     * received by {@code receivedByAdminId}. Validates every precondition explicitly - see the
+     * locked X1 design, plus the Slice 1 correction below - before persisting anything.
+     *
+     * Slice 1 (Sale Completion &amp; Failure API) corrections:
+     * <ul>
+     *   <li>The Auction is fetched with a pessimistic write lock ({@code findByIdWithLock}),
+     *       inside this same {@code @Transactional} method, so a concurrent {@code /fail}
+     *       cannot transition the auction to SALE_FAILED between this method's status check and
+     *       its insert. Without the lock, a PaymentEvidence could be committed for an auction
+     *       that is already durably SALE_FAILED - with no matching PaymentRefundEvidence,
+     *       violating the locked refund invariant.</li>
+     *   <li>{@code buyerId} is no longer a caller-supplied parameter - it is derived from
+     *       {@code auction.getWinnerId()}. The client never supplies buyer identity.</li>
+     * </ul>
      */
     @Transactional
-    public PaymentEvidence recordPayment(Long auctionId, Long buyerId, BigDecimal amount, Long receivedByAdminId) {
-        Auction auction = auctionRepository.findById(auctionId)
+    public PaymentEvidence recordPayment(Long auctionId, BigDecimal amount, Long receivedByAdminId) {
+        Auction auction = auctionRepository.findByIdWithLock(auctionId)
                 .orElseThrow(() -> new IllegalArgumentException("Аукцион не найден: " + auctionId));
 
         if (auction.getStatus() != AuctionStatus.WAITING_FOR_PAYMENT) {
@@ -64,10 +76,7 @@ public class PaymentEvidenceService {
         if (auction.getWinnerId() == null) {
             throw new IllegalStateException("У аукциона " + auctionId + " нет победителя");
         }
-        if (!auction.getWinnerId().equals(buyerId)) {
-            throw new IllegalArgumentException(
-                    "buyerId (" + buyerId + ") не совпадает с победителем аукциона (" + auction.getWinnerId() + ")");
-        }
+        Long buyerId = auction.getWinnerId();
         if (auction.getWinningBid() == null) {
             throw new IllegalStateException("У аукциона " + auctionId + " не установлена winningBid");
         }
