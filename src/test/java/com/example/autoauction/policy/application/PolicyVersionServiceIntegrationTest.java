@@ -244,4 +244,161 @@ class PolicyVersionServiceIntegrationTest {
 
         assertTrue(published.isPublished());
     }
+
+    // ── Slice 1 (Policy Administration) ─────────────────────────────────────────
+
+    /** Creates a draft and configures every currently-existing catalogue definition on it at PERCENTAGE {@code value}. */
+    private PolicyVersion publishableDraft(BigDecimal commissionRate, BigDecimal value) {
+        violationDefinitionJpaRepository.save(
+                new com.example.autoauction.policy.infrastructure.persistence.JpaViolationDefinitionEntity(
+                        "SLICE1_TEST_" + System.nanoTime(), "test fixture", java.time.OffsetDateTime.now()));
+        PolicyVersion draft = policyVersionService.create(commissionRate, adminId);
+        for (var d : violationDefinitionJpaRepository.findAll()) {
+            policyVersionService.updateDraftViolation(draft.getId(), d.getId(),
+                    com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE, value);
+        }
+        return draft;
+    }
+
+    @Test
+    @DisplayName("Slice 1: updateDraftCommission then publish -> published rate reflects the edit")
+    void slice1_UpdateDraftCommissionThenPublish() {
+        PolicyVersion draft = publishableDraft(new BigDecimal("0.0200"), new BigDecimal("100"));
+        policyVersionService.updateDraftCommission(draft.getId(), new BigDecimal("0.0250"));
+
+        PolicyVersion published = policyVersionService.publish(draft.getId());
+
+        assertTrue(published.isPublished());
+        assertEquals(0, new BigDecimal("0.0250").compareTo(published.getCommissionRate()));
+        assertEquals(0, new BigDecimal("0.0250")
+                .compareTo(policyVersionService.getById(draft.getId()).getCommissionRate()));
+    }
+
+    @Test
+    @DisplayName("Slice 1: editing a published version (commission or violation) is rejected at the application layer")
+    void slice1_PublishedVersionIsImmutable() {
+        PolicyVersion draft = publishableDraft(new BigDecimal("0.0200"), new BigDecimal("100"));
+        PolicyVersion published = policyVersionService.publish(draft.getId());
+        Long anyDefId = violationDefinitionJpaRepository.findAll().get(0).getId();
+
+        assertThrows(IllegalStateException.class,
+                () -> policyVersionService.updateDraftCommission(published.getId(), new BigDecimal("0.03")));
+        assertThrows(IllegalStateException.class,
+                () -> policyVersionService.updateDraftViolation(published.getId(), anyDefId,
+                        com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE, new BigDecimal("10")));
+
+        // unchanged
+        assertEquals(0, new BigDecimal("0.0200")
+                .compareTo(policyVersionService.getById(published.getId()).getCommissionRate()));
+    }
+
+    @Test
+    @DisplayName("Slice 1: a draft based on v1 stays publishable after a sibling draft was published; " +
+            "sibling drafts never share violation rows")
+    void slice1_MultipleDraftsCopyForwardFromCurrentPublishedNotFromSiblings() {
+        PolicyVersion base = publishableDraft(new BigDecimal("0.0200"), new BigDecimal("100"));
+        PolicyVersion basePublished = policyVersionService.publish(base.getId());
+
+        // Two drafts both copy-forward from the current published (basePublished), not from each other.
+        PolicyVersion d2 = policyVersionService.create(new BigDecimal("0.0300"), adminId);
+        PolicyVersion d3 = policyVersionService.create(new BigDecimal("0.0400"), adminId);
+
+        // Edit d2 and publish it.
+        Long anyDefId = violationDefinitionViolationIdOfFirstCatalogueEntry(d2.getId());
+        policyVersionService.updateDraftViolation(d2.getId(), anyDefId,
+                com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE, new BigDecimal("25"));
+        PolicyVersion d2Published = policyVersionService.publish(d2.getId());
+
+        // d3 was copied from basePublished, is complete, and is still publishable (stale base is allowed).
+        PolicyVersion d3Published = policyVersionService.publish(d3.getId());
+        assertTrue(d3Published.isPublished());
+
+        // d3 did NOT pick up d2's edit - its rows are its own copy of basePublished's config.
+        var d3Rows = policyVersionViolationRepository.findByPolicyVersionId(d3.getId());
+        var d2Rows = policyVersionViolationRepository.findByPolicyVersionId(d2.getId());
+        assertFalse(d3Rows.isEmpty());
+        // no PolicyVersionViolation id is shared between the two drafts
+        Set<Long> d2Ids = new HashSet<>();
+        d2Rows.forEach(r -> d2Ids.add(r.getId()));
+        d3Rows.forEach(r -> assertFalse(d2Ids.contains(r.getId()), "sibling drafts must not share violation rows"));
+
+        // current published = the highest versionNumber among {basePublished, d2Published, d3Published}
+        long maxVn = Math.max(basePublished.getVersionNumber(),
+                Math.max(d2Published.getVersionNumber(), d3Published.getVersionNumber()));
+        assertEquals(maxVn, policyVersionService.getCurrentPublished().getVersionNumber());
+    }
+
+    private Long violationDefinitionViolationIdOfFirstCatalogueEntry(Long draftId) {
+        return policyVersionViolationRepository.findByPolicyVersionId(draftId).get(0).getViolationDefinitionId();
+    }
+
+    @Test
+    @DisplayName("Slice 1: concurrent publish of the SAME draft -> exactly one succeeds, the other fails")
+    void slice1_ConcurrentPublishSameDraft() throws Exception {
+        PolicyVersion draft = publishableDraft(new BigDecimal("0.0200"), new BigDecimal("100"));
+
+        int threads = 8;
+        ExecutorService ex = Executors.newFixedThreadPool(threads);
+        CountDownLatch ready = new CountDownLatch(threads);
+        CountDownLatch go = new CountDownLatch(1);
+        List<Future<Boolean>> futures = new ArrayList<>();
+        try {
+            for (int i = 0; i < threads; i++) {
+                futures.add(ex.submit(() -> {
+                    ready.countDown();
+                    go.await();
+                    try {
+                        policyVersionService.publish(draft.getId());
+                        return true;
+                    } catch (IllegalStateException e) {
+                        return false;
+                    }
+                }));
+            }
+            ready.await();
+            go.countDown();
+            int successes = 0;
+            for (Future<Boolean> f : futures) {
+                if (f.get(10, TimeUnit.SECONDS)) successes++;
+            }
+            assertEquals(1, successes, "exactly one concurrent publish of the same draft must succeed");
+        } finally {
+            ex.shutdown();
+        }
+        assertTrue(policyVersionService.getById(draft.getId()).isPublished());
+    }
+
+    @Test
+    @DisplayName("Slice 1: concurrent publish of DIFFERENT complete drafts -> both succeed, distinct versionNumbers")
+    void slice1_ConcurrentPublishDifferentDrafts() throws Exception {
+        // Seed once, then build BOTH drafts against the SAME (now-stable) catalogue so both are complete.
+        violationDefinitionJpaRepository.save(
+                new com.example.autoauction.policy.infrastructure.persistence.JpaViolationDefinitionEntity(
+                        "SLICE1_TEST_" + System.nanoTime(), "test fixture", java.time.OffsetDateTime.now()));
+        PolicyVersion a = policyVersionService.create(new BigDecimal("0.0200"), adminId);
+        PolicyVersion b = policyVersionService.create(new BigDecimal("0.0300"), adminId);
+        for (var d : violationDefinitionJpaRepository.findAll()) {
+            policyVersionService.updateDraftViolation(a.getId(), d.getId(),
+                    com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE, new BigDecimal("100"));
+            policyVersionService.updateDraftViolation(b.getId(), d.getId(),
+                    com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE, new BigDecimal("100"));
+        }
+
+        ExecutorService ex = Executors.newFixedThreadPool(2);
+        CountDownLatch go = new CountDownLatch(1);
+        try {
+            Future<PolicyVersion> fa = ex.submit(() -> { go.await(); return policyVersionService.publish(a.getId()); });
+            Future<PolicyVersion> fb = ex.submit(() -> { go.await(); return policyVersionService.publish(b.getId()); });
+            go.countDown();
+            PolicyVersion pa = fa.get(10, TimeUnit.SECONDS);
+            PolicyVersion pb = fb.get(10, TimeUnit.SECONDS);
+            assertTrue(pa.isPublished());
+            assertTrue(pb.isPublished());
+            assertFalse(pa.getVersionNumber().equals(pb.getVersionNumber()));
+            long higher = Math.max(pa.getVersionNumber(), pb.getVersionNumber());
+            assertEquals(higher, policyVersionService.getCurrentPublished().getVersionNumber());
+        } finally {
+            ex.shutdown();
+        }
+    }
 }

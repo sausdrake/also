@@ -5,6 +5,7 @@ import api from '../api/client';
 import { formatDateTime, formatDate } from '../utils/formatDate';
 import { useAuthStore } from '../store/authStore';
 import { PhotoLightbox } from '../components/PhotoLightbox';
+import { PolicyPage } from './admin/PolicyPage';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
@@ -298,6 +299,16 @@ function AdminSidebar() {
             }`}>
           {NAV_ITEMS[2].icon}
           Аукционы
+        </NavLink>
+
+        {/* Ценовая политика */}
+        <NavLink to="/admin/policy"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+              isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            }`}>
+          {NAV_ITEMS[4].icon}
+          Политика
         </NavLink>
 
         {/* Депозиты */}
@@ -2477,7 +2488,8 @@ function DepositsPage() {
 const SETTINGS_META: Record<string, { label: string; description: string; min: number; max: number; step: number }> = {
   deposit_percent:                      { label: 'Депозит для аукциона (%)',          description: 'Процент от стартовой цены, замораживаемый при входе в аукцион',          min: 0, max: 50, step: 1 },
   default_bid_step_percent:             { label: 'Минимальный шаг ставки (%)',         description: 'Минимальный шаг ставки в процентах от текущей цены аукциона',            min: 0, max: 50, step: 0.5 },
-  commission_percent:                   { label: 'Комиссия платформы (%)',             description: 'Процент комиссии, взимаемый с победителя аукциона',                       min: 0, max: 30, step: 0.5 },
+  // commission_percent / platform_fee_percent removed: commission is configured only via the
+  // PolicyVersion admin surface (/admin/policy). The legacy system_settings row is inert.
   diagnostic_deposit_amount:            { label: 'Залог для диагностики (сом)',        description: 'Фиксированная сумма заморозки при подаче заявки на диагностику',          min: 0, max: 100000, step: 1000 },
   auction_confirm_hours:                { label: 'Подтверждение аукциона (ч)',         description: 'Часов на подтверждение аукциона администратором после создания',          min: 1, max: 168, step: 1 },
   completed_auction_visibility_hours:   { label: 'Видимость завершённых аукционов (ч)', description: 'Часов, в течение которых показываются завершённые аукционы',              min: 1, max: 8760, step: 24 },
@@ -2572,6 +2584,7 @@ export function AdminDashboard() {
             <Route path="diagnostic/templates" element={<TemplatesPage />} />
             <Route path="diagnostic/reports" element={<ReportsPage />} />
             <Route path="auctions" element={<AuctionsPage />} />
+            <Route path="policy" element={<PolicyPage />} />
             <Route path="deposits" element={<DepositsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />

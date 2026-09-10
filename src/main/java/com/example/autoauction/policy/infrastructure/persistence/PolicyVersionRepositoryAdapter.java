@@ -6,6 +6,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -87,5 +88,15 @@ public class PolicyVersionRepositoryAdapter implements PolicyVersionRepository {
     @Override
     public boolean claimPublish(Long id) {
         return jpaRepository.claimPublish(id) > 0;
+    }
+
+    @Override
+    public List<PolicyVersion> findAllOrderByVersionNumberDesc() {
+        return jpaRepository.findAllByOrderByVersionNumberDesc().stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<PolicyVersion> findByPublishedOrderByVersionNumberDesc(boolean published) {
+        return jpaRepository.findByPublishedOrderByVersionNumberDesc(published).stream().map(mapper::toDomain).toList();
     }
 }

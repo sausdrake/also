@@ -173,4 +173,56 @@ public class PolicyVersionService {
                 .orElseThrow(() -> new IllegalStateException(
                         "Нет опубликованной ценовой политики (PolicyVersion) - создание аукциона невозможно"));
     }
+
+    /**
+     * Slice 1 (Policy Administration): admin edit of a still-unpublished draft's commission
+     * rate. Fails closed if the target is already published (defense-in-depth: the DB trigger
+     * and {@link PolicyVersion#changeCommissionRate} would also reject it). Range/null
+     * validation lives entirely in the domain - no duplicate business validation here.
+     */
+    @Transactional
+    public PolicyVersion updateDraftCommission(Long id, BigDecimal newRate) {
+        PolicyVersion target = policyVersionRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("PolicyVersion не найдена: " + id));
+        if (target.isPublished()) {
+            throw new IllegalStateException(
+                    "PolicyVersion " + id + " уже опубликована - ставку комиссии изменить нельзя");
+        }
+        target.changeCommissionRate(newRate);
+        PolicyVersion saved = policyVersionRepository.save(target);
+        log.info("PolicyVersion {} commissionRate updated to {}", id, newRate);
+        return saved;
+    }
+
+    /**
+     * Slice 1: history/listing for the admin console. {@code publishedFilter == null} returns
+     * every version (drafts + published); otherwise only versions in that publication state.
+     * Always newest-first by {@code versionNumber}.
+     */
+    @Transactional(readOnly = true)
+    public List<PolicyVersion> listVersions(Boolean publishedFilter) {
+        return (publishedFilter == null)
+                ? policyVersionRepository.findAllOrderByVersionNumberDesc()
+                : policyVersionRepository.findByPublishedOrderByVersionNumberDesc(publishedFilter);
+    }
+
+    /**
+     * Slice 1: the configured violation rows for one PolicyVersion (draft or published).
+     * 404-style semantics for an unknown id, consistent with {@link #getById(Long)}.
+     */
+    @Transactional(readOnly = true)
+    public List<PolicyVersionViolation> getViolations(Long policyVersionId) {
+        policyVersionRepository.findById(policyVersionId)
+                .orElseThrow(() -> new IllegalArgumentException("PolicyVersion не найдена: " + policyVersionId));
+        return policyVersionViolationRepository.findByPolicyVersionId(policyVersionId);
+    }
+
+    /**
+     * Slice 1: the stable violation-code catalogue (read-only; seeded by V37, never mutated
+     * here).
+     */
+    @Transactional(readOnly = true)
+    public List<ViolationDefinition> listViolationDefinitions() {
+        return violationDefinitionRepository.findAll();
+    }
 }

@@ -2,6 +2,7 @@ package com.example.autoauction.policy.domain.port;
 
 import com.example.autoauction.policy.domain.PolicyVersion;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -36,4 +37,17 @@ public interface PolicyVersionRepository {
      * callers must fail closed in that case, never fall back to a default/live setting.
      */
     Optional<PolicyVersion> findCurrentPublished();
+
+    /**
+     * Slice 1 (Policy Administration): all PolicyVersions (drafts and published), newest first
+     * by {@code versionNumber}. Read-only history/listing support for the admin console - no
+     * update or delete capability is added.
+     */
+    List<PolicyVersion> findAllOrderByVersionNumberDesc();
+
+    /**
+     * Slice 1: PolicyVersions filtered by publication state, newest first by
+     * {@code versionNumber}.
+     */
+    List<PolicyVersion> findByPublishedOrderByVersionNumberDesc(boolean published);
 }

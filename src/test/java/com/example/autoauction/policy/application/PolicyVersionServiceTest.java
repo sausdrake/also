@@ -237,4 +237,106 @@ class PolicyVersionServiceTest {
             assertThat(captor.getValue().getPenaltyValue()).isEqualByComparingTo("50");
         }
     }
+
+    @Nested
+    @DisplayName("Slice 1 (Policy Administration): updateDraftCommission / list / read")
+    class PolicyAdministrationTests {
+
+        @Test
+        @DisplayName("updateDraftCommission on an unpublished draft changes the rate and saves")
+        void updateDraftCommission_Draft_UpdatesAndSaves() {
+            PolicyVersion draft = new PolicyVersion(10L, 5L, new BigDecimal("0.02"), false,
+                    OffsetDateTime.now(), 1L, OffsetDateTime.now());
+            when(policyVersionRepository.findById(10L)).thenReturn(Optional.of(draft));
+            when(policyVersionRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            PolicyVersion result = policyVersionService.updateDraftCommission(10L, new BigDecimal("0.0250"));
+
+            assertThat(result.getCommissionRate()).isEqualByComparingTo("0.0250");
+            ArgumentCaptor<PolicyVersion> captor = ArgumentCaptor.forClass(PolicyVersion.class);
+            verify(policyVersionRepository).save(captor.capture());
+            assertThat(captor.getValue().getCommissionRate()).isEqualByComparingTo("0.0250");
+        }
+
+        @Test
+        @DisplayName("updateDraftCommission on a published version is rejected with IllegalStateException, no save")
+        void updateDraftCommission_Published_RejectsNoSave() {
+            PolicyVersion published = new PolicyVersion(10L, 5L, new BigDecimal("0.02"), true,
+                    OffsetDateTime.now(), 1L, OffsetDateTime.now());
+            when(policyVersionRepository.findById(10L)).thenReturn(Optional.of(published));
+
+            assertThatThrownBy(() -> policyVersionService.updateDraftCommission(10L, new BigDecimal("0.03")))
+                    .isInstanceOf(IllegalStateException.class);
+
+            verify(policyVersionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("updateDraftCommission on an unknown id -> IllegalArgumentException with 'не найден' (404 semantics)")
+        void updateDraftCommission_UnknownId_NotFound() {
+            when(policyVersionRepository.findById(999L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> policyVersionService.updateDraftCommission(999L, new BigDecimal("0.02")))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("не найден");
+
+            verify(policyVersionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("updateDraftCommission with an out-of-range rate is rejected by the domain, no save")
+        void updateDraftCommission_OutOfRange_RejectsNoSave() {
+            PolicyVersion draft = new PolicyVersion(10L, 5L, new BigDecimal("0.02"), false,
+                    OffsetDateTime.now(), 1L, OffsetDateTime.now());
+            when(policyVersionRepository.findById(10L)).thenReturn(Optional.of(draft));
+
+            assertThatThrownBy(() -> policyVersionService.updateDraftCommission(10L, new BigDecimal("1.5")))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> policyVersionService.updateDraftCommission(10L, new BigDecimal("-0.01")))
+                    .isInstanceOf(IllegalArgumentException.class);
+
+            verify(policyVersionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("listVersions(null) returns full history newest-first; listVersions(true/false) filters by published")
+        void listVersions_DelegatesToRepositoryByFilter() {
+            PolicyVersion a = new PolicyVersion(2L, 2L, new BigDecimal("0.02"), true, OffsetDateTime.now(), 1L, OffsetDateTime.now());
+            PolicyVersion b = new PolicyVersion(1L, 1L, new BigDecimal("0.02"), false, OffsetDateTime.now(), 1L, OffsetDateTime.now());
+            when(policyVersionRepository.findAllOrderByVersionNumberDesc()).thenReturn(List.of(a, b));
+            when(policyVersionRepository.findByPublishedOrderByVersionNumberDesc(true)).thenReturn(List.of(a));
+            when(policyVersionRepository.findByPublishedOrderByVersionNumberDesc(false)).thenReturn(List.of(b));
+
+            assertThat(policyVersionService.listVersions(null)).containsExactly(a, b);
+            assertThat(policyVersionService.listVersions(true)).containsExactly(a);
+            assertThat(policyVersionService.listVersions(false)).containsExactly(b);
+        }
+
+        @Test
+        @DisplayName("getViolations returns the configured rows; unknown policy id -> 404 semantics")
+        void getViolations_KnownAndUnknown() {
+            PolicyVersion v = new PolicyVersion(10L, 5L, new BigDecimal("0.02"), false, OffsetDateTime.now(), 1L, OffsetDateTime.now());
+            when(policyVersionRepository.findById(10L)).thenReturn(Optional.of(v));
+            List<PolicyVersionViolation> rows = List.of(
+                    new PolicyVersionViolation(1L, 10L, 1L, PenaltyType.PERCENTAGE, new BigDecimal("100"), OffsetDateTime.now()));
+            when(policyVersionViolationRepository.findByPolicyVersionId(10L)).thenReturn(rows);
+
+            assertThat(policyVersionService.getViolations(10L)).isEqualTo(rows);
+
+            when(policyVersionRepository.findById(999L)).thenReturn(Optional.empty());
+            assertThatThrownBy(() -> policyVersionService.getViolations(999L))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("не найден");
+        }
+
+        @Test
+        @DisplayName("listViolationDefinitions returns the catalogue verbatim")
+        void listViolationDefinitions_ReturnsCatalogue() {
+            List<ViolationDefinition> catalogue = List.of(
+                    new ViolationDefinition(1L, "SELLER_REFUSED_HANDOVER", "d", OffsetDateTime.now()));
+            when(violationDefinitionRepository.findAll()).thenReturn(catalogue);
+
+            assertThat(policyVersionService.listViolationDefinitions()).isEqualTo(catalogue);
+        }
+    }
 }

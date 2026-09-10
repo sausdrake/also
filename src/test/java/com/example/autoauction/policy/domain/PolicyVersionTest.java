@@ -91,6 +91,54 @@ class PolicyVersionTest {
         assertTrue(pv.isPublished());
     }
 
+    // ── Slice 1 (Policy Administration): changeCommissionRate ────────────────────
+
+    @Test
+    @DisplayName("changeCommissionRate on an unpublished draft updates the field")
+    void changeCommissionRate_WhenDraft_ShouldUpdate() {
+        PolicyVersion pv = new PolicyVersion(new BigDecimal("0.02"), createdBy, FIXED_CLOCK);
+        pv.changeCommissionRate(new BigDecimal("0.0250"));
+        assertEquals(0, new BigDecimal("0.0250").compareTo(pv.getCommissionRate()));
+        assertFalse(pv.isPublished());
+    }
+
+    @Test
+    @DisplayName("changeCommissionRate on a published version is rejected (immutable)")
+    void changeCommissionRate_WhenPublished_ShouldThrow() {
+        PolicyVersion pv = new PolicyVersion(new BigDecimal("0.02"), createdBy, FIXED_CLOCK);
+        pv.publish();
+        assertThrows(IllegalStateException.class, () -> pv.changeCommissionRate(new BigDecimal("0.03")));
+        assertEquals(0, new BigDecimal("0.02").compareTo(pv.getCommissionRate()));
+    }
+
+    @Test
+    @DisplayName("changeCommissionRate rejects null")
+    void changeCommissionRate_Null_ShouldThrow() {
+        PolicyVersion pv = new PolicyVersion(new BigDecimal("0.02"), createdBy, FIXED_CLOCK);
+        assertThrows(NullPointerException.class, () -> pv.changeCommissionRate(null));
+    }
+
+    @Test
+    @DisplayName("changeCommissionRate rejects a negative rate")
+    void changeCommissionRate_Negative_ShouldThrow() {
+        PolicyVersion pv = new PolicyVersion(new BigDecimal("0.02"), createdBy, FIXED_CLOCK);
+        assertThrows(IllegalArgumentException.class, () -> pv.changeCommissionRate(new BigDecimal("-0.01")));
+    }
+
+    @Test
+    @DisplayName("changeCommissionRate rejects a rate >= 1 (100%)")
+    void changeCommissionRate_AtOrAboveOne_ShouldThrow() {
+        PolicyVersion pv = new PolicyVersion(new BigDecimal("0.02"), createdBy, FIXED_CLOCK);
+        assertThrows(IllegalArgumentException.class, () -> pv.changeCommissionRate(BigDecimal.ONE));
+        assertThrows(IllegalArgumentException.class, () -> pv.changeCommissionRate(new BigDecimal("1.5")));
+    }
+
+    @Test
+    @DisplayName("SYSTEM_ACTOR_ID is the reserved bootstrap actor 0")
+    void systemActorId_IsZero() {
+        assertEquals(0L, PolicyVersion.SYSTEM_ACTOR_ID);
+    }
+
     @Test
     @DisplayName("reconstruction constructor preserves every field exactly, for mapper use")
     void reconstruction_ShouldPreserveAllFields() {

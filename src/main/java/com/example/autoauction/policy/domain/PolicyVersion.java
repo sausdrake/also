@@ -20,9 +20,18 @@ import java.util.Objects;
  */
 public class PolicyVersion {
 
+    /**
+     * Reserved actor id used ONLY by the automatic startup seed of the very first published
+     * PolicyVersion (see {@code policy.application.PolicyBootstrap}). {@code
+     * policy_version.created_by} has no foreign key (V32), and {@code BIGSERIAL} user ids start
+     * at 1, so 0 collides with no real user. Every admin-authored PolicyVersion created
+     * afterwards records the real authenticated admin's id.
+     */
+    public static final Long SYSTEM_ACTOR_ID = 0L;
+
     private Long id;
     private Long versionNumber;
-    private final BigDecimal commissionRate;
+    private BigDecimal commissionRate;
     private boolean published;
     private final OffsetDateTime effectiveFrom;
     private final Long createdBy;
@@ -42,14 +51,8 @@ public class PolicyVersion {
      * see the Slice 1b pre-implementation audit, section 9).
      */
     public PolicyVersion(BigDecimal commissionRate, Long createdBy, Clock clock) {
-        Objects.requireNonNull(commissionRate, "Комиссия не может быть null");
         Objects.requireNonNull(createdBy, "ID создателя не может быть null");
-        if (commissionRate.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Комиссия не может быть отрицательной: " + commissionRate);
-        }
-        if (commissionRate.compareTo(BigDecimal.ONE) >= 0) {
-            throw new IllegalArgumentException("Комиссия должна быть меньше 100% (1.0): " + commissionRate);
-        }
+        validateCommissionRate(commissionRate);
         this.commissionRate = commissionRate;
         this.createdBy = createdBy;
         OffsetDateTime now = OffsetDateTime.now(clock);
@@ -85,6 +88,35 @@ public class PolicyVersion {
             throw new IllegalStateException("PolicyVersion уже опубликована и не может быть опубликована повторно");
         }
         this.published = true;
+    }
+
+    /**
+     * Slice 1 (Policy Administration): the only legitimate way to change a draft's commission
+     * rate. Mirrors the draft-only, published-immutable contract of the seller-violation
+     * configuration path. Never a public setter, never reflection - a published PolicyVersion
+     * is immutable and this is rejected for one.
+     *
+     * @throws IllegalStateException    if this PolicyVersion is already published
+     * @throws NullPointerException     if {@code newRate} is null
+     * @throws IllegalArgumentException if {@code newRate} is &lt; 0 or &gt;= 1
+     */
+    public void changeCommissionRate(BigDecimal newRate) {
+        if (this.published) {
+            throw new IllegalStateException(
+                    "PolicyVersion опубликована и неизменяема - ставку комиссии изменить нельзя");
+        }
+        validateCommissionRate(newRate);
+        this.commissionRate = newRate;
+    }
+
+    private static void validateCommissionRate(BigDecimal rate) {
+        Objects.requireNonNull(rate, "Комиссия не может быть null");
+        if (rate.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Комиссия не может быть отрицательной: " + rate);
+        }
+        if (rate.compareTo(BigDecimal.ONE) >= 0) {
+            throw new IllegalArgumentException("Комиссия должна быть меньше 100% (1.0): " + rate);
+        }
     }
 
     public Long getId() { return id; }
