@@ -2,14 +2,27 @@ package com.example.autoauction.sale.web;
 
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
+import com.example.autoauction.auction.domain.SaleFinalizationMethod;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.auth.infrastructure.security.WithMockCustomUser;
 import com.example.autoauction.deposit.application.DepositService;
+import com.example.autoauction.diagnostic.commitment.application.SellerDiagnosticCommitmentService;
+import com.example.autoauction.diagnostic.commitment.domain.port.SellerDiagnosticCommitmentRepository;
+import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
+import com.example.autoauction.diagnostic.domain.port.DiagnosticRequestRepository;
+import com.example.autoauction.policy.application.PolicyVersionService;
 import com.example.autoauction.sale.domain.SaleResolutionResult;
 import com.example.autoauction.sale.domain.port.HandoverEvidenceRepository;
 import com.example.autoauction.sale.domain.port.PaymentEvidenceRepository;
 import com.example.autoauction.sale.domain.port.PaymentRefundEvidenceRepository;
 import com.example.autoauction.sale.domain.port.SaleResolutionRepository;
+import com.example.autoauction.settlement.domain.SettlementStatus;
+import com.example.autoauction.settlement.domain.port.SettlementCorrectionRepository;
+import com.example.autoauction.settlement.domain.port.SettlementRepository;
+import com.example.autoauction.user.domain.Role;
+import com.example.autoauction.user.domain.User;
+import com.example.autoauction.user.domain.port.RoleRepository;
+import com.example.autoauction.user.domain.port.UserRepository;
 import com.example.autoauction.vehicle.domain.Vehicle;
 import com.example.autoauction.vehicle.domain.VehicleStatus;
 import com.example.autoauction.vehicle.domain.VehicleType;
@@ -25,6 +38,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -53,6 +67,14 @@ class AdminSaleApiIntegrationTest {
     @Autowired private HandoverEvidenceRepository handoverEvidenceRepository;
     @Autowired private SaleResolutionRepository saleResolutionRepository;
     @Autowired private PaymentRefundEvidenceRepository paymentRefundEvidenceRepository;
+    @Autowired private SettlementRepository settlementRepository;
+    @Autowired private SettlementCorrectionRepository settlementCorrectionRepository;
+    @Autowired private UserRepository userRepository;
+    @Autowired private RoleRepository roleRepository;
+    @Autowired private DiagnosticRequestRepository diagnosticRequestRepository;
+    @Autowired private SellerDiagnosticCommitmentRepository sellerDiagnosticCommitmentRepository;
+    @Autowired private SellerDiagnosticCommitmentService sellerDiagnosticCommitmentService;
+    @Autowired private PolicyVersionService policyVersionService;
 
     private final BigDecimal winningBid = new BigDecimal("1020000.00");
 
@@ -85,6 +107,77 @@ class AdminSaleApiIntegrationTest {
         depositService.markAsWinner(winnerId, auctionId);
 
         return new Fixture(auctionId, vehicleId, winnerId);
+    }
+
+    private record SettlementFixture(Long auctionId, Long vehicleId, Long winnerId, Long sellerId) {}
+
+    /**
+     * Step 2C: same as {@link #waitingForPayment()}, but with the full seller-identity chain
+     * (User -&gt; DiagnosticRequest -&gt; SellerDiagnosticCommitment) plus a published PolicyVersion
+     * and the Buy Now discriminator wired onto the Auction - the exact preconditions
+     * {@code SettlementService.createPending} requires to avoid failing closed. Used only by the
+     * tests that need {@code completeSale} to actually reach SOLD; {@link #waitingForPayment()}
+     * remains untouched for every test that never reaches a successful completion.
+     */
+    private SettlementFixture waitingForPaymentWithSettlementPrerequisites(BigDecimal commissionRate) {
+        Role userRole = roleRepository.findByName("ROLE_USER")
+                .orElseGet(() -> roleRepository.save(new Role(null, "ROLE_USER", "Обычный пользователь")));
+        User seller = new User(null, "settlesel" + System.nanoTime(), "settlesel" + System.nanoTime() + "@test.com",
+                "encoded", true, Set.of(userRole));
+        Long sellerId = userRepository.save(seller).getId();
+        depositService.createDeposit(sellerId, new BigDecimal("50000"));
+
+        DiagnosticRequest request = new DiagnosticRequest();
+        request.setUserId(sellerId);
+        request.setBrand("Toyota");
+        request.setModel("Camry");
+        request.setYear(2020);
+        request.setVin("SETTLE" + (System.nanoTime() % 100000000L));
+        request.setDepositFrozen(new BigDecimal("10000"));
+        request.setStatus(DiagnosticRequest.DiagnosticRequestStatus.PENDING);
+        request.setCreatedAt(OffsetDateTime.now());
+        request.setUpdatedAt(OffsetDateTime.now());
+        Long diagnosticRequestId = diagnosticRequestRepository.save(request).getId();
+
+        // freezeCommitment() itself snapshots whatever PolicyVersion is currently published at
+        // the moment it runs - the publish must happen first so that snapshot matches the same
+        // policyVersionId this fixture later sets on the Auction.
+        Long policyVersionId = policyVersionService.create(commissionRate, 1L).getId();
+        policyVersionService.publish(policyVersionId);
+
+        sellerDiagnosticCommitmentService.freezeCommitment(sellerId, diagnosticRequestId,
+                new BigDecimal("10000"), new BigDecimal("4000"));
+        // AuctionFinalizer.completeSale() also resolves Outcome A for this commitment (X3-D,
+        // pre-existing, unrelated to Step 2C) - it requires AWAITING_FINALIZATION, same as
+        // AuctionCommitmentResolver's own precondition for linking a commitment to a new auction.
+        sellerDiagnosticCommitmentRepository.markAwaitingFinalization(diagnosticRequestId);
+        Long commitmentId = sellerDiagnosticCommitmentRepository.findByDiagnosticRequestId(diagnosticRequestId)
+                .orElseThrow().getId();
+
+        Long winnerId = 800_000L + (System.nanoTime() % 100_000_000L);
+        Vehicle vehicle = new Vehicle("Toyota", "Camry", 2020,
+                "S2" + (System.nanoTime() % 1_000_000_000L), VehicleType.SEDAN, 1L, "owner");
+        vehicle.submitForReview();
+        vehicle.approve(1L, "admin");
+        vehicle.markInAuction();
+        Long vehicleId = vehicleRepository.save(vehicle).getId();
+
+        OffsetDateTime now = OffsetDateTime.now();
+        Auction auction = new Auction(vehicleId, new BigDecimal("1000000"), new BigDecimal("1000000"), null,
+                new BigDecimal("10000"), now.minusDays(7), now.minusHours(1), 10L /* adminId - never the seller */);
+        auction.setPolicyVersionId(policyVersionId);
+        auction.setSellerDiagnosticCommitmentId(commitmentId);
+        auction.setSaleFinalizationMethod(SaleFinalizationMethod.ORDINARY_BID);
+        auction.setStatus(AuctionStatus.WAITING_FOR_PAYMENT);
+        auction.setWinnerId(winnerId);
+        auction.setWinningBid(winningBid);
+        Long auctionId = auctionRepository.save(auction).getId();
+
+        depositService.createDeposit(winnerId, new BigDecimal("1000000"));
+        depositService.freezeForAuction(winnerId, auctionId, new BigDecimal("50000"));
+        depositService.markAsWinner(winnerId, auctionId);
+
+        return new SettlementFixture(auctionId, vehicleId, winnerId, sellerId);
     }
 
     private void recordPaymentAndHandover(Long auctionId) throws Exception {
@@ -232,7 +325,10 @@ class AdminSaleApiIntegrationTest {
     @WithMockCustomUser(userId = 1L, roles = {"ADMIN"})
     @DisplayName("Complete: payment+handover -> 200 SOLD; Vehicle SOLD; НЕТ refund evidence; повтор -> 409")
     void complete_valid_thenRepeat() throws Exception {
-        Fixture f = waitingForPayment();
+        // Step 2C: this fixture must carry the full seller-identity/policy/discriminator chain -
+        // completeSale() now also creates a PENDING Settlement in the same transaction, and that
+        // creation fails closed (rolling back the whole SOLD transition) without it.
+        SettlementFixture f = waitingForPaymentWithSettlementPrerequisites(new BigDecimal("0.02"));
         recordPaymentAndHandover(f.auctionId());
 
         mockMvc.perform(post(base(f.auctionId()) + "/complete")
@@ -248,6 +344,20 @@ class AdminSaleApiIntegrationTest {
         assertThat(paymentRefundEvidenceRepository.existsByAuctionId(f.auctionId()))
                 .as("no refund evidence on the successful SOLD path")
                 .isFalse();
+
+        // Step 2C: the Settlement side-effect of a successful completeSale().
+        var settlement = settlementRepository.findByAuctionId(f.auctionId()).orElseThrow();
+        assertThat(settlement.getSellerId())
+                .as("seller must be the DiagnosticRequest.userId, never Auction.createdBy (10L)")
+                .isEqualTo(f.sellerId());
+        assertThat(settlement.getStatus()).isEqualTo(SettlementStatus.PENDING);
+        assertThat(settlement.getExpectedBuyerPaidAmount()).isEqualByComparingTo(winningBid);
+        assertThat(settlement.getExpectedSellerAmount())
+                .isEqualByComparingTo(settlement.getExpectedBuyerPaidAmount()
+                        .divide(new BigDecimal("1.02"), 2, java.math.RoundingMode.HALF_UP));
+        assertThat(settlement.getExpectedSellerAmount().add(settlement.getExpectedCommission()))
+                .as("conservation: sellerAmount + commission == buyerPaidAmount")
+                .isEqualByComparingTo(settlement.getExpectedBuyerPaidAmount());
 
         mockMvc.perform(post(base(f.auctionId()) + "/complete")
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
@@ -391,5 +501,247 @@ class AdminSaleApiIntegrationTest {
                 .andExpect(status().isConflict());
         assertThat(saleResolutionRepository.findByAuctionId(f.auctionId()).orElseThrow().getResult())
                 .isEqualTo(SaleResolutionResult.B);
+    }
+
+    // ==================== Step 2C: Settlement fail-closed precondition ====================
+
+    @Test
+    @WithMockCustomUser(userId = 1L, roles = {"ADMIN"})
+    @DisplayName("Complete: историч. аукцион без sellerDiagnosticCommitmentId/discriminator -> 409, " +
+            "SOLD/Settlement не создаются (весь successful-sale транзакшн откатывается)")
+    void complete_legacyAuctionWithoutSettlementPrerequisites_rejectedAndRolledBack() throws Exception {
+        // The plain waitingForPayment() fixture (no commitment/policy/discriminator) is exactly
+        // the historical shape SettlementService.createPending must fail closed for.
+        Fixture f = waitingForPayment();
+        recordPaymentAndHandover(f.auctionId());
+
+        mockMvc.perform(post(base(f.auctionId()) + "/complete")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isConflict());
+
+        assertThat(auctionRepository.findById(f.auctionId()).orElseThrow().getStatus())
+                .as("the whole successful-sale transaction must roll back - Auction never reaches SOLD")
+                .isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
+        assertThat(settlementRepository.existsByAuctionId(f.auctionId())).isFalse();
+    }
+
+    // ==================== Step 2C: Settlement payout recording ====================
+
+    @Test
+    @DisplayName("Settlement payout: anonymous -> 401")
+    void settlementPayout_anonymous_401() throws Exception {
+        mockMvc.perform(post(base(1L) + "/settlement/payout")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"attestedAmount\": 1}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @org.springframework.security.test.context.support.WithMockUser(roles = {"USER"})
+    @DisplayName("Settlement payout: role USER -> 403")
+    void settlementPayout_userRole_403() throws Exception {
+        mockMvc.perform(post(base(1L) + "/settlement/payout")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"attestedAmount\": 1}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @org.springframework.security.test.context.support.WithMockUser(roles = {"DIAGNOSTIC"})
+    @DisplayName("Settlement payout: role DIAGNOSTIC -> 403")
+    void settlementPayout_diagnosticRole_403() throws Exception {
+        mockMvc.perform(post(base(1L) + "/settlement/payout")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"attestedAmount\": 1}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Settlement correction: anonymous -> 401")
+    void settlementCorrection_anonymous_401() throws Exception {
+        mockMvc.perform(post(base(1L) + "/settlement/corrections")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correctionType\": \"PAYOUT_INVALIDATED\", \"reason\": \"r\", \"idempotencyKey\": \"k\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @org.springframework.security.test.context.support.WithMockUser(roles = {"USER"})
+    @DisplayName("Settlement correction: role USER -> 403")
+    void settlementCorrection_userRole_403() throws Exception {
+        mockMvc.perform(post(base(1L) + "/settlement/corrections")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correctionType\": \"PAYOUT_INVALIDATED\", \"reason\": \"r\", \"idempotencyKey\": \"k\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @org.springframework.security.test.context.support.WithMockUser(roles = {"DIAGNOSTIC"})
+    @DisplayName("Settlement correction: role DIAGNOSTIC -> 403")
+    void settlementCorrection_diagnosticRole_403() throws Exception {
+        mockMvc.perform(post(base(1L) + "/settlement/corrections")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correctionType\": \"PAYOUT_INVALIDATED\", \"reason\": \"r\", \"idempotencyKey\": \"k\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockCustomUser(userId = 42L, roles = {"ADMIN"})
+    @DisplayName("Settlement payout: валидная сумма -> 200, PAYOUT_RECORDED; точный повтор -> тот же admin, без 2-й записи")
+    void settlementPayout_validThenExactReplay() throws Exception {
+        SettlementFixture f = waitingForPaymentWithSettlementPrerequisites(new BigDecimal("0.02"));
+        recordPaymentAndHandover(f.auctionId());
+        mockMvc.perform(post(base(f.auctionId()) + "/complete")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post(base(f.auctionId()) + "/settlement/payout")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"attestedAmount\": 970000.00}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PAYOUT_RECORDED"))
+                .andExpect(jsonPath("$.attestedPayoutAmount").value(970000.00))
+                .andExpect(jsonPath("$.recordedByAdminId").value(42));
+
+        // Exact replay by a DIFFERENT admin - still a safe no-op; original admin preserved.
+        mockMvc.perform(post(base(f.auctionId()) + "/settlement/payout")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"attestedAmount\": 970000.00}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recordedByAdminId").value(42));
+
+        assertThat(settlementRepository.findByAuctionId(f.auctionId()).orElseThrow().getRecordedByAdminId())
+                .isEqualTo(42L);
+    }
+
+    @Test
+    @WithMockCustomUser(userId = 42L, roles = {"ADMIN"})
+    @DisplayName("Settlement payout: конфликтующая сумма после PAYOUT_RECORDED -> 409, без перезаписи")
+    void settlementPayout_conflictingAmount_rejected() throws Exception {
+        SettlementFixture f = waitingForPaymentWithSettlementPrerequisites(new BigDecimal("0.02"));
+        recordPaymentAndHandover(f.auctionId());
+        mockMvc.perform(post(base(f.auctionId()) + "/complete")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(base(f.auctionId()) + "/settlement/payout")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"attestedAmount\": 970000.00}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post(base(f.auctionId()) + "/settlement/payout")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"attestedAmount\": 970000.01}"))
+                .andExpect(status().isConflict());
+
+        assertThat(settlementRepository.findByAuctionId(f.auctionId()).orElseThrow().getAttestedPayoutAmount())
+                .isEqualByComparingTo("970000.00");
+    }
+
+    @Test
+    @WithMockCustomUser(userId = 42L, roles = {"ADMIN"})
+    @DisplayName("Settlement payout: отсутствующий Settlement -> 404")
+    void settlementPayout_noSettlement_404() throws Exception {
+        mockMvc.perform(post(base(99_999_999L) + "/settlement/payout")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"attestedAmount\": 1}"))
+                .andExpect(status().isNotFound());
+    }
+
+    // ==================== Step 2C: Settlement correction ====================
+
+    @Test
+    @WithMockCustomUser(userId = 42L, roles = {"ADMIN"})
+    @DisplayName("Settlement correction: AMOUNT_CORRECTION -> 201; повтор того же idempotencyKey -> тот же результат")
+    void settlementCorrection_amountCorrection_thenExactReplay() throws Exception {
+        SettlementFixture f = waitingForPaymentWithSettlementPrerequisites(new BigDecimal("0.02"));
+        recordPaymentAndHandover(f.auctionId());
+        mockMvc.perform(post(base(f.auctionId()) + "/complete")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(base(f.auctionId()) + "/settlement/payout")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"attestedAmount\": 970000.00}"))
+                .andExpect(status().isOk());
+
+        String body = "{\"correctionType\": \"AMOUNT_CORRECTION\", \"correctedAmount\": 960000.00, "
+                + "\"reason\": \"recount of physical cash\", \"idempotencyKey\": \"corr-key-1\"}";
+
+        mockMvc.perform(post(base(f.auctionId()) + "/settlement/corrections")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.correctionType").value("AMOUNT_CORRECTION"))
+                .andExpect(jsonPath("$.correctedAmount").value(960000.00));
+
+        mockMvc.perform(post(base(f.auctionId()) + "/settlement/corrections")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated());
+
+        Long settlementId = settlementRepository.findByAuctionId(f.auctionId()).orElseThrow().getId();
+        assertThat(settlementCorrectionRepository.findBySettlementIdOrderByCorrectedAtAscIdAsc(settlementId))
+                .as("the exact-key replay must never create a second correction row")
+                .hasSize(1);
+    }
+
+    @Test
+    @WithMockCustomUser(userId = 42L, roles = {"ADMIN"})
+    @DisplayName("Settlement correction: тот же idempotencyKey с другим reason -> 409, без второй записи")
+    void settlementCorrection_sameKeyDifferentFingerprint_rejected() throws Exception {
+        SettlementFixture f = waitingForPaymentWithSettlementPrerequisites(new BigDecimal("0.02"));
+        recordPaymentAndHandover(f.auctionId());
+        mockMvc.perform(post(base(f.auctionId()) + "/complete")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(base(f.auctionId()) + "/settlement/payout")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"attestedAmount\": 970000.00}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post(base(f.auctionId()) + "/settlement/corrections")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correctionType\": \"AMOUNT_CORRECTION\", \"correctedAmount\": 960000.00, "
+                                + "\"reason\": \"first reason\", \"idempotencyKey\": \"corr-key-2\"}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post(base(f.auctionId()) + "/settlement/corrections")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correctionType\": \"AMOUNT_CORRECTION\", \"correctedAmount\": 960000.00, "
+                                + "\"reason\": \"a completely different reason\", \"idempotencyKey\": \"corr-key-2\"}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @WithMockCustomUser(userId = 42L, roles = {"ADMIN"})
+    @DisplayName("Settlement correction: PAYOUT_INVALIDATED -> 201, corrected* оба отсутствуют")
+    void settlementCorrection_payoutInvalidated() throws Exception {
+        SettlementFixture f = waitingForPaymentWithSettlementPrerequisites(new BigDecimal("0.02"));
+        recordPaymentAndHandover(f.auctionId());
+        mockMvc.perform(post(base(f.auctionId()) + "/complete")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(base(f.auctionId()) + "/settlement/payout")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"attestedAmount\": 970000.00}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post(base(f.auctionId()) + "/settlement/corrections")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correctionType\": \"PAYOUT_INVALIDATED\", "
+                                + "\"reason\": \"original attestation was entirely erroneous\", "
+                                + "\"idempotencyKey\": \"corr-key-3\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.correctionType").value("PAYOUT_INVALIDATED"))
+                .andExpect(jsonPath("$.correctedAmount").doesNotExist())
+                .andExpect(jsonPath("$.correctedSellerId").doesNotExist());
+
+        // The original Settlement row remains entirely unchanged by the correction.
+        var settlement = settlementRepository.findByAuctionId(f.auctionId()).orElseThrow();
+        assertThat(settlement.getStatus()).isEqualTo(SettlementStatus.PAYOUT_RECORDED);
+        assertThat(settlement.getAttestedPayoutAmount()).isEqualByComparingTo("970000.00");
+    }
+
+    @Test
+    @WithMockCustomUser(userId = 42L, roles = {"ADMIN"})
+    @DisplayName("Settlement correction: пустой reason -> 400")
+    void settlementCorrection_blankReason_400() throws Exception {
+        SettlementFixture f = waitingForPaymentWithSettlementPrerequisites(new BigDecimal("0.02"));
+        recordPaymentAndHandover(f.auctionId());
+        mockMvc.perform(post(base(f.auctionId()) + "/complete")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post(base(f.auctionId()) + "/settlement/corrections")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correctionType\": \"PAYOUT_INVALIDATED\", \"reason\": \"\", "
+                                + "\"idempotencyKey\": \"corr-key-4\"}"))
+                .andExpect(status().isBadRequest());
     }
 }

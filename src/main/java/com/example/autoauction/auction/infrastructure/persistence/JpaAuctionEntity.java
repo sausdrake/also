@@ -1,6 +1,7 @@
 package com.example.autoauction.auction.infrastructure.persistence;
 
 import com.example.autoauction.auction.domain.AuctionStatus;
+import com.example.autoauction.auction.domain.SaleFinalizationMethod;
 import jakarta.persistence.*;
 import lombok.extern.slf4j.Slf4j;
 
@@ -58,6 +59,14 @@ public class JpaAuctionEntity {
      */
     @Column(name = "seller_diagnostic_commitment_id")
     private Long sellerDiagnosticCommitmentId;
+
+    /**
+     * Step 2C: nullable discriminator - null only for historical auctions finalized before this
+     * column existed. Written exactly once by the domain's own current-value-guarded setter.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sale_finalization_method", length = 16)
+    private SaleFinalizationMethod saleFinalizationMethod;
 
     @Column(name = "start_time", nullable = false)
     private OffsetDateTime startTime;
@@ -147,6 +156,9 @@ public class JpaAuctionEntity {
 
     public Long getSellerDiagnosticCommitmentId() { return sellerDiagnosticCommitmentId; }
     public void setSellerDiagnosticCommitmentId(Long sellerDiagnosticCommitmentId) { this.sellerDiagnosticCommitmentId = sellerDiagnosticCommitmentId; }
+
+    public SaleFinalizationMethod getSaleFinalizationMethod() { return saleFinalizationMethod; }
+    public void setSaleFinalizationMethod(SaleFinalizationMethod saleFinalizationMethod) { this.saleFinalizationMethod = saleFinalizationMethod; }
 
     public OffsetDateTime getStartTime() { return startTime; }
     public void setStartTime(OffsetDateTime startTime) { this.startTime = startTime; }

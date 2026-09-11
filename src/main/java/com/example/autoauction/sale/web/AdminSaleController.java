@@ -13,7 +13,15 @@ import com.example.autoauction.sale.web.dto.FailRequest;
 import com.example.autoauction.sale.web.dto.HandoverEvidenceResponse;
 import com.example.autoauction.sale.web.dto.PaymentEvidenceResponse;
 import com.example.autoauction.sale.web.dto.PaymentRequest;
+import com.example.autoauction.sale.web.dto.RecordPayoutRequest;
 import com.example.autoauction.sale.web.dto.SaleResolutionResponse;
+import com.example.autoauction.sale.web.dto.SettlementCorrectionRequest;
+import com.example.autoauction.sale.web.dto.SettlementCorrectionResponse;
+import com.example.autoauction.sale.web.dto.SettlementResponse;
+import com.example.autoauction.settlement.application.SettlementService;
+import com.example.autoauction.settlement.domain.Settlement;
+import com.example.autoauction.settlement.domain.SettlementCorrection;
+import com.example.autoauction.settlement.domain.SettlementCorrectionType;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -57,13 +65,16 @@ public class AdminSaleController {
     private final PaymentEvidenceService paymentEvidenceService;
     private final HandoverEvidenceService handoverEvidenceService;
     private final SaleAdministrationService saleAdministrationService;
+    private final SettlementService settlementService;
 
     public AdminSaleController(PaymentEvidenceService paymentEvidenceService,
                               HandoverEvidenceService handoverEvidenceService,
-                              SaleAdministrationService saleAdministrationService) {
+                              SaleAdministrationService saleAdministrationService,
+                              SettlementService settlementService) {
         this.paymentEvidenceService = paymentEvidenceService;
         this.handoverEvidenceService = handoverEvidenceService;
         this.saleAdministrationService = saleAdministrationService;
+        this.settlementService = settlementService;
     }
 
     @PostMapping("/{auctionId}/payment")
@@ -116,6 +127,48 @@ public class AdminSaleController {
         SaleResolution resolution = saleAdministrationService.failSale(
                 auctionId, outcome, request.violationDefinitionIds(), request.reason(), adminId);
         return ResponseEntity.ok(SaleResolutionResponse.fromDomain(resolution));
+    }
+
+    @PostMapping("/{auctionId}/settlement/payout")
+    @Operation(summary = "Зафиксировать attestation физической выплаты продавцу (admin-witnessed, не проверяется системой)")
+    public ResponseEntity<SettlementResponse> recordSettlementPayout(
+            @Parameter(description = "ID аукциона", required = true) @PathVariable Long auctionId,
+            @Valid @RequestBody RecordPayoutRequest request,
+            @Parameter(hidden = true) @CurrentUser UserPrincipal currentUser
+    ) {
+        Long adminId = currentUser.getUserId();
+        log.info("Admin {} recording settlement payout for auction {}", adminId, auctionId);
+        Settlement settlement = settlementService.recordPayout(auctionId, request.attestedAmount(), adminId);
+        return ResponseEntity.ok(SettlementResponse.fromDomain(settlement));
+    }
+
+    @PostMapping("/{auctionId}/settlement/corrections")
+    @Operation(summary = "Зафиксировать корректировку Settlement (сумма/продавец/недействительность исходного payout)")
+    public ResponseEntity<SettlementCorrectionResponse> recordSettlementCorrection(
+            @Parameter(description = "ID аукциона", required = true) @PathVariable Long auctionId,
+            @Valid @RequestBody SettlementCorrectionRequest request,
+            @Parameter(hidden = true) @CurrentUser UserPrincipal currentUser
+    ) {
+        Long adminId = currentUser.getUserId();
+        SettlementCorrectionType type = parseCorrectionType(request.correctionType());
+        log.info("Admin {} recording settlement correction for auction {}: type={}", adminId, auctionId, type);
+        SettlementCorrection correction = settlementService.recordCorrection(auctionId, type,
+                request.correctedAmount(), request.correctedSellerId(), request.reason(), adminId,
+                request.idempotencyKey());
+        return ResponseEntity.status(HttpStatus.CREATED).body(SettlementCorrectionResponse.fromDomain(correction));
+    }
+
+    /**
+     * Parses the admin-selected correction type string. An unknown value is a 400 - this API
+     * never invents a fourth correction category.
+     */
+    private SettlementCorrectionType parseCorrectionType(String raw) {
+        try {
+            return SettlementCorrectionType.valueOf(raw.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Недопустимый correctionType: '" + raw
+                    + "'. Ожидается один из: AMOUNT_CORRECTION, SELLER_CORRECTION, PAYOUT_INVALIDATED");
+        }
     }
 
     /**

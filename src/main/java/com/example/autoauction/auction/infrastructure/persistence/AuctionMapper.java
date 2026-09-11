@@ -43,6 +43,7 @@ public class AuctionMapper {
         entity.setConfirmationDeadline(domain.getConfirmationDeadline());
         entity.setPolicyVersionId(domain.getPolicyVersionId());
         entity.setSellerDiagnosticCommitmentId(domain.getSellerDiagnosticCommitmentId());
+        entity.setSaleFinalizationMethod(domain.getSaleFinalizationMethod());
         return entity;
     }
 
@@ -87,6 +88,9 @@ public class AuctionMapper {
         // X3-C: pure field restoration, same discipline as policyVersionId above - no
         // commitment-module lookup, no re-resolution against Vehicle's current pointer.
         auction.setSellerDiagnosticCommitmentId(entity.getSellerDiagnosticCommitmentId());
+        // Step 2C: pure field restoration (including null, for historical auctions) - never
+        // inferred/backfilled here.
+        auction.setSaleFinalizationMethod(entity.getSaleFinalizationMethod());
         return auction;
     }
 }

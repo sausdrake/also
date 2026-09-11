@@ -71,6 +71,15 @@ public class Auction {
     private BigDecimal winningBid;
     private Integer totalBids;
 
+    /**
+     * Step 2C: persisted discriminator between an ordinary winning bid and a Buy Now sale -
+     * {@code null} for every historical auction finalized before this field existed (never
+     * backfilled, never inferred from price). Written exactly once, by
+     * {@link #setSaleFinalizationMethod(SaleFinalizationMethod)}, at the moment a winner is
+     * first determined (either branch of finalization) - never touched again afterward.
+     */
+    private SaleFinalizationMethod saleFinalizationMethod;
+
     private Long createdBy;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
@@ -219,6 +228,7 @@ public class Auction {
     public Long getWinnerId() { return winnerId; }
     public BigDecimal getWinningBid() { return winningBid; }
     public Integer getTotalBids() { return totalBids; }
+    public SaleFinalizationMethod getSaleFinalizationMethod() { return saleFinalizationMethod; }
     public Long getCreatedBy() { return createdBy; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }
@@ -368,6 +378,32 @@ public class Auction {
         }
         this.sellerDiagnosticCommitmentId = sellerDiagnosticCommitmentId;
         this.sellerDiagnosticCommitmentIdAssigned = true;
+        this.updatedAt = now();
+    }
+
+    /**
+     * Step 2C: write-once guard keyed on the CURRENT VALUE being non-null, not on a separate
+     * "has this setter ever been called" flag (unlike {@link #setSellerDiagnosticCommitmentId}).
+     * This is a deliberate difference, not an oversight: that field is assigned exactly once, at
+     * construction time, by a single call site with no reconstruction ever sharing the same
+     * instance. {@code saleFinalizationMethod} is different - every Auction instance passes
+     * through {@code AuctionMapper.toDomain()} first (restoring the persisted value, {@code null}
+     * for an auction not yet finalized), and THEN, on the very same in-memory instance, through
+     * {@code AuctionFinalizer.finalizeAuction()}/{@code finalizeWithBuyNow()} assigning the real
+     * value for the first time. A boolean-flag guard would reject that legitimate second call. A
+     * current-value guard handles both correctly: null-&gt;null (reconstructing a not-yet-finalized
+     * auction) and null-&gt;real-value (finalizing it) both succeed; any call once the value is
+     * already non-null - including an attempt to set it back to null - fails closed.
+     *
+     * @throws IllegalStateException if a non-null value is already assigned
+     */
+    public void setSaleFinalizationMethod(SaleFinalizationMethod saleFinalizationMethod) {
+        if (this.saleFinalizationMethod != null) {
+            throw new IllegalStateException(
+                    "saleFinalizationMethod — неизменяемый снимок, уже назначен (" +
+                    this.saleFinalizationMethod + "). Переназначение запрещено.");
+        }
+        this.saleFinalizationMethod = saleFinalizationMethod;
         this.updatedAt = now();
     }
 

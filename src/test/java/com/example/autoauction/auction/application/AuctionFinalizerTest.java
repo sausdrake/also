@@ -12,6 +12,7 @@ import com.example.autoauction.sale.application.SaleResolutionService;
 import com.example.autoauction.sale.domain.FinancialResolutionStatus;
 import com.example.autoauction.sale.domain.SaleResolution;
 import com.example.autoauction.sale.domain.SaleResolutionResult;
+import com.example.autoauction.settlement.application.SettlementService;
 import com.example.autoauction.vehicle.application.VehicleService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -65,6 +66,9 @@ class AuctionFinalizerTest {
 
     @Mock
     private SaleCommitmentResolutionOrchestrator saleCommitmentResolutionOrchestrator;
+
+    @Mock
+    private SettlementService settlementService;
 
     @InjectMocks
     private AuctionFinalizer auctionFinalizer;
@@ -350,12 +354,15 @@ class AuctionFinalizerTest {
                     .isEqualTo(AuctionStatus.SOLD);
             assertThat(waitingAuction.getStatus()).isEqualTo(AuctionStatus.SOLD);
 
-            InOrder inOrder = inOrder(saleResolutionService, vehicleService, depositService, auctionRepository);
+            InOrder inOrder = inOrder(saleResolutionService, vehicleService, depositService, auctionRepository,
+                    settlementService);
             inOrder.verify(saleResolutionService).createSuccess(waitingAuction.getId(), resolvedBy);
             inOrder.verify(vehicleService).markAsSold(vehicleId);
             inOrder.verify(depositService).releaseWinnerDeposit(winnerId, waitingAuction.getId());
             inOrder.verify(auctionRepository).save(waitingAuction);
             inOrder.verify(saleResolutionService).markFinancialResolutionDone(99L);
+            // Step 2C: Settlement creation is the last step, inside this same transaction.
+            inOrder.verify(settlementService).createPending(waitingAuction);
 
             // waitingAuction has no commitment (default null) - resolver must never be invoked.
             verifyNoInteractions(saleCommitmentResolutionOrchestrator);
@@ -371,11 +378,13 @@ class AuctionFinalizerTest {
 
             auctionFinalizer.completeSale(waitingAuction, resolvedBy);
 
-            InOrder inOrder = inOrder(depositService, saleCommitmentResolutionOrchestrator, auctionRepository, saleResolutionService);
+            InOrder inOrder = inOrder(depositService, saleCommitmentResolutionOrchestrator, auctionRepository,
+                    saleResolutionService, settlementService);
             inOrder.verify(depositService).releaseWinnerDeposit(winnerId, waitingAuction.getId());
             inOrder.verify(saleCommitmentResolutionOrchestrator).resolve(555L, FinalizationOutcome.A);
             inOrder.verify(auctionRepository).save(waitingAuction);
             inOrder.verify(saleResolutionService).markFinancialResolutionDone(99L);
+            inOrder.verify(settlementService).createPending(waitingAuction);
         }
 
         @Test
@@ -392,6 +401,7 @@ class AuctionFinalizerTest {
             verifyNoInteractions(saleCommitmentResolutionOrchestrator);
             verify(auctionRepository, never()).save(any());
             verify(saleResolutionService, never()).markFinancialResolutionDone(any());
+            verifyNoInteractions(settlementService);
         }
 
         @Test
@@ -409,6 +419,7 @@ class AuctionFinalizerTest {
             verify(depositService, times(1)).releaseWinnerDeposit(winnerId, waitingAuction.getId());
             verify(auctionRepository, never()).save(any());
             verify(saleResolutionService, never()).markFinancialResolutionDone(any());
+            verifyNoInteractions(settlementService);
         }
 
         @Test
@@ -425,6 +436,7 @@ class AuctionFinalizerTest {
             verifyNoInteractions(saleResolutionService);
             verifyNoInteractions(vehicleService);
             verify(auctionRepository, never()).save(any());
+            verifyNoInteractions(settlementService);
         }
 
         @Test
@@ -441,6 +453,7 @@ class AuctionFinalizerTest {
             verifyNoInteractions(saleResolutionService);
             verifyNoInteractions(vehicleService);
             verify(auctionRepository, never()).save(any());
+            verifyNoInteractions(settlementService);
         }
 
         @Test
@@ -461,6 +474,7 @@ class AuctionFinalizerTest {
             assertThat(waitingAuction.getStatus()).isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
             verifyNoInteractions(vehicleService, saleCommitmentResolutionOrchestrator);
             verify(auctionRepository, never()).save(any());
+            verifyNoInteractions(settlementService);
         }
 
         @Test
@@ -486,6 +500,7 @@ class AuctionFinalizerTest {
             assertThat(waitingAuction.getStatus()).isEqualTo(AuctionStatus.SOLD);
             verify(auctionRepository, never()).save(any());
             verifyNoInteractions(depositService, saleCommitmentResolutionOrchestrator);
+            verifyNoInteractions(settlementService);
         }
     }
 

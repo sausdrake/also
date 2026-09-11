@@ -3,6 +3,7 @@ package com.example.autoauction.auction.application;
 
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
+import com.example.autoauction.auction.domain.SaleFinalizationMethod;
 import com.example.autoauction.auction.domain.port.AuctionParticipantRepository;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.auction.web.AuctionWebSocketController;
@@ -12,6 +13,7 @@ import com.example.autoauction.notification.application.NotificationService;
 import com.example.autoauction.policy.application.PolicyVersionService;
 import com.example.autoauction.sale.application.SaleResolutionService;
 import com.example.autoauction.sale.domain.SaleResolution;
+import com.example.autoauction.settlement.application.SettlementService;
 import com.example.autoauction.vehicle.application.VehicleService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,6 +38,7 @@ public class AuctionFinalizer {
     private final VehicleService vehicleService;
     private final SaleResolutionService saleResolutionService;
     private final SaleCommitmentResolutionOrchestrator saleCommitmentResolutionOrchestrator;
+    private final SettlementService settlementService;
 
     public AuctionFinalizer(AuctionRepository auctionRepository,
                             DepositService depositService,
@@ -46,7 +49,8 @@ public class AuctionFinalizer {
                             PolicyVersionService policyVersionService,
                             VehicleService vehicleService,
                             SaleResolutionService saleResolutionService,
-                            SaleCommitmentResolutionOrchestrator saleCommitmentResolutionOrchestrator) {
+                            SaleCommitmentResolutionOrchestrator saleCommitmentResolutionOrchestrator,
+                            SettlementService settlementService) {
         this.auctionRepository = auctionRepository;
         this.depositService = depositService;
         this.participantRepository = participantRepository;
@@ -57,6 +61,7 @@ public class AuctionFinalizer {
         this.vehicleService = vehicleService;
         this.saleResolutionService = saleResolutionService;
         this.saleCommitmentResolutionOrchestrator = saleCommitmentResolutionOrchestrator;
+        this.settlementService = settlementService;
     }
 
     /**
@@ -122,6 +127,9 @@ public class AuctionFinalizer {
                 finalStatus = AuctionStatus.WAITING_FOR_PAYMENT;
                 winnerId = auction.getWinnerId();
                 winningBid = auction.getWinningBid();
+                // Step 2C: winner determined through ordinary competitive bidding - the Buy Now
+                // discriminator Settlement creation later depends on.
+                auction.setSaleFinalizationMethod(SaleFinalizationMethod.ORDINARY_BID);
 
                 log.info("Auction {} finished bidding with a winner, awaiting payment confirmation. Winner: {}, Winning bid: {}",
                         auction.getId(), winnerId, winningBid);
@@ -325,8 +333,15 @@ public class AuctionFinalizer {
 
         // X3-D: financialResolutionStatus now reflects that every financial consequence this
         // slice owns (buyer deposit + commitment, if any) has succeeded within this same
-        // transaction.
+        // transaction. Step 2C's Settlement is a separate, later-owned financial consequence -
+        // this status is never reinterpreted as seller-payout completion.
         saleResolutionService.markFinancialResolutionDone(resolution.getId());
+
+        // Step 2C: the PENDING Settlement is created atomically in this same transaction - no
+        // Auction.SOLD may ever commit without its required Settlement. Every precondition this
+        // call cannot establish (missing Buy Now discriminator, missing seller-commitment
+        // snapshot, missing policy snapshot) fails closed, rolling back this entire transaction.
+        settlementService.createPending(auction);
 
         log.info("Auction {} sale completed, vehicle {} marked SOLD", auction.getId(), auction.getVehicleId());
         return resolution;
@@ -396,6 +411,9 @@ public class AuctionFinalizer {
         auction.setWinnerId(winnerId);
         auction.setWinningBid(buyNowAmount);
         auction.setCurrentPrice(buyNowAmount);
+        // Step 2C: winner determined through Buy Now - the Buy Now discriminator Settlement
+        // creation later depends on.
+        auction.setSaleFinalizationMethod(SaleFinalizationMethod.BUY_NOW);
         auction.setUpdatedAt(now());
 
         auctionRepository.save(auction);

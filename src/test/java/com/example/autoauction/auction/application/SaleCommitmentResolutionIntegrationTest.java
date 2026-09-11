@@ -220,6 +220,16 @@ class SaleCommitmentResolutionIntegrationTest {
             auction.setWinningBid(winningBid);
             if (commitmentId != null) {
                 auction.setSellerDiagnosticCommitmentId(commitmentId);
+                // Step 2C: SettlementService.createPending requires both a policyVersionId and
+                // the Buy Now discriminator, in addition to the commitment snapshot this test
+                // class already wires - deliberately a SEPARATE, freshly-published PolicyVersion
+                // from whichever one approveAndGetVehicleWithCommitment snapshotted onto the
+                // SellerDiagnosticCommitment itself (the two are independent by design, never
+                // synchronized).
+                Long auctionPolicyVersionId = policyVersionService.create(new BigDecimal("0.02"), 1L).getId();
+                policyVersionService.publish(auctionPolicyVersionId);
+                auction.setPolicyVersionId(auctionPolicyVersionId);
+                auction.setSaleFinalizationMethod(com.example.autoauction.auction.domain.SaleFinalizationMethod.ORDINARY_BID);
             }
             return auctionRepository.save(auction).getId();
         });

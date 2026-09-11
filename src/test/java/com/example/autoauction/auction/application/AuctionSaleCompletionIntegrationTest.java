@@ -3,8 +3,14 @@ package com.example.autoauction.auction.application;
 
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
+import com.example.autoauction.auction.domain.SaleFinalizationMethod;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.deposit.application.DepositService;
+import com.example.autoauction.diagnostic.commitment.application.SellerDiagnosticCommitmentService;
+import com.example.autoauction.diagnostic.commitment.domain.port.SellerDiagnosticCommitmentRepository;
+import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
+import com.example.autoauction.diagnostic.domain.port.DiagnosticRequestRepository;
+import com.example.autoauction.policy.application.PolicyVersionService;
 import com.example.autoauction.sale.application.HandoverEvidenceService;
 import com.example.autoauction.sale.application.PaymentEvidenceService;
 import com.example.autoauction.sale.domain.HandoverEvidence;
@@ -12,10 +18,17 @@ import com.example.autoauction.sale.domain.PaymentEvidence;
 import com.example.autoauction.sale.domain.port.HandoverEvidenceRepository;
 import com.example.autoauction.sale.domain.port.PaymentEvidenceRepository;
 import com.example.autoauction.sale.domain.port.SaleResolutionRepository;
+import com.example.autoauction.settlement.domain.port.SettlementRepository;
+import com.example.autoauction.user.domain.Role;
+import com.example.autoauction.user.domain.User;
+import com.example.autoauction.user.domain.port.RoleRepository;
+import com.example.autoauction.user.domain.port.UserRepository;
 import com.example.autoauction.vehicle.domain.Vehicle;
 import com.example.autoauction.vehicle.domain.VehicleStatus;
 import com.example.autoauction.vehicle.domain.VehicleType;
 import com.example.autoauction.vehicle.domain.port.VehicleRepository;
+
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -84,6 +97,21 @@ class AuctionSaleCompletionIntegrationTest {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
+    @Autowired
+    private SettlementRepository settlementRepository;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private RoleRepository roleRepository;
+    @Autowired
+    private DiagnosticRequestRepository diagnosticRequestRepository;
+    @Autowired
+    private SellerDiagnosticCommitmentRepository sellerDiagnosticCommitmentRepository;
+    @Autowired
+    private SellerDiagnosticCommitmentService sellerDiagnosticCommitmentService;
+    @Autowired
+    private PolicyVersionService policyVersionService;
+
     private final Long resolvedBy = 1L;
 
     private TransactionTemplate txTemplate() {
@@ -123,6 +151,61 @@ class AuctionSaleCompletionIntegrationTest {
             OffsetDateTime now = OffsetDateTime.now();
             Auction auction = new Auction(vehicleId, new BigDecimal("1000000"), null, null,
                     new BigDecimal("10000"), now.minusDays(7), now.minusHours(1), 10L);
+            auction.setStatus(AuctionStatus.WAITING_FOR_PAYMENT);
+            auction.setWinnerId(winnerId);
+            auction.setWinningBid(winningBid);
+            return auctionRepository.save(auction).getId();
+        });
+    }
+
+    /**
+     * Step 2C: same as {@link #createWaitingForPaymentAuction}, but wires the full seller-
+     * identity/policy/discriminator chain {@code SettlementService.createPending} requires to
+     * avoid failing closed - used only by the tests that need {@code completeSale} to actually
+     * reach SOLD (T1/T10/T11); every other test in this class fails before ever reaching
+     * Settlement creation and is left on the plain helper, unchanged.
+     */
+    private Long createSettlementCapableWaitingForPaymentAuction(TransactionTemplate txTemplate, Long vehicleId,
+                                                                   Long winnerId, BigDecimal winningBid) {
+        return txTemplate.execute(status -> {
+            Role userRole = roleRepository.findByName("ROLE_USER")
+                    .orElseGet(() -> roleRepository.save(new Role(null, "ROLE_USER", "Обычный пользователь")));
+            User seller = new User(null, "x2settle" + System.nanoTime(), "x2settle" + System.nanoTime() + "@test.com",
+                    "encoded", true, Set.of(userRole));
+            Long sellerId = userRepository.save(seller).getId();
+            depositService.createDeposit(sellerId, new BigDecimal("50000"));
+
+            DiagnosticRequest request = new DiagnosticRequest();
+            request.setUserId(sellerId);
+            request.setBrand("Toyota");
+            request.setModel("Camry");
+            request.setYear(2020);
+            request.setVin(shortVin("X2S"));
+            request.setDepositFrozen(new BigDecimal("10000"));
+            request.setStatus(DiagnosticRequest.DiagnosticRequestStatus.PENDING);
+            request.setCreatedAt(OffsetDateTime.now());
+            request.setUpdatedAt(OffsetDateTime.now());
+            Long diagnosticRequestId = diagnosticRequestRepository.save(request).getId();
+
+            // freezeCommitment() snapshots whatever PolicyVersion is currently published - the
+            // publish must happen first so that snapshot matches the policyVersionId below.
+            Long policyVersionId = policyVersionService.create(new BigDecimal("0.02"), 1L).getId();
+            policyVersionService.publish(policyVersionId);
+
+            sellerDiagnosticCommitmentService.freezeCommitment(sellerId, diagnosticRequestId,
+                    new BigDecimal("10000"), new BigDecimal("4000"));
+            // AuctionFinalizer.completeSale() also resolves Outcome A for this commitment (X3-D,
+            // pre-existing, unrelated to Step 2C) - it requires AWAITING_FINALIZATION.
+            sellerDiagnosticCommitmentRepository.markAwaitingFinalization(diagnosticRequestId);
+            Long commitmentId = sellerDiagnosticCommitmentRepository.findByDiagnosticRequestId(diagnosticRequestId)
+                    .orElseThrow().getId();
+
+            OffsetDateTime now = OffsetDateTime.now();
+            Auction auction = new Auction(vehicleId, new BigDecimal("1000000"), new BigDecimal("1000000"), null,
+                    new BigDecimal("10000"), now.minusDays(7), now.minusHours(1), 10L);
+            auction.setPolicyVersionId(policyVersionId);
+            auction.setSellerDiagnosticCommitmentId(commitmentId);
+            auction.setSaleFinalizationMethod(SaleFinalizationMethod.ORDINARY_BID);
             auction.setStatus(AuctionStatus.WAITING_FOR_PAYMENT);
             auction.setWinnerId(winnerId);
             auction.setWinningBid(winningBid);
@@ -196,7 +279,7 @@ class AuctionSaleCompletionIntegrationTest {
         TransactionTemplate txTemplate = txTemplate();
         Long vehicleId = createInAuctionVehicle(txTemplate);
         BigDecimal winningBid = new BigDecimal("1020000.00");
-        Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
+        Long auctionId = createSettlementCapableWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
         recordValidEvidence(txTemplate, auctionId, vehicleId, 100L, winningBid);
         ensureWinnerHasFrozenDeposit(100L, auctionId);
 
@@ -215,6 +298,11 @@ class AuctionSaleCompletionIntegrationTest {
         // has no commitment) succeeds. Pre-X3-D this stayed PENDING forever; that was always
         // documented as "no future slice has moved it yet", not a permanent invariant.
         assertThat(resolution.orElseThrow().getFinancialResolutionStatus().name()).isEqualTo("DONE");
+
+        // Step 2C: the same transaction also durably creates the Settlement side-effect.
+        var settlement = txTemplate.execute(status -> settlementRepository.findByAuctionId(auctionId));
+        assertThat(settlement).isPresent();
+        assertThat(settlement.orElseThrow().getExpectedBuyerPaidAmount()).isEqualByComparingTo(winningBid);
     }
 
     // ==================== T2/T3: missing evidence ====================
@@ -400,7 +488,7 @@ class AuctionSaleCompletionIntegrationTest {
         TransactionTemplate txTemplate = txTemplate();
         Long vehicleId = createInAuctionVehicle(txTemplate);
         BigDecimal winningBid = new BigDecimal("1020000.00");
-        Long auctionId = createWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
+        Long auctionId = createSettlementCapableWaitingForPaymentAuction(txTemplate, vehicleId, 100L, winningBid);
         recordValidEvidence(txTemplate, auctionId, vehicleId, 100L, winningBid);
         ensureWinnerHasFrozenDeposit(100L, auctionId);
 
@@ -425,7 +513,7 @@ class AuctionSaleCompletionIntegrationTest {
         TransactionTemplate setupTx = txTemplate();
         Long vehicleId = createInAuctionVehicle(setupTx);
         BigDecimal winningBid = new BigDecimal("1020000.00");
-        Long auctionId = createWaitingForPaymentAuction(setupTx, vehicleId, 100L, winningBid);
+        Long auctionId = createSettlementCapableWaitingForPaymentAuction(setupTx, vehicleId, 100L, winningBid);
         recordValidEvidence(setupTx, auctionId, vehicleId, 100L, winningBid);
         ensureWinnerHasFrozenDeposit(100L, auctionId);
 
