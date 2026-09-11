@@ -12,10 +12,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -92,20 +88,10 @@ public class AdminUserController {
         return ResponseEntity.ok(UserDto.from(userService.setUserRole(id, roleName)));
     }
 
-    @PostMapping("/{id}/deposit/adjust")
-    @Operation(summary = "Ручная корректировка депозита пользователя (положительная — пополнение, отрицательная — списание)")
-    public ResponseEntity<DepositResponse> adjustDeposit(
-            @PathVariable Long id,
-            @Valid @RequestBody AdjustDepositRequest body
-    ) {
-        return ResponseEntity.ok(depositService.adminAdjust(id, body.amount(), body.comment(), body.idempotencyKey()));
-    }
-
-    record AdjustDepositRequest(
-            @NotNull(message = "Сумма обязательна") BigDecimal amount,
-            @NotBlank(message = "Комментарий обязателен") String comment,
-            @NotBlank(message = "Ключ идемпотентности обязателен") String idempotencyKey
-    ) {}
+    // Slice 2 · Step 2A: the duplicate admin-adjust route previously hosted here has been removed.
+    // The single canonical endpoint is POST /api/v1/admin/deposits/{userId}/adjust
+    // (AdminDepositController.adjustDeposit). A fresh repository-wide search confirmed zero
+    // remaining callers of this route (frontend and backend) before removal.
 
     @GetMapping("/{id}/deposit")
     @Operation(summary = "Баланс депозита пользователя")

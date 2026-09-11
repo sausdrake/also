@@ -2,6 +2,7 @@
 package com.example.autoauction.deposit.application;
 
 import com.example.autoauction.common.application.FailedOperationService;
+import com.example.autoauction.deposit.domain.AdminAdjustmentReason;
 import com.example.autoauction.deposit.domain.Deposit;
 import com.example.autoauction.deposit.domain.DepositTransaction;
 import com.example.autoauction.deposit.domain.FreezeReason;
@@ -795,12 +796,30 @@ public class DepositService {
                         "Убедитесь, что аукцион завершён и пользователь является победителем."));
     }
 
-    static final BigDecimal MAX_ADJUST_AMOUNT = new BigDecimal("99999999");
+    /** Slice 2 · Step 2A hardening: replaces the previous, un-hardened {@code 99_999_999} cap. */
+    static final BigDecimal MAX_ADJUST_AMOUNT = new BigDecimal("500000");
 
+    /**
+     * Slice 2 · Step 2A: the single canonical administrative deposit-correction operation.
+     * Supports both credit (positive) and debit (negative) adjustments through this one method -
+     * deliberately not split into separate endpoints/primitives (CHARGEBACK/SUPPORT_CORRECTION
+     * inherently need debit capability; splitting would reopen the multi-endpoint problem this
+     * hardening exists to close).
+     *
+     * @param actingAdminId the authenticated admin performing this adjustment - NEVER supplied by
+     *                       the client; the caller (the canonical controller) must derive it from
+     *                       the security context. Required non-null for every new row this method
+     *                       creates (the {@code performed_by_admin_id} column itself stays
+     *                       nullable for historical-row compatibility, per V42's own design).
+     */
     @Transactional
-    public DepositResponse adminAdjust(Long targetUserId, BigDecimal amount, String comment, String idempotencyKey) {
-        if (comment == null || comment.isBlank()) {
-            throw new IllegalArgumentException("Комментарий к корректировке обязателен");
+    public DepositResponse adminAdjust(Long targetUserId, BigDecimal amount, AdminAdjustmentReason reason,
+                                       String reference, String idempotencyKey, Long actingAdminId) {
+        if (reason == null) {
+            throw new IllegalArgumentException("Причина корректировки обязательна");
+        }
+        if (reference == null || reference.isBlank()) {
+            throw new IllegalArgumentException("Ссылка (reference) обязательна для корректировки депозита");
         }
         if (amount == null) {
             throw new IllegalArgumentException("Сумма корректировки не может быть null");
@@ -821,20 +840,39 @@ public class DepositService {
             throw new IllegalArgumentException(
                     "Ключ идемпотентности обязателен для административной корректировки депозита");
         }
+        if (actingAdminId == null) {
+            throw new IllegalArgumentException("Не удалось определить администратора, выполняющего корректировку");
+        }
+
+        // Slice 2 Phase 2 lock (§11/§15/§27): a RECONCILIATION adjustment must never duplicate an
+        // automatic payment credit already recorded for the payment this adjustment references.
+        // Treated as a fully opaque idempotency-key probe - this module never parses, validates,
+        // or interprets the "PAYMENT:" convention; it only asks "does a ledger row already exist
+        // for this exact key", using the SAME existing port method adminAdjust's own idempotency
+        // check already uses. No payment.* dependency is introduced by this check.
+        if (reason == AdminAdjustmentReason.RECONCILIATION
+                && depositRepository.findTransactionByIdempotencyKey(reference).isPresent()) {
+            throw new IllegalStateException(
+                    "Корректировка отклонена: по ссылке '" + reference + "' уже существует зачисление " +
+                    "в депозитном реестре — повторное зачисление приведёт к задвоению средств");
+        }
 
         Optional<DepositTransaction> existing = depositRepository.findTransactionByIdempotencyKey(idempotencyKey);
         if (existing.isPresent()) {
             DepositTransaction prev = existing.get();
-            // Follow-up item 2: a key match alone is not enough - verify the replay is for
-            // the SAME operation (same target user, same signed amount, same type), not just
-            // a key collision with a different mutation silently returning stale state.
+            // Follow-up item 2 (pre-existing) + Step 2A: a key match alone is not enough - verify
+            // the replay is for the SAME operation (same target user, same signed amount, same
+            // type, same reason, same reference), not just a key collision with a different
+            // mutation silently returning stale state.
             boolean sameFingerprint = prev.getUserId().equals(targetUserId)
                     && prev.getType() == DepositTransaction.TransactionType.ADMIN_ADJUSTMENT
-                    && prev.getAmount().compareTo(amount) == 0;
+                    && prev.getAmount().compareTo(amount) == 0
+                    && reason.name().equals(prev.getDescription())
+                    && reference.equals(prev.getReference());
             if (!sameFingerprint) {
                 throw new IllegalStateException(
                         "Ключ идемпотентности '" + idempotencyKey + "' уже использован для другой операции " +
-                        "(другая сумма, пользователь или тип операции)");
+                        "(другая сумма, пользователь, причина, ссылка или тип операции)");
             }
             log.info("Idempotent replay of admin adjustment for key '{}', target user {}. No new mutation applied.",
                     idempotencyKey, targetUserId);
@@ -849,7 +887,8 @@ public class DepositService {
         if (amount.compareTo(BigDecimal.ZERO) > 0) {
             deposit.deposit(amount);
         } else {
-            // Отрицательная корректировка — списание. withdraw проверяет availableBalance.
+            // Отрицательная корректировка — списание. withdraw проверяет availableBalance, то есть
+            // не допускает ни отрицательный доступный баланс, ни списание замороженного залога.
             deposit.withdraw(amount.negate());
         }
 
@@ -857,16 +896,74 @@ public class DepositService {
                 deposit.getId(), targetUserId,
                 DepositTransaction.TransactionType.ADMIN_ADJUSTMENT,
                 amount, balanceBefore, deposit.getBalance(),
-                "ADMIN_ADJUSTMENT", comment
+                reference, reason.name()
         );
         tx.setIdempotencyKey(idempotencyKey);
+        tx.setPerformedByAdminId(actingAdminId);
         // Уникальность idempotency_key обеспечена на уровне БД (частичный уникальный индекс);
         // конкурентный дубликат с тем же ключом завершится DataIntegrityViolationException
         // и полным откатом транзакции — повторного зачисления не произойдёт.
         depositRepository.saveTransaction(tx);
         Deposit saved = depositRepository.save(deposit);
-        log.info("Admin adjusted deposit for user {}: amount={}, comment={}, idempotencyKey={}",
-                targetUserId, amount, comment, idempotencyKey);
+        log.info("Admin adjusted deposit for user {}: amount={}, reason={}, reference={}, actingAdminId={}, idempotencyKey={}",
+                targetUserId, amount, reason, reference, actingAdminId, idempotencyKey);
+        return DepositResponse.fromDomain(saved);
+    }
+
+    /**
+     * Slice 2 · Step 2A: the narrow deposit-side primitive the future payment application layer
+     * (Step 2D) will use to credit a deposit once a {@code Payment} is confirmed - WITHOUT this
+     * method or this class ever depending on anything from {@code payment.*}. Plain
+     * {@code @Transactional} (REQUIRED, the default) deliberately - this must participate in the
+     * CALLER's own physical transaction (the future canonical confirmation operation), never open
+     * an independent one, so that the ledger write and the caller's own Payment-status/event writes
+     * commit or roll back together. Never populates {@code performedByAdminId} (there is no human
+     * admin actor for an automatic credit) and never uses {@code TransactionType.ADMIN_ADJUSTMENT}.
+     */
+    @Transactional
+    public DepositResponse creditFromPayment(DepositCreditCommand command) {
+        Optional<DepositTransaction> existing =
+                depositRepository.findTransactionByIdempotencyKey(command.ledgerIdempotencyKey());
+        if (existing.isPresent()) {
+            DepositTransaction prev = existing.get();
+            // The idempotency key is globally unique, so a collision is NOT by itself proof of a
+            // safe replay - it could be a different operation that happens to share the key
+            // (client/provider bug, key-reuse, or a row belonging to someone else entirely). Every
+            // field of the operation's fingerprint must match exactly before this is treated as a
+            // no-op; any mismatch is a conflict, never a silent "return someone else's deposit".
+            boolean sameFingerprint = prev.getUserId().equals(command.userId())
+                    && prev.getType() == DepositTransaction.TransactionType.PAYMENT_CREDIT
+                    && prev.getAmount().compareTo(command.amount()) == 0
+                    && command.ledgerReference().equals(prev.getReference())
+                    && command.ledgerIdempotencyKey().equals(prev.getIdempotencyKey());
+            if (!sameFingerprint) {
+                throw new IllegalStateException(
+                        "Ключ идемпотентности '" + command.ledgerIdempotencyKey() + "' уже использован для другой операции " +
+                        "(другой пользователь, сумма, ссылка или тип операции) - автоматическое зачисление отклонено");
+            }
+            log.info("Idempotent replay of automatic payment credit for key '{}', user {}. No new mutation applied.",
+                    command.ledgerIdempotencyKey(), command.userId());
+            return getDepositByUserId(command.userId());
+        }
+
+        Deposit deposit = depositRepository.findByUserId(command.userId())
+                .orElseThrow(() -> new IllegalArgumentException("Депозит не найден для пользователя: " + command.userId()));
+
+        BigDecimal balanceBefore = deposit.getBalance();
+        deposit.deposit(command.amount());
+
+        DepositTransaction tx = new DepositTransaction(
+                deposit.getId(), command.userId(),
+                DepositTransaction.TransactionType.PAYMENT_CREDIT,
+                command.amount(), balanceBefore, deposit.getBalance(),
+                command.ledgerReference(), "Автоматическое зачисление по платежу"
+        );
+        tx.setIdempotencyKey(command.ledgerIdempotencyKey());
+        // performedByAdminId intentionally left null - no human admin actor for an automatic credit.
+        depositRepository.saveTransaction(tx);
+        Deposit saved = depositRepository.save(deposit);
+        log.info("Automatic payment credit applied for user {}: amount={}, reference={}, idempotencyKey={}",
+                command.userId(), command.amount(), command.ledgerReference(), command.ledgerIdempotencyKey());
         return DepositResponse.fromDomain(saved);
     }
 }

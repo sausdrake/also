@@ -58,6 +58,7 @@ public class DepositMapper {
                 domain.getDescription()
         );
         entity.setIdempotencyKey(domain.getIdempotencyKey());
+        entity.setPerformedByAdminId(domain.getPerformedByAdminId());
         return entity;
     }
 
@@ -78,6 +79,7 @@ public class DepositMapper {
         transaction.setAuctionId(entity.getAuctionId());
         transaction.setIdempotencyKey(entity.getIdempotencyKey());
         transaction.setCreatedAt(entity.getCreatedAt());
+        transaction.setPerformedByAdminId(entity.getPerformedByAdminId());
 
         return transaction;
     }

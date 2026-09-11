@@ -1,6 +1,7 @@
 // deposit/application/IdempotencyConcurrencyIntegrationTest.java
 package com.example.autoauction.deposit.application;
 
+import com.example.autoauction.deposit.domain.AdminAdjustmentReason;
 import com.example.autoauction.deposit.domain.Deposit;
 import com.example.autoauction.deposit.domain.DepositTransaction;
 import com.example.autoauction.deposit.domain.port.DepositRepository;
@@ -102,7 +103,8 @@ class IdempotencyConcurrencyIntegrationTest {
         AtomicReference<Throwable> errB = new AtomicReference<>();
 
         Runnable op = () -> {
-            depositService.adminAdjust(userId, amount, "конкурентная корректировка", key);
+            depositService.adminAdjust(userId, amount, AdminAdjustmentReason.OTHER,
+                    "CONCURRENT-TEST", key, 999L);
             successCount.incrementAndGet();
         };
         runConcurrently(op, op, errA, errB);

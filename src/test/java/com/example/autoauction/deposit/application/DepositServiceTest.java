@@ -56,6 +56,7 @@ class DepositServiceTest {
     private final BigDecimal withdrawAmount = new BigDecimal("30000");
     private final BigDecimal zero = BigDecimal.ZERO;
     private final BigDecimal negativeAmount = new BigDecimal("-1000");
+    private final Long adminActorId = 999L;
 
     @BeforeEach
     void setUp() {
@@ -591,7 +592,7 @@ class DepositServiceTest {
     // ==================== ADMIN ADJUST TESTS ====================
 
     @Nested
-    @DisplayName("Административная корректировка депозита")
+    @DisplayName("Административная корректировка депозита (Slice 2 · Step 2A)")
     class AdminAdjustTests {
 
         @Test
@@ -603,7 +604,8 @@ class DepositServiceTest {
             when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
 
             BigDecimal topUp = new BigDecimal("5000");
-            depositService.adminAdjust(userId, topUp, "тест пополнение", "key-1");
+            depositService.adminAdjust(userId, topUp, AdminAdjustmentReason.SUPPORT_CORRECTION,
+                    "TICKET-1", "key-1", adminActorId);
 
             ArgumentCaptor<Deposit> cap = ArgumentCaptor.forClass(Deposit.class);
             verify(depositRepository).save(cap.capture());
@@ -619,7 +621,8 @@ class DepositServiceTest {
             when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
 
             BigDecimal deduction = new BigDecimal("-10000");
-            depositService.adminAdjust(userId, deduction, "возврат за ошибку", "key-2");
+            depositService.adminAdjust(userId, deduction, AdminAdjustmentReason.CHARGEBACK,
+                    "TICKET-2", "key-2", adminActorId);
 
             ArgumentCaptor<Deposit> cap = ArgumentCaptor.forClass(Deposit.class);
             verify(depositRepository).save(cap.capture());
@@ -628,65 +631,148 @@ class DepositServiceTest {
         }
 
         @Test
-        @DisplayName("Отрицательная корректировка больше доступного баланса — исключение")
+        @DisplayName("Отрицательная корректировка больше доступного баланса — исключение (залог не списывается)")
         void adminAdjust_NegativeExceedsBalance_Throws() {
             when(depositRepository.findTransactionByIdempotencyKey(any())).thenReturn(Optional.empty());
             when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
 
-            BigDecimal tooMuch = new BigDecimal("-999999");
+            BigDecimal tooMuch = new BigDecimal("-499999");
             assertThrows(IllegalStateException.class,
-                    () -> depositService.adminAdjust(userId, tooMuch, "удаление", "key-3"));
+                    () -> depositService.adminAdjust(userId, tooMuch, AdminAdjustmentReason.OTHER,
+                            "TICKET-3", "key-3", adminActorId));
+        }
+
+        @Test
+        @DisplayName("Отрицательная корректировка не может списать замороженный залог")
+        void adminAdjust_CannotClawBackFrozenCollateral() {
+            when(depositRepository.findTransactionByIdempotencyKey(any())).thenReturn(Optional.empty());
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
+
+            // depositWithBlocked: баланс=depositAmount, заморожено=requiredDeposit; доступно = depositAmount-requiredDeposit.
+            BigDecimal moreThanAvailable = depositAmount.subtract(requiredDeposit).add(BigDecimal.ONE).negate();
+            assertThrows(IllegalStateException.class,
+                    () -> depositService.adminAdjust(userId, moreThanAvailable, AdminAdjustmentReason.OTHER,
+                            "TICKET-4", "key-4a", adminActorId));
         }
 
         @Test
         @DisplayName("Нулевая корректировка — IllegalArgumentException")
         void adminAdjust_ZeroAmount_Throws() {
             assertThrows(IllegalArgumentException.class,
-                    () -> depositService.adminAdjust(userId, BigDecimal.ZERO, "ноль", null));
+                    () -> depositService.adminAdjust(userId, BigDecimal.ZERO, AdminAdjustmentReason.OTHER,
+                            "TICKET-5", "key-5", adminActorId));
         }
 
         @Test
         @DisplayName("Null сумма — IllegalArgumentException")
         void adminAdjust_NullAmount_Throws() {
             assertThrows(IllegalArgumentException.class,
-                    () -> depositService.adminAdjust(userId, null, "комментарий", null));
+                    () -> depositService.adminAdjust(userId, null, AdminAdjustmentReason.OTHER,
+                            "TICKET-6", "key-6", adminActorId));
         }
 
         @Test
-        @DisplayName("Пустой комментарий — IllegalArgumentException")
-        void adminAdjust_BlankComment_Throws() {
+        @DisplayName("Null причина — IllegalArgumentException")
+        void adminAdjust_NullReason_Throws() {
             assertThrows(IllegalArgumentException.class,
-                    () -> depositService.adminAdjust(userId, new BigDecimal("1000"), "  ", null));
+                    () -> depositService.adminAdjust(userId, new BigDecimal("1000"), null,
+                            "TICKET-7", "key-7", adminActorId));
+            verifyNoInteractions(depositRepository);
         }
 
         @Test
-        @DisplayName("Null комментарий — IllegalArgumentException")
-        void adminAdjust_NullComment_Throws() {
+        @DisplayName("Пустая ссылка (reference) — IllegalArgumentException")
+        void adminAdjust_BlankReference_Throws() {
             assertThrows(IllegalArgumentException.class,
-                    () -> depositService.adminAdjust(userId, new BigDecimal("1000"), null, null));
+                    () -> depositService.adminAdjust(userId, new BigDecimal("1000"), AdminAdjustmentReason.OTHER,
+                            "  ", "key-8", adminActorId));
         }
 
         @Test
-        @DisplayName("Превышение MAX_ADJUST_AMOUNT — IllegalArgumentException")
+        @DisplayName("Null ссылка (reference) — IllegalArgumentException")
+        void adminAdjust_NullReference_Throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> depositService.adminAdjust(userId, new BigDecimal("1000"), AdminAdjustmentReason.OTHER,
+                            null, "key-9", adminActorId));
+        }
+
+        @Test
+        @DisplayName("Превышение 500 000 — IllegalArgumentException")
         void adminAdjust_ExceedsMaxAmount_Throws() {
             BigDecimal over = DepositService.MAX_ADJUST_AMOUNT.add(BigDecimal.ONE);
             assertThrows(IllegalArgumentException.class,
-                    () -> depositService.adminAdjust(userId, over, "слишком много", null));
+                    () -> depositService.adminAdjust(userId, over, AdminAdjustmentReason.OTHER,
+                            "TICKET-10", "key-10", adminActorId));
         }
 
         @Test
-        @DisplayName("Транзакция типа ADMIN_ADJUSTMENT записывается")
-        void adminAdjust_SavesAdjustmentTransaction() {
+        @DisplayName("Превышение 500 000 по модулю для отрицательной суммы — IllegalArgumentException")
+        void adminAdjust_ExceedsMaxAmount_Negative_Throws() {
+            BigDecimal over = DepositService.MAX_ADJUST_AMOUNT.add(BigDecimal.ONE).negate();
+            assertThrows(IllegalArgumentException.class,
+                    () -> depositService.adminAdjust(userId, over, AdminAdjustmentReason.OTHER,
+                            "TICKET-11", "key-11", adminActorId));
+        }
+
+        @Test
+        @DisplayName("Ровно 500 000 — допускается (граница не нарушена)")
+        void adminAdjust_ExactlyMaxAmount_Allowed() {
             when(depositRepository.findTransactionByIdempotencyKey(any())).thenReturn(Optional.empty());
             when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
             when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
             when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
 
-            depositService.adminAdjust(userId, new BigDecimal("1000"), "тест", "key-4");
+            assertDoesNotThrow(() -> depositService.adminAdjust(userId, DepositService.MAX_ADJUST_AMOUNT,
+                    AdminAdjustmentReason.OTHER, "TICKET-12", "key-12", adminActorId));
+        }
+
+        @Test
+        @DisplayName("Null идентификатор администратора — IllegalArgumentException (клиент не может выбрать актора)")
+        void adminAdjust_NullActingAdmin_Throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> depositService.adminAdjust(userId, new BigDecimal("1000"), AdminAdjustmentReason.OTHER,
+                            "TICKET-13", "key-13", null));
+            verifyNoInteractions(depositRepository);
+        }
+
+        @Test
+        @DisplayName("Транзакция типа ADMIN_ADJUSTMENT записывается с актором и ссылкой")
+        void adminAdjust_SavesAdjustmentTransaction_WithActorAndReference() {
+            when(depositRepository.findTransactionByIdempotencyKey(any())).thenReturn(Optional.empty());
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            depositService.adminAdjust(userId, new BigDecimal("1000"), AdminAdjustmentReason.MANUAL_REFUND,
+                    "TICKET-14", "key-14", adminActorId);
 
             ArgumentCaptor<DepositTransaction> txCap = ArgumentCaptor.forClass(DepositTransaction.class);
             verify(depositRepository).saveTransaction(txCap.capture());
             assertEquals(DepositTransaction.TransactionType.ADMIN_ADJUSTMENT, txCap.getValue().getType());
+            assertEquals(adminActorId, txCap.getValue().getPerformedByAdminId());
+            assertEquals("TICKET-14", txCap.getValue().getReference());
+            assertEquals("MANUAL_REFUND", txCap.getValue().getDescription());
+        }
+
+        @Test
+        @DisplayName("Клиент не может выбрать актора — только значение, переданное из аутентифицированного контекста, сохраняется")
+        void adminAdjust_ActorAlwaysComesFromAuthenticatedContext() {
+            when(depositRepository.findTransactionByIdempotencyKey(any())).thenReturn(Optional.empty());
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            Long suppliedByCaller = 555L; // the only way an actor id reaches this method at all
+            depositService.adminAdjust(userId, new BigDecimal("1000"), AdminAdjustmentReason.OTHER,
+                    "TICKET-15", "key-15", suppliedByCaller);
+
+            ArgumentCaptor<DepositTransaction> txCap = ArgumentCaptor.forClass(DepositTransaction.class);
+            verify(depositRepository).saveTransaction(txCap.capture());
+            // adminAdjust has no other source for the actor than its own method parameter - there
+            // is no request-body/client-supplied path into performedByAdminId at the service layer;
+            // the controller (verified separately, see AdminDepositControllerTest) is the only
+            // place the value can originate, and it is wired exclusively to @CurrentUser.
+            assertEquals(suppliedByCaller, txCap.getValue().getPerformedByAdminId());
         }
 
         @Test
@@ -696,14 +782,15 @@ class DepositServiceTest {
             DepositTransaction previous = new DepositTransaction(
                     depositId, userId, DepositTransaction.TransactionType.ADMIN_ADJUSTMENT,
                     new BigDecimal("5000"), depositAmount, depositAmount.add(new BigDecimal("5000")),
-                    "ADMIN_ADJUSTMENT", "первое зачисление"
+                    "TICKET-16", AdminAdjustmentReason.OTHER.name()
             );
             previous.setIdempotencyKey(key);
 
             when(depositRepository.findTransactionByIdempotencyKey(key)).thenReturn(Optional.of(previous));
             when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
 
-            DepositResponse response = depositService.adminAdjust(userId, new BigDecimal("5000"), "тест", key);
+            DepositResponse response = depositService.adminAdjust(userId, new BigDecimal("5000"),
+                    AdminAdjustmentReason.OTHER, "TICKET-16", key, adminActorId);
 
             assertEquals(0, response.balance().compareTo(depositWithBalance.getBalance()));
             verify(depositRepository, never()).save(any(Deposit.class));
@@ -719,7 +806,8 @@ class DepositServiceTest {
             when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
             when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
 
-            depositService.adminAdjust(userId, new BigDecimal("2000"), "тест", key);
+            depositService.adminAdjust(userId, new BigDecimal("2000"), AdminAdjustmentReason.OTHER,
+                    "TICKET-17", key, adminActorId);
 
             ArgumentCaptor<DepositTransaction> txCap = ArgumentCaptor.forClass(DepositTransaction.class);
             verify(depositRepository).saveTransaction(txCap.capture());
@@ -730,7 +818,8 @@ class DepositServiceTest {
         @DisplayName("R-1.4: пустой ключ идемпотентности — IllegalArgumentException, мутация не выполняется")
         void adminAdjust_BlankIdempotencyKey_Throws() {
             assertThrows(IllegalArgumentException.class,
-                    () -> depositService.adminAdjust(userId, new BigDecimal("2000"), "тест", "   "));
+                    () -> depositService.adminAdjust(userId, new BigDecimal("2000"), AdminAdjustmentReason.OTHER,
+                            "TICKET-18", "   ", adminActorId));
 
             verifyNoInteractions(depositRepository);
         }
@@ -739,7 +828,8 @@ class DepositServiceTest {
         @DisplayName("R-1.4: null ключ идемпотентности — IllegalArgumentException, мутация не выполняется")
         void adminAdjust_NullIdempotencyKey_Throws() {
             assertThrows(IllegalArgumentException.class,
-                    () -> depositService.adminAdjust(userId, new BigDecimal("2000"), "тест", null));
+                    () -> depositService.adminAdjust(userId, new BigDecimal("2000"), AdminAdjustmentReason.OTHER,
+                            "TICKET-19", null, adminActorId));
 
             verifyNoInteractions(depositRepository);
         }
@@ -758,7 +848,8 @@ class DepositServiceTest {
                             "duplicate key value violates unique constraint \"uk_deposit_transactions_idempotency_key\""));
 
             assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
-                    () -> depositService.adminAdjust(userId, new BigDecimal("1000"), "тест", key));
+                    () -> depositService.adminAdjust(userId, new BigDecimal("1000"), AdminAdjustmentReason.OTHER,
+                            "TICKET-20", key, adminActorId));
 
             // saveTransaction() выполняется ДО save(deposit) в adminAdjust — если первое
             // бросает исключение, второе никогда не вызывается: баланс не изменяется.
@@ -773,64 +864,396 @@ class DepositServiceTest {
             when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
             when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
 
-            depositService.adminAdjust(userId, new BigDecimal("1000"), "первая", "key-A");
-            depositService.adminAdjust(userId, new BigDecimal("2000"), "вторая", "key-B");
+            depositService.adminAdjust(userId, new BigDecimal("1000"), AdminAdjustmentReason.OTHER,
+                    "TICKET-21", "key-A", adminActorId);
+            depositService.adminAdjust(userId, new BigDecimal("2000"), AdminAdjustmentReason.OTHER,
+                    "TICKET-21b", "key-B", adminActorId);
 
             verify(depositRepository, times(2)).save(any(Deposit.class));
             verify(depositRepository, times(2)).saveTransaction(any(DepositTransaction.class));
         }
 
         @Test
-        @DisplayName("Follow-up #2: тот же ключ с ДРУГОЙ суммой — IllegalStateException, повторная мутация не применяется")
+        @DisplayName("Тот же ключ с ДРУГОЙ суммой — IllegalStateException, повторная мутация не применяется")
         void adminAdjust_SameKeyDifferentAmount_Throws() {
             DepositTransaction previous = new DepositTransaction(
                     depositId, userId, DepositTransaction.TransactionType.ADMIN_ADJUSTMENT,
                     new BigDecimal("5000"), depositAmount, depositAmount.add(new BigDecimal("5000")),
-                    "ADMIN_ADJUSTMENT", "первое зачисление"
+                    "TICKET-22", AdminAdjustmentReason.OTHER.name()
             );
             previous.setIdempotencyKey("fp-key-1");
             when(depositRepository.findTransactionByIdempotencyKey("fp-key-1")).thenReturn(Optional.of(previous));
 
             assertThrows(IllegalStateException.class,
-                    () -> depositService.adminAdjust(userId, new BigDecimal("9999"), "другая сумма", "fp-key-1"));
+                    () -> depositService.adminAdjust(userId, new BigDecimal("9999"), AdminAdjustmentReason.OTHER,
+                            "TICKET-22", "fp-key-1", adminActorId));
 
             verify(depositRepository, never()).save(any(Deposit.class));
             verify(depositRepository, never()).saveTransaction(any(DepositTransaction.class));
         }
 
         @Test
-        @DisplayName("Follow-up #2: тот же ключ для ДРУГОГО пользователя — IllegalStateException")
+        @DisplayName("Тот же ключ для ДРУГОГО пользователя — IllegalStateException")
         void adminAdjust_SameKeyDifferentUser_Throws() {
             DepositTransaction previous = new DepositTransaction(
                     depositId, anotherUserId, DepositTransaction.TransactionType.ADMIN_ADJUSTMENT,
                     new BigDecimal("5000"), depositAmount, depositAmount.add(new BigDecimal("5000")),
-                    "ADMIN_ADJUSTMENT", "первое зачисление"
+                    "TICKET-23", AdminAdjustmentReason.OTHER.name()
             );
             previous.setIdempotencyKey("fp-key-2");
             when(depositRepository.findTransactionByIdempotencyKey("fp-key-2")).thenReturn(Optional.of(previous));
 
             assertThrows(IllegalStateException.class,
-                    () -> depositService.adminAdjust(userId, new BigDecimal("5000"), "тот же ключ, другой юзер", "fp-key-2"));
+                    () -> depositService.adminAdjust(userId, new BigDecimal("5000"), AdminAdjustmentReason.OTHER,
+                            "TICKET-23", "fp-key-2", adminActorId));
 
             verify(depositRepository, never()).save(any(Deposit.class));
         }
 
         @Test
-        @DisplayName("Follow-up #2: тот же ключ, тот же пользователь и та же сумма — корректный идемпотентный повтор")
+        @DisplayName("Тот же ключ, но ДРУГАЯ причина — IllegalStateException (fingerprint включает reason)")
+        void adminAdjust_SameKeyDifferentReason_Throws() {
+            DepositTransaction previous = new DepositTransaction(
+                    depositId, userId, DepositTransaction.TransactionType.ADMIN_ADJUSTMENT,
+                    new BigDecimal("5000"), depositAmount, depositAmount.add(new BigDecimal("5000")),
+                    "TICKET-24", AdminAdjustmentReason.OTHER.name()
+            );
+            previous.setIdempotencyKey("fp-key-reason");
+            when(depositRepository.findTransactionByIdempotencyKey("fp-key-reason")).thenReturn(Optional.of(previous));
+
+            assertThrows(IllegalStateException.class,
+                    () -> depositService.adminAdjust(userId, new BigDecimal("5000"), AdminAdjustmentReason.MANUAL_REFUND,
+                            "TICKET-24", "fp-key-reason", adminActorId));
+
+            verify(depositRepository, never()).save(any(Deposit.class));
+        }
+
+        @Test
+        @DisplayName("Тот же ключ, но ДРУГАЯ ссылка — IllegalStateException (fingerprint включает reference)")
+        void adminAdjust_SameKeyDifferentReference_Throws() {
+            DepositTransaction previous = new DepositTransaction(
+                    depositId, userId, DepositTransaction.TransactionType.ADMIN_ADJUSTMENT,
+                    new BigDecimal("5000"), depositAmount, depositAmount.add(new BigDecimal("5000")),
+                    "TICKET-25", AdminAdjustmentReason.OTHER.name()
+            );
+            previous.setIdempotencyKey("fp-key-ref");
+            when(depositRepository.findTransactionByIdempotencyKey("fp-key-ref")).thenReturn(Optional.of(previous));
+
+            assertThrows(IllegalStateException.class,
+                    () -> depositService.adminAdjust(userId, new BigDecimal("5000"), AdminAdjustmentReason.OTHER,
+                            "TICKET-DIFFERENT", "fp-key-ref", adminActorId));
+
+            verify(depositRepository, never()).save(any(Deposit.class));
+        }
+
+        @Test
+        @DisplayName("Тот же ключ, тот же пользователь, сумма, причина и ссылка — корректный идемпотентный повтор")
         void adminAdjust_SameKeySameFingerprint_IsIdempotentReplay() {
             DepositTransaction previous = new DepositTransaction(
                     depositId, userId, DepositTransaction.TransactionType.ADMIN_ADJUSTMENT,
                     new BigDecimal("5000"), depositAmount, depositAmount.add(new BigDecimal("5000")),
-                    "ADMIN_ADJUSTMENT", "первое зачисление"
+                    "TICKET-26", AdminAdjustmentReason.OTHER.name()
             );
             previous.setIdempotencyKey("fp-key-3");
             when(depositRepository.findTransactionByIdempotencyKey("fp-key-3")).thenReturn(Optional.of(previous));
             when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
 
-            DepositResponse response = depositService.adminAdjust(userId, new BigDecimal("5000"), "тот же запрос повторно", "fp-key-3");
+            DepositResponse response = depositService.adminAdjust(userId, new BigDecimal("5000"),
+                    AdminAdjustmentReason.OTHER, "TICKET-26", "fp-key-3", adminActorId);
 
             assertEquals(0, response.balance().compareTo(depositWithBalance.getBalance()));
             verify(depositRepository, never()).save(any(Deposit.class));
+        }
+
+        @Test
+        @DisplayName("RECONCILIATION отклоняется, если по ссылке уже есть зачисление в реестре (защита от задвоения)")
+        void adminAdjust_Reconciliation_RejectedWhenAlreadyCreditedByPayment() {
+            String paymentLedgerKey = "PAYMENT:TX-already-credited";
+            DepositTransaction alreadyCredited = new DepositTransaction(
+                    depositId, userId, DepositTransaction.TransactionType.PAYMENT_CREDIT,
+                    new BigDecimal("5000"), depositAmount, depositAmount.add(new BigDecimal("5000")),
+                    paymentLedgerKey, "Автоматическое зачисление по платежу"
+            );
+            alreadyCredited.setIdempotencyKey(paymentLedgerKey);
+
+            when(depositRepository.findTransactionByIdempotencyKey(paymentLedgerKey))
+                    .thenReturn(Optional.of(alreadyCredited));
+
+            assertThrows(IllegalStateException.class,
+                    () -> depositService.adminAdjust(userId, new BigDecimal("5000"), AdminAdjustmentReason.RECONCILIATION,
+                            paymentLedgerKey, "admin-retry-key", adminActorId));
+
+            verify(depositRepository, never()).save(any(Deposit.class));
+            verify(depositRepository, never()).saveTransaction(any(DepositTransaction.class));
+        }
+
+        @Test
+        @DisplayName("RECONCILIATION проходит, если по ссылке ЕЩЁ НЕТ зачисления в реестре")
+        void adminAdjust_Reconciliation_AllowedWhenNotYetCredited() {
+            String paymentLedgerKey = "PAYMENT:TX-not-yet-credited";
+            // findTransactionByIdempotencyKey отвечает и на guard-проверку по reference, и на
+            // собственную проверку по idempotencyKey корректировки - оба раза "ничего не найдено".
+            when(depositRepository.findTransactionByIdempotencyKey(any())).thenReturn(Optional.empty());
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            assertDoesNotThrow(() -> depositService.adminAdjust(userId, new BigDecimal("5000"),
+                    AdminAdjustmentReason.RECONCILIATION, paymentLedgerKey, "admin-retry-key-2", adminActorId));
+
+            verify(depositRepository).save(any(Deposit.class));
+        }
+
+        @Test
+        @DisplayName("Guard по reference применяется ТОЛЬКО для reason=RECONCILIATION, не для остальных причин")
+        void adminAdjust_NonReconciliationReason_DoesNotTriggerPaymentGuard() {
+            // Даже если по этой ссылке "случайно" существует платёжное зачисление, не-RECONCILIATION
+            // корректировка не обязана и не должна его проверять - guard специфичен для RECONCILIATION.
+            when(depositRepository.findTransactionByIdempotencyKey("own-key-mr")).thenReturn(Optional.empty());
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            assertDoesNotThrow(() -> depositService.adminAdjust(userId, new BigDecimal("1000"),
+                    AdminAdjustmentReason.MANUAL_REFUND, "PAYMENT:TX-unrelated", "own-key-mr", adminActorId));
+
+            // guard-специфичный lookup по "PAYMENT:TX-unrelated" не должен выполняться для этой причины
+            verify(depositRepository, never()).findTransactionByIdempotencyKey("PAYMENT:TX-unrelated");
+        }
+    }
+
+    // ==================== AUTOMATIC PAYMENT CREDIT PRIMITIVE TESTS (Slice 2 · Step 2A) ========
+
+    @Nested
+    @DisplayName("creditFromPayment — автоматическое зачисление по платежу")
+    class CreditFromPaymentTests {
+
+        @Test
+        @DisplayName("Увеличивает баланс на сумму команды")
+        void creditFromPayment_IncreasesBalance() {
+            when(depositRepository.findTransactionByIdempotencyKey(any())).thenReturn(Optional.empty());
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            DepositCreditCommand command = new DepositCreditCommand(userId, new BigDecimal("7500"),
+                    "PAYMENT:TX-1", "PAYMENT:TX-1");
+            depositService.creditFromPayment(command);
+
+            ArgumentCaptor<Deposit> cap = ArgumentCaptor.forClass(Deposit.class);
+            verify(depositRepository).save(cap.capture());
+            assertEquals(0, cap.getValue().getBalance().compareTo(depositAmount.add(new BigDecimal("7500"))));
+        }
+
+        @Test
+        @DisplayName("Создаёт ровно одну запись DepositTransaction типа PAYMENT_CREDIT")
+        void creditFromPayment_CreatesOnePaymentCreditTransaction() {
+            when(depositRepository.findTransactionByIdempotencyKey(any())).thenReturn(Optional.empty());
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            depositService.creditFromPayment(new DepositCreditCommand(userId, new BigDecimal("1000"),
+                    "PAYMENT:TX-2", "PAYMENT:TX-2"));
+
+            ArgumentCaptor<DepositTransaction> txCap = ArgumentCaptor.forClass(DepositTransaction.class);
+            verify(depositRepository, times(1)).saveTransaction(txCap.capture());
+            assertEquals(DepositTransaction.TransactionType.PAYMENT_CREDIT, txCap.getValue().getType());
+            assertNotEquals(DepositTransaction.TransactionType.ADMIN_ADJUSTMENT, txCap.getValue().getType());
+        }
+
+        @Test
+        @DisplayName("performedByAdminId всегда NULL — нет человеческого актора")
+        void creditFromPayment_PerformedByAdminIdIsNull() {
+            when(depositRepository.findTransactionByIdempotencyKey(any())).thenReturn(Optional.empty());
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            depositService.creditFromPayment(new DepositCreditCommand(userId, new BigDecimal("1000"),
+                    "PAYMENT:TX-3", "PAYMENT:TX-3"));
+
+            ArgumentCaptor<DepositTransaction> txCap = ArgumentCaptor.forClass(DepositTransaction.class);
+            verify(depositRepository).saveTransaction(txCap.capture());
+            assertNull(txCap.getValue().getPerformedByAdminId());
+        }
+
+        @Test
+        @DisplayName("Переданная ledgerReference сохраняется верно")
+        void creditFromPayment_PersistsSuppliedReference() {
+            when(depositRepository.findTransactionByIdempotencyKey(any())).thenReturn(Optional.empty());
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            depositService.creditFromPayment(new DepositCreditCommand(userId, new BigDecimal("1000"),
+                    "PAYMENT:TX-4", "key-tx-4"));
+
+            ArgumentCaptor<DepositTransaction> txCap = ArgumentCaptor.forClass(DepositTransaction.class);
+            verify(depositRepository).saveTransaction(txCap.capture());
+            assertEquals("PAYMENT:TX-4", txCap.getValue().getReference());
+        }
+
+        @Test
+        @DisplayName("Переданный ledgerIdempotencyKey сохраняется верно")
+        void creditFromPayment_PersistsSuppliedIdempotencyKey() {
+            when(depositRepository.findTransactionByIdempotencyKey(any())).thenReturn(Optional.empty());
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            depositService.creditFromPayment(new DepositCreditCommand(userId, new BigDecimal("1000"),
+                    "PAYMENT:TX-5", "PAYMENT:TX-5"));
+
+            ArgumentCaptor<DepositTransaction> txCap = ArgumentCaptor.forClass(DepositTransaction.class);
+            verify(depositRepository).saveTransaction(txCap.capture());
+            assertEquals("PAYMENT:TX-5", txCap.getValue().getIdempotencyKey());
+        }
+
+        @Test
+        @DisplayName("Повтор с тем же ledgerIdempotencyKey не создаёт второе зачисление")
+        void creditFromPayment_RepeatedSameIdempotencyKey_DoesNotDoubleCredit() {
+            String key = "PAYMENT:TX-6";
+            DepositTransaction previous = new DepositTransaction(
+                    depositId, userId, DepositTransaction.TransactionType.PAYMENT_CREDIT,
+                    new BigDecimal("1000"), depositAmount, depositAmount.add(new BigDecimal("1000")),
+                    key, "Автоматическое зачисление по платежу");
+            previous.setIdempotencyKey(key);
+            when(depositRepository.findTransactionByIdempotencyKey(key)).thenReturn(Optional.of(previous));
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
+
+            DepositResponse response = depositService.creditFromPayment(
+                    new DepositCreditCommand(userId, new BigDecimal("1000"), key, key));
+
+            assertEquals(0, response.balance().compareTo(depositWithBalance.getBalance()));
+            verify(depositRepository, never()).save(any(Deposit.class));
+            verify(depositRepository, never()).saveTransaction(any(DepositTransaction.class));
+        }
+
+        @Test
+        @DisplayName("Коллизия ключа: существующая запись принадлежит ДРУГОМУ пользователю — конфликт, " +
+                "чужой депозит НЕ возвращается как идемпотентный повтор")
+        void creditFromPayment_KeyCollision_DifferentUser_Throws() {
+            String key = "PAYMENT:TX-collision-user";
+            DepositTransaction existingForAnotherUser = new DepositTransaction(
+                    depositId, anotherUserId, DepositTransaction.TransactionType.PAYMENT_CREDIT,
+                    new BigDecimal("1000"), depositAmount, depositAmount.add(new BigDecimal("1000")),
+                    key, "Автоматическое зачисление по платежу");
+            existingForAnotherUser.setIdempotencyKey(key);
+            when(depositRepository.findTransactionByIdempotencyKey(key)).thenReturn(Optional.of(existingForAnotherUser));
+
+            assertThrows(IllegalStateException.class,
+                    () -> depositService.creditFromPayment(new DepositCreditCommand(userId, new BigDecimal("1000"), key, key)));
+
+            verify(depositRepository, never()).findByUserId(any());
+            verify(depositRepository, never()).save(any(Deposit.class));
+            verify(depositRepository, never()).saveTransaction(any(DepositTransaction.class));
+        }
+
+        @Test
+        @DisplayName("Коллизия ключа: существующая запись с ДРУГОЙ суммой — конфликт, мутация не выполняется")
+        void creditFromPayment_KeyCollision_DifferentAmount_Throws() {
+            String key = "PAYMENT:TX-collision-amount";
+            DepositTransaction existingDifferentAmount = new DepositTransaction(
+                    depositId, userId, DepositTransaction.TransactionType.PAYMENT_CREDIT,
+                    new BigDecimal("1000"), depositAmount, depositAmount.add(new BigDecimal("1000")),
+                    key, "Автоматическое зачисление по платежу");
+            existingDifferentAmount.setIdempotencyKey(key);
+            when(depositRepository.findTransactionByIdempotencyKey(key)).thenReturn(Optional.of(existingDifferentAmount));
+
+            assertThrows(IllegalStateException.class,
+                    () -> depositService.creditFromPayment(new DepositCreditCommand(userId, new BigDecimal("2000"), key, key)));
+
+            verify(depositRepository, never()).save(any(Deposit.class));
+            verify(depositRepository, never()).saveTransaction(any(DepositTransaction.class));
+        }
+
+        @Test
+        @DisplayName("Коллизия ключа: существующая запись с ДРУГОЙ ссылкой (ledgerReference) — конфликт")
+        void creditFromPayment_KeyCollision_DifferentReference_Throws() {
+            String key = "PAYMENT:TX-collision-ref";
+            DepositTransaction existingDifferentReference = new DepositTransaction(
+                    depositId, userId, DepositTransaction.TransactionType.PAYMENT_CREDIT,
+                    new BigDecimal("1000"), depositAmount, depositAmount.add(new BigDecimal("1000")),
+                    "PAYMENT:TX-original", "Автоматическое зачисление по платежу");
+            existingDifferentReference.setIdempotencyKey(key);
+            when(depositRepository.findTransactionByIdempotencyKey(key)).thenReturn(Optional.of(existingDifferentReference));
+
+            assertThrows(IllegalStateException.class,
+                    () -> depositService.creditFromPayment(new DepositCreditCommand(userId, new BigDecimal("1000"), key, key)));
+
+            verify(depositRepository, never()).save(any(Deposit.class));
+            verify(depositRepository, never()).saveTransaction(any(DepositTransaction.class));
+        }
+
+        @Test
+        @DisplayName("Коллизия ключа: существующая запись с ДРУГИМ типом транзакции (не PAYMENT_CREDIT) — " +
+                "никогда не трактуется как повтор платёжного зачисления")
+        void creditFromPayment_KeyCollision_WrongTransactionType_Throws() {
+            String key = "PAYMENT:TX-collision-type";
+            DepositTransaction existingAdminAdjustment = new DepositTransaction(
+                    depositId, userId, DepositTransaction.TransactionType.ADMIN_ADJUSTMENT,
+                    new BigDecimal("1000"), depositAmount, depositAmount.add(new BigDecimal("1000")),
+                    key, AdminAdjustmentReason.OTHER.name());
+            existingAdminAdjustment.setIdempotencyKey(key);
+            when(depositRepository.findTransactionByIdempotencyKey(key)).thenReturn(Optional.of(existingAdminAdjustment));
+
+            assertThrows(IllegalStateException.class,
+                    () -> depositService.creditFromPayment(new DepositCreditCommand(userId, new BigDecimal("1000"), key, key)));
+
+            verify(depositRepository, never()).save(any(Deposit.class));
+            verify(depositRepository, never()).saveTransaction(any(DepositTransaction.class));
+        }
+
+        @Test
+        @DisplayName("Замороженная сумма не изменяется автоматическим зачислением")
+        void creditFromPayment_DoesNotTouchFrozenCollateral() {
+            when(depositRepository.findTransactionByIdempotencyKey(any())).thenReturn(Optional.empty());
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            BigDecimal blockedBefore = depositWithBlocked.getBlockedAmount();
+            depositService.creditFromPayment(new DepositCreditCommand(userId, new BigDecimal("1000"),
+                    "PAYMENT:TX-7", "PAYMENT:TX-7"));
+
+            ArgumentCaptor<Deposit> cap = ArgumentCaptor.forClass(Deposit.class);
+            verify(depositRepository).save(cap.capture());
+            assertEquals(0, cap.getValue().getBlockedAmount().compareTo(blockedBefore));
+        }
+
+        @Test
+        @DisplayName("Доступный баланс корректно увеличивается (баланс растёт, залог не трогается)")
+        void creditFromPayment_AvailableBalanceSemanticsCorrect() {
+            when(depositRepository.findTransactionByIdempotencyKey(any())).thenReturn(Optional.empty());
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
+            when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
+
+            BigDecimal availableBefore = depositWithBlocked.getAvailableBalance();
+            depositService.creditFromPayment(new DepositCreditCommand(userId, new BigDecimal("1000"),
+                    "PAYMENT:TX-8", "PAYMENT:TX-8"));
+
+            ArgumentCaptor<Deposit> cap = ArgumentCaptor.forClass(Deposit.class);
+            verify(depositRepository).save(cap.capture());
+            assertEquals(0, cap.getValue().getAvailableBalance().compareTo(availableBefore.add(new BigDecimal("1000"))));
+        }
+
+        @Test
+        @DisplayName("Null команда отклоняется на уровне конструктора DepositCreditCommand")
+        void creditFromPayment_NullFieldsRejectedAtCommandConstruction() {
+            assertThrows(NullPointerException.class,
+                    () -> new DepositCreditCommand(null, new BigDecimal("1000"), "ref", "key"));
+            assertThrows(NullPointerException.class,
+                    () -> new DepositCreditCommand(userId, null, "ref", "key"));
+            assertThrows(IllegalArgumentException.class,
+                    () -> new DepositCreditCommand(userId, BigDecimal.ZERO, "ref", "key"));
+            assertThrows(IllegalArgumentException.class,
+                    () -> new DepositCreditCommand(userId, new BigDecimal("-100"), "ref", "key"));
+            assertThrows(IllegalArgumentException.class,
+                    () -> new DepositCreditCommand(userId, new BigDecimal("100"), " ", "key"));
+            assertThrows(IllegalArgumentException.class,
+                    () -> new DepositCreditCommand(userId, new BigDecimal("100"), "ref", " "));
         }
     }
 
@@ -865,7 +1288,8 @@ class DepositServiceTest {
                 String key = "concurrency-key-" + i;
                 executor.submit(() -> {
                     try {
-                        depositService.adminAdjust(userId, new BigDecimal("100"), "concurrency test", key);
+                        depositService.adminAdjust(userId, new BigDecimal("100"), AdminAdjustmentReason.OTHER,
+                                "CONCURRENCY-TEST", key, adminActorId);
                         successCount.incrementAndGet();
                     } catch (Exception e) {
                         failureCount.incrementAndGet();

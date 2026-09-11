@@ -59,6 +59,13 @@ public class JpaDepositTransactionEntity {
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
+    // Slice 2 · Step 2A: column already added by V42 (payment infrastructure migration, nullable,
+    // no FK - matches this project's existing actor/audit-id convention). Nullable for every
+    // non-admin transaction type (including the new PAYMENT_CREDIT); application-enforced
+    // non-null for newly created ADMIN_ADJUSTMENT rows only. No migration needed here.
+    @Column(name = "performed_by_admin_id")
+    private Long performedByAdminId;
+
     protected JpaDepositTransactionEntity() {}
 
     public JpaDepositTransactionEntity(Long depositId, Long userId, Long auctionId,
@@ -113,4 +120,7 @@ public class JpaDepositTransactionEntity {
 
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
+
+    public Long getPerformedByAdminId() { return performedByAdminId; }
+    public void setPerformedByAdminId(Long performedByAdminId) { this.performedByAdminId = performedByAdminId; }
 }

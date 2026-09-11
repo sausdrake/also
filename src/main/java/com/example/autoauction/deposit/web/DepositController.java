@@ -21,7 +21,6 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @RestController
@@ -110,18 +109,10 @@ public class DepositController {
         return ResponseEntity.ok(new ParticipationResponse(canParticipate));
     }
 
-    @PostMapping("/admin/users/{userId}/adjust")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Административная корректировка депозита")
-    public ResponseEntity<DepositResponse> adminAdjust(
-            @PathVariable Long userId,
-            @RequestBody Map<String, Object> body
-    ) {
-        BigDecimal amount = new BigDecimal(body.get("amount").toString());
-        String comment = (String) body.get("comment");
-        String idempotencyKey = (String) body.get("idempotencyKey");
-        return ResponseEntity.ok(depositService.adminAdjust(userId, amount, comment, idempotencyKey));
-    }
+    // Slice 2 · Step 2A: the duplicate admin-adjust route previously hosted here has been removed.
+    // The single canonical endpoint is POST /api/v1/admin/deposits/{userId}/adjust
+    // (AdminDepositController.adjustDeposit). A fresh repository-wide search confirmed zero
+    // remaining callers of this route (frontend and backend) before removal.
 
     public record ParticipationResponse(boolean canParticipate) {}
 }

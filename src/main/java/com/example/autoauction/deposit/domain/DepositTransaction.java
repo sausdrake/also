@@ -18,6 +18,10 @@ public class DepositTransaction {
     private String description;
     private String idempotencyKey;
     private OffsetDateTime createdAt;
+    /** Null for every non-admin-initiated transaction (see {@link TransactionType#PAYMENT_CREDIT}
+     *  and every pre-existing type); application-enforced non-null for newly created
+     *  {@link TransactionType#ADMIN_ADJUSTMENT} rows only. */
+    private Long performedByAdminId;
 
     public DepositTransaction(Long depositId, Long userId, TransactionType type,
                               BigDecimal amount, BigDecimal balanceBefore,
@@ -46,6 +50,7 @@ public class DepositTransaction {
     public String getDescription() { return description; }
     public String getIdempotencyKey() { return idempotencyKey; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
+    public Long getPerformedByAdminId() { return performedByAdminId; }
 
     // Сеттеры (добавляем!)
     public void setId(Long id) { this.id = id; }
@@ -60,6 +65,7 @@ public class DepositTransaction {
     public void setDescription(String description) { this.description = description; }
     public void setIdempotencyKey(String idempotencyKey) { this.idempotencyKey = idempotencyKey; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
+    public void setPerformedByAdminId(Long performedByAdminId) { this.performedByAdminId = performedByAdminId; }
 
     public enum TransactionType {
         DEPOSIT,            // Пополнение
@@ -67,6 +73,9 @@ public class DepositTransaction {
         BLOCK,              // Блокировка
         UNBLOCK,            // Разблокировка
         CHARGE,             // Удержание (штраф)
-        ADMIN_ADJUSTMENT    // Ручная корректировка администратором
+        ADMIN_ADJUSTMENT,   // Ручная корректировка администратором
+        /** Slice 2 · Step 2A: automatic deposit credit driven by a confirmed payment (Step 2D).
+         *  Never has a human admin actor - {@code performedByAdminId} stays null. */
+        PAYMENT_CREDIT
     }
 }

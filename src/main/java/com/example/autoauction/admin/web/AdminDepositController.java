@@ -1,20 +1,22 @@
 package com.example.autoauction.admin.web;
 
+import com.example.autoauction.auth.domain.UserPrincipal;
+import com.example.autoauction.auth.infrastructure.security.CurrentUser;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.deposit.domain.port.DepositRepository;
+import com.example.autoauction.deposit.web.dto.AdminAdjustDepositRequest;
 import com.example.autoauction.deposit.web.dto.DepositResponse;
 import com.example.autoauction.deposit.web.dto.DepositTransactionResponse;
 import com.example.autoauction.user.application.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/admin/deposits")
@@ -42,15 +44,20 @@ public class AdminDepositController {
         return ResponseEntity.ok(depositService.getTransactionsByUserId(userId));
     }
 
+    /**
+     * Slice 2 · Step 2A: the single canonical administrative deposit-adjustment endpoint. The
+     * acting admin is derived exclusively from the authenticated security context - the request
+     * body has no actor field and none is ever accepted from the client.
+     */
     @PostMapping("/{userId}/adjust")
     @Operation(summary = "Корректировка депозита пользователя")
     public ResponseEntity<DepositResponse> adjustDeposit(
             @PathVariable Long userId,
-            @RequestBody Map<String, Object> body
+            @Valid @RequestBody AdminAdjustDepositRequest body,
+            @CurrentUser UserPrincipal currentUser
     ) {
-        BigDecimal amount = new BigDecimal(body.get("amount").toString());
-        String comment = (String) body.get("comment");
-        String idempotencyKey = (String) body.get("idempotencyKey");
-        return ResponseEntity.ok(depositService.adminAdjust(userId, amount, comment, idempotencyKey));
+        return ResponseEntity.ok(depositService.adminAdjust(
+                userId, body.amount(), body.reason(), body.reference(), body.idempotencyKey(),
+                currentUser.getUserId()));
     }
 }
