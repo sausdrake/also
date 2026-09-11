@@ -35,7 +35,7 @@
 -- are both explicitly out of scope.
 
 ALTER TABLE vehicles
-    ADD COLUMN diagnostic_request_id BIGINT NULL
+    ADD COLUMN IF NOT EXISTS diagnostic_request_id BIGINT NULL
         REFERENCES diagnostic_requests(id);
 
 ALTER TABLE vehicles

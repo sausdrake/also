@@ -4,7 +4,7 @@
 
 -- Шаблон
 INSERT INTO inspection_templates (name, vehicle_type, description, is_active, created_by, created_at, updated_at)
-SELECT 'Стандартный шаблон для седана', 'SEDAN', 'Стандартная анкета для легкового автомобиля', true, 1, NOW(), NOW()
+SELECT 'Стандартный шаблон для седана', 'SEDAN', 'Стандартная анкета для легкового автомобиля', true, NULL, NOW(), NOW()
 WHERE NOT EXISTS (SELECT 1 FROM inspection_templates WHERE name = 'Стандартный шаблон для седана');
 
 -- Получаем ID шаблона
