@@ -3,6 +3,7 @@ package com.example.autoauction.sale.web;
 import com.example.autoauction.auth.domain.UserPrincipal;
 import com.example.autoauction.auth.infrastructure.security.CurrentUser;
 import com.example.autoauction.auction.application.SaleAdministrationService;
+import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.sale.application.HandoverEvidenceService;
 import com.example.autoauction.sale.application.PaymentEvidenceService;
 import com.example.autoauction.sale.domain.HandoverEvidence;
@@ -11,6 +12,9 @@ import com.example.autoauction.sale.domain.SaleResolution;
 import com.example.autoauction.sale.domain.SaleResolutionResult;
 import com.example.autoauction.sale.web.dto.FailRequest;
 import com.example.autoauction.sale.web.dto.HandoverEvidenceResponse;
+import com.example.autoauction.sale.web.dto.PaymentDeadlineExtendRequest;
+import com.example.autoauction.sale.web.dto.PaymentDeadlineHistoryResponse;
+import com.example.autoauction.sale.web.dto.PaymentDeadlineResponse;
 import com.example.autoauction.sale.web.dto.PaymentEvidenceResponse;
 import com.example.autoauction.sale.web.dto.PaymentRequest;
 import com.example.autoauction.sale.web.dto.RecordPayoutRequest;
@@ -30,11 +34,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.Clock;
+import java.time.OffsetDateTime;
+import java.util.List;
 
 /**
  * Slice 1 (Sale Completion &amp; Failure API): the four admin-only operations that move a
@@ -66,15 +75,18 @@ public class AdminSaleController {
     private final HandoverEvidenceService handoverEvidenceService;
     private final SaleAdministrationService saleAdministrationService;
     private final SettlementService settlementService;
+    private final Clock clock;
 
     public AdminSaleController(PaymentEvidenceService paymentEvidenceService,
                               HandoverEvidenceService handoverEvidenceService,
                               SaleAdministrationService saleAdministrationService,
-                              SettlementService settlementService) {
+                              SettlementService settlementService,
+                              Clock clock) {
         this.paymentEvidenceService = paymentEvidenceService;
         this.handoverEvidenceService = handoverEvidenceService;
         this.saleAdministrationService = saleAdministrationService;
         this.settlementService = settlementService;
+        this.clock = clock;
     }
 
     @PostMapping("/{auctionId}/payment")
@@ -127,6 +139,30 @@ public class AdminSaleController {
         SaleResolution resolution = saleAdministrationService.failSale(
                 auctionId, outcome, request.violationDefinitionIds(), request.reason(), adminId);
         return ResponseEntity.ok(SaleResolutionResponse.fromDomain(resolution));
+    }
+
+    @PostMapping("/{auctionId}/deadline/extend")
+    @Operation(summary = "Изменить/продлить платёжный дедлайн (admin-only, unlimited, только для WAITING_FOR_PAYMENT)")
+    public ResponseEntity<PaymentDeadlineResponse> extendPaymentDeadline(
+            @Parameter(description = "ID аукциона", required = true) @PathVariable Long auctionId,
+            @Valid @RequestBody PaymentDeadlineExtendRequest request,
+            @Parameter(hidden = true) @CurrentUser UserPrincipal currentUser
+    ) {
+        Long adminId = currentUser.getUserId();
+        log.info("Admin {} extending payment deadline for auction {}", adminId, auctionId);
+        Auction auction = saleAdministrationService.extendPaymentDeadline(
+                auctionId, request.newDeadline(), request.reason(), adminId);
+        return ResponseEntity.ok(PaymentDeadlineResponse.fromDomain(auction, OffsetDateTime.now(clock)));
+    }
+
+    @GetMapping("/{auctionId}/deadline/history")
+    @Operation(summary = "История изменений платёжного дедлайна (INITIAL + все ADMIN_EXTENSION), по возрастанию времени")
+    public ResponseEntity<List<PaymentDeadlineHistoryResponse>> getPaymentDeadlineHistory(
+            @Parameter(description = "ID аукциона", required = true) @PathVariable Long auctionId
+    ) {
+        List<PaymentDeadlineHistoryResponse> history = saleAdministrationService.getPaymentDeadlineHistory(auctionId)
+                .stream().map(PaymentDeadlineHistoryResponse::fromDomain).toList();
+        return ResponseEntity.ok(history);
     }
 
     @PostMapping("/{auctionId}/settlement/payout")

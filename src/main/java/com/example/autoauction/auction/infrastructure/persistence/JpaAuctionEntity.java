@@ -116,6 +116,9 @@ public class JpaAuctionEntity {
     @Column(name = "confirmation_deadline")
     private OffsetDateTime confirmationDeadline;
 
+    @Column(name = "payment_deadline")
+    private OffsetDateTime paymentDeadline;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version = 0L;
@@ -204,4 +207,6 @@ public class JpaAuctionEntity {
     public void setConfirmedStart(boolean confirmedStart) { this.confirmedStart = confirmedStart; }
     public OffsetDateTime getConfirmationDeadline() { return confirmationDeadline; }
     public void setConfirmationDeadline(OffsetDateTime confirmationDeadline) { this.confirmationDeadline = confirmationDeadline; }
+    public OffsetDateTime getPaymentDeadline() { return paymentDeadline; }
+    public void setPaymentDeadline(OffsetDateTime paymentDeadline) { this.paymentDeadline = paymentDeadline; }
 }

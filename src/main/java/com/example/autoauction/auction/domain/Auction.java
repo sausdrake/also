@@ -94,6 +94,20 @@ public class Auction {
     private boolean confirmedStart = false;
     private OffsetDateTime confirmationDeadline;
 
+    /**
+     * Slice 1B: the deadline by which a {@code WAITING_FOR_PAYMENT} winner/seller must complete
+     * payment/handover. {@code null} for every auction never yet transitioned to
+     * {@code WAITING_FOR_PAYMENT}, and for historical auctions that reached it before this field
+     * existed (never backfilled - see the locked migration boundary). Set exactly once atomically
+     * with the transition (by {@code AuctionFinalizer}, via the plain setter below, immediately
+     * alongside {@code setStatus(WAITING_FOR_PAYMENT)}) and thereafter only ever changed through
+     * {@link #extendPaymentDeadline(OffsetDateTime)}. This is purely a technical/informational
+     * fact - passing it never by itself changes {@link #status} or anything else (locked business
+     * rule); only {@code completeSale()}/{@code markSaleFailed()} ever end the window this field
+     * describes, and neither reads it.
+     */
+    private OffsetDateTime paymentDeadline;
+
     private transient Clock clock;
     private transient AuctionExtensionProperties extensionProperties;
 
@@ -239,6 +253,7 @@ public class Auction {
     public String getVideoUrl() { return videoUrl; }
     public boolean isConfirmedStart() { return confirmedStart; }
     public OffsetDateTime getConfirmationDeadline() { return confirmationDeadline; }
+    public OffsetDateTime getPaymentDeadline() { return paymentDeadline; }
 
     // ==================== СЕТТЕРЫ ====================
 
@@ -456,6 +471,15 @@ public class Auction {
     public void setConfirmedStart(boolean confirmedStart) { this.confirmedStart = confirmedStart; }
     public void setConfirmationDeadline(OffsetDateTime confirmationDeadline) { this.confirmationDeadline = confirmationDeadline; }
 
+    /**
+     * Slice 1B: plain setter, same convention as {@link #setConfirmationDeadline} - used for
+     * reconstruction (AuctionMapper) and for the initial, system-computed assignment
+     * (AuctionFinalizer, atomically alongside {@code setStatus(WAITING_FOR_PAYMENT)}). No status
+     * guard here; {@link #extendPaymentDeadline(OffsetDateTime)} is the guarded entry point for
+     * every subsequent (admin-driven) change.
+     */
+    public void setPaymentDeadline(OffsetDateTime paymentDeadline) { this.paymentDeadline = paymentDeadline; }
+
     // ==================== БИЗНЕС-МЕТОДЫ ====================
 
     public void updateVehicleInfo(String vehicleInfo) {
@@ -521,6 +545,39 @@ public class Auction {
             );
         }
         this.status = AuctionStatus.SALE_FAILED;
+        this.updatedAt = now();
+    }
+
+    /**
+     * Slice 1B: admin-driven payment-deadline override/extension - the only guarded entry point
+     * for changing {@link #paymentDeadline} after its initial, system-computed assignment.
+     * Permitted only while the auction is {@code WAITING_FOR_PAYMENT} (locked rule): this guard
+     * exists solely to prevent mutating a deadline that no longer has operational meaning once
+     * the auction has left this window - it deliberately does NOT gate
+     * {@code completeSale()}/{@code markSaleFailed()} the other way (those never read this
+     * field).  No "new deadline must be in the future/later than the previous one" rule is
+     * enforced - the locked business rule explicitly allows an admin to set a past deadline,
+     * which simply makes the auction immediately overdue per {@code now > paymentDeadline}.
+     *
+     * <p>Requires an existing (non-null) deadline: a historical auction that reached
+     * {@code WAITING_FOR_PAYMENT} before this feature existed has no initial deadline and is
+     * deliberately never retroactively given one by this method - "do not invent deadlines for
+     * historical auctions" per the locked migration boundary. Such an auction simply cannot use
+     * this override path.
+     */
+    public void extendPaymentDeadline(OffsetDateTime newDeadline) {
+        Objects.requireNonNull(newDeadline, "Новый платёжный дедлайн не может быть null");
+        if (this.status != AuctionStatus.WAITING_FOR_PAYMENT) {
+            throw new IllegalStateException(
+                    String.format("Невозможно изменить платёжный дедлайн аукциона %d в статусе '%s'. Изменение дедлайна доступно только в статусе 'WAITING_FOR_PAYMENT'",
+                            this.id, this.status));
+        }
+        if (this.paymentDeadline == null) {
+            throw new IllegalStateException(
+                    String.format("У аукциона %d отсутствует исходный платёжный дедлайн (вероятно, аукцион создан до введения этой функции) - изменение через этот метод недоступно",
+                            this.id));
+        }
+        this.paymentDeadline = newDeadline;
         this.updatedAt = now();
     }
 

@@ -3,9 +3,11 @@ package com.example.autoauction.auction.application;
 
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
+import com.example.autoauction.auction.domain.PaymentDeadlineHistory;
 import com.example.autoauction.auction.domain.SaleFinalizationMethod;
 import com.example.autoauction.auction.domain.port.AuctionParticipantRepository;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
+import com.example.autoauction.auction.domain.port.PaymentDeadlineHistoryRepository;
 import com.example.autoauction.auction.web.AuctionWebSocketController;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.diagnostic.commitment.domain.FinalizationOutcome;
@@ -39,6 +41,8 @@ public class AuctionFinalizer {
     private final SaleResolutionService saleResolutionService;
     private final SaleCommitmentResolutionOrchestrator saleCommitmentResolutionOrchestrator;
     private final SettlementService settlementService;
+    private final StandardPaymentDeadlineCalculator standardPaymentDeadlineCalculator;
+    private final PaymentDeadlineHistoryRepository paymentDeadlineHistoryRepository;
 
     public AuctionFinalizer(AuctionRepository auctionRepository,
                             DepositService depositService,
@@ -50,7 +54,9 @@ public class AuctionFinalizer {
                             VehicleService vehicleService,
                             SaleResolutionService saleResolutionService,
                             SaleCommitmentResolutionOrchestrator saleCommitmentResolutionOrchestrator,
-                            SettlementService settlementService) {
+                            SettlementService settlementService,
+                            StandardPaymentDeadlineCalculator standardPaymentDeadlineCalculator,
+                            PaymentDeadlineHistoryRepository paymentDeadlineHistoryRepository) {
         this.auctionRepository = auctionRepository;
         this.depositService = depositService;
         this.participantRepository = participantRepository;
@@ -62,6 +68,8 @@ public class AuctionFinalizer {
         this.saleResolutionService = saleResolutionService;
         this.saleCommitmentResolutionOrchestrator = saleCommitmentResolutionOrchestrator;
         this.settlementService = settlementService;
+        this.standardPaymentDeadlineCalculator = standardPaymentDeadlineCalculator;
+        this.paymentDeadlineHistoryRepository = paymentDeadlineHistoryRepository;
     }
 
     /**
@@ -98,6 +106,7 @@ public class AuctionFinalizer {
         AuctionStatus finalStatus;
         Long winnerId = null;
         BigDecimal winningBid = null;
+        OffsetDateTime paymentDeadline = null;
         List<Long> participants = participantRepository.getParticipants(auction.getId());
 
         if (auction.getTotalBids() == null || auction.getTotalBids() == 0) {
@@ -130,6 +139,10 @@ public class AuctionFinalizer {
                 // Step 2C: winner determined through ordinary competitive bidding - the Buy Now
                 // discriminator Settlement creation later depends on.
                 auction.setSaleFinalizationMethod(SaleFinalizationMethod.ORDINARY_BID);
+                // Slice 1B: initial payment deadline, computed atomically with this same
+                // WAITING_FOR_PAYMENT transition (locked rule) - assigned below, alongside
+                // setStatus/setWinnerId/setWinningBid, before the single auctionRepository.save().
+                paymentDeadline = standardPaymentDeadlineCalculator.computeInitialDeadline();
 
                 log.info("Auction {} finished bidding with a winner, awaiting payment confirmation. Winner: {}, Winning bid: {}",
                         auction.getId(), winnerId, winningBid);
@@ -212,10 +225,19 @@ public class AuctionFinalizer {
         auction.setStatus(finalStatus);
         auction.setWinnerId(winnerId);
         auction.setWinningBid(winningBid);
+        auction.setPaymentDeadline(paymentDeadline);
         auction.setUpdatedAt(now());
 
         auctionRepository.save(auction);
         participantRepository.clearParticipants(auction.getId());
+
+        // Slice 1B: exactly one INITIAL history row, in this same transaction, only when a
+        // deadline was actually assigned (i.e. finalStatus == WAITING_FOR_PAYMENT) - never for
+        // the EXPIRED branches above.
+        if (finalStatus == AuctionStatus.WAITING_FOR_PAYMENT) {
+            paymentDeadlineHistoryRepository.save(
+                    PaymentDeadlineHistory.initial(auction.getId(), paymentDeadline, now()));
+        }
 
         // ✅ Отправляем финальное обновление
         try {
@@ -414,9 +436,15 @@ public class AuctionFinalizer {
         // Step 2C: winner determined through Buy Now - the Buy Now discriminator Settlement
         // creation later depends on.
         auction.setSaleFinalizationMethod(SaleFinalizationMethod.BUY_NOW);
+        // Slice 1B: initial payment deadline, computed atomically with this same
+        // WAITING_FOR_PAYMENT transition (locked rule).
+        OffsetDateTime paymentDeadline = standardPaymentDeadlineCalculator.computeInitialDeadline();
+        auction.setPaymentDeadline(paymentDeadline);
         auction.setUpdatedAt(now());
 
         auctionRepository.save(auction);
+        paymentDeadlineHistoryRepository.save(
+                PaymentDeadlineHistory.initial(auction.getId(), paymentDeadline, now()));
         markWinnerSafely(winnerId, auction.getId());
 
         List<Long> participants = participantRepository.getParticipants(auction.getId());

@@ -527,4 +527,92 @@ class AuctionTest {
 
         assertThrows(NullPointerException.class, () -> auction.resolveBuyerFacingBuyNowPrice(null));
     }
+
+    // ==================== Slice 1B: paymentDeadline ====================
+
+    @Test
+    void getPaymentDeadline_Initially_ShouldBeNull() {
+        assertNull(auction.getPaymentDeadline());
+    }
+
+    @Test
+    void setPaymentDeadline_ShouldSetValueWithoutStatusGuard() {
+        // given: plain setter, mirrors setConfirmationDeadline - no status requirement, used by
+        // AuctionFinalizer (initial assignment) and AuctionMapper (reconstruction)
+        OffsetDateTime deadline = OffsetDateTime.now().plusDays(1);
+
+        // when
+        auction.setPaymentDeadline(deadline);
+
+        // then
+        assertEquals(deadline, auction.getPaymentDeadline());
+    }
+
+    @Test
+    void extendPaymentDeadline_WhenWaitingForPaymentWithExistingDeadline_ShouldUpdateValue() {
+        // given
+        OffsetDateTime initialDeadline = OffsetDateTime.now().plusDays(1);
+        auction.setStatus(AuctionStatus.WAITING_FOR_PAYMENT);
+        auction.setPaymentDeadline(initialDeadline);
+        OffsetDateTime newDeadline = initialDeadline.plusDays(3);
+
+        // when
+        auction.extendPaymentDeadline(newDeadline);
+
+        // then
+        assertEquals(newDeadline, auction.getPaymentDeadline());
+        assertNotNull(auction.getUpdatedAt());
+    }
+
+    @Test
+    void extendPaymentDeadline_AllowsPastDeadline_NoFutureRuleEnforced() {
+        // given: locked rule explicitly forbids inventing a "must be future" rule
+        auction.setStatus(AuctionStatus.WAITING_FOR_PAYMENT);
+        auction.setPaymentDeadline(OffsetDateTime.now().plusDays(1));
+        OffsetDateTime pastDeadline = OffsetDateTime.now().minusDays(5);
+
+        // when
+        auction.extendPaymentDeadline(pastDeadline);
+
+        // then
+        assertEquals(pastDeadline, auction.getPaymentDeadline());
+    }
+
+    @Test
+    void extendPaymentDeadline_WhenNotWaitingForPayment_ShouldThrowException() {
+        // given: CREATED (default setUp state), never reached WAITING_FOR_PAYMENT
+        assertThrows(IllegalStateException.class,
+                () -> auction.extendPaymentDeadline(OffsetDateTime.now().plusDays(1)));
+    }
+
+    @Test
+    void extendPaymentDeadline_WhenWaitingForPaymentButNoExistingDeadline_ShouldThrowException() {
+        // given: simulates a historical (pre-Slice-1B) WAITING_FOR_PAYMENT auction with no
+        // initial deadline - must never be retroactively given one through this path
+        auction.setStatus(AuctionStatus.WAITING_FOR_PAYMENT);
+        assertNull(auction.getPaymentDeadline());
+
+        // when & then
+        assertThrows(IllegalStateException.class,
+                () -> auction.extendPaymentDeadline(OffsetDateTime.now().plusDays(1)));
+    }
+
+    @Test
+    void extendPaymentDeadline_NullNewDeadline_ShouldThrowNullPointerException() {
+        auction.setStatus(AuctionStatus.WAITING_FOR_PAYMENT);
+        auction.setPaymentDeadline(OffsetDateTime.now().plusDays(1));
+
+        assertThrows(NullPointerException.class, () -> auction.extendPaymentDeadline(null));
+    }
+
+    @Test
+    void extendPaymentDeadline_WhenSold_ShouldThrowException() {
+        // given: deadline changes must never be possible once the auction has left the window
+        auction.setStatus(AuctionStatus.WAITING_FOR_PAYMENT);
+        auction.setPaymentDeadline(OffsetDateTime.now().plusDays(1));
+        auction.markSold();
+
+        assertThrows(IllegalStateException.class,
+                () -> auction.extendPaymentDeadline(OffsetDateTime.now().plusDays(2)));
+    }
 }

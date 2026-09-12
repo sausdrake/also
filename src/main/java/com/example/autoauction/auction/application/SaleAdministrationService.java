@@ -1,7 +1,9 @@
 package com.example.autoauction.auction.application;
 
 import com.example.autoauction.auction.domain.Auction;
+import com.example.autoauction.auction.domain.PaymentDeadlineHistory;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
+import com.example.autoauction.auction.domain.port.PaymentDeadlineHistoryRepository;
 import com.example.autoauction.sale.domain.FaultParty;
 import com.example.autoauction.sale.domain.SaleResolution;
 import com.example.autoauction.sale.domain.SaleResolutionResult;
@@ -9,7 +11,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Slice 1 (Sale Completion &amp; Failure API): the application boundary that turns a
@@ -42,13 +47,23 @@ public class SaleAdministrationService {
     private final AuctionRepository auctionRepository;
     private final AuctionFinalizer auctionFinalizer;
     private final SaleFailureResolutionOrchestrator saleFailureResolutionOrchestrator;
+    private final PaymentDeadlineHistoryRepository paymentDeadlineHistoryRepository;
+    private final Clock clock;
 
     public SaleAdministrationService(AuctionRepository auctionRepository,
                                      AuctionFinalizer auctionFinalizer,
-                                     SaleFailureResolutionOrchestrator saleFailureResolutionOrchestrator) {
+                                     SaleFailureResolutionOrchestrator saleFailureResolutionOrchestrator,
+                                     PaymentDeadlineHistoryRepository paymentDeadlineHistoryRepository,
+                                     Clock clock) {
         this.auctionRepository = auctionRepository;
         this.auctionFinalizer = auctionFinalizer;
         this.saleFailureResolutionOrchestrator = saleFailureResolutionOrchestrator;
+        this.paymentDeadlineHistoryRepository = paymentDeadlineHistoryRepository;
+        this.clock = clock;
+    }
+
+    private OffsetDateTime now() {
+        return OffsetDateTime.now(clock);
     }
 
     /**
@@ -98,6 +113,44 @@ public class SaleAdministrationService {
                 adminId, auctionId, outcome, faultParty);
         return saleFailureResolutionOrchestrator.resolveSaleFailure(
                 auction, outcome, faultParty, normalisedReason, adminId, violationDefinitionIds);
+    }
+
+    /**
+     * Slice 1B: admin-driven payment-deadline override/extension - unlimited, admin-only, only
+     * while {@code WAITING_FOR_PAYMENT} (locked rules). Loads the Auction via
+     * {@code findByIdWithLock}, mirroring {@link #completeSale}/{@link #failSale}'s own
+     * established pattern, so a concurrent extension or a concurrent {@code completeSale}/
+     * {@code failSale} on the same auction serializes through the same lock - no new locking
+     * mechanism is introduced. {@code reason} is mandatory (locked rule); the previous deadline
+     * and the authenticated admin actor are recorded in the same transaction as the Auction
+     * update, as an append-only {@link PaymentDeadlineHistory} row.
+     */
+    @Transactional
+    public Auction extendPaymentDeadline(Long auctionId, OffsetDateTime newDeadline, String reason, Long adminId) {
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("reason обязателен для изменения платёжного дедлайна");
+        }
+        Objects.requireNonNull(newDeadline, "newDeadline не может быть null");
+        Objects.requireNonNull(adminId, "adminId не может быть null");
+
+        Auction auction = auctionRepository.findByIdWithLock(auctionId)
+                .orElseThrow(() -> new IllegalArgumentException("Аукцион не найден: " + auctionId));
+
+        OffsetDateTime previousDeadline = auction.getPaymentDeadline();
+        auction.extendPaymentDeadline(newDeadline);
+        auctionRepository.save(auction);
+
+        paymentDeadlineHistoryRepository.save(PaymentDeadlineHistory.adminExtension(
+                auctionId, previousDeadline, newDeadline, reason.strip(), adminId, now()));
+
+        log.info("Admin {} extended payment deadline for auction {} to {}", adminId, auctionId, newDeadline);
+        return auction;
+    }
+
+    /** Slice 1B: ordered history of every deadline change (INITIAL + every ADMIN_EXTENSION). */
+    @Transactional(readOnly = true)
+    public List<PaymentDeadlineHistory> getPaymentDeadlineHistory(Long auctionId) {
+        return paymentDeadlineHistoryRepository.findByAuctionIdOrderByChangedAtAscIdAsc(auctionId);
     }
 
     /**

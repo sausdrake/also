@@ -41,6 +41,7 @@ public class AuctionMapper {
         entity.setVideoUrl(domain.getVideoUrl());
         entity.setConfirmedStart(domain.isConfirmedStart());
         entity.setConfirmationDeadline(domain.getConfirmationDeadline());
+        entity.setPaymentDeadline(domain.getPaymentDeadline());
         entity.setPolicyVersionId(domain.getPolicyVersionId());
         entity.setSellerDiagnosticCommitmentId(domain.getSellerDiagnosticCommitmentId());
         entity.setSaleFinalizationMethod(domain.getSaleFinalizationMethod());
@@ -79,6 +80,9 @@ public class AuctionMapper {
         auction.setVideoUrl(entity.getVideoUrl());
         auction.setConfirmedStart(entity.isConfirmedStart());
         auction.setConfirmationDeadline(entity.getConfirmationDeadline());
+        // Slice 1B: pure field restoration (including null, for auctions that predate this
+        // feature) - never computed/backfilled here.
+        auction.setPaymentDeadline(entity.getPaymentDeadline());
         auction.setRequiredDepositAmount(entity.getRequiredDepositAmount());
         // Slice 1b-2: pure field restoration, no PolicyVersion lookup and no re-validation -
         // reconstruction must never query the policy module (see the Slice 1b-2 architecture

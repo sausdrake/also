@@ -2,8 +2,10 @@ package com.example.autoauction.auction.application;
 
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
+import com.example.autoauction.auction.domain.PaymentDeadlineChangeType;
 import com.example.autoauction.auction.domain.port.AuctionParticipantRepository;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
+import com.example.autoauction.auction.domain.port.PaymentDeadlineHistoryRepository;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.diagnostic.commitment.domain.FinalizationOutcome;
 import com.example.autoauction.policy.application.PolicyVersionService;
@@ -70,6 +72,12 @@ class AuctionFinalizerTest {
     @Mock
     private SettlementService settlementService;
 
+    @Mock
+    private StandardPaymentDeadlineCalculator standardPaymentDeadlineCalculator;
+
+    @Mock
+    private PaymentDeadlineHistoryRepository paymentDeadlineHistoryRepository;
+
     @InjectMocks
     private AuctionFinalizer auctionFinalizer;
 
@@ -128,6 +136,8 @@ class AuctionFinalizerTest {
             assertThat(activeAuction.getStatus()).isEqualTo(AuctionStatus.EXPIRED);
             assertThat(activeAuction.getWinnerId()).isNull();
             assertThat(activeAuction.getWinningBid()).isNull();
+            assertThat(activeAuction.getPaymentDeadline()).isNull();
+            verifyNoInteractions(standardPaymentDeadlineCalculator, paymentDeadlineHistoryRepository);
 
             verify(depositService, times(2)).unfreezeForAuction(anyLong(), eq(auctionId));
             verify(participantRepository, times(1)).clearParticipants(auctionId);
@@ -519,6 +529,8 @@ class AuctionFinalizerTest {
             doNothing().when(depositService).markAsWinner(eq(winnerId), eq(auctionId));
             when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
             doNothing().when(participantRepository).clearParticipants(auctionId);
+            OffsetDateTime deadline = fixedTime.plusDays(1);
+            when(standardPaymentDeadlineCalculator.computeInitialDeadline()).thenReturn(deadline);
 
             // when
             auctionFinalizer.finalizeWithBuyNow(activeAuction, winnerId, buyNowAmount);
@@ -528,10 +540,17 @@ class AuctionFinalizerTest {
             assertThat(activeAuction.getWinnerId()).isEqualTo(winnerId);
             assertThat(activeAuction.getCurrentPrice()).isEqualTo(buyNowAmount);
             assertThat(activeAuction.getWinningBid()).isEqualTo(buyNowAmount);
+            assertThat(activeAuction.getPaymentDeadline()).isEqualTo(deadline);
 
             verify(depositService, times(1)).markAsWinner(winnerId, auctionId);
             verify(depositService, times(1)).unfreezeForAuction(eq(loserId), eq(auctionId));
             verify(participantRepository, times(1)).clearParticipants(auctionId);
+            verify(paymentDeadlineHistoryRepository, times(1)).save(argThat(h ->
+                    h.getChangeType() == PaymentDeadlineChangeType.INITIAL
+                            && h.getAuctionId().equals(auctionId)
+                            && h.getNewDeadline().equals(deadline)
+                            && h.getChangedByAdminId() == null
+                            && h.getPreviousDeadline() == null));
         }
 
         @Test
@@ -565,6 +584,8 @@ class AuctionFinalizerTest {
             activeAuction.setWinningBid(new BigDecimal("1200000"));
             when(participantRepository.getParticipants(auctionId)).thenReturn(List.of(winnerId));
             when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+            OffsetDateTime deadline = fixedTime.plusDays(1);
+            when(standardPaymentDeadlineCalculator.computeInitialDeadline()).thenReturn(deadline);
 
             // when
             boolean result = auctionFinalizer.finalizeAuction(activeAuction);
@@ -572,7 +593,22 @@ class AuctionFinalizerTest {
             // then
             assertThat(result).isTrue();
             assertThat(activeAuction.getStatus()).isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
+            assertThat(activeAuction.getPaymentDeadline()).isEqualTo(deadline);
             verifyNoInteractions(policyVersionService);
+            verify(paymentDeadlineHistoryRepository, times(1)).save(argThat(h ->
+                    h.getChangeType() == PaymentDeadlineChangeType.INITIAL
+                            && h.getAuctionId().equals(auctionId)
+                            && h.getNewDeadline().equals(deadline)
+                            && h.getPreviousDeadline() == null
+                            && h.getChangedByAdminId() == null
+                            && h.getReason() != null && !h.getReason().isBlank()));
+            // Statement-order proxy for "committed atomically" - both happen inside this same
+            // @Transactional method; genuine rollback-on-failure atomicity is out of reach for a
+            // Mockito unit test (same established limitation already documented elsewhere in this
+            // class) and is covered by this codebase's real-transaction integration tests.
+            InOrder inOrder = inOrder(auctionRepository, paymentDeadlineHistoryRepository);
+            inOrder.verify(auctionRepository).save(activeAuction);
+            inOrder.verify(paymentDeadlineHistoryRepository).save(any());
         }
 
         @Test
@@ -605,6 +641,8 @@ class AuctionFinalizerTest {
             // then
             assertThat(result).isTrue();
             assertThat(policyBound.getStatus()).isEqualTo(AuctionStatus.EXPIRED);
+            assertThat(policyBound.getPaymentDeadline()).isNull();
+            verifyNoInteractions(standardPaymentDeadlineCalculator, paymentDeadlineHistoryRepository);
         }
 
         @Test
@@ -627,6 +665,8 @@ class AuctionFinalizerTest {
                             fixedTime, sellerId, fixedTime));
             when(participantRepository.getParticipants(2L)).thenReturn(List.of(winnerId));
             when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+            OffsetDateTime deadline = fixedTime.plusDays(1);
+            when(standardPaymentDeadlineCalculator.computeInitialDeadline()).thenReturn(deadline);
 
             // when
             boolean result = auctionFinalizer.finalizeAuction(policyBound);
@@ -634,6 +674,7 @@ class AuctionFinalizerTest {
             // then
             assertThat(result).isTrue();
             assertThat(policyBound.getStatus()).isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
+            assertThat(policyBound.getPaymentDeadline()).isEqualTo(deadline);
         }
 
         @Test
@@ -658,6 +699,7 @@ class AuctionFinalizerTest {
                             fixedTime, sellerId, fixedTime));
             when(participantRepository.getParticipants(2L)).thenReturn(List.of(winnerId));
             when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(standardPaymentDeadlineCalculator.computeInitialDeadline()).thenReturn(fixedTime.plusDays(1));
 
             // when
             auctionFinalizer.finalizeAuction(policyBound);
