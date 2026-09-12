@@ -40,6 +40,7 @@ interface Report {
 
 interface UserItem {
   id: number; username: string; email: string; active: boolean;
+  trusted: boolean;
   roles: string[]; balance?: number; availableBalance?: number;
   createdAt?: string;
 }
@@ -513,6 +514,15 @@ function UsersPage() {
     } catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); }
   };
 
+  // Slice 1A: operational controlled-beta trust toggle - NOT identity/KYC verification.
+  const toggleTrust = async (u: UserItem) => {
+    try {
+      await api.patch(`/admin/users/${u.id}/${u.trusted ? 'untrust' : 'trust'}`);
+      notify(`${u.username} ${u.trusted ? 'доверие отозвано' : 'доверен для участия в торгах'}`);
+      load();
+    } catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); }
+  };
+
   const applyRole = async () => {
     if (!roleTarget || !newRole.trim()) return;
     try {
@@ -581,6 +591,12 @@ function UsersPage() {
                   {viewTarget.active ? 'Активен' : 'Заблокирован'}
                 </span>
               </div>
+              <div className="flex gap-2">
+                <span className="text-gray-500 w-32 shrink-0">Доверие:</span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${viewTarget.trusted ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {viewTarget.trusted ? 'Доверен' : 'Не рассмотрен'}
+                </span>
+              </div>
               {viewTarget.createdAt && (
                 <div className="flex gap-2">
                   <span className="text-gray-500 w-32 shrink-0">Регистрация:</span>
@@ -592,6 +608,10 @@ function UsersPage() {
               <button onClick={() => { toggleBlock(viewTarget); setViewTarget(null); }}
                 className={`px-3 py-2 rounded-lg text-sm ${viewTarget.active ? 'bg-red-50 text-red-700 hover:bg-red-100' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}>
                 {viewTarget.active ? 'Заблокировать' : 'Разблокировать'}
+              </button>
+              <button onClick={() => { toggleTrust(viewTarget); setViewTarget(null); }}
+                className={`px-3 py-2 rounded-lg text-sm ${viewTarget.trusted ? 'bg-gray-50 text-gray-600 hover:bg-gray-100' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}>
+                {viewTarget.trusted ? 'Отозвать доверие' : 'Доверить'}
               </button>
               <button onClick={() => { setViewTarget(null); setRoleTarget(viewTarget); setNewRole(viewTarget.roles[0] || ''); }}
                 className="px-3 py-2 rounded-lg text-sm bg-blue-50 text-blue-700 hover:bg-blue-100">
@@ -637,7 +657,7 @@ function UsersPage() {
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  {['Имя', 'Email', 'Роль', 'Дата регистрации', 'Статус', 'Действия'].map(h => (
+                  {['Имя', 'Email', 'Роль', 'Дата регистрации', 'Статус', 'Доверие', 'Действия'].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -665,6 +685,11 @@ function UsersPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${u.trusted ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {u.trusted ? 'Доверен' : 'Не рассмотрен'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
                       <div className="flex gap-1.5">
                         <button onClick={() => setViewTarget(u)}
                           className="text-xs px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">
@@ -673,6 +698,10 @@ function UsersPage() {
                         <button onClick={() => toggleBlock(u)}
                           className={`text-xs px-2.5 py-1.5 rounded-lg font-medium ${u.active ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}>
                           {u.active ? 'Заблок.' : 'Разблок.'}
+                        </button>
+                        <button onClick={() => toggleTrust(u)}
+                          className={`text-xs px-2.5 py-1.5 rounded-lg font-medium ${u.trusted ? 'bg-gray-50 text-gray-600 hover:bg-gray-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}>
+                          {u.trusted ? 'Отозвать' : 'Доверить'}
                         </button>
                         <button onClick={() => { setRoleTarget(u); setNewRole(u.roles[0] || ''); }}
                           className="text-xs px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium">

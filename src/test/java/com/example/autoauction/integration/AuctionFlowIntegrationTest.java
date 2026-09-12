@@ -69,11 +69,15 @@ class AuctionFlowIntegrationTest {
         userRole = roleRepository.findByName("ROLE_USER")
                 .orElseGet(() -> roleRepository.save(new Role(null, "ROLE_USER", "Обычный пользователь")));
 
-        User seller = new User(null, "seller", "seller@test.com", "encoded", true, Set.of(userRole));
+        // Slice 1A: trust gate - every user that ever acts as the bidder/buyer argument to
+        // placeBid()/buyNow() (seller included, used as the actor in the self-bid rejection
+        // tests below) must be trusted, or they would be rejected at the trust gate before ever
+        // reaching the behavior these pre-existing tests actually exercise.
+        User seller = new User(null, "seller", "seller@test.com", "encoded", true, Set.of(userRole), true, null, null);
         sellerId = userRepository.save(seller).getId();
 
-        User bidder1 = new User(null, "bidder1", "bidder1@test.com", "encoded", true, Set.of(userRole));
-        User bidder2 = new User(null, "bidder2", "bidder2@test.com", "encoded", true, Set.of(userRole));
+        User bidder1 = new User(null, "bidder1", "bidder1@test.com", "encoded", true, Set.of(userRole), true, null, null);
+        User bidder2 = new User(null, "bidder2", "bidder2@test.com", "encoded", true, Set.of(userRole), true, null, null);
         bidder1Id = userRepository.save(bidder1).getId();
         bidder2Id = userRepository.save(bidder2).getId();
 
@@ -177,7 +181,7 @@ class AuctionFlowIntegrationTest {
         notStartedAuction = auctionRepository.save(notStartedAuction);
 
         // Покупатель с достаточным депозитом
-        User buyer = new User(null, "buyer", "buyer@test.com", "encoded", true, Set.of(userRole));
+        User buyer = new User(null, "buyer", "buyer@test.com", "encoded", true, Set.of(userRole), true, null, null);
         Long buyerId = userRepository.save(buyer).getId();
         depositService.createDeposit(buyerId, new BigDecimal("1000000"));
 
@@ -215,7 +219,7 @@ class AuctionFlowIntegrationTest {
         noBuyNowAuction.setRequiredDepositAmount(new BigDecimal("10000"));
         noBuyNowAuction = auctionRepository.save(noBuyNowAuction);
 
-        User buyer = new User(null, "buyer2", "buyer2@test.com", "encoded", true, Set.of(userRole));
+        User buyer = new User(null, "buyer2", "buyer2@test.com", "encoded", true, Set.of(userRole), true, null, null);
         Long buyerId = userRepository.save(buyer).getId();
         depositService.createDeposit(buyerId, new BigDecimal("1000000"));
 
@@ -268,7 +272,7 @@ class AuctionFlowIntegrationTest {
         notStartedAuction = auctionRepository.save(notStartedAuction);
 
         // Покупатель с нулевым депозитом
-        User poorBuyer = new User(null, "poor", "poor@test.com", "encoded", true, Set.of(userRole));
+        User poorBuyer = new User(null, "poor", "poor@test.com", "encoded", true, Set.of(userRole), true, null, null);
         Long poorBuyerId = userRepository.save(poorBuyer).getId();
         depositService.createDeposit(poorBuyerId, BigDecimal.ZERO);
 
@@ -292,7 +296,7 @@ class AuctionFlowIntegrationTest {
     @Test
     @DisplayName("Недостаточно средств на депозите - ошибка")
     void placeBid_InsufficientDeposit_ThrowsException() {
-        User poorUser = new User(null, "poor", "poor@test.com", "encoded", true, Set.of(userRole));
+        User poorUser = new User(null, "poor", "poor@test.com", "encoded", true, Set.of(userRole), true, null, null);
         Long poorUserId = userRepository.save(poorUser).getId();
         depositService.createDeposit(poorUserId, BigDecimal.ZERO);
 

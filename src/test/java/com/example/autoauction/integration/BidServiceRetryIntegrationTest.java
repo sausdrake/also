@@ -59,7 +59,8 @@ class BidServiceRetryIntegrationTest {
         User seller = new User(null, "seller", "seller@test.com", "encoded", true, Set.of(userRole));
         sellerId = userRepository.save(seller).getId();
 
-        User bidder = new User(null, "bidder", "bidder@test.com", "encoded", true, Set.of(userRole));
+        // Slice 1A: trust gate - the bidder actually calling placeBid() must be trusted.
+        User bidder = new User(null, "bidder", "bidder@test.com", "encoded", true, Set.of(userRole), true, null, null);
         bidderId = userRepository.save(bidder).getId();
 
         depositService.createDeposit(bidderId, new BigDecimal("50000"));

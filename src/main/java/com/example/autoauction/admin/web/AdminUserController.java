@@ -1,10 +1,13 @@
 package com.example.autoauction.admin.web;
 
+import com.example.autoauction.auth.domain.UserPrincipal;
+import com.example.autoauction.auth.infrastructure.security.CurrentUser;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.deposit.web.dto.DepositResponse;
 import com.example.autoauction.user.application.UserService;
 import com.example.autoauction.user.domain.User;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -75,6 +78,30 @@ public class AdminUserController {
         return ResponseEntity.ok(UserDto.from(userService.unblockUser(id)));
     }
 
+    /**
+     * Slice 1A: records that the authenticated admin currently vouches this user is trusted to
+     * bid/Buy Now in the controlled beta. This is an operational trust decision, never legal
+     * identity verification. The acting admin is always taken from the authenticated principal -
+     * never from the request body.
+     */
+    @PatchMapping("/{id}/trust")
+    @Operation(summary = "Доверить пользователю участие в торгах (контролируемый бета-режим, не юридическая верификация)")
+    public ResponseEntity<UserDto> trustUser(
+            @PathVariable Long id,
+            @Parameter(hidden = true) @CurrentUser UserPrincipal currentUser
+    ) {
+        return ResponseEntity.ok(UserDto.from(userService.trustUser(id, currentUser.getUserId())));
+    }
+
+    @PatchMapping("/{id}/untrust")
+    @Operation(summary = "Отозвать доверие пользователю для участия в торгах")
+    public ResponseEntity<UserDto> untrustUser(
+            @PathVariable Long id,
+            @Parameter(hidden = true) @CurrentUser UserPrincipal currentUser
+    ) {
+        return ResponseEntity.ok(UserDto.from(userService.untrustUser(id, currentUser.getUserId())));
+    }
+
     @PatchMapping("/{id}/role")
     @Operation(summary = "Сменить роль пользователя")
     public ResponseEntity<UserDto> setRole(
@@ -108,13 +135,14 @@ public class AdminUserController {
             String username,
             String email,
             boolean active,
+            boolean trusted,
             List<String> roles,
             java.math.BigDecimal balance,
             java.math.BigDecimal availableBalance
     ) {
         static UserDto from(User u) {
             return new UserDto(
-                    u.getId(), u.getUsername(), u.getEmail(), u.isActive(),
+                    u.getId(), u.getUsername(), u.getEmail(), u.isActive(), u.isTrusted(),
                     u.getRoles().stream().map(r -> r.getName()).toList(),
                     null, null
             );
@@ -122,7 +150,7 @@ public class AdminUserController {
 
         static UserDto fromWithBalance(User u, DepositResponse dep) {
             return new UserDto(
-                    u.getId(), u.getUsername(), u.getEmail(), u.isActive(),
+                    u.getId(), u.getUsername(), u.getEmail(), u.isActive(), u.isTrusted(),
                     u.getRoles().stream().map(r -> r.getName()).toList(),
                     dep != null ? dep.balance() : null,
                     dep != null ? dep.availableBalance() : null

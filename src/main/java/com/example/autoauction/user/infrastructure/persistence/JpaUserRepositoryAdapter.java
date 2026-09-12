@@ -35,6 +35,9 @@ public class JpaUserRepositoryAdapter implements UserRepository {
                 user.isActive()
         );
         entity.setId(user.getId());
+        entity.setTrusted(user.isTrusted());
+        entity.setVerifiedByAdminId(user.getVerifiedByAdminId());
+        entity.setVerifiedAt(user.getVerifiedAt());
 
         // Конвертируем роли (загружаем существующие из БД)
         Set<JpaRoleEntity> roleEntities = user.getRoles().stream()
@@ -66,7 +69,10 @@ public class JpaUserRepositoryAdapter implements UserRepository {
                 entity.getEmail(),
                 entity.getPasswordHash(),
                 entity.isActive(),
-                roles
+                roles,
+                entity.isTrusted(),
+                entity.getVerifiedByAdminId(),
+                entity.getVerifiedAt()
         );
     }
 

@@ -10,6 +10,8 @@ import com.example.autoauction.auction.web.dto.BidResponse;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.notification.application.NotificationService;
 import com.example.autoauction.policy.application.PolicyVersionService;
+import com.example.autoauction.user.application.UserService;
+import com.example.autoauction.user.domain.User;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -34,6 +36,7 @@ public class BidService {
     private final AuctionWebSocketController webSocketController;
     private final NotificationService notificationService;
     private final PolicyVersionService policyVersionService;
+    private final UserService userService;
 
     public BidService(AuctionRepository auctionRepository,
                       DepositService depositService,
@@ -42,7 +45,8 @@ public class BidService {
                       RateLimitService rateLimitService,
                       AuctionWebSocketController webSocketController,
                       NotificationService notificationService,
-                      PolicyVersionService policyVersionService) {
+                      PolicyVersionService policyVersionService,
+                      UserService userService) {
         this.auctionRepository = auctionRepository;
         this.depositService = depositService;
         this.participantRepository = participantRepository;
@@ -51,7 +55,27 @@ public class BidService {
         this.webSocketController = webSocketController;
         this.notificationService = notificationService;
         this.policyVersionService = policyVersionService;
+        this.userService = userService;
         log.info("BidService initialized with WebSocket and Notification support");
+    }
+
+    /**
+     * Slice 1A: fail-closed controlled-beta trust gate for the protected participant actions
+     * (bidding, Buy Now). Reused by both placeBid() and buyNow() rather than duplicated. Checked
+     * before any auction lookup/deposit freeze/participant registration - an untrusted caller's
+     * request is rejected with zero side effects. Uses SecurityException, the established
+     * convention in this codebase for "this actor is not permitted to do this" application-layer
+     * rejections (mirrors VehicleService/DiagnosticRequestService), mapped to 403 by
+     * GlobalExceptionHandler.
+     */
+    private void requireTrustedParticipant(Long userId) {
+        User user = userService.getUser(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден: " + userId));
+        if (!user.isTrusted()) {
+            throw new SecurityException(
+                    "Участие в торгах доступно только доверенным пользователям. "
+                            + "Обратитесь к администратору для получения доступа.");
+        }
     }
 
     /**
@@ -85,6 +109,9 @@ public class BidService {
             log.warn("Rate limit exceeded for user: {}", buyerId);
             throw new RateLimitException("Слишком много запросов. Пожалуйста, подождите.");
         }
+
+        // Slice 1A: fail-closed before any auction lookup/deposit/participant side effect.
+        requireTrustedParticipant(buyerId);
 
         Auction auction = auctionRepository.findByIdWithLock(auctionId)
                 .orElseThrow(() -> {
@@ -164,6 +191,9 @@ public class BidService {
             log.warn("Rate limit exceeded for user: {}", bidderId);
             throw new RateLimitException("Слишком много ставок. Пожалуйста, подождите.");
         }
+
+        // Slice 1A: fail-closed before any auction lookup/deposit/participant side effect.
+        requireTrustedParticipant(bidderId);
 
         Auction auction = auctionRepository.findByIdWithLock(auctionId)
                 .orElseThrow(() -> {

@@ -28,6 +28,19 @@ public class JpaUserEntity {
     @Column(nullable = false)
     private boolean active;
 
+    /**
+     * Slice 1A: operational controlled-beta trust flag - not legal identity verification.
+     * Defaults to false (never reviewed) for every historical/newly-registered row.
+     */
+    @Column(nullable = false)
+    private boolean trusted;
+
+    @Column(name = "verified_by_admin_id")
+    private Long verifiedByAdminId;
+
+    @Column(name = "verified_at")
+    private OffsetDateTime verifiedAt;
+
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 
@@ -81,6 +94,15 @@ public class JpaUserEntity {
 
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+
+    public boolean isTrusted() { return trusted; }
+    public void setTrusted(boolean trusted) { this.trusted = trusted; }
+
+    public Long getVerifiedByAdminId() { return verifiedByAdminId; }
+    public void setVerifiedByAdminId(Long verifiedByAdminId) { this.verifiedByAdminId = verifiedByAdminId; }
+
+    public OffsetDateTime getVerifiedAt() { return verifiedAt; }
+    public void setVerifiedAt(OffsetDateTime verifiedAt) { this.verifiedAt = verifiedAt; }
 
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }

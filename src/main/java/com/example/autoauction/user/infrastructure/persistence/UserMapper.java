@@ -25,7 +25,10 @@ public final class UserMapper {
                 entity.getEmail(),
                 entity.getPasswordHash(),
                 entity.isActive(),
-                roles
+                roles,
+                entity.isTrusted(),
+                entity.getVerifiedByAdminId(),
+                entity.getVerifiedAt()
         );
     }
 

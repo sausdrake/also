@@ -44,6 +44,11 @@ class AdminDepositControllerTest {
     @Autowired private UserRepository userRepository;
     @Autowired private RoleRepository roleRepository;
 
+    // Slice 1A: deliberately left on the OLD 6-arg User constructor - this target user defaults
+    // to untrusted (the correct default). canonicalEndpoint_AdminAdjust_Succeeds below therefore
+    // already proves the required Slice 1A non-circularity invariant: adminAdjust must remain
+    // available regardless of the target user's trust state, since admin-mediated deposit
+    // funding and admin trust assignment are independent administrative operations.
     private Long createUserWithDeposit(BigDecimal balance) {
         Role userRole = roleRepository.findByName("ROLE_USER")
                 .orElseGet(() -> roleRepository.save(new Role(null, "ROLE_USER", "Обычный пользователь")));

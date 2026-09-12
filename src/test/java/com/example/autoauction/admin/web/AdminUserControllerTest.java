@@ -130,6 +130,81 @@ class AdminUserControllerTest {
     }
 
     @Nested
+    @DisplayName("PATCH /api/v1/admin/users/{id}/trust")
+    class TrustUserTests {
+
+        @Test
+        @WithMockCustomUser(userId = 42L, roles = {"ADMIN"})
+        @DisplayName("ADMIN может доверить пользователю участие в торгах")
+        void trustUser_ReturnsTrusted() throws Exception {
+            Role role = new Role(1L, "ROLE_USER", "User role");
+            User trusted = new User(1L, "john", "john@test.com", "hash", true, Set.of(role),
+                    true, 42L, java.time.OffsetDateTime.now());
+            when(userService.trustUser(1L, 42L)).thenReturn(trusted);
+
+            mockMvc.perform(patch("/api/v1/admin/users/1/trust"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.trusted").value(true));
+
+            verify(userService).trustUser(1L, 42L);
+        }
+
+        // Note: role-rejection (USER/DIAGNOSTIC/anonymous -> 403/401) is deliberately NOT tested
+        // here. This class's own TestSecurityConfig (admin.web package) matches "/api/admin/**",
+        // not the real "/api/v1/admin/**" prefix - a pre-existing, unrelated gap that predates
+        // Slice 1A and already affects every other endpoint in this controller (block/unblock/
+        // role), not just trust/untrust. Fixing it would mean touching shared test
+        // infrastructure outside this slice's scope. Role-rejection is instead proven against
+        // the real security chain in AdminUserTrustApiIntegrationTest (full @SpringBootTest,
+        // mirroring AdminDepositControllerTest's own established convention).
+
+        @Test
+        @WithMockCustomUser(userId = 42L, roles = {"ADMIN"})
+        @DisplayName("Actor всегда берётся из аутентифицированного контекста, а не из тела запроса")
+        void trustUser_ActorAlwaysFromAuthenticatedContext() throws Exception {
+            Role role = new Role(1L, "ROLE_USER", "User role");
+            User trusted = new User(1L, "john", "john@test.com", "hash", true, Set.of(role),
+                    true, 42L, java.time.OffsetDateTime.now());
+            when(userService.trustUser(eq(1L), eq(42L))).thenReturn(trusted);
+
+            // Even if a client tried to smuggle an admin id in the body, there is no field in
+            // this endpoint's contract that accepts one - trustUser() is called with exactly the
+            // path id and the authenticated principal's own id, nothing else.
+            mockMvc.perform(patch("/api/v1/admin/users/1/trust")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"verifiedByAdminId\": 999, \"verifiedAt\": \"2020-01-01T00:00:00Z\"}"))
+                    .andExpect(status().isOk());
+
+            verify(userService).trustUser(1L, 42L);
+            verify(userService, never()).trustUser(anyLong(), eq(999L));
+        }
+    }
+
+    @Nested
+    @DisplayName("PATCH /api/v1/admin/users/{id}/untrust")
+    class UntrustUserTests {
+
+        @Test
+        @WithMockCustomUser(userId = 42L, roles = {"ADMIN"})
+        @DisplayName("ADMIN может отозвать доверие пользователю")
+        void untrustUser_ReturnsUntrusted() throws Exception {
+            Role role = new Role(1L, "ROLE_USER", "User role");
+            User untrusted = new User(1L, "john", "john@test.com", "hash", true, Set.of(role),
+                    false, 42L, java.time.OffsetDateTime.now());
+            when(userService.untrustUser(1L, 42L)).thenReturn(untrusted);
+
+            mockMvc.perform(patch("/api/v1/admin/users/1/untrust"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.trusted").value(false));
+
+            verify(userService).untrustUser(1L, 42L);
+        }
+
+        // Note: role/anonymous-rejection deliberately not tested here - see the same note in
+        // TrustUserTests above; proven instead in AdminUserTrustApiIntegrationTest.
+    }
+
+    @Nested
     @DisplayName("PATCH /api/v1/admin/users/{id}/role")
     class SetRoleTests {
 

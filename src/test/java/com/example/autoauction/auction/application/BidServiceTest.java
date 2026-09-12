@@ -10,6 +10,8 @@ import com.example.autoauction.auction.web.dto.BidResponse;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.policy.application.PolicyVersionService;
 import com.example.autoauction.policy.domain.PolicyVersion;
+import com.example.autoauction.user.application.UserService;
+import com.example.autoauction.user.domain.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -53,6 +55,9 @@ class BidServiceTest {
     @Mock
     private PolicyVersionService policyVersionService;
 
+    @Mock
+    private UserService userService;
+
     @InjectMocks
     private BidService bidService;
 
@@ -77,6 +82,20 @@ class BidServiceTest {
 
     private OffsetDateTime now;
     private OffsetDateTime futureEndTime;
+
+    /**
+     * Slice 1A: every test that expects a bid/Buy Now to actually proceed must stub the caller
+     * as trusted - untrusted is the correct default (new user defaults to untrusted), so tests
+     * that represent a normal, already-participating actor must explicitly opt into that state.
+     * Following this file's own established convention (see the rateLimitService comment in
+     * setUp() below): stubbed individually per test, never as a blanket @BeforeEach stub, to
+     * avoid UnnecessaryStubbingException under MockitoExtension's strict stubbing for tests that
+     * never reach this check (null-argument / rate-limit-rejected tests).
+     */
+    private User trustedUser(Long id) {
+        return new User(id, "u" + id, "u" + id + "@test.com", "hash", true, java.util.Set.of(),
+                true, 1L, OffsetDateTime.now());
+    }
 
     @BeforeEach
     void setUp() {
@@ -140,6 +159,7 @@ class BidServiceTest {
         void placeBid_FirstBid_Success() {
             // given
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, requiredDeposit);
@@ -170,6 +190,7 @@ class BidServiceTest {
         void placeBid_SecondBidBySameUser_NoAdditionalFreeze() {
             // given
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, requiredDeposit);
@@ -203,6 +224,7 @@ class BidServiceTest {
         void placeBid_LastMinuteBid_AuctionExtended() {
             // given
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, requiredDeposit);
@@ -229,6 +251,7 @@ class BidServiceTest {
         @DisplayName("Ставка на несуществующий аукцион - IllegalArgumentException")
         void placeBid_AuctionNotFound_ThrowsException() {
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
             when(auctionRepository.findByIdWithLock(nonExistentAuctionId)).thenReturn(Optional.empty());
 
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
@@ -240,6 +263,7 @@ class BidServiceTest {
         @DisplayName("Ставка на неактивный аукцион (CREATED) - IllegalStateException")
         void placeBid_AuctionNotActive_ThrowsException() {
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
             when(auctionRepository.findByIdWithLock(2L)).thenReturn(Optional.of(createdAuction));
 
             IllegalStateException exception = assertThrows(IllegalStateException.class,
@@ -252,6 +276,7 @@ class BidServiceTest {
         @DisplayName("Ставка на свой собственный аукцион - IllegalArgumentException")
         void placeBid_OnOwnAuction_ThrowsException() {
             when(rateLimitService.tryAcquire(sellerId)).thenReturn(true);
+            when(userService.getUser(sellerId)).thenReturn(Optional.of(trustedUser(sellerId)));
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
 
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
@@ -263,6 +288,7 @@ class BidServiceTest {
         @DisplayName("Ставка ниже минимального шага - IllegalArgumentException")
         void placeBid_BidTooLow_ThrowsException() {
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, requiredDeposit);
@@ -279,6 +305,7 @@ class BidServiceTest {
         @DisplayName("Недостаточно средств на депозите - IllegalArgumentException")
         void placeBid_InsufficientDeposit_ThrowsException() {
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(false);
             when(participantRepository.isParticipant(auctionId, bidderId1)).thenReturn(false);
@@ -295,6 +322,7 @@ class BidServiceTest {
         void placeBid_NoRequiredDepositAmountConfigured_ThrowsAndDoesNotTouchDeposit() {
             activeAuction.setRequiredDepositAmount(null);
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(participantRepository.isParticipant(auctionId, bidderId1)).thenReturn(false);
 
@@ -316,6 +344,7 @@ class BidServiceTest {
         @DisplayName("При успешной ставке депозит замораживается")
         void placeBid_Success_FreezesDeposit() {
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, requiredDeposit);
@@ -332,6 +361,7 @@ class BidServiceTest {
         @DisplayName("При ошибочной ставке депозит размораживается")
         void placeBid_Failed_UnfreezesDeposit() {
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, requiredDeposit);
@@ -354,6 +384,7 @@ class BidServiceTest {
         @DisplayName("После ставки пользователь добавляется в список участников")
         void placeBid_AddsUserToParticipantsList() {
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, requiredDeposit);
@@ -370,6 +401,7 @@ class BidServiceTest {
         @DisplayName("Несколько пользователей - все добавляются в список")
         void placeBid_MultipleUsers_AllAdded() {
             when(rateLimitService.tryAcquire(anyLong())).thenReturn(true);
+            when(userService.getUser(anyLong())).thenAnswer(inv -> Optional.of(trustedUser(inv.getArgument(0))));
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(depositService.canParticipateInAuction(anyLong(), eq(requiredDeposit))).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(anyLong(), eq(auctionId), eq(requiredDeposit));
@@ -404,6 +436,7 @@ class BidServiceTest {
         @DisplayName("Buy Now на ACTIVE аукцион — IllegalStateException")
         void buyNow_OnActiveAuction_Throws() {
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
 
             IllegalStateException ex = assertThrows(IllegalStateException.class,
@@ -416,6 +449,7 @@ class BidServiceTest {
         @DisplayName("Buy Now на COMPLETED аукцион — IllegalStateException")
         void buyNow_OnCompletedAuction_Throws() {
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
             when(auctionRepository.findByIdWithLock(3L)).thenReturn(Optional.of(completedAuction));
 
             assertThrows(IllegalStateException.class,
@@ -426,6 +460,7 @@ class BidServiceTest {
         @DisplayName("Buy Now на собственный аукцион — IllegalArgumentException")
         void buyNow_OnOwnAuction_Throws() {
             when(rateLimitService.tryAcquire(sellerId)).thenReturn(true);
+            when(userService.getUser(sellerId)).thenReturn(Optional.of(trustedUser(sellerId)));
             when(auctionRepository.findByIdWithLock(2L)).thenReturn(Optional.of(createdAuction));
 
             IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
@@ -444,6 +479,7 @@ class BidServiceTest {
             noBuyNow.setStatus(AuctionStatus.CREATED);
 
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
             when(auctionRepository.findByIdWithLock(5L)).thenReturn(Optional.of(noBuyNow));
 
             assertThrows(IllegalStateException.class,
@@ -454,6 +490,7 @@ class BidServiceTest {
         @DisplayName("Buy Now при недостаточном депозите — IllegalArgumentException")
         void buyNow_InsufficientDeposit_Throws() {
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
             when(auctionRepository.findByIdWithLock(2L)).thenReturn(Optional.of(createdAuction));
             when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(false);
 
@@ -467,6 +504,7 @@ class BidServiceTest {
         void buyNow_NoRequiredDepositAmountConfigured_Throws() {
             createdAuction.setRequiredDepositAmount(null);
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
             when(auctionRepository.findByIdWithLock(2L)).thenReturn(Optional.of(createdAuction));
 
             IllegalStateException ex = assertThrows(IllegalStateException.class,
@@ -533,6 +571,7 @@ class BidServiceTest {
             BigDecimal exactMinBid = startingPrice.add(minBidStep);
 
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
             when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
             when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(bidderId1, auctionId, requiredDeposit);
@@ -580,6 +619,7 @@ class BidServiceTest {
             // given
             assertNull(createdAuction.getPolicyVersionId());
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
             when(auctionRepository.findByIdWithLock(2L)).thenReturn(Optional.of(createdAuction));
             when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(bidderId1, 2L, requiredDeposit);
@@ -602,6 +642,7 @@ class BidServiceTest {
                     now, sellerId, now);
             when(policyVersionService.getById(5L)).thenReturn(policyA);
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
             when(auctionRepository.findByIdWithLock(2L)).thenReturn(Optional.of(createdAuction));
             when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(bidderId1, 2L, requiredDeposit);
@@ -628,6 +669,7 @@ class BidServiceTest {
                     now, sellerId, now);
             when(policyVersionService.getById(5L)).thenReturn(policyA);
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
             when(auctionRepository.findByIdWithLock(2L)).thenReturn(Optional.of(createdAuction));
             when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
             doNothing().when(depositService).freezeForAuction(bidderId1, 2L, requiredDeposit);
@@ -639,6 +681,106 @@ class BidServiceTest {
             verify(policyVersionService, times(1)).getById(5L);
             verify(policyVersionService, never()).getById(9L);
             verify(policyVersionService, never()).getCurrentPublished();
+        }
+    }
+
+    // ==================== Slice 1A: trust gate ====================
+
+    @Nested
+    @DisplayName("🔒 Slice 1A — доверенный участник (trust gate)")
+    class TrustGateTests {
+
+        @Test
+        @DisplayName("Untrusted пользователь не может сделать ставку - SecurityException, без side-эффектов")
+        void placeBid_UntrustedUser_RejectedWithNoSideEffects() {
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1))
+                    .thenReturn(Optional.of(new User(bidderId1, "u" + bidderId1, "u" + bidderId1 + "@test.com",
+                            "hash", true, java.util.Set.of())));
+
+            assertThrows(SecurityException.class,
+                    () -> bidService.placeBid(auctionId, validBid, bidderId1));
+
+            verifyNoInteractions(auctionRepository);
+            verifyNoInteractions(depositService);
+            verifyNoInteractions(participantRepository);
+        }
+
+        @Test
+        @DisplayName("Несуществующий пользователь не может сделать ставку - IllegalArgumentException, без side-эффектов")
+        void placeBid_NonExistentUser_RejectedWithNoSideEffects() {
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.empty());
+
+            assertThrows(IllegalArgumentException.class,
+                    () -> bidService.placeBid(auctionId, validBid, bidderId1));
+
+            verifyNoInteractions(auctionRepository);
+            verifyNoInteractions(depositService);
+            verifyNoInteractions(participantRepository);
+        }
+
+        @Test
+        @DisplayName("Trusted пользователь может сделать ставку - существующее поведение не изменилось")
+        void placeBid_TrustedUser_ExistingBehaviorUnchanged() {
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
+            when(auctionRepository.findByIdWithLock(auctionId)).thenReturn(Optional.of(activeAuction));
+            when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
+            when(participantRepository.isParticipant(auctionId, bidderId1)).thenReturn(false);
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            BidResponse response = bidService.placeBid(auctionId, validBid, bidderId1);
+
+            assertNotNull(response);
+            verify(depositService, times(1)).freezeForAuction(bidderId1, auctionId, requiredDeposit);
+        }
+
+        @Test
+        @DisplayName("Untrusted пользователь не может Buy Now - SecurityException, без side-эффектов")
+        void buyNow_UntrustedUser_RejectedWithNoSideEffects() {
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1))
+                    .thenReturn(Optional.of(new User(bidderId1, "u" + bidderId1, "u" + bidderId1 + "@test.com",
+                            "hash", true, java.util.Set.of())));
+
+            assertThrows(SecurityException.class,
+                    () -> bidService.buyNow(2L, bidderId1));
+
+            verifyNoInteractions(auctionRepository);
+            verifyNoInteractions(depositService);
+            verifyNoInteractions(participantRepository);
+            verifyNoInteractions(auctionFinalizer);
+        }
+
+        @Test
+        @DisplayName("Несуществующий пользователь не может Buy Now - IllegalArgumentException, без side-эффектов")
+        void buyNow_NonExistentUser_RejectedWithNoSideEffects() {
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.empty());
+
+            assertThrows(IllegalArgumentException.class,
+                    () -> bidService.buyNow(2L, bidderId1));
+
+            verifyNoInteractions(auctionRepository);
+            verifyNoInteractions(depositService);
+            verifyNoInteractions(participantRepository);
+            verifyNoInteractions(auctionFinalizer);
+        }
+
+        @Test
+        @DisplayName("Trusted пользователь может Buy Now - существующее Step 2C поведение не изменилось")
+        void buyNow_TrustedUser_ExistingStep2CBehaviorUnchanged() {
+            when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
+            when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
+            when(auctionRepository.findByIdWithLock(2L)).thenReturn(Optional.of(createdAuction));
+            when(depositService.canParticipateInAuction(bidderId1, requiredDeposit)).thenReturn(true);
+
+            BidResponse response = bidService.buyNow(2L, bidderId1);
+
+            assertNotNull(response);
+            assertEquals(0, buyNowPrice.compareTo(response.amount()));
+            verify(auctionFinalizer, times(1)).finalizeWithBuyNow(createdAuction, bidderId1, buyNowPrice);
         }
     }
 }
