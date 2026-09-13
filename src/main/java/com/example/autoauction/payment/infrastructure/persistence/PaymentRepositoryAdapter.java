@@ -36,7 +36,17 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
         return jpaRepository.findById(id).map(mapper::toDomain);
     }
 
+    /**
+     * P1.4: missing {@code @Transactional} here (discovered during real-PostgreSQL concurrency
+     * testing for P1.4's canonical confirmation operation) meant this call ran with no
+     * transactional advice applied by this bean's own proxy - empirically proven, via a real
+     * transaction trace, to let two concurrent callers both pass the lock unblocked, defeating
+     * the exact serialization this method's own Javadoc promises. Mirrors the identity module's
+     * own {@code IdentityVerificationRepositoryAdapter.findByIdWithLock}, which already carries
+     * this annotation for the identical reason.
+     */
     @Override
+    @Transactional
     public Optional<Payment> findByIdForUpdate(Long id) {
         return jpaRepository.findByIdWithLock(id).map(mapper::toDomain);
     }
