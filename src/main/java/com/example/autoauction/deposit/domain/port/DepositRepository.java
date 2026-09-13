@@ -14,6 +14,17 @@ public interface DepositRepository {
     Deposit save(Deposit deposit);
     Optional<Deposit> findById(Long id);
     Optional<Deposit> findByUserId(Long userId);
+
+    /**
+     * P1.5: pessimistic ({@code SELECT ... FOR UPDATE}) load of the user's Deposit row, used as
+     * the serialization primitive for payment-creation capacity checks (creation-vs-creation for
+     * the same user). Never held across an outbound provider call. Mirrors this project's
+     * {@code findByIdForUpdate}/{@code findByIdWithLock} idiom (Payment, Identity) - explicitly
+     * {@code @Transactional} on the adapter method itself, not just relying on the class-level
+     * annotation, per the lesson already proven twice in this engagement (a lock query with no
+     * transactional advice on its own proxy boundary silently loses its serialization power).
+     */
+    Optional<Deposit> findByUserIdForUpdate(Long userId);
     List<Deposit> findAll();
     void deleteById(Long id);
 

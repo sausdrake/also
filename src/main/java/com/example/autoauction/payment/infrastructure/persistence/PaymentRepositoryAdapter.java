@@ -31,6 +31,12 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     }
 
     @Override
+    @Transactional
+    public Payment createAndFlush(Payment payment) {
+        return mapper.toDomain(jpaRepository.saveAndFlush(mapper.toEntity(payment)));
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Optional<Payment> findById(Long id) {
         return jpaRepository.findById(id).map(mapper::toDomain);
@@ -81,6 +87,19 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     public BigDecimal sumSucceededConfirmedByUserSince(Long userId, OffsetDateTime since) {
         BigDecimal sum = jpaRepository.sumConfirmedByUserSince(userId, PaymentStatus.SUCCEEDED, since);
         return sum != null ? sum : BigDecimal.ZERO;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal calculateCapacityUsage(Long userId, OffsetDateTime since) {
+        BigDecimal sum = jpaRepository.calculateCapacityUsage(userId, since, PaymentStatus.SUCCEEDED, NON_TERMINAL);
+        return sum != null ? sum : BigDecimal.ZERO;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Long> findExpiredCandidateIds(OffsetDateTime asOf) {
+        return jpaRepository.findIdsByStatusInAndExpiresAtBefore(NON_TERMINAL, asOf);
     }
 
     @Override

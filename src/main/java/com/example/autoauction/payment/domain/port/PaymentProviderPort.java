@@ -46,6 +46,22 @@ public interface PaymentProviderPort {
     record PaymentInitiationResult(String providerReference, Optional<String> checkoutUrl, Optional<String> qrPayload) {
     }
 
+    /**
+     * P1.5: thrown by a provider adapter ONLY when the provider has definitively, synchronously
+     * rejected the initiation request itself (e.g. a validation error the provider's own
+     * synchronous response carried) - distinct from, and never to be conflated with, any other
+     * failure (timeout, connection failure, unrecognised response), which the caller must treat
+     * as ambiguous (never as a rejection) per the locked P1.5 architecture. A minimal, necessary,
+     * provider-neutral addition: without it there is no way to distinguish an explicit rejection
+     * from ambiguity at this boundary, which would make the locked "provider rejected -> FAILED"
+     * rule unimplementable without inventing provider-specific behaviour.
+     */
+    class PaymentInitiationRejectedException extends RuntimeException {
+        public PaymentInitiationRejectedException(String message) {
+            super(message);
+        }
+    }
+
     /** Provider-neutral, normalised payment state. */
     enum ProviderPaymentState {
         PENDING,

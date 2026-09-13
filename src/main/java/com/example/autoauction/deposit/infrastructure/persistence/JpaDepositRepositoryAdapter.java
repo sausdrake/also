@@ -57,6 +57,18 @@ public class JpaDepositRepositoryAdapter implements DepositRepository {
         return depositJpaRepository.findByUserId(userId).map(mapper::toDomain);
     }
 
+    /**
+     * P1.5: explicit {@code @Transactional} here (not {@code readOnly}), deliberately, even
+     * though this class already carries a class-level {@code @Transactional} - matches the
+     * defensive, self-documenting convention already established for lock-query adapter methods
+     * in this codebase after the P1.4 {@code findByIdForUpdate} incident.
+     */
+    @Override
+    @Transactional
+    public Optional<Deposit> findByUserIdForUpdate(Long userId) {
+        return depositJpaRepository.findByUserIdWithLock(userId).map(mapper::toDomain);
+    }
+
     @Override
     @Transactional(readOnly = true)
     public List<Deposit> findAll() {
