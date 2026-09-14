@@ -41,6 +41,9 @@ class DepositServiceTest {
     @Mock
     private FailedOperationService failedOperationService;
 
+    @Mock
+    private DepositUnfreezeTransactionService depositUnfreezeTransactionService;
+
     @InjectMocks
     private DepositService depositService;
 
@@ -394,36 +397,42 @@ class DepositServiceTest {
     @DisplayName("Разморозка депозита")
     class UnfreezeForAuctionTests {
 
+        /**
+         * D4 Option B: unfreezeForAuction is now a thin orchestrator delegating the actual
+         * Deposit/FrozenDeposit/ledger mutation to DepositUnfreezeTransactionService - these tests
+         * verify ONLY the orchestration contract (delegate, notify-on-success, record-on-failure).
+         * The mutation's own arithmetic/ledger/FrozenDeposit behavior is covered by
+         * DepositUnfreezeTransactionServiceTest.
+         */
         @Test
-        @DisplayName("Успешная разморозка")
+        @DisplayName("Успешная разморозка — делегирует в DepositUnfreezeTransactionService, без FailedOperation")
         void unfreezeForAuction_Success() {
-            // given
-            FrozenDeposit frozenDeposit = new FrozenDeposit(auctionId, requiredDeposit, FreezeReason.FIRST_BID);
+            when(depositUnfreezeTransactionService.unfreeze(userId, auctionId))
+                    .thenReturn(Optional.of(requiredDeposit));
 
-            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
-            when(depositRepository.getFrozenDepositsByDepositId(depositId))
-                    .thenReturn(List.of(frozenDeposit));
-            when(depositRepository.save(any(Deposit.class))).thenAnswer(inv -> inv.getArgument(0));
-            when(depositRepository.saveTransaction(any(DepositTransaction.class)))
-                    .thenAnswer(inv -> inv.getArgument(0));
-
-            // when
             depositService.unfreezeForAuction(userId, auctionId);
 
-            // then
-            ArgumentCaptor<Deposit> depositCaptor = ArgumentCaptor.forClass(Deposit.class);
-            verify(depositRepository, times(1)).save(depositCaptor.capture());
+            verify(depositUnfreezeTransactionService, times(1)).unfreeze(userId, auctionId);
+            verify(failedOperationService, never()).saveFailedOperation(any(), any(), any(), any());
+        }
 
-            Deposit savedDeposit = depositCaptor.getValue();
+        @Test
+        @DisplayName("Нечего размораживать — Optional.empty(), без FailedOperation")
+        void unfreezeForAuction_NoOp_WhenNothingFrozen() {
+            when(depositUnfreezeTransactionService.unfreeze(userId, auctionId))
+                    .thenReturn(Optional.empty());
 
-            // ИСПРАВЛЕНО: используем BigDecimal.ZERO вместо 0
-            assertEquals(0, savedDeposit.getBlockedAmount().compareTo(BigDecimal.ZERO));
-            assertTrue(savedDeposit.getAvailableBalance().compareTo(depositAmount) == 0);}
+            depositService.unfreezeForAuction(userId, auctionId);
+
+            verify(depositUnfreezeTransactionService, times(1)).unfreeze(userId, auctionId);
+            verify(failedOperationService, never()).saveFailedOperation(any(), any(), any(), any());
+        }
 
         @Test
         @DisplayName("Депозит не найден — ошибка сохраняется через FailedOperationService")
         void unfreezeForAuction_DepositNotFound_RecordsFailedOperation() {
-            when(depositRepository.findByUserId(userId)).thenReturn(Optional.empty());
+            when(depositUnfreezeTransactionService.unfreeze(userId, auctionId))
+                    .thenThrow(new IllegalArgumentException("Депозит не найден для пользователя: " + userId));
 
             // Не должно выбрасывать исключение наружу
             depositService.unfreezeForAuction(userId, auctionId);
@@ -435,10 +444,7 @@ class DepositServiceTest {
         @Test
         @DisplayName("Непредвиденная ошибка при разморозке — сохраняется через FailedOperationService")
         void unfreezeForAuction_UnexpectedError_RecordsFailedOperation() {
-            FrozenDeposit frozenDeposit = new FrozenDeposit(auctionId, requiredDeposit, FreezeReason.FIRST_BID);
-            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
-            when(depositRepository.getFrozenDepositsByDepositId(depositId)).thenReturn(List.of(frozenDeposit));
-            when(depositRepository.saveTransaction(any(DepositTransaction.class)))
+            when(depositUnfreezeTransactionService.unfreeze(userId, auctionId))
                     .thenThrow(new RuntimeException("DB down"));
 
             depositService.unfreezeForAuction(userId, auctionId);

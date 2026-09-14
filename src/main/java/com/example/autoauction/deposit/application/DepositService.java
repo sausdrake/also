@@ -28,13 +28,16 @@ public class DepositService {
     private final DepositRepository depositRepository;
     private final FailedOperationService failedOperationService;
     private final NotificationService notificationService;
+    private final DepositUnfreezeTransactionService depositUnfreezeTransactionService;
 
     public DepositService(DepositRepository depositRepository,
                           FailedOperationService failedOperationService,
-                          NotificationService notificationService) {
+                          NotificationService notificationService,
+                          DepositUnfreezeTransactionService depositUnfreezeTransactionService) {
         this.depositRepository = depositRepository;
         this.failedOperationService = failedOperationService;
         this.notificationService = notificationService;
+        this.depositUnfreezeTransactionService = depositUnfreezeTransactionService;
         log.info("DepositService initialized");
     }
 
@@ -189,75 +192,39 @@ public class DepositService {
     }
 
     /**
-     * R-1.6: REQUIRES_NEW deliberately, not the default REQUIRED. This method is called
-     * from AuctionFinalizer/BidService/AdminAuctionService while THEY are already inside
-     * their own @Transactional method — under default (REQUIRED) propagation this would
-     * join that same physical transaction/Hibernate session. Its internal catch blocks
-     * intentionally swallow failures (so one participant's unfreeze failure doesn't block
-     * unfreezing the others or the caller's own auction-status update) — but catching an
-     * exception does not undo damage already done to a shared Hibernate session: a genuine
-     * DB-level failure here (e.g. ObjectOptimisticLockingFailureException from Deposit's
-     * @Version check racing another concurrent mutation) can mark a shared transaction
-     * rollback-only even though the exception never appears to propagate, surfacing later
-     * as a confusing UnexpectedRollbackException at the OUTER commit - or silently
-     * discarding unrelated work the caller did in the same transaction. REQUIRES_NEW gives
-     * this method its own independent transaction: a failure here rolls back only this
-     * unfreeze attempt (cleanly, atomically) and is durably recorded via
-     * FailedOperationService (itself run in a separate, always-committing transaction),
-     * without ever being able to poison the caller's transaction.
+     * R-1.6: the mutation itself must run in its own independent transaction, isolated from
+     * whatever transaction the caller (AuctionFinalizer/BidService/AdminAuctionService) is already
+     * inside. D4 defect fix (PLAN/VERIFY #3, Option B): that isolated mutation now lives entirely
+     * in {@link DepositUnfreezeTransactionService#unfreeze}, a genuinely separate bean - calling it
+     * from here is a plain Java call through Spring's normal (proxied) dependency reference, not a
+     * same-bean {@code this.method()} call. This method itself deliberately carries NO
+     * {@code @Transactional} of its own: if the mutation's REQUIRES_NEW transaction fails to commit
+     * (e.g. a genuine {@code @Version} optimistic-lock conflict, detected via
+     * {@code saveAndFlush}), whatever exception surfaces - including a possible
+     * {@code UnexpectedRollbackException} from that OTHER bean's own proxy - is thrown
+     * synchronously as part of THIS single call, fully caught below, and durably recorded via
+     * FailedOperationService (itself run in a separate, always-committing transaction) - without
+     * ever having had a transaction of its own that Spring's proxy could fail to commit.
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void unfreezeForAuction(Long userId, Long auctionId) {
         log.info("Unfreezing deposit for user: {}, auction: {}", userId, auctionId);
 
         try {
-            Deposit deposit = depositRepository.findByUserId(userId)
-                    .orElseThrow(() -> new IllegalArgumentException("Депозит не найден для пользователя: " + userId));
+            Optional<BigDecimal> unfrozenAmount = depositUnfreezeTransactionService.unfreeze(userId, auctionId);
 
-            List<FrozenDeposit> frozen = depositRepository.getFrozenDepositsByDepositId(deposit.getId());
-            FrozenDeposit target = frozen.stream()
-                    .filter(f -> f.getAuctionId().equals(auctionId))
-                    .findFirst()
-                    .orElse(null); // Не выбрасываем исключение, а просто возвращаем null
-
-            // Если нет замороженных средств для этого аукциона - просто логируем и выходим
-            // Это не должно быть ошибкой, так как аукцион мог завершиться без ставок
-            if (target == null) {
-                log.warn("No frozen amount found for auction {}, user {}. Skipping unfreeze.", auctionId, userId);
-                return;
+            if (unfrozenAmount.isPresent()) {
+                BigDecimal frozenAmount = unfrozenAmount.get();
+                try {
+                    notificationService.send(userId, "DEPOSIT_UNFROZEN",
+                            "Депозит разморожен",
+                            String.format("Заморозка %s сом по аукциону #%d снята. Средства доступны.",
+                                    frozenAmount.toPlainString(), auctionId));
+                } catch (Exception e2) {
+                    log.warn("Failed to send deposit unfreeze notification to user {}: {}", userId, e2.getMessage());
+                }
             }
-
-            BigDecimal frozenAmount = target.getAmount();
-            BigDecimal balanceBefore = deposit.getAvailableBalance();
-
-            deposit.unfreezeForAuction(frozenAmount);
-
-            depositRepository.unfreezeForAuction(deposit.getId(), auctionId);
-
-            DepositTransaction transaction = new DepositTransaction(
-                    deposit.getId(),
-                    userId,
-                    DepositTransaction.TransactionType.UNBLOCK,
-                    frozenAmount,
-                    balanceBefore,
-                    deposit.getAvailableBalance(),
-                    auctionId.toString(),
-                    "Разблокировка средств после аукциона #" + auctionId
-            );
-            transaction.setAuctionId(auctionId);
-            depositRepository.saveTransaction(transaction);
-
-            depositRepository.save(deposit);
-            log.info("Deposit unfrozen for auction {}. New available balance: {}", auctionId, deposit.getAvailableBalance());
-
-            try {
-                notificationService.send(userId, "DEPOSIT_UNFROZEN",
-                        "Депозит разморожен",
-                        String.format("Заморозка %s сом по аукциону #%d снята. Средства доступны.",
-                                frozenAmount.toPlainString(), auctionId));
-            } catch (Exception e2) {
-                log.warn("Failed to send deposit unfreeze notification to user {}: {}", userId, e2.getMessage());
-            }
+            // Если ничего не было заморожено - DepositUnfreezeTransactionService уже залогировал
+            // это как no-op; здесь дополнительных действий не требуется.
 
         } catch (IllegalArgumentException e) {
             // Если депозит не найден - логируем и не выбрасываем исключение

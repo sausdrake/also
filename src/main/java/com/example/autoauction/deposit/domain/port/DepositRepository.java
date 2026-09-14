@@ -12,6 +12,18 @@ import java.util.Optional;
 public interface DepositRepository {
     // Депозиты
     Deposit save(Deposit deposit);
+
+    /**
+     * D4 defect fix: forces the write (and its {@code @Version} check) to happen synchronously,
+     * inside the caller's own try/catch, instead of being deferred to transaction commit. Needed
+     * specifically by {@code DepositService.unfreezeForAuction} - see its own Javadoc - where a
+     * plain {@link #save(Deposit)} lets a genuine optimistic-lock conflict surface only at
+     * {@code JpaTransactionManager.doCommit}, after the method body (and its catch block) has
+     * already returned, so the failure escapes uncaught instead of being recorded via
+     * {@code FailedOperationService}.
+     */
+    Deposit saveAndFlush(Deposit deposit);
+
     Optional<Deposit> findById(Long id);
     Optional<Deposit> findByUserId(Long userId);
 

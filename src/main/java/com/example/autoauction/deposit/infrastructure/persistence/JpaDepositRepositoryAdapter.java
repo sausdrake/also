@@ -46,6 +46,13 @@ public class JpaDepositRepositoryAdapter implements DepositRepository {
     }
 
     @Override
+    public Deposit saveAndFlush(Deposit deposit) {
+        JpaDepositEntity entity = mapper.toEntity(deposit);
+        JpaDepositEntity saved = depositJpaRepository.saveAndFlush(entity);
+        return mapper.toDomain(saved);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Optional<Deposit> findById(Long id) {
         return depositJpaRepository.findById(id).map(mapper::toDomain);
