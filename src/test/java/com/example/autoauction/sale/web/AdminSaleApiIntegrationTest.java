@@ -143,7 +143,7 @@ class AdminSaleApiIntegrationTest {
         // the moment it runs - the publish must happen first so that snapshot matches the same
         // policyVersionId this fixture later sets on the Auction.
         Long policyVersionId = policyVersionService.create(commissionRate, 1L).getId();
-        policyVersionService.publish(policyVersionId);
+        policyVersionService.publish(policyVersionId, 2L, 0L);
 
         sellerDiagnosticCommitmentService.freezeCommitment(sellerId, diagnosticRequestId,
                 new BigDecimal("10000"), new BigDecimal("4000"));

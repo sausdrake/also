@@ -114,7 +114,7 @@ class SaleCommitmentResolutionIntegrationTest {
     // fails closed if none exists.
     @BeforeEach
     void publishPolicyVersion() {
-        policyVersionService.publish(policyVersionService.create(new BigDecimal("0.02"), 1L).getId());
+        policyVersionService.publish(policyVersionService.create(new BigDecimal("0.02"), 1L).getId(), 2L, 0L);
     }
 
     /**
@@ -134,8 +134,9 @@ class SaleCommitmentResolutionIntegrationTest {
                         code, "test fixture", OffsetDateTime.now())).getId();
         Long policyVersionId = policyVersionService.create(new BigDecimal("0.02"), 1L).getId();
         policyVersionService.updateDraftViolation(policyVersionId, violationDefinitionId,
-                com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE, percentageValue);
-        policyVersionService.publish(policyVersionId);
+                com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE, percentageValue, 0L);
+        Long revision = policyVersionService.getById(policyVersionId).getConfigurationRevision();
+        policyVersionService.publish(policyVersionId, 2L, revision);
         return new PolicyWithViolation(policyVersionId, violationDefinitionId);
     }
 
@@ -227,7 +228,7 @@ class SaleCommitmentResolutionIntegrationTest {
                 // SellerDiagnosticCommitment itself (the two are independent by design, never
                 // synchronized).
                 Long auctionPolicyVersionId = policyVersionService.create(new BigDecimal("0.02"), 1L).getId();
-                policyVersionService.publish(auctionPolicyVersionId);
+                policyVersionService.publish(auctionPolicyVersionId, 2L, 0L);
                 auction.setPolicyVersionId(auctionPolicyVersionId);
                 auction.setSaleFinalizationMethod(com.example.autoauction.auction.domain.SaleFinalizationMethod.ORDINARY_BID);
             }
@@ -857,10 +858,11 @@ class SaleCommitmentResolutionIntegrationTest {
                         "X3E_CONFLICT_TEST_B", "test fixture", OffsetDateTime.now())).getId();
         Long policyVersionId = policyVersionService.create(new BigDecimal("0.02"), 1L).getId();
         policyVersionService.updateDraftViolation(policyVersionId, violationAId,
-                com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE, new BigDecimal("20"));
+                com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE, new BigDecimal("20"), 0L);
         policyVersionService.updateDraftViolation(policyVersionId, violationBId,
-                com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE, new BigDecimal("50"));
-        policyVersionService.publish(policyVersionId);
+                com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE, new BigDecimal("50"), 0L);
+        Long revision = policyVersionService.getById(policyVersionId).getConfigurationRevision();
+        policyVersionService.publish(policyVersionId, 2L, revision);
 
         Setup setup = approveAndGetVehicleWithCommitment(new BigDecimal("10000"), new BigDecimal("4000"));
 

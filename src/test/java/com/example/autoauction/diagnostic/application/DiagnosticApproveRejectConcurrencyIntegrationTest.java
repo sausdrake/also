@@ -87,7 +87,7 @@ class DiagnosticApproveRejectConcurrencyIntegrationTest {
     // threads/transactions) - each repetition simply publishes another version, harmless.
     @BeforeEach
     void publishPolicyVersion() {
-        policyVersionService.publish(policyVersionService.create(new BigDecimal("0.02"), 1L).getId());
+        policyVersionService.publish(policyVersionService.create(new BigDecimal("0.02"), 1L).getId(), 2L, 0L);
     }
 
     private record Setup(Long userId, Long requestId, BigDecimal depositAmount, BigDecimal availableBeforeFreeze) {}

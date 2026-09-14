@@ -4,6 +4,8 @@ package com.example.autoauction.config;
 
 import com.example.autoauction.auction.application.RateLimitException;
 import com.example.autoauction.deposit.domain.InsufficientFundsException;
+import com.example.autoauction.policy.application.PolicyConflictException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -101,6 +103,49 @@ public class GlobalExceptionHandler {
             }
         }
         error.put("message", message);
+
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(error);
+    }
+
+    // Policy Administration concurrency lock: one structured conflict family, one stable `code`
+    // field per concrete subtype - the smallest consistent extension to this project's existing
+    // {timestamp, status, error, message} error body, given no pre-existing stable error-code
+    // convention exists. Mapped to 409, the same established status every other business-state
+    // conflict in this handler already uses.
+    @ExceptionHandler(PolicyConflictException.class)
+    public ResponseEntity<Map<String, Object>> handlePolicyConflict(PolicyConflictException e) {
+        log.warn("Policy conflict [{}]: {}", e.getCode(), e.getMessage());
+
+        Map<String, Object> error = new HashMap<>();
+        error.put("timestamp", java.time.LocalDateTime.now().toString());
+        error.put("status", HttpStatus.CONFLICT.value());
+        error.put("error", "Конфликт состояния");
+        error.put("code", e.getCode());
+        error.put("message", e.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(error);
+    }
+
+    // Policy Administration concurrency lock: Hibernate's own @Version flush-time check (the
+    // genuine-race half of Boundary A, distinct from PolicyConflictException's explicit
+    // up-front staleness pre-check - see OptimisticVersionConflictException's Javadoc). Same
+    // stable code, for a frontend that only cares about the category, not which half caught it.
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<Map<String, Object>> handleOptimisticLockingFailure(ObjectOptimisticLockingFailureException e) {
+        log.warn("Optimistic locking conflict: {}", e.getMessage());
+
+        Map<String, Object> error = new HashMap<>();
+        error.put("timestamp", java.time.LocalDateTime.now().toString());
+        error.put("status", HttpStatus.CONFLICT.value());
+        error.put("error", "Конфликт состояния");
+        error.put("code", "OPTIMISTIC_VERSION_CONFLICT");
+        error.put("message", "Данные были изменены другим администратором. Обновите данные и попробуйте снова.");
 
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)

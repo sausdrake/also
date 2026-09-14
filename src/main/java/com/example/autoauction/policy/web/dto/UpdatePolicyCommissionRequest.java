@@ -17,6 +17,9 @@ public record UpdatePolicyCommissionRequest(
         @NotNull(message = "commissionRate обязателен")
         @DecimalMin(value = "0", message = "commissionRate не может быть отрицательным")
         @DecimalMax(value = "1", inclusive = false, message = "commissionRate должен быть меньше 1 (100%)")
-        BigDecimal commissionRate
+        BigDecimal commissionRate,
+
+        @NotNull(message = "version обязателен")
+        Long version
 ) {
 }

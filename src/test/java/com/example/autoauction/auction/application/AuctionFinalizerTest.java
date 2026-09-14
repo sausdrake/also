@@ -631,7 +631,7 @@ class AuctionFinalizerTest {
 
             when(policyVersionService.getById(5L)).thenReturn(
                     new PolicyVersion(5L, 1L, new BigDecimal("0.02"), true,
-                            fixedTime, sellerId, fixedTime));
+                            sellerId, fixedTime, sellerId, fixedTime, null, 0L, 0L));
             when(participantRepository.getParticipants(2L)).thenReturn(List.of(winnerId));
             when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -662,7 +662,7 @@ class AuctionFinalizerTest {
 
             when(policyVersionService.getById(5L)).thenReturn(
                     new PolicyVersion(5L, 1L, new BigDecimal("0.02"), true,
-                            fixedTime, sellerId, fixedTime));
+                            sellerId, fixedTime, sellerId, fixedTime, null, 0L, 0L));
             when(participantRepository.getParticipants(2L)).thenReturn(List.of(winnerId));
             when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
             OffsetDateTime deadline = fixedTime.plusDays(1);
@@ -696,7 +696,7 @@ class AuctionFinalizerTest {
 
             when(policyVersionService.getById(5L)).thenReturn(
                     new PolicyVersion(5L, 1L, new BigDecimal("0.02"), true,
-                            fixedTime, sellerId, fixedTime));
+                            sellerId, fixedTime, sellerId, fixedTime, null, 0L, 0L));
             when(participantRepository.getParticipants(2L)).thenReturn(List.of(winnerId));
             when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
             when(standardPaymentDeadlineCalculator.computeInitialDeadline()).thenReturn(fixedTime.plusDays(1));

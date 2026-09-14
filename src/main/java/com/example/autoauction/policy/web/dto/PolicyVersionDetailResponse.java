@@ -17,9 +17,13 @@ public record PolicyVersionDetailResponse(
         Long versionNumber,
         BigDecimal commissionRate,
         boolean published,
-        OffsetDateTime effectiveFrom,
         Long createdBy,
         OffsetDateTime createdAt,
+        Long publishedBy,
+        OffsetDateTime publishedAt,
+        Long basedOnPublishedVersionId,
+        Long version,
+        Long configurationRevision,
         List<ViolationView> violations
 ) {
     public static PolicyVersionDetailResponse fromDomain(PolicyVersion v,
@@ -31,6 +35,7 @@ public record PolicyVersionDetailResponse(
                 .toList();
         return new PolicyVersionDetailResponse(
                 v.getId(), v.getVersionNumber(), v.getCommissionRate(), v.isPublished(),
-                v.getEffectiveFrom(), v.getCreatedBy(), v.getCreatedAt(), views);
+                v.getCreatedBy(), v.getCreatedAt(), v.getPublishedBy(), v.getPublishedAt(),
+                v.getBasedOnPublishedVersionId(), v.getVersion(), v.getConfigurationRevision(), views);
     }
 }

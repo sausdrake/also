@@ -134,8 +134,9 @@ class SellerViolationResolutionApiIntegrationTest {
         Long violationDefinitionId = violationDefinitionJpaRepository.save(
                 new JpaViolationDefinitionEntity(code, "test fixture", OffsetDateTime.now())).getId();
         Long policyVersionId = policyVersionService.create(new BigDecimal("0.02"), 1L).getId();
-        policyVersionService.updateDraftViolation(policyVersionId, violationDefinitionId, PenaltyType.PERCENTAGE, percentageValue);
-        policyVersionService.publish(policyVersionId);
+        policyVersionService.updateDraftViolation(policyVersionId, violationDefinitionId, PenaltyType.PERCENTAGE, percentageValue, 0L);
+        Long revision = policyVersionService.getById(policyVersionId).getConfigurationRevision();
+        policyVersionService.publish(policyVersionId, 2L, revision);
         return violationDefinitionId;
     }
 

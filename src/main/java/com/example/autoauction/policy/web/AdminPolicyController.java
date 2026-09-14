@@ -10,6 +10,7 @@ import com.example.autoauction.policy.web.dto.ConfigureViolationRequest;
 import com.example.autoauction.policy.web.dto.CreatePolicyDraftRequest;
 import com.example.autoauction.policy.web.dto.PolicyVersionDetailResponse;
 import com.example.autoauction.policy.web.dto.PolicyVersionSummaryResponse;
+import com.example.autoauction.policy.web.dto.PublishPolicyRequest;
 import com.example.autoauction.policy.web.dto.UpdatePolicyCommissionRequest;
 import com.example.autoauction.policy.web.dto.ViolationDefinitionResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -102,7 +103,7 @@ public class AdminPolicyController {
     @Operation(summary = "Изменить ставку комиссии черновика")
     public PolicyVersionDetailResponse updateCommission(@PathVariable Long id,
                                                         @Valid @RequestBody UpdatePolicyCommissionRequest request) {
-        return toDetail(policyVersionService.updateDraftCommission(id, request.commissionRate()));
+        return toDetail(policyVersionService.updateDraftCommission(id, request.commissionRate(), request.version()));
     }
 
     @PutMapping("/drafts/{id}/violations/{violationDefinitionId}")
@@ -111,17 +112,22 @@ public class AdminPolicyController {
                                                           @PathVariable Long violationDefinitionId,
                                                           @Valid @RequestBody ConfigureViolationRequest request) {
         PenaltyType penaltyType = parsePenaltyType(request.penaltyType());
-        policyVersionService.updateDraftViolation(id, violationDefinitionId, penaltyType, request.penaltyValue());
+        policyVersionService.updateDraftViolation(id, violationDefinitionId, penaltyType, request.penaltyValue(), request.version());
         return toDetail(policyVersionService.getById(id));
     }
 
     @PostMapping("/drafts/{id}/publish")
-    @Operation(summary = "Опубликовать полный черновик -> новая неизменяемая версия")
-    public PolicyVersionDetailResponse publish(@PathVariable Long id) {
-        // Explicit 404 for an unknown id BEFORE publish() (whose claimPublish would otherwise
-        // report "not found" as a 409 conflict). publish()'s own behaviour is unchanged.
+    @Operation(summary = "Опубликовать полный черновик -> новая неизменяемая версия (maker/checker: другой администратор)")
+    public PolicyVersionDetailResponse publish(@PathVariable Long id,
+                                               @Valid @RequestBody PublishPolicyRequest request,
+                                               @CurrentUser UserPrincipal admin) {
+        // Explicit 404 for an unknown id BEFORE publish() (whose claims would otherwise report
+        // "not found" as a 409 conflict). publish()'s own behaviour is unchanged.
         policyVersionService.getById(id);
-        return toDetail(policyVersionService.publish(id));
+        PolicyVersion published = policyVersionService.publish(id, admin.getUserId(), request.observedConfigurationRevision());
+        log.info("Admin {} published PolicyVersion {} (versionNumber={})",
+                admin.getUserId(), published.getId(), published.getVersionNumber());
+        return toDetail(published);
     }
 
     // ---------------------------------------------------------------------------

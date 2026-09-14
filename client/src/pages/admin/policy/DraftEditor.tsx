@@ -8,6 +8,7 @@ interface ViolationView {
   code: string | null;
   penaltyType: PenaltyType;
   penaltyValue: number;
+  version: number;
 }
 
 export interface PolicyDetail {
@@ -15,9 +16,13 @@ export interface PolicyDetail {
   versionNumber: number;
   commissionRate: number;
   published: boolean;
-  effectiveFrom: string;
   createdBy: number;
   createdAt: string;
+  publishedBy: number | null;
+  publishedAt: string | null;
+  basedOnPublishedVersionId: number | null;
+  version: number;
+  configurationRevision: number;
   violations: ViolationView[];
 }
 
@@ -31,6 +36,7 @@ interface Props {
   draft: PolicyDetail;
   catalogue: ViolationDefinition[];
   currentPublishedVersionNumber: number | null;
+  currentPublishedId: number | null;
   onChanged: (updated: PolicyDetail) => void;
   onPublished: () => void;
   onClose: () => void;
@@ -40,6 +46,10 @@ function apiError(e: any): string {
   return e?.response?.data?.message
     || (e?.response?.data?.details && JSON.stringify(e.response.data.details))
     || 'Ошибка запроса';
+}
+
+function apiErrorCode(e: any): string | null {
+  return e?.response?.data?.code ?? null;
 }
 
 /**
@@ -52,6 +62,7 @@ export function DraftEditor({
   draft,
   catalogue,
   currentPublishedVersionNumber,
+  currentPublishedId,
   onChanged,
   onPublished,
   onClose,
@@ -82,15 +93,12 @@ export function DraftEditor({
     return commission.trim() !== '' && !Number.isNaN(n) && n >= 0 && n < 1;
   })();
 
-  // A draft carries NO copy-forward base reference (Slice 1 scope: no base_policy_version_id
-  // column, deliberately). The client therefore cannot know this draft's exact base. What it
-  // CAN know reliably: version numbers are assigned monotonically at creation, so if a
-  // published version exists with a higher number than this draft's, that version was
-  // published AFTER this draft was created — meaning publishing this draft will not carry
-  // forward anything from versions published in the meantime. Surface that only as a "may be
-  // outdated" warning, never as a claim about a specific base version.
-  const showStaleWarning =
-    currentPublishedVersionNumber !== null && currentPublishedVersionNumber > draft.versionNumber;
+  // Policy Administration Decision 5 (locked): the draft's immutable lineage
+  // (basedOnPublishedVersionId) is now a real server-enforced field, not a heuristic. A draft
+  // whose base no longer equals the current published policy's id WILL be rejected by the
+  // server (STALE_POLICY_BASE, 409) if the admin tries to publish it - this warning surfaces
+  // that deterministically, not as a guess.
+  const showStaleWarning = draft.basedOnPublishedVersionId !== currentPublishedId;
 
   const notify = (text: string, isErr = false) => {
     setMsg(text);
@@ -105,11 +113,18 @@ export function DraftEditor({
     }
     setBusy(true);
     try {
-      const r = await api.patch(`/admin/policy/drafts/${draft.id}`, { commissionRate: Number(commission) });
+      const r = await api.patch(`/admin/policy/drafts/${draft.id}`, {
+        commissionRate: Number(commission),
+        version: draft.version,
+      });
       onChanged(r.data);
       notify('Комиссия сохранена');
     } catch (e) {
-      notify(apiError(e), true);
+      if (apiErrorCode(e) === 'OPTIMISTIC_VERSION_CONFLICT') {
+        notify('Конфигурация изменена другим администратором. Обновите черновик перед редактированием.', true);
+      } else {
+        notify(apiError(e), true);
+      }
     } finally {
       setBusy(false);
     }
@@ -123,16 +138,22 @@ export function DraftEditor({
       notify('Недопустимое значение штрафа', true);
       return;
     }
+    const existing = draft.violations.find((v) => v.violationDefinitionId === defId);
     setBusy(true);
     try {
       const r = await api.put(`/admin/policy/drafts/${draft.id}/violations/${defId}`, {
         penaltyType: row.penaltyType,
         penaltyValue: n,
+        version: existing ? existing.version : 0,
       });
       onChanged(r.data);
       notify('Нарушение сохранено');
     } catch (e) {
-      notify(apiError(e), true);
+      if (apiErrorCode(e) === 'OPTIMISTIC_VERSION_CONFLICT' || apiErrorCode(e) === 'VIOLATION_INSERT_CONFLICT') {
+        notify('Конфигурация изменена другим администратором. Обновите черновик перед редактированием.', true);
+      } else {
+        notify(apiError(e), true);
+      }
     } finally {
       setBusy(false);
     }
@@ -141,11 +162,22 @@ export function DraftEditor({
   const publish = async () => {
     setBusy(true);
     try {
-      await api.post(`/admin/policy/drafts/${draft.id}/publish`);
+      await api.post(`/admin/policy/drafts/${draft.id}/publish`, {
+        observedConfigurationRevision: draft.configurationRevision,
+      });
       notify('Версия опубликована');
       onPublished();
     } catch (e) {
-      notify(apiError(e), true);
+      const code = apiErrorCode(e);
+      if (code === 'STALE_POLICY_BASE') {
+        notify('Эта версия опубликована позже, чем текущая опубликованная политика. Создайте новый черновик.', true);
+      } else if (code === 'STALE_POLICY_CONFIGURATION') {
+        notify('Черновик изменился после проверки. Обновите страницу и проверьте заново перед публикацией.', true);
+      } else if (code === 'MAKER_CHECKER_VIOLATION') {
+        notify('Создатель черновика не может опубликовать его сам. Требуется другой администратор.', true);
+      } else {
+        notify(apiError(e), true);
+      }
     } finally {
       setBusy(false);
     }
@@ -177,11 +209,10 @@ export function DraftEditor({
       </div>
 
       {showStaleWarning && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-xl px-4 py-3">
-          Этот черновик мог устареть: после его создания уже была опубликована версия
-          v{currentPublishedVersionNumber}. Черновик создавался на основе версии, актуальной на тот
-          момент; его публикация НЕ перенесёт изменения из версий, опубликованных позже. Публикация
-          всё равно разрешена и создаст новую неизменяемую версию.
+        <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-xl px-4 py-3">
+          Эта версия опубликована позже, чем черновик создавался (текущая опубликованная — v
+          {currentPublishedVersionNumber}). Публикация этого черновика будет отклонена сервером.
+          Создайте новый черновик на основе текущей опубликованной политики.
         </div>
       )}
 
@@ -262,7 +293,7 @@ export function DraftEditor({
       <div className="flex items-center gap-3">
         <button
           onClick={publish}
-          disabled={busy || !complete}
+          disabled={busy || !complete || showStaleWarning}
           className="bg-green-600 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-green-700 disabled:opacity-50"
         >
           Опубликовать версию
@@ -270,6 +301,11 @@ export function DraftEditor({
         {!complete && (
           <span className="text-xs text-gray-400">
             Опубликовать можно только полностью настроенный черновик ({configuredCount}/{catalogue.length}).
+          </span>
+        )}
+        {complete && showStaleWarning && (
+          <span className="text-xs text-red-500">
+            Публикация заблокирована: базовая версия устарела.
           </span>
         )}
       </div>

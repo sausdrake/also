@@ -62,7 +62,7 @@ class SellerDiagnosticCommitmentServiceTest {
      */
     private void stubCurrentPublishedPolicy() {
         PolicyVersion published = new PolicyVersion(policyVersionId, 1L, new BigDecimal("0.02"), true,
-                OffsetDateTime.now(), 1L, OffsetDateTime.now());
+                1L, OffsetDateTime.now(), 1L, OffsetDateTime.now(), null, 0L, 0L);
         when(policyVersionService.getCurrentPublished()).thenReturn(published);
     }
 

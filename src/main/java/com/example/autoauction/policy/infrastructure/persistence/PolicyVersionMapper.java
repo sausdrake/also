@@ -14,9 +14,13 @@ public class PolicyVersionMapper {
         entity.setVersionNumber(domain.getVersionNumber());
         entity.setCommissionRate(domain.getCommissionRate());
         entity.setPublished(domain.isPublished());
-        entity.setEffectiveFrom(domain.getEffectiveFrom());
         entity.setCreatedBy(domain.getCreatedBy());
         entity.setCreatedAt(domain.getCreatedAt());
+        entity.setPublishedBy(domain.getPublishedBy());
+        entity.setPublishedAt(domain.getPublishedAt());
+        entity.setBasedOnPublishedVersionId(domain.getBasedOnPublishedVersionId());
+        entity.setVersion(domain.getVersion());
+        entity.setConfigurationRevision(domain.getConfigurationRevision());
         return entity;
     }
 
@@ -28,9 +32,13 @@ public class PolicyVersionMapper {
                 entity.getVersionNumber(),
                 entity.getCommissionRate(),
                 entity.isPublished(),
-                entity.getEffectiveFrom(),
                 entity.getCreatedBy(),
-                entity.getCreatedAt()
+                entity.getCreatedAt(),
+                entity.getPublishedBy(),
+                entity.getPublishedAt(),
+                entity.getBasedOnPublishedVersionId(),
+                entity.getVersion(),
+                entity.getConfigurationRevision()
         );
     }
 }

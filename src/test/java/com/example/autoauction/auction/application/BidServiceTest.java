@@ -639,7 +639,7 @@ class BidServiceTest {
             // given: raw buyNowPrice 1,500,000 @ 2% -> 1,530,000.00 buyer-facing
             createdAuction.setPolicyVersionId(5L);
             PolicyVersion policyA = new PolicyVersion(5L, 1L, new BigDecimal("0.02"), true,
-                    now, sellerId, now);
+                    sellerId, now, sellerId, now, null, 0L, 0L);
             when(policyVersionService.getById(5L)).thenReturn(policyA);
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));
@@ -666,7 +666,7 @@ class BidServiceTest {
             // given: auction bound to Policy A (id=5); Policy B (id=9) has since been published
             createdAuction.setPolicyVersionId(5L);
             PolicyVersion policyA = new PolicyVersion(5L, 1L, new BigDecimal("0.02"), true,
-                    now, sellerId, now);
+                    sellerId, now, sellerId, now, null, 0L, 0L);
             when(policyVersionService.getById(5L)).thenReturn(policyA);
             when(rateLimitService.tryAcquire(bidderId1)).thenReturn(true);
             when(userService.getUser(bidderId1)).thenReturn(Optional.of(trustedUser(bidderId1)));

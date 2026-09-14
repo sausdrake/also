@@ -190,7 +190,7 @@ class AuctionSaleCompletionIntegrationTest {
             // freezeCommitment() snapshots whatever PolicyVersion is currently published - the
             // publish must happen first so that snapshot matches the policyVersionId below.
             Long policyVersionId = policyVersionService.create(new BigDecimal("0.02"), 1L).getId();
-            policyVersionService.publish(policyVersionId);
+            policyVersionService.publish(policyVersionId, 2L, 0L);
 
             sellerDiagnosticCommitmentService.freezeCommitment(sellerId, diagnosticRequestId,
                     new BigDecimal("10000"), new BigDecimal("4000"));

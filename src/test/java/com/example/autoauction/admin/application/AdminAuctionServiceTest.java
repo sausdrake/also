@@ -132,7 +132,7 @@ class AdminAuctionServiceTest {
         // rejections), and MockitoExtension's strict stubbing would flag an unused global stub
         // as UnnecessaryStubbingException - see BidServiceTest's setUp() for the same convention.
         currentPolicy = new PolicyVersion(1L, 1L, new BigDecimal("0.05"), true,
-                OffsetDateTime.now(), adminId, OffsetDateTime.now());
+                adminId, OffsetDateTime.now(), adminId, OffsetDateTime.now(), null, 0L, 0L);
 
         // X3-C: lenient default so every test that happens to reach past checkExistingAuctions
         // gets a valid commitment id without having to stub it individually - matching this
@@ -1067,7 +1067,7 @@ class AdminAuctionServiceTest {
     class PolicyAwarePriceValidationTests {
 
         private PolicyVersion policyAt(BigDecimal rate) {
-            return new PolicyVersion(2L, 2L, rate, true, OffsetDateTime.now(), adminId, OffsetDateTime.now());
+            return new PolicyVersion(2L, 2L, rate, true, adminId, OffsetDateTime.now(), adminId, OffsetDateTime.now(), null, 0L, 0L);
         }
 
         @Test

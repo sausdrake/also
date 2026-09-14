@@ -19,10 +19,17 @@ public class PolicyVersionViolationRepositoryAdapter implements PolicyVersionVio
         this.mapper = mapper;
     }
 
+    /**
+     * Locked concurrency design, section C: always flushes explicitly, so that a first-time
+     * insert's unique-constraint race ({@code uk_policy_version_violation}) surfaces
+     * synchronously as {@link org.springframework.dao.DataIntegrityViolationException} to THIS
+     * call, inside the caller's own transaction - never deferred to some later, unrelated flush
+     * point where the caller could no longer attribute the failure to this specific write.
+     */
     @Override
     public PolicyVersionViolation save(PolicyVersionViolation policyVersionViolation) {
         JpaPolicyVersionViolationEntity entity = mapper.toEntity(policyVersionViolation);
-        JpaPolicyVersionViolationEntity saved = jpaRepository.save(entity);
+        JpaPolicyVersionViolationEntity saved = jpaRepository.saveAndFlush(entity);
         return mapper.toDomain(saved);
     }
 

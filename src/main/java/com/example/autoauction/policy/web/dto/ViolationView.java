@@ -13,9 +13,10 @@ public record ViolationView(
         Long violationDefinitionId,
         String code,
         PenaltyType penaltyType,
-        BigDecimal penaltyValue
+        BigDecimal penaltyValue,
+        Long version
 ) {
     public static ViolationView fromDomain(PolicyVersionViolation v, String code) {
-        return new ViolationView(v.getViolationDefinitionId(), code, v.getPenaltyType(), v.getPenaltyValue());
+        return new ViolationView(v.getViolationDefinitionId(), code, v.getPenaltyType(), v.getPenaltyValue(), v.getVersion());
     }
 }

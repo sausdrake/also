@@ -6,6 +6,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -86,8 +87,20 @@ public class PolicyVersionRepositoryAdapter implements PolicyVersionRepository {
     }
 
     @Override
-    public boolean claimPublish(Long id) {
-        return jpaRepository.claimPublish(id) > 0;
+    public boolean claimPublish(Long id, Long publishedBy, OffsetDateTime publishedAt, Long observedConfigurationRevision) {
+        return jpaRepository.claimPublish(id, publishedBy, publishedAt, observedConfigurationRevision) > 0;
+    }
+
+    @Override
+    @Transactional
+    public void lockPublicationSerializationPoint() {
+        counterRepository.findByIdWithLock(COUNTER_ID).orElseGet(this::initializeCounter);
+    }
+
+    @Override
+    @Transactional
+    public void incrementConfigurationRevision(Long policyVersionId) {
+        jpaRepository.incrementConfigurationRevision(policyVersionId);
     }
 
     @Override

@@ -12,12 +12,13 @@ public class PolicyVersionViolationMapper {
                 domain.getPolicyVersionId(), domain.getViolationDefinitionId(),
                 domain.getPenaltyType(), domain.getPenaltyValue(), domain.getCreatedAt());
         entity.setId(domain.getId());
+        entity.setVersion(domain.getVersion());
         return entity;
     }
 
     public PolicyVersionViolation toDomain(JpaPolicyVersionViolationEntity entity) {
         if (entity == null) return null;
         return new PolicyVersionViolation(entity.getId(), entity.getPolicyVersionId(), entity.getViolationDefinitionId(),
-                entity.getPenaltyType(), entity.getPenaltyValue(), entity.getCreatedAt());
+                entity.getPenaltyType(), entity.getPenaltyValue(), entity.getCreatedAt(), entity.getVersion());
     }
 }

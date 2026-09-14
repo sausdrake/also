@@ -114,7 +114,7 @@ class SaleCommitmentResolutionRollbackIntegrationTest {
     // fails closed if none exists.
     @BeforeEach
     void publishPolicyVersion() {
-        policyVersionService.publish(policyVersionService.create(new BigDecimal("0.02"), 1L).getId());
+        policyVersionService.publish(policyVersionService.create(new BigDecimal("0.02"), 1L).getId(), 2L, 0L);
     }
 
     private TransactionTemplate txTemplate() {
@@ -229,8 +229,9 @@ class SaleCommitmentResolutionRollbackIntegrationTest {
                         code, "test fixture", OffsetDateTime.now())).getId();
         Long policyVersionId = policyVersionService.create(new BigDecimal("0.02"), 1L).getId();
         policyVersionService.updateDraftViolation(policyVersionId, violationDefinitionId,
-                com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE, percentageValue);
-        policyVersionService.publish(policyVersionId);
+                com.example.autoauction.policy.domain.PenaltyType.PERCENTAGE, percentageValue, 0L);
+        Long revision = policyVersionService.getById(policyVersionId).getConfigurationRevision();
+        policyVersionService.publish(policyVersionId, 2L, revision);
         return new PolicyWithViolation(policyVersionId, violationDefinitionId);
     }
 

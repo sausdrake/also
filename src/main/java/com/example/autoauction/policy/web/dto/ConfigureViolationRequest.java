@@ -28,6 +28,14 @@ public record ConfigureViolationRequest(
 
         @NotNull(message = "penaltyValue обязателен")
         @DecimalMin(value = "0", message = "penaltyValue не может быть отрицательным")
-        BigDecimal penaltyValue
+        BigDecimal penaltyValue,
+
+        /**
+         * The caller's last-observed row version, or {@code 0} if this violation has never been
+         * configured on this draft before (nothing to observe yet) - ignored in that case; see
+         * {@code PolicyVersionService.updateDraftViolation}.
+         */
+        @NotNull(message = "version обязателен")
+        Long version
 ) {
 }

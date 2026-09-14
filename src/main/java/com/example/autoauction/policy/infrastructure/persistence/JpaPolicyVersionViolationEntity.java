@@ -10,6 +10,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -40,6 +41,11 @@ public class JpaPolicyVersionViolationEntity {
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
+    /** Boundary A: entity-level optimistic lock, protects this row's own fields. */
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version = 0L;
+
     protected JpaPolicyVersionViolationEntity() {}
 
     public JpaPolicyVersionViolationEntity(Long policyVersionId, Long violationDefinitionId,
@@ -63,4 +69,6 @@ public class JpaPolicyVersionViolationEntity {
     public void setPenaltyValue(BigDecimal penaltyValue) { this.penaltyValue = penaltyValue; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 }

@@ -112,7 +112,7 @@ class SettlementServiceTest {
             stubSellerChain();
             when(policyVersionService.getById(policyVersionId)).thenReturn(
                     new PolicyVersion(policyVersionId, 1L, new BigDecimal("0.02"), true,
-                            fixedTime, 1L, fixedTime));
+                            1L, fixedTime, 1L, fixedTime, null, 0L, 0L));
             Auction a = auction(SaleFinalizationMethod.ORDINARY_BID, new BigDecimal("1020000.00"), null,
                     commitmentId, policyVersionId);
             when(settlementRepository.save(any(Settlement.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -134,7 +134,7 @@ class SettlementServiceTest {
             stubSellerChain();
             when(policyVersionService.getById(policyVersionId)).thenReturn(
                     new PolicyVersion(policyVersionId, 1L, new BigDecimal("0.02"), true,
-                            fixedTime, 1L, fixedTime));
+                            1L, fixedTime, 1L, fixedTime, null, 0L, 0L));
             // winningBid already holds the buyer-facing Buy Now amount (1,530,000.00 = 1,500,000
             // * 1.02) - set by AuctionFinalizer.finalizeWithBuyNow before completeSale runs.
             Auction a = auction(SaleFinalizationMethod.BUY_NOW, new BigDecimal("1530000.00"),
@@ -208,7 +208,7 @@ class SettlementServiceTest {
             stubSellerChain();
             when(policyVersionService.getById(policyVersionId)).thenReturn(
                     new PolicyVersion(policyVersionId, 1L, new BigDecimal("0.02"), true,
-                            fixedTime, 1L, fixedTime));
+                            1L, fixedTime, 1L, fixedTime, null, 0L, 0L));
             // Deliberately chosen so the forward markup's rounding does NOT round-trip back to
             // buyNowPrice when divided by 1.02 - 999999.99*1.02=1019999.9898 -> rounds to
             // 1020000.00, but 1020000.00/1.02=1000000.00 EXACTLY (no rounding needed on the way

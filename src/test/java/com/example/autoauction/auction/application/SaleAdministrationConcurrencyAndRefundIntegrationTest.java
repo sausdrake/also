@@ -177,7 +177,7 @@ class SaleAdministrationConcurrencyAndRefundIntegrationTest {
 
         Long policyVersionId = txTemplate().execute(s -> {
             Long id = policyVersionService.create(new BigDecimal("0.02"), 1L).getId();
-            policyVersionService.publish(id);
+            policyVersionService.publish(id, 2L, 0L);
             return id;
         });
 

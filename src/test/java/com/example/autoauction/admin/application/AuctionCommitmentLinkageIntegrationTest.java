@@ -144,7 +144,7 @@ class AuctionCommitmentLinkageIntegrationTest {
 
     private Long publishPolicyVersion() {
         return policyVersionService.publish(
-                policyVersionService.create(new BigDecimal("0.05"), 999L).getId()).getId();
+                policyVersionService.create(new BigDecimal("0.05"), 999L).getId(), 998L, 0L).getId();
     }
 
     private AuctionCreateRequest requestFor(Long vehicleId) {

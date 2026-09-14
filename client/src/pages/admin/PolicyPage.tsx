@@ -116,6 +116,7 @@ export function PolicyPage() {
           draft={openDraft}
           catalogue={catalogue}
           currentPublishedVersionNumber={current?.versionNumber ?? null}
+          currentPublishedId={current?.id ?? null}
           onChanged={(u) => setOpenDraft(u)}
           onPublished={async () => {
             setOpenDraft(null);

@@ -123,11 +123,22 @@ public class PolicyBootstrap implements ApplicationRunner {
             return false;
         }
 
+        // The publishing actor is deliberately a DIFFERENT reserved sentinel from the creating
+        // actor (SYSTEM_ACTOR_ID) - purely so the locked maker/checker rule ("draft creator
+        // cannot publish own draft") is satisfied mechanically for this one system-internal,
+        // no-human-involved startup action, without fabricating a second human admin. See
+        // PolicyVersion.SYSTEM_BOOTSTRAP_PUBLISHER_ID's Javadoc.
         transactionTemplate.executeWithoutResult(status -> {
             PolicyVersion draft = policyVersionService.create(SEED_COMMISSION_RATE, PolicyVersion.SYSTEM_ACTOR_ID);
+            // Every seed violation is a genuine first-time configuration (no previously
+            // published policy exists yet to have copied any row forward from) - the insert
+            // branch is always taken, which never consults observedVersion. 0L is passed purely
+            // as the documented "no row observed yet" sentinel.
             SEED_VIOLATION_PENALTIES.forEach((code, value) -> policyVersionService.updateDraftViolation(
-                    draft.getId(), idByCode.get(code), PenaltyType.PERCENTAGE, value));
-            policyVersionService.publish(draft.getId());
+                    draft.getId(), idByCode.get(code), PenaltyType.PERCENTAGE, value, 0L));
+            PolicyVersion beforePublish = policyVersionService.getById(draft.getId());
+            policyVersionService.publish(draft.getId(), PolicyVersion.SYSTEM_BOOTSTRAP_PUBLISHER_ID,
+                    beforePublish.getConfigurationRevision());
         });
 
         log.info("PolicyBootstrap: seeded and published initial PolicyVersion (commissionRate={}, {} violations, createdBy={})",

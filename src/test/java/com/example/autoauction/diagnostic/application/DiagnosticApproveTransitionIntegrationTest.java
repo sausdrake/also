@@ -84,7 +84,7 @@ class DiagnosticApproveTransitionIntegrationTest {
     // else afterward).
     @BeforeEach
     void publishPolicyVersion() {
-        policyVersionService.publish(policyVersionService.create(new BigDecimal("0.02"), 1L).getId());
+        policyVersionService.publish(policyVersionService.create(new BigDecimal("0.02"), 1L).getId(), 2L, 0L);
     }
 
     @Test
