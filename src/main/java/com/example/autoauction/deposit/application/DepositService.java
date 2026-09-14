@@ -919,9 +919,19 @@ public class DepositService {
      * an independent one, so that the ledger write and the caller's own Payment-status/event writes
      * commit or roll back together. Never populates {@code performedByAdminId} (there is no human
      * admin actor for an automatic credit) and never uses {@code TransactionType.ADMIN_ADJUSTMENT}.
+     *
+     * <p>Slice D3: acquires the Deposit row's pessimistic lock ({@code findByUserIdForUpdate})
+     * FIRST, unconditionally - before the ledger-idempotency check - mirroring
+     * {@code PaymentCreationService.createPayment}'s own established lock-then-check order.
+     * Serializes this operation against every other Deposit-mutating path for the same user
+     * (e.g. two different Payments for the same user confirmed concurrently), closing the race
+     * the unlocked {@code findByUserId} read previously left open.
      */
     @Transactional
     public DepositResponse creditFromPayment(DepositCreditCommand command) {
+        Deposit deposit = depositRepository.findByUserIdForUpdate(command.userId())
+                .orElseThrow(() -> new IllegalArgumentException("Депозит не найден для пользователя: " + command.userId()));
+
         Optional<DepositTransaction> existing =
                 depositRepository.findTransactionByIdempotencyKey(command.ledgerIdempotencyKey());
         if (existing.isPresent()) {
@@ -945,9 +955,6 @@ public class DepositService {
                     command.ledgerIdempotencyKey(), command.userId());
             return getDepositByUserId(command.userId());
         }
-
-        Deposit deposit = depositRepository.findByUserId(command.userId())
-                .orElseThrow(() -> new IllegalArgumentException("Депозит не найден для пользователя: " + command.userId()));
 
         BigDecimal balanceBefore = deposit.getBalance();
         deposit.deposit(command.amount());

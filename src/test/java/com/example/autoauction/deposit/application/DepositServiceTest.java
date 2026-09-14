@@ -1032,7 +1032,7 @@ class DepositServiceTest {
         @DisplayName("Увеличивает баланс на сумму команды")
         void creditFromPayment_IncreasesBalance() {
             when(depositRepository.findTransactionByIdempotencyKey(any())).thenReturn(Optional.empty());
-            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
+            when(depositRepository.findByUserIdForUpdate(userId)).thenReturn(Optional.of(depositWithBalance));
             when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
             when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -1049,7 +1049,7 @@ class DepositServiceTest {
         @DisplayName("Создаёт ровно одну запись DepositTransaction типа PAYMENT_CREDIT")
         void creditFromPayment_CreatesOnePaymentCreditTransaction() {
             when(depositRepository.findTransactionByIdempotencyKey(any())).thenReturn(Optional.empty());
-            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
+            when(depositRepository.findByUserIdForUpdate(userId)).thenReturn(Optional.of(depositWithBalance));
             when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
             when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -1066,7 +1066,7 @@ class DepositServiceTest {
         @DisplayName("performedByAdminId всегда NULL — нет человеческого актора")
         void creditFromPayment_PerformedByAdminIdIsNull() {
             when(depositRepository.findTransactionByIdempotencyKey(any())).thenReturn(Optional.empty());
-            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
+            when(depositRepository.findByUserIdForUpdate(userId)).thenReturn(Optional.of(depositWithBalance));
             when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
             when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -1082,7 +1082,7 @@ class DepositServiceTest {
         @DisplayName("Переданная ledgerReference сохраняется верно")
         void creditFromPayment_PersistsSuppliedReference() {
             when(depositRepository.findTransactionByIdempotencyKey(any())).thenReturn(Optional.empty());
-            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
+            when(depositRepository.findByUserIdForUpdate(userId)).thenReturn(Optional.of(depositWithBalance));
             when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
             when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -1098,7 +1098,7 @@ class DepositServiceTest {
         @DisplayName("Переданный ledgerIdempotencyKey сохраняется верно")
         void creditFromPayment_PersistsSuppliedIdempotencyKey() {
             when(depositRepository.findTransactionByIdempotencyKey(any())).thenReturn(Optional.empty());
-            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
+            when(depositRepository.findByUserIdForUpdate(userId)).thenReturn(Optional.of(depositWithBalance));
             when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
             when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -1120,6 +1120,7 @@ class DepositServiceTest {
                     key, "Автоматическое зачисление по платежу");
             previous.setIdempotencyKey(key);
             when(depositRepository.findTransactionByIdempotencyKey(key)).thenReturn(Optional.of(previous));
+            when(depositRepository.findByUserIdForUpdate(userId)).thenReturn(Optional.of(depositWithBalance));
             when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
 
             DepositResponse response = depositService.creditFromPayment(
@@ -1141,11 +1142,16 @@ class DepositServiceTest {
                     key, "Автоматическое зачисление по платежу");
             existingForAnotherUser.setIdempotencyKey(key);
             when(depositRepository.findTransactionByIdempotencyKey(key)).thenReturn(Optional.of(existingForAnotherUser));
+            // D3 locked order: the Deposit row lock is now acquired unconditionally, BEFORE the
+            // ledger-idempotency check - so this stub must exist for the method to even reach the
+            // collision detection below (mirrors PaymentCreationService.createPayment's own
+            // lock-then-check order).
+            when(depositRepository.findByUserIdForUpdate(userId)).thenReturn(Optional.of(depositWithBalance));
 
             assertThrows(IllegalStateException.class,
                     () -> depositService.creditFromPayment(new DepositCreditCommand(userId, new BigDecimal("1000"), key, key)));
 
-            verify(depositRepository, never()).findByUserId(any());
+            verify(depositRepository).findByUserIdForUpdate(userId);
             verify(depositRepository, never()).save(any(Deposit.class));
             verify(depositRepository, never()).saveTransaction(any(DepositTransaction.class));
         }
@@ -1160,6 +1166,7 @@ class DepositServiceTest {
                     key, "Автоматическое зачисление по платежу");
             existingDifferentAmount.setIdempotencyKey(key);
             when(depositRepository.findTransactionByIdempotencyKey(key)).thenReturn(Optional.of(existingDifferentAmount));
+            when(depositRepository.findByUserIdForUpdate(userId)).thenReturn(Optional.of(depositWithBalance));
 
             assertThrows(IllegalStateException.class,
                     () -> depositService.creditFromPayment(new DepositCreditCommand(userId, new BigDecimal("2000"), key, key)));
@@ -1178,6 +1185,7 @@ class DepositServiceTest {
                     "PAYMENT:TX-original", "Автоматическое зачисление по платежу");
             existingDifferentReference.setIdempotencyKey(key);
             when(depositRepository.findTransactionByIdempotencyKey(key)).thenReturn(Optional.of(existingDifferentReference));
+            when(depositRepository.findByUserIdForUpdate(userId)).thenReturn(Optional.of(depositWithBalance));
 
             assertThrows(IllegalStateException.class,
                     () -> depositService.creditFromPayment(new DepositCreditCommand(userId, new BigDecimal("1000"), key, key)));
@@ -1197,6 +1205,7 @@ class DepositServiceTest {
                     key, AdminAdjustmentReason.OTHER.name());
             existingAdminAdjustment.setIdempotencyKey(key);
             when(depositRepository.findTransactionByIdempotencyKey(key)).thenReturn(Optional.of(existingAdminAdjustment));
+            when(depositRepository.findByUserIdForUpdate(userId)).thenReturn(Optional.of(depositWithBalance));
 
             assertThrows(IllegalStateException.class,
                     () -> depositService.creditFromPayment(new DepositCreditCommand(userId, new BigDecimal("1000"), key, key)));
@@ -1209,7 +1218,7 @@ class DepositServiceTest {
         @DisplayName("Замороженная сумма не изменяется автоматическим зачислением")
         void creditFromPayment_DoesNotTouchFrozenCollateral() {
             when(depositRepository.findTransactionByIdempotencyKey(any())).thenReturn(Optional.empty());
-            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
+            when(depositRepository.findByUserIdForUpdate(userId)).thenReturn(Optional.of(depositWithBlocked));
             when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
             when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -1226,7 +1235,7 @@ class DepositServiceTest {
         @DisplayName("Доступный баланс корректно увеличивается (баланс растёт, залог не трогается)")
         void creditFromPayment_AvailableBalanceSemanticsCorrect() {
             when(depositRepository.findTransactionByIdempotencyKey(any())).thenReturn(Optional.empty());
-            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
+            when(depositRepository.findByUserIdForUpdate(userId)).thenReturn(Optional.of(depositWithBlocked));
             when(depositRepository.save(any())).thenAnswer(i -> i.getArgument(0));
             when(depositRepository.saveTransaction(any())).thenAnswer(i -> i.getArgument(0));
 
