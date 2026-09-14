@@ -358,7 +358,7 @@ public class DepositService {
             );
             depositRepository.saveTransaction(transaction);
 
-            depositRepository.save(deposit);
+            depositRepository.saveAndFlush(deposit);
         } catch (Exception e) {
             // R-1.2/R-1.6: в отличие от unfreezeForAuction (fail-soft, вызывается из
             // AuctionFinalizer, которое уже единолично отвечает за размораживание ВСЕХ
