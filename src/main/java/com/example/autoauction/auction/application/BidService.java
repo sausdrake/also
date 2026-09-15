@@ -240,14 +240,8 @@ public class BidService {
                 );
             }
 
-            try {
-                depositService.freezeForAuction(bidderId, auctionId, requiredDeposit);
-                log.info("Deposit frozen for user {} on auction {}", bidderId, auctionId);
-            } catch (Exception e) {
-                log.error("Failed to freeze deposit for user {} on auction {}: {}",
-                        bidderId, auctionId, e.getMessage());
-                throw new IllegalArgumentException("Ошибка при заморозке депозита: " + e.getMessage());
-            }
+            depositService.freezeForAuction(bidderId, auctionId, requiredDeposit);
+            log.info("Deposit frozen for user {} on auction {}", bidderId, auctionId);
 
             participantRepository.registerParticipant(auctionId, bidderId, requiredDeposit);
         }
