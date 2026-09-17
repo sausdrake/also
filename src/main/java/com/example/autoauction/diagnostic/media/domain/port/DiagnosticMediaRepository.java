@@ -131,4 +131,15 @@ public interface DiagnosticMediaRepository {
      * pattern exactly.
      */
     List<DiagnosticMedia> findPendingThumbnailOrphans(int limit);
+
+    // ==================== mandatory-video completion gate ====================
+
+    /**
+     * Existence check used by DiagnosticRequestService's completion guard: does at
+     * least one row for this exact (diagnosticRequestId, inspectionItemId) pair have
+     * mediaType=VIDEO, uploadStatus=READY, and processingStatus=READY. Deliberately
+     * an EXISTS check, not a count=1 check - multiple qualifying rows are tolerated
+     * by design (the locked mandatory-video business invariant).
+     */
+    boolean existsQualifyingVideo(Long diagnosticRequestId, Long inspectionItemId);
 }

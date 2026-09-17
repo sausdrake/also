@@ -68,6 +68,9 @@ class DiagnosticRequestServiceTest {
     @Mock
     private com.example.autoauction.vehicle.application.VehicleService vehicleService;
 
+    @Mock
+    private com.example.autoauction.diagnostic.media.domain.port.DiagnosticMediaRepository mediaRepository;
+
     @InjectMocks
     private DiagnosticRequestService requestService;
 
@@ -490,6 +493,9 @@ class DiagnosticRequestServiceTest {
             when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
             doNothing().when(answerRepository).deleteByDiagnosticRequestId(requestId);
             when(answerRepository.saveAll(anyList())).thenReturn(List.of());
+            // template fixture has zero groups/items (see setUp) - the mandatory-video gate
+            // enumerates zero required items and passes trivially without touching mediaRepository.
+            when(templateRepository.findFullTemplateById(1L)).thenReturn(Optional.of(template));
             when(requestRepository.markAsCompleted(requestId, diagnosticId)).thenReturn(true);
 
             SubmitInspectionRequest submitRequest = new SubmitInspectionRequest();
@@ -709,6 +715,143 @@ class DiagnosticRequestServiceTest {
             requestService.saveInspectionAnswers(requestId, diagnosticId, submitRequest);
 
             verify(answerRepository).saveAll(anyList());
+        }
+    }
+
+    @Nested
+    @DisplayName("Обязательное видео при завершении заявки (mandatory video completion gate)")
+    class MandatoryVideoGateTests {
+
+        private InspectionItem videoItem;
+        private InspectionTemplate templateWithVideoItem;
+
+        @BeforeEach
+        void setUpBoundInProgress() {
+            savedRequest.setAssignedTo(diagnosticId);
+            savedRequest.setStatus(DiagnosticRequest.DiagnosticRequestStatus.IN_PROGRESS);
+            savedRequest.setTemplateId(1L);
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+            doNothing().when(answerRepository).deleteByDiagnosticRequestId(requestId);
+            when(answerRepository.saveAll(anyList())).thenReturn(List.of());
+
+            videoItem = new InspectionItem();
+            videoItem.setId(10L);
+            videoItem.setGroupId(20L);
+            videoItem.setHasVideo(true);
+
+            InspectionGroup group = new InspectionGroup();
+            group.setId(20L);
+            group.setTemplateId(1L);
+            group.setItems(List.of(videoItem));
+
+            templateWithVideoItem = new InspectionTemplate();
+            templateWithVideoItem.setId(1L);
+            templateWithVideoItem.setGroups(List.of(group));
+        }
+
+        private SubmitInspectionRequest submitRequest(InspectionAnswerDto... answers) {
+            SubmitInspectionRequest dto = new SubmitInspectionRequest();
+            dto.setSubmit(true);
+            dto.setAnswers(List.of(answers));
+            return dto;
+        }
+
+        @Test
+        @DisplayName("Требуемое видео отсутствует - IllegalStateException, завершение не выполняется")
+        void submit_RequiredVideoMissing_ThrowsAndDoesNotComplete() {
+            when(templateRepository.findFullTemplateById(1L)).thenReturn(Optional.of(templateWithVideoItem));
+            when(mediaRepository.existsQualifyingVideo(requestId, 10L)).thenReturn(false);
+
+            assertThatThrownBy(() -> requestService.saveInspectionAnswers(requestId, diagnosticId, submitRequest()))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("видео");
+
+            verify(requestRepository, never()).markAsCompleted(anyLong(), anyLong());
+        }
+
+        @Test
+        @DisplayName("Требуемое видео полностью готово - завершение проходит существующим путём")
+        void submit_RequiredVideoQualifies_Completes() {
+            when(templateRepository.findFullTemplateById(1L)).thenReturn(Optional.of(templateWithVideoItem));
+            when(mediaRepository.existsQualifyingVideo(requestId, 10L)).thenReturn(true);
+            when(requestRepository.markAsCompleted(requestId, diagnosticId)).thenReturn(true);
+
+            requestService.saveInspectionAnswers(requestId, diagnosticId, submitRequest());
+
+            verify(requestRepository).markAsCompleted(requestId, diagnosticId);
+        }
+
+        @Test
+        @DisplayName("Два требуемых пункта, удовлетворён только один - отклонено")
+        void submit_MultipleRequiredItems_OnlyOneSatisfied_Rejected() {
+            InspectionItem secondVideoItem = new InspectionItem();
+            secondVideoItem.setId(11L);
+            secondVideoItem.setGroupId(20L);
+            secondVideoItem.setHasVideo(true);
+            templateWithVideoItem.getGroups().get(0).setItems(List.of(videoItem, secondVideoItem));
+
+            when(templateRepository.findFullTemplateById(1L)).thenReturn(Optional.of(templateWithVideoItem));
+            when(mediaRepository.existsQualifyingVideo(requestId, 10L)).thenReturn(true);
+            when(mediaRepository.existsQualifyingVideo(requestId, 11L)).thenReturn(false);
+
+            assertThatThrownBy(() -> requestService.saveInspectionAnswers(requestId, diagnosticId, submitRequest()))
+                    .isInstanceOf(IllegalStateException.class);
+
+            verify(requestRepository, never()).markAsCompleted(anyLong(), anyLong());
+        }
+
+        @Test
+        @DisplayName("Два требуемых пункта, оба удовлетворены - завершение проходит")
+        void submit_MultipleRequiredItems_BothSatisfied_Completes() {
+            InspectionItem secondVideoItem = new InspectionItem();
+            secondVideoItem.setId(11L);
+            secondVideoItem.setGroupId(20L);
+            secondVideoItem.setHasVideo(true);
+            templateWithVideoItem.getGroups().get(0).setItems(List.of(videoItem, secondVideoItem));
+
+            when(templateRepository.findFullTemplateById(1L)).thenReturn(Optional.of(templateWithVideoItem));
+            when(mediaRepository.existsQualifyingVideo(requestId, 10L)).thenReturn(true);
+            when(mediaRepository.existsQualifyingVideo(requestId, 11L)).thenReturn(true);
+            when(requestRepository.markAsCompleted(requestId, diagnosticId)).thenReturn(true);
+
+            requestService.saveInspectionAnswers(requestId, diagnosticId, submitRequest());
+
+            verify(requestRepository).markAsCompleted(requestId, diagnosticId);
+        }
+
+        @Test
+        @DisplayName("Требуемые пункты берутся из шаблона, а не из dto.answers - " +
+                "пустой список ответов не позволяет обойти проверку")
+        void submit_RequiredItemsComeFromTemplate_NotFromClientAnswers() {
+            when(templateRepository.findFullTemplateById(1L)).thenReturn(Optional.of(templateWithVideoItem));
+            when(mediaRepository.existsQualifyingVideo(requestId, 10L)).thenReturn(false);
+
+            // dto carries zero answers - the gate must still find and enforce the
+            // template's own required item, never relying on the (empty) answer list.
+            assertThatThrownBy(() -> requestService.saveInspectionAnswers(requestId, diagnosticId, submitRequest()))
+                    .isInstanceOf(IllegalStateException.class);
+
+            verify(mediaRepository).existsQualifyingVideo(requestId, 10L);
+            verify(requestRepository, never()).markAsCompleted(anyLong(), anyLong());
+        }
+
+        @Test
+        @DisplayName("Шаблон без требуемых видео - существующее поведение не меняется, " +
+                "mediaRepository не опрашивается")
+        void submit_NoVideoRequirements_UnaffectedByGate() {
+            InspectionItem photoOnlyItem = new InspectionItem();
+            photoOnlyItem.setId(12L);
+            photoOnlyItem.setGroupId(20L);
+            photoOnlyItem.setHasVideo(false);
+            templateWithVideoItem.getGroups().get(0).setItems(List.of(photoOnlyItem));
+
+            when(templateRepository.findFullTemplateById(1L)).thenReturn(Optional.of(templateWithVideoItem));
+            when(requestRepository.markAsCompleted(requestId, diagnosticId)).thenReturn(true);
+
+            requestService.saveInspectionAnswers(requestId, diagnosticId, submitRequest());
+
+            verify(requestRepository).markAsCompleted(requestId, diagnosticId);
+            verifyNoInteractions(mediaRepository);
         }
     }
 

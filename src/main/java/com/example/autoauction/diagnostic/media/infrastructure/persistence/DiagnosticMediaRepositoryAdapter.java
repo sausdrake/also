@@ -1,6 +1,7 @@
 package com.example.autoauction.diagnostic.media.infrastructure.persistence;
 
 import com.example.autoauction.diagnostic.media.domain.DiagnosticMedia;
+import com.example.autoauction.diagnostic.media.domain.MediaType;
 import com.example.autoauction.diagnostic.media.domain.ProcessingStatus;
 import com.example.autoauction.diagnostic.media.domain.UploadStatus;
 import com.example.autoauction.diagnostic.media.domain.port.DiagnosticMediaRepository;
@@ -207,5 +208,14 @@ public class DiagnosticMediaRepositoryAdapter implements DiagnosticMediaReposito
         return jpaRepository.findByPendingThumbnailStorageKeyIsNotNullAndProcessingStatusNot(
                         ProcessingStatus.PROCESSING, PageRequest.of(0, limit))
                 .stream().map(mapper::toDomain).collect(Collectors.toList());
+    }
+
+    // ==================== mandatory-video completion gate ====================
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsQualifyingVideo(Long diagnosticRequestId, Long inspectionItemId) {
+        return jpaRepository.existsByDiagnosticRequestIdAndInspectionItemIdAndMediaTypeAndUploadStatusAndProcessingStatus(
+                diagnosticRequestId, inspectionItemId, MediaType.VIDEO, UploadStatus.READY, ProcessingStatus.READY);
     }
 }

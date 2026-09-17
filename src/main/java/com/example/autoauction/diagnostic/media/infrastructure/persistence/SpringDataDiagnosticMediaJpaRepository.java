@@ -1,5 +1,6 @@
 package com.example.autoauction.diagnostic.media.infrastructure.persistence;
 
+import com.example.autoauction.diagnostic.media.domain.MediaType;
 import com.example.autoauction.diagnostic.media.domain.ProcessingStatus;
 import com.example.autoauction.diagnostic.media.domain.UploadStatus;
 import org.springframework.data.domain.Pageable;
@@ -110,4 +111,10 @@ public interface SpringDataDiagnosticMediaJpaRepository extends JpaRepository<Jp
 
     List<JpaDiagnosticMediaEntity> findByPendingThumbnailStorageKeyIsNotNullAndProcessingStatusNot(
             ProcessingStatus processingStatus, Pageable pageable);
+
+    // ==================== mandatory-video completion gate ====================
+
+    boolean existsByDiagnosticRequestIdAndInspectionItemIdAndMediaTypeAndUploadStatusAndProcessingStatus(
+            Long diagnosticRequestId, Long inspectionItemId, MediaType mediaType,
+            UploadStatus uploadStatus, ProcessingStatus processingStatus);
 }

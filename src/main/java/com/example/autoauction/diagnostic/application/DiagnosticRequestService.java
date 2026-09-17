@@ -334,6 +334,7 @@ public class DiagnosticRequestService {
 
         // Если это финальная отправка, меняем статус
         if (dto.isSubmit()) {
+            validateMandatoryVideos(request);
             requestRepository.markAsCompleted(requestId, diagnosticId);
             log.info("Request {} marked as completed", requestId);
 
@@ -349,6 +350,31 @@ public class DiagnosticRequestService {
                 }
             } catch (Exception e) {
                 log.warn("Failed to send DIAG_REPORT_SUBMITTED notifications: {}", e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Mandatory-video completion gate: for every InspectionItem on the request's bound
+     * template where hasVideo=true, at least one VIDEO DiagnosticMedia row with
+     * uploadStatus=READY and processingStatus=READY must exist for that (request, item)
+     * pair. Required item IDs are enumerated from the template itself, never from the
+     * client-supplied answer DTO, so a client cannot satisfy this gate by omitting a
+     * required item or supplying an unrelated item ID. Runs inside the caller's existing
+     * transaction, before markAsCompleted - a failure here throws and rolls back the
+     * answers already persisted earlier in this same method.
+     */
+    private void validateMandatoryVideos(DiagnosticRequest request) {
+        InspectionTemplate template = templateRepository.findFullTemplateById(request.getTemplateId())
+                .orElseThrow(() -> new IllegalStateException("Шаблон анкеты не найден: " + request.getTemplateId()));
+
+        for (InspectionGroup group : template.getGroups()) {
+            for (InspectionItem item : group.getItems()) {
+                if (item.isHasVideo() && !mediaRepository.existsQualifyingVideo(request.getId(), item.getId())) {
+                    throw new IllegalStateException(
+                            "Обязательное видео для пункта анкеты " + item.getId()
+                                    + " отсутствует или ещё не полностью обработано");
+                }
             }
         }
     }
