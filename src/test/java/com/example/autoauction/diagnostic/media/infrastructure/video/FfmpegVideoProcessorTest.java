@@ -61,6 +61,22 @@ class FfmpegVideoProcessorTest {
         return output;
     }
 
+    /** Generates a real, valid WebM of the given duration/resolution using ffmpeg's own lavfi color source. */
+    private Path generateRealTestWebm(Path dir, int durationSeconds, int width, int height) throws IOException, InterruptedException {
+        Path output = dir.resolve("real-input.webm");
+        List<String> command = List.of(FFMPEG_PATH, "-y", "-v", "quiet",
+                "-f", "lavfi", "-i", "color=c=blue:s=" + width + "x" + height + ":d=" + durationSeconds,
+                "-frames:v", String.valueOf(durationSeconds * 5),
+                output.toString());
+        Process process = new ProcessBuilder(command).start();
+        boolean finished = process.waitFor(30, TimeUnit.SECONDS);
+        if (!finished || process.exitValue() != 0) {
+            throw new IllegalStateException("failed to generate the synthetic test webm fixture (exit="
+                    + (finished ? process.exitValue() : "timeout") + ")");
+        }
+        return output;
+    }
+
     private VideoProcessor.ProcessingLimits generousLimits() {
         return new VideoProcessor.ProcessingLimits(120, 1920, 1080, 320, 240);
     }
@@ -161,6 +177,89 @@ class FfmpegVideoProcessorTest {
         assertThatThrownBy(() -> processor.process(video, tooStrict))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("dimensions");
+
+        try (Stream<Path> files = Files.list(dir)) {
+            assertThat(files).noneMatch(p -> p.getFileName().toString().startsWith("thumbnail-"));
+        }
+    }
+
+    // ==================== WebM compatibility (ffmpeg-dependent) ====================
+
+    @Test
+    @DisplayName("Валидное реальное WebM -> метаданные и миниатюра корректны")
+    void validRealWebm_ExtractsMetadataAndThumbnail() throws Exception {
+        assumeFfmpegAvailable();
+        Path dir = Files.createTempDirectory("ffmpeg-test-webm-valid-");
+        Path video = generateRealTestWebm(dir, 2, 320, 240);
+        FfmpegVideoProcessor processor = new FfmpegVideoProcessor();
+
+        VideoProcessor.ProcessingResult result = processor.process(video, generousLimits());
+
+        assertThat(result.durationSeconds()).isBetween(1, 3); // rounding tolerance around the 2s source
+        assertThat(result.width()).isEqualTo(320);
+        assertThat(result.height()).isEqualTo(240);
+        assertThat(result.thumbnailFile()).exists();
+        assertThat(Files.size(result.thumbnailFile())).isGreaterThan(0);
+    }
+
+    @Test
+    @DisplayName("WebM: длительность превышает лимит -> отклонено ДО извлечения миниатюры")
+    void webmDurationExceedsLimit_RejectedBeforeThumbnailExtraction() throws Exception {
+        assumeFfmpegAvailable();
+        Path dir = Files.createTempDirectory("ffmpeg-test-webm-duration-limit-");
+        Path video = generateRealTestWebm(dir, 2, 320, 240);
+        FfmpegVideoProcessor processor = new FfmpegVideoProcessor();
+        VideoProcessor.ProcessingLimits tooStrict = new VideoProcessor.ProcessingLimits(1, 1920, 1080, 320, 240);
+
+        assertThatThrownBy(() -> processor.process(video, tooStrict))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("duration");
+
+        try (Stream<Path> files = Files.list(dir)) {
+            assertThat(files).noneMatch(p -> p.getFileName().toString().startsWith("thumbnail-"));
+        }
+    }
+
+    @Test
+    @DisplayName("WebM: ширина превышает лимит -> отклонено ДО извлечения миниатюры")
+    void webmWidthExceedsLimit_RejectedBeforeThumbnailExtraction() throws Exception {
+        assumeFfmpegAvailable();
+        Path dir = Files.createTempDirectory("ffmpeg-test-webm-width-limit-");
+        Path video = generateRealTestWebm(dir, 2, 320, 240);
+        FfmpegVideoProcessor processor = new FfmpegVideoProcessor();
+        VideoProcessor.ProcessingLimits tooStrict = new VideoProcessor.ProcessingLimits(120, 100, 1080, 320, 240);
+
+        assertThatThrownBy(() -> processor.process(video, tooStrict))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("dimensions");
+
+        try (Stream<Path> files = Files.list(dir)) {
+            assertThat(files).noneMatch(p -> p.getFileName().toString().startsWith("thumbnail-"));
+        }
+    }
+
+    @Test
+    @DisplayName("Валидный заголовок EBML, но повреждённое содержимое -> ошибка, миниатюра не создаётся")
+    void malformedWebmPayload_Fails() throws Exception {
+        assumeFfmpegAvailable();
+        Path dir = Files.createTempDirectory("ffmpeg-test-webm-malformed-");
+        Path malformed = dir.resolve("malformed.webm");
+        // Valid EBML/WebM signature followed by garbage - passes MediaContentValidator's
+        // magic-byte check (application-layer concern, not exercised here) but is not a real,
+        // decodable WebM container - ffprobe must reject it, never silently succeed.
+        byte[] payload = new byte[64];
+        payload[0] = (byte) 0x1A;
+        payload[1] = 0x45;
+        payload[2] = (byte) 0xDF;
+        payload[3] = (byte) 0xA3;
+        for (int i = 4; i < payload.length; i++) {
+            payload[i] = (byte) 0xFF; // arbitrary non-EBML garbage after the header
+        }
+        Files.write(malformed, payload);
+        FfmpegVideoProcessor processor = new FfmpegVideoProcessor();
+
+        assertThatThrownBy(() -> processor.process(malformed, generousLimits()))
+                .isInstanceOf(IllegalStateException.class);
 
         try (Stream<Path> files = Files.list(dir)) {
             assertThat(files).noneMatch(p -> p.getFileName().toString().startsWith("thumbnail-"));

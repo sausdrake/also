@@ -75,6 +75,7 @@ class DiagnosticMediaServiceIntegrationTest {
 
     private static final byte[] VALID_JPEG = new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x01, 0x02, 0x03};
     private static final byte[] VALID_MP4 = new byte[]{0x00, 0x00, 0x00, 0x18, 'f', 't', 'y', 'p', 0x01};
+    private static final byte[] VALID_WEBM = new byte[]{(byte) 0x1A, 0x45, (byte) 0xDF, (byte) 0xA3, 0x01, 0x02, 0x03, 0x04};
     private static final byte[] INVALID_CONTENT = "not a real image".getBytes(StandardCharsets.UTF_8);
 
     private Long createUser(String prefix) {
@@ -229,6 +230,38 @@ class DiagnosticMediaServiceIntegrationTest {
             Setup s = setUpStandard(true, false);
             assertThatThrownBy(() -> mediaService.createIntent(
                     s.requestId(), s.itemId(), s.diagnosticId(), MediaType.PHOTO, "application/pdf", 1000L))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        @DisplayName("WebM: intent для VIDEO + video/webm создаётся успешно, ключ хранилища получает .webm")
+        void webmVideoIntent_Succeeds_WithWebmStorageKeySuffix() {
+            Setup s = setUpStandard(false, true);
+            MediaIntentResponse response = mediaService.createIntent(
+                    s.requestId(), s.itemId(), s.diagnosticId(), MediaType.VIDEO, "video/webm", VALID_WEBM.length);
+
+            assertThat(response.uploadStatus()).isEqualTo(UploadStatus.PENDING_UPLOAD);
+            DiagnosticMedia saved = mediaRepository.findById(response.mediaId()).orElseThrow();
+            assertThat(saved.getStorageKey()).endsWith(".webm");
+        }
+
+        @Test
+        @DisplayName("Существующий MP4 intent по-прежнему получает .mp4 (регрессия)")
+        void mp4VideoIntent_StillReceivesMp4StorageKeySuffix() {
+            Setup s = setUpStandard(false, true);
+            MediaIntentResponse response = mediaService.createIntent(
+                    s.requestId(), s.itemId(), s.diagnosticId(), MediaType.VIDEO, "video/mp4", VALID_MP4.length);
+
+            DiagnosticMedia saved = mediaRepository.findById(response.mediaId()).orElseThrow();
+            assertThat(saved.getStorageKey()).endsWith(".mp4");
+        }
+
+        @Test
+        @DisplayName("Неподдерживаемый видео-MIME по-прежнему отклоняется (video/avi)")
+        void unsupportedVideoMime_StillRejected() {
+            Setup s = setUpStandard(false, true);
+            assertThatThrownBy(() -> mediaService.createIntent(
+                    s.requestId(), s.itemId(), s.diagnosticId(), MediaType.VIDEO, "video/avi", 1000L))
                     .isInstanceOf(IllegalArgumentException.class);
         }
 
@@ -430,6 +463,76 @@ class DiagnosticMediaServiceIntegrationTest {
             assertThat(result.durationSeconds()).isNull();
             assertThat(result.width()).isNull();
             assertThat(result.height()).isNull();
+        }
+
+        @Test
+        @DisplayName("WebM: валидные magic bytes (EBML) -> READY, processingStatus остаётся PENDING")
+        void validWebmVideo_ReadyButProcessingPending() {
+            Setup s = setUpStandard(false, true);
+            MediaIntentResponse intent = mediaService.createIntent(
+                    s.requestId(), s.itemId(), s.diagnosticId(), MediaType.VIDEO, "video/webm", VALID_WEBM.length);
+            DiagnosticMedia media = mediaRepository.findById(intent.mediaId()).orElseThrow();
+            storageClient.simulateUpload(media.getStorageKey(), VALID_WEBM, "video/webm");
+
+            MediaResponse result = mediaService.finalize(intent.mediaId(), s.diagnosticId());
+
+            assertThat(result.uploadStatus()).isEqualTo(UploadStatus.READY);
+            assertThat(result.mimeType()).isEqualTo("video/webm");
+            assertThat(result.processingStatus()).isEqualTo(ProcessingStatus.PENDING);
+        }
+
+        // NOTE: finalize() validates detected content against the media CATEGORY allow-list
+        // (PHOTO vs VIDEO), never against the client's originally-declared MIME string - this
+        // is a pre-existing characteristic (already true for PHOTO_MIME_TYPES's two members
+        // since this class's original design), unrelated to and unchanged by WebM support. The
+        // tests below therefore cover cross-CATEGORY rejection (photo content in a video slot),
+        // which is the actual, real content-validation boundary this class enforces - not
+        // cross-type-within-category equality, which was never part of this contract.
+
+        @Test
+        @DisplayName("VIDEO intent, но фактическое содержимое - JPEG -> FAILED (другая категория медиа)")
+        void videoIntentActualJpegContent_Failed_CrossCategoryRejected() {
+            Setup s = setUpStandard(false, true);
+            MediaIntentResponse intent = mediaService.createIntent(
+                    s.requestId(), s.itemId(), s.diagnosticId(), MediaType.VIDEO, "video/webm", VALID_JPEG.length);
+            DiagnosticMedia media = mediaRepository.findById(intent.mediaId()).orElseThrow();
+            storageClient.simulateUpload(media.getStorageKey(), VALID_JPEG, "video/webm");
+
+            assertThatThrownBy(() -> mediaService.finalize(intent.mediaId(), s.diagnosticId()))
+                    .isInstanceOf(IllegalStateException.class);
+            assertThat(mediaRepository.findById(intent.mediaId()).orElseThrow().getUploadStatus())
+                    .isEqualTo(UploadStatus.FAILED);
+        }
+
+        @Test
+        @DisplayName("VIDEO intent, но фактическое содержимое - PNG -> FAILED (другая категория медиа)")
+        void videoIntentActualPngContent_Failed_CrossCategoryRejected() {
+            byte[] validPng = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+            Setup s = setUpStandard(false, true);
+            MediaIntentResponse intent = mediaService.createIntent(
+                    s.requestId(), s.itemId(), s.diagnosticId(), MediaType.VIDEO, "video/mp4", validPng.length);
+            DiagnosticMedia media = mediaRepository.findById(intent.mediaId()).orElseThrow();
+            storageClient.simulateUpload(media.getStorageKey(), validPng, "video/mp4");
+
+            assertThatThrownBy(() -> mediaService.finalize(intent.mediaId(), s.diagnosticId()))
+                    .isInstanceOf(IllegalStateException.class);
+            assertThat(mediaRepository.findById(intent.mediaId()).orElseThrow().getUploadStatus())
+                    .isEqualTo(UploadStatus.FAILED);
+        }
+
+        @Test
+        @DisplayName("Заявлен video/webm, случайные байты -> FAILED (не распознано)")
+        void declaredWebmRandomBytes_Failed() {
+            Setup s = setUpStandard(false, true);
+            MediaIntentResponse intent = mediaService.createIntent(
+                    s.requestId(), s.itemId(), s.diagnosticId(), MediaType.VIDEO, "video/webm", INVALID_CONTENT.length);
+            DiagnosticMedia media = mediaRepository.findById(intent.mediaId()).orElseThrow();
+            storageClient.simulateUpload(media.getStorageKey(), INVALID_CONTENT, "video/webm");
+
+            assertThatThrownBy(() -> mediaService.finalize(intent.mediaId(), s.diagnosticId()))
+                    .isInstanceOf(IllegalStateException.class);
+            assertThat(mediaRepository.findById(intent.mediaId()).orElseThrow().getUploadStatus())
+                    .isEqualTo(UploadStatus.FAILED);
         }
     }
 

@@ -2,7 +2,8 @@ package com.example.autoauction.diagnostic.media.application;
 
 /**
  * Basic magic-byte signature matching only - JPEG (FFD8FF), PNG
- * (89504E47 0D0A1A0A), MP4/ISO-BMFF (ftyp box at offset 4). Deliberately NOT
+ * (89504E47 0D0A1A0A), MP4/ISO-BMFF (ftyp box at offset 4), WebM/EBML
+ * (1A45DFA3 at offset 0). Deliberately NOT
  * full container/codec validation, which would require a media-processing
  * library this project does not have; MEDIA-3.2 explicitly does not add one.
  * Sufficient to distinguish the three supported types and reject content
@@ -28,6 +29,10 @@ final class MediaContentValidator {
         }
         if (b.length >= 8 && b[4] == 'f' && b[5] == 't' && b[6] == 'y' && b[7] == 'p') {
             return "video/mp4";
+        }
+        if (b.length >= 4 && (b[0] & 0xFF) == 0x1A && (b[1] & 0xFF) == 0x45
+                && (b[2] & 0xFF) == 0xDF && (b[3] & 0xFF) == 0xA3) {
+            return "video/webm";
         }
         return null;
     }

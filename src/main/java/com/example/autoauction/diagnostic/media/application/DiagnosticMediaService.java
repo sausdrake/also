@@ -44,10 +44,11 @@ public class DiagnosticMediaService {
     private static final Map<String, String> EXTENSION_BY_MIME = Map.of(
             "image/jpeg", ".jpg",
             "image/png", ".png",
-            "video/mp4", ".mp4"
+            "video/mp4", ".mp4",
+            "video/webm", ".webm"
     );
     private static final Set<String> PHOTO_MIME_TYPES = Set.of("image/jpeg", "image/png");
-    private static final Set<String> VIDEO_MIME_TYPES = Set.of("video/mp4");
+    private static final Set<String> VIDEO_MIME_TYPES = Set.of("video/mp4", "video/webm");
 
     private final DiagnosticMediaRepository mediaRepository;
     private final DiagnosticRequestRepository requestRepository;
