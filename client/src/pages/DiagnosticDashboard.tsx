@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Routes, Route, NavLink, useNavigate, Navigate } from 'react-router-dom';
 import React from 'react';
 import axios from 'axios';
 import api from '../api/client';
 import { formatDate } from '../utils/formatDate';
 import { useAuthStore } from '../store/authStore';
+import { DiagnosticMediaSection, type ItemReadiness } from '../components/diagnostic/DiagnosticMediaSection';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
@@ -30,6 +31,7 @@ interface Item {
   isRequired: boolean;
   hasRating: boolean;
   hasPhoto: boolean;
+  hasVideo: boolean;
 }
 
 interface Group {
@@ -222,6 +224,13 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
   const [missingFields, setMissingFields] = useState<string[]>([]);
   const [templates, setTemplates] = useState<{ id: number; name: string; vehicleType: string }[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
+  const [itemReadiness, setItemReadiness] = useState<Record<number, ItemReadiness>>({});
+
+  // Frontend readiness is advisory only - the backend completion gate remains
+  // authoritative (submit() below still relies on the real POST/409 path).
+  const handleReadinessChange = useCallback((itemId: number, readiness: ItemReadiness) => {
+    setItemReadiness(prev => (prev[itemId] === readiness ? prev : { ...prev, [itemId]: readiness }));
+  }, []);
 
   const loadForm = (templateId?: number) => {
     const url = templateId
@@ -337,6 +346,18 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
   }).length;
   const progress = totalRequired > 0 ? Math.round((filledRequired / totalRequired) * 100) : 100;
 
+  // HYBRID submit UX: advisory only, never blocks the submit button (unlike
+  // the existing progress<100 disable above, which is untouched). Distinct
+  // from a genuine "confirmed missing" message when readiness is still
+  // unknown (media list not yet loaded / failed to load) - NOT_LOADED must
+  // never be presented to the user as "video missing".
+  const videoRequiredItems = groups.flatMap(g => g.items).filter(i => i.hasVideo);
+  const videoMissing = videoRequiredItems.filter(i => itemReadiness[i.id] === 'missing').map(i => i.title);
+  const videoUnknown = videoRequiredItems.filter(i => {
+    const r = itemReadiness[i.id];
+    return r === undefined || r === 'unknown';
+  }).map(i => i.title);
+
   return (
     <div className="p-6 max-w-3xl space-y-4">
       <div className="flex items-center gap-2 text-sm">
@@ -402,6 +423,20 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
           <ul className="list-disc pl-4 space-y-0.5">
             {missingFields.map((f, i) => <li key={i}>{f}</li>)}
           </ul>
+        </div>
+      )}
+
+      {videoMissing.length > 0 && (
+        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-800">
+          <p className="font-medium mb-1">Обязательное видео ещё не готово (отправка всё же возможна):</p>
+          <ul className="list-disc pl-4 space-y-0.5">
+            {videoMissing.map((f, i) => <li key={i}>{f}</li>)}
+          </ul>
+        </div>
+      )}
+      {videoMissing.length === 0 && videoUnknown.length > 0 && (
+        <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-600">
+          Статус обязательного видео пока не проверен: {videoUnknown.join(', ')}
         </div>
       )}
 
@@ -471,6 +506,14 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
                       </div>
                     )}
                     {hasError && <p className="text-xs text-red-500">Обязательное поле</p>}
+                    {item.hasVideo && editable && (
+                      <DiagnosticMediaSection
+                        requestId={requestId}
+                        itemId={item.id}
+                        hasVideo={item.hasVideo}
+                        onReadinessChange={handleReadinessChange}
+                      />
+                    )}
                   </div>
                 );
               })}
