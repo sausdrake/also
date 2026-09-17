@@ -57,6 +57,10 @@ export function DiagnosticMediaSection({
         mediaType: 'VIDEO',
         blob: recorder.blob,
         mimeType: recorder.mimeType,
+        // Covers an attempt that finishes in the background after a newer
+        // recording has superseded it in the hook's displayed state - its
+        // eventual server-side outcome must still be picked up.
+        onSettled: () => processing.refetch(),
       });
       recorder.reset();
     }
@@ -77,7 +81,20 @@ export function DiagnosticMediaSection({
   if (!hasVideo) return null;
 
   const handleSnapshot = (blob: Blob) => {
-    void snapshotUpload.start({ requestId, itemId, mediaType: 'PHOTO', blob, mimeType: 'image/jpeg' });
+    void snapshotUpload.start({
+      requestId,
+      itemId,
+      mediaType: 'PHOTO',
+      blob,
+      mimeType: 'image/jpeg',
+      onSettled: () => processing.refetch(),
+    });
+  };
+
+  // Finalize failure keeps the already-uploaded object; retry re-finalizes
+  // the SAME mediaId (no new intent, no re-upload of the blob).
+  const handleRetryFinalizeVideo = () => {
+    void videoUpload.retryFinalize(() => processing.refetch());
   };
 
   return (
@@ -90,6 +107,7 @@ export function DiagnosticMediaSection({
         snapshotUpload={snapshotUpload}
         fetchStatus={processing.status}
         onRetryFetch={processing.refetch}
+        onRetryFinalizeVideo={handleRetryFinalizeVideo}
       />
     </div>
   );

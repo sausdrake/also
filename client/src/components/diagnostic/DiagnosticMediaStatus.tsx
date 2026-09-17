@@ -9,6 +9,7 @@ export interface DiagnosticMediaStatusProps {
   snapshotUpload: UseMediaUploadResult;
   fetchStatus: MediaListStatus;
   onRetryFetch: () => void;
+  onRetryFinalizeVideo: () => void;
 }
 
 const UPLOAD_STATE_LABELS: Partial<Record<UseMediaUploadResult['state'], string>> = {
@@ -33,6 +34,7 @@ export function DiagnosticMediaStatus({
   snapshotUpload,
   fetchStatus,
   onRetryFetch,
+  onRetryFinalizeVideo,
 }: DiagnosticMediaStatusProps) {
   const videos = mediaList.filter((m) => m.mediaType === 'VIDEO');
   const photoCount = mediaList.filter((m) => m.mediaType === 'PHOTO').length;
@@ -80,8 +82,16 @@ export function DiagnosticMediaStatus({
               : '…')}
         </p>
       )}
-      {(videoUpload.state === 'upload_failed' || videoUpload.state === 'finalize_failed') && (
-        <p className="text-red-600">{UPLOAD_STATE_LABELS[videoUpload.state]}</p>
+      {videoUpload.state === 'upload_failed' && (
+        <p className="text-red-600">{UPLOAD_STATE_LABELS.upload_failed}</p>
+      )}
+      {videoUpload.state === 'finalize_failed' && (
+        <div className="text-red-600">
+          <p>{UPLOAD_STATE_LABELS.finalize_failed}</p>
+          <button type="button" onClick={onRetryFinalizeVideo} className="underline">
+            Повторить завершение
+          </button>
+        </div>
       )}
 
       {(snapshotUpload.state === 'upload_failed' || snapshotUpload.state === 'finalize_failed') && (
