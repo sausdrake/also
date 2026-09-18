@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class PaymentEventRepositoryAdapter implements PaymentEventRepository {
@@ -29,5 +30,11 @@ public class PaymentEventRepositoryAdapter implements PaymentEventRepository {
     public List<PaymentEvent> findByPaymentId(Long paymentId) {
         return jpaRepository.findByPaymentIdOrderByOccurredAtAscIdAsc(paymentId).stream()
                 .map(mapper::toDomain).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<PaymentEvent> findLatestByPaymentId(Long paymentId) {
+        return jpaRepository.findTopByPaymentIdOrderByOccurredAtDescIdDesc(paymentId).map(mapper::toDomain);
     }
 }

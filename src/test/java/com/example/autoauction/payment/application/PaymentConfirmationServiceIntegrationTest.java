@@ -6,6 +6,7 @@ import com.example.autoauction.deposit.domain.DepositTransaction;
 import com.example.autoauction.deposit.domain.port.DepositRepository;
 import com.example.autoauction.payment.domain.Payment;
 import com.example.autoauction.payment.domain.PaymentEvent;
+import com.example.autoauction.payment.domain.PaymentEventSource;
 import com.example.autoauction.payment.domain.PaymentEventType;
 import com.example.autoauction.payment.domain.PaymentStatus;
 import com.example.autoauction.payment.domain.ReconciliationCaseStatus;
@@ -27,6 +28,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -414,5 +416,144 @@ class PaymentConfirmationServiceIntegrationTest extends AbstractPostgresIntegrat
         assertThat(paymentEventRepository.findByPaymentId(p.getId()))
                 .extracting(com.example.autoauction.payment.domain.PaymentEvent::getType)
                 .containsExactly(PaymentEventType.POLL_RESULT);
+    }
+
+    // ==================== Phase 31: consecutive POLL_RESULT deduplication ====================
+    // Note on scenario G (SUCCEEDED as the latest event, then a POLL_RESULT-producing branch):
+    // unreachable via the real confirmPayment flow - confirmPayment's own terminal guard
+    // (SUCCEEDED/FAILED/CANCELLED) returns before ever reaching a provider pull or either
+    // POLL_RESULT branch, so a POLL_RESULT can never be attempted, let alone appended, once a
+    // payment is SUCCEEDED. This is already proven by alreadySucceeded_NoOp above (no event at
+    // all is appended on a second call) - no separate fixture is added here to avoid bypassing
+    // that guard artificially.
+
+    @Test
+    @DisplayName("A/B/C. repeated identical PENDING/UNKNOWN observations collapse to exactly one consecutive POLL_RESULT")
+    void repeatedIdenticalObservations_CollapseToOnePollResult() {
+        Long userId = newUserWithDeposit();
+        String ref = "PAY-DEDUP-A-" + System.nanoTime();
+        String providerRef = "PSP-DEDUP-A-" + System.nanoTime();
+        Payment p = newPayment(userId, ref, PaymentStatus.PENDING, providerRef);
+        fakeProvider.stubStatus(providerRef, new PaymentProviderPort.ProviderPaymentStatus(
+                PaymentProviderPort.ProviderPaymentState.UNKNOWN, null, null, null));
+
+        orchestrator.confirmPayment(ref); // A: first observation - no previous event
+        orchestrator.confirmPayment(ref); // B: second, identical - must not add a row
+        orchestrator.confirmPayment(ref); // C: third, identical - must still not add a row
+
+        assertThat(paymentEventRepository.findByPaymentId(p.getId()))
+                .extracting(PaymentEvent::getType)
+                .as("three identical PENDING/UNKNOWN polls persist as exactly one POLL_RESULT")
+                .containsExactly(PaymentEventType.POLL_RESULT);
+    }
+
+    @Test
+    @DisplayName("H. EXPIRED branch: repeated identical polls also collapse to exactly one consecutive POLL_RESULT")
+    void expiredBranch_RepeatedIdenticalObservations_CollapseToOnePollResult() {
+        Long userId = newUserWithDeposit();
+        String ref = "PAY-DEDUP-H-" + System.nanoTime();
+        String providerRef = "PSP-DEDUP-H-" + System.nanoTime();
+        Payment p = newPayment(userId, ref, PaymentStatus.EXPIRED, providerRef);
+        fakeProvider.stubStatus(providerRef, new PaymentProviderPort.ProviderPaymentStatus(
+                PaymentProviderPort.ProviderPaymentState.UNKNOWN, null, null, null));
+
+        orchestrator.confirmPayment(ref);
+        orchestrator.confirmPayment(ref);
+
+        assertThat(paymentRepository.findById(p.getId()).orElseThrow().getStatus())
+                .as("EXPIRED must remain untouched by dedup")
+                .isEqualTo(PaymentStatus.EXPIRED);
+        assertThat(paymentEventRepository.findByPaymentId(p.getId()))
+                .extracting(PaymentEvent::getType)
+                .containsExactly(PaymentEventType.POLL_RESULT);
+    }
+
+    @Test
+    @DisplayName("D/K. a real prior PENDING event does not suppress the next POLL_RESULT (not consecutive)")
+    void nonPollResultLatestEvent_PendingThenPollResult_IsNotSuppressed() {
+        Long userId = newUserWithDeposit();
+        String ref = "PAY-DEDUP-D-" + System.nanoTime();
+        String providerRef = "PSP-DEDUP-D-" + System.nanoTime();
+        Payment p = newPayment(userId, ref, PaymentStatus.PENDING, providerRef);
+        // Reconstructs exactly the PaymentEvent PaymentCreationService.finalizeAccepted would have
+        // appended for this real PENDING transition - not an artificial/impossible event shape.
+        paymentEventRepository.append(new PaymentEvent(
+                p.getId(), PaymentEventType.PENDING, PaymentEventSource.CLIENT, null, OffsetDateTime.now()));
+        fakeProvider.stubStatus(providerRef, new PaymentProviderPort.ProviderPaymentStatus(
+                PaymentProviderPort.ProviderPaymentState.UNKNOWN, null, null, null));
+
+        orchestrator.confirmPayment(ref);
+
+        assertThat(paymentEventRepository.findByPaymentId(p.getId()))
+                .extracting(PaymentEvent::getType)
+                .containsExactly(PaymentEventType.PENDING, PaymentEventType.POLL_RESULT);
+    }
+
+    @Test
+    @DisplayName("E. a real EXPIRED transition between two polls breaks the consecutive run - the second POLL_RESULT is persisted")
+    void realExpiryBetweenPolls_BreaksConsecutiveRun_SecondPollResultIsPersisted() {
+        Long userId = newUserWithDeposit();
+        String ref = "PAY-DEDUP-E-" + System.nanoTime();
+        String providerRef = "PSP-DEDUP-E-" + System.nanoTime();
+        Payment p = newPayment(userId, ref, PaymentStatus.PENDING, providerRef);
+        fakeProvider.stubStatus(providerRef, new PaymentProviderPort.ProviderPaymentStatus(
+                PaymentProviderPort.ProviderPaymentState.UNKNOWN, null, null, null));
+
+        orchestrator.confirmPayment(ref); // first POLL_RESULT
+
+        // Real EXPIRED transition (same domain method / event shape PaymentExpiryService.expireOnePayment
+        // produces), breaking the consecutive POLL_RESULT run.
+        Payment fresh = paymentRepository.findById(p.getId()).orElseThrow();
+        fresh.markExpired();
+        paymentRepository.save(fresh);
+        paymentEventRepository.append(new PaymentEvent(
+                p.getId(), PaymentEventType.EXPIRED, PaymentEventSource.SCHEDULER, null, OffsetDateTime.now()));
+
+        orchestrator.confirmPayment(ref); // second POLL_RESULT - must NOT be suppressed
+
+        assertThat(paymentEventRepository.findByPaymentId(p.getId()))
+                .extracting(PaymentEvent::getType)
+                .containsExactly(PaymentEventType.POLL_RESULT, PaymentEventType.EXPIRED, PaymentEventType.POLL_RESULT);
+    }
+
+    @Test
+    @DisplayName("F/K. a RECONCILIATION event (from a real mismatch) does not suppress the next POLL_RESULT")
+    void reconciliationLatestEvent_ThenPollResult_IsNotSuppressed() {
+        Long userId = newUserWithDeposit();
+        String ref = "PAY-DEDUP-F-" + System.nanoTime();
+        String providerRef = "PSP-DEDUP-F-" + System.nanoTime();
+        Payment p = newPayment(userId, ref, PaymentStatus.EXPIRED, providerRef);
+        fakeProvider.stubStatus(providerRef, new PaymentProviderPort.ProviderPaymentStatus(
+                PaymentProviderPort.ProviderPaymentState.SUCCEEDED, new BigDecimal("999.99"), "KGS", "TXN-DEDUP-F-" + System.nanoTime()));
+
+        orchestrator.confirmPayment(ref); // real mismatch -> RECONCILIATION event, no credit, stays EXPIRED
+
+        fakeProvider.stubStatus(providerRef, new PaymentProviderPort.ProviderPaymentStatus(
+                PaymentProviderPort.ProviderPaymentState.UNKNOWN, null, null, null));
+        orchestrator.confirmPayment(ref); // must NOT be suppressed - latest event is RECONCILIATION, not POLL_RESULT
+
+        assertThat(paymentEventRepository.findByPaymentId(p.getId()))
+                .extracting(PaymentEvent::getType)
+                .containsExactly(PaymentEventType.RECONCILIATION, PaymentEventType.POLL_RESULT);
+        assertThat(paymentCreditCount(userId)).isZero();
+    }
+
+    @Test
+    @DisplayName("J. latest-event selection breaks a tie on identical occurredAt using id DESC")
+    void latestEvent_TiebreaksEqualTimestampsByIdDescending() {
+        Long userId = newUserWithDeposit();
+        Payment p = newPayment(userId, "PAY-DEDUP-J-" + System.nanoTime(), PaymentStatus.PENDING,
+                "PSP-DEDUP-J-" + System.nanoTime());
+        OffsetDateTime sameInstant = OffsetDateTime.now();
+
+        paymentEventRepository.append(new PaymentEvent(
+                p.getId(), PaymentEventType.PENDING, PaymentEventSource.CLIENT, null, sameInstant));
+        PaymentEvent second = paymentEventRepository.append(new PaymentEvent(
+                p.getId(), PaymentEventType.POLL_RESULT, PaymentEventSource.PROVIDER_POLL, null, sameInstant));
+
+        Optional<PaymentEvent> latest = paymentEventRepository.findLatestByPaymentId(p.getId());
+        assertThat(latest).isPresent();
+        assertThat(latest.get().getId()).as("the higher id wins an occurredAt tie").isEqualTo(second.getId());
+        assertThat(latest.get().getType()).isEqualTo(PaymentEventType.POLL_RESULT);
     }
 }

@@ -133,8 +133,7 @@ public class PaymentConfirmationService {
             // no resurrection, no transition at all - only the observation is recorded.
             log.info("confirmPayment: payment {} is EXPIRED and provider did not report SUCCEEDED ({}) - preserved",
                     payment.getId(), providerStatus.state());
-            paymentEventRepository.append(new PaymentEvent(
-                    payment.getId(), PaymentEventType.POLL_RESULT, PaymentEventSource.PROVIDER_POLL, null, now()));
+            appendPollResultIfNotConsecutive(payment);
             return payment;
         }
         if (providerStatus.state() == PaymentProviderPort.ProviderPaymentState.FAILED) {
@@ -143,9 +142,31 @@ public class PaymentConfirmationService {
         }
         // PENDING or UNKNOWN: observe only, no transition, safely re-callable later.
         log.info("confirmPayment: payment {} provider state {} - no transition", payment.getId(), providerStatus.state());
+        appendPollResultIfNotConsecutive(payment);
+        return payment;
+    }
+
+    /**
+     * Phase 31: technical deduplication only - suppresses a new {@code POLL_RESULT} when the
+     * immediately preceding event for this payment is already a {@code POLL_RESULT}, so an
+     * unbroken run of non-transition observations (repeated {@code UNKNOWN}/{@code PENDING})
+     * persists as exactly one row instead of one per poll. Deliberately does NOT attempt to
+     * distinguish {@code UNKNOWN} from {@code PENDING} from the persisted event - both already
+     * produce an indistinguishable {@code POLL_RESULT} row ({@code rawPayload} is always null),
+     * so this is consecutive-event deduplication, not provider-state deduplication. Any other
+     * latest event (a real transition, {@code RECONCILIATION}, or none at all) never suppresses
+     * this append - only two consecutive {@code POLL_RESULT} rows are ever collapsed.
+     */
+    private void appendPollResultIfNotConsecutive(Payment payment) {
+        boolean latestIsAlreadyPollResult = paymentEventRepository.findLatestByPaymentId(payment.getId())
+                .map(PaymentEvent::getType)
+                .filter(type -> type == PaymentEventType.POLL_RESULT)
+                .isPresent();
+        if (latestIsAlreadyPollResult) {
+            return;
+        }
         paymentEventRepository.append(new PaymentEvent(
                 payment.getId(), PaymentEventType.POLL_RESULT, PaymentEventSource.PROVIDER_POLL, null, now()));
-        return payment;
     }
 
     private void handleSucceeded(Payment payment, PaymentProviderPort.ProviderPaymentStatus providerStatus) {
