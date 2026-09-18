@@ -11,12 +11,14 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 
 import java.time.OffsetDateTime;
 
 /**
- * Slice 2: JPA representation of {@code reconciliation_case} (V42). At most one case of each
- * {@link ReconciliationCaseType} per payment, enforced by {@code UNIQUE(payment_id, type)}.
+ * Slice 2: JPA representation of {@code reconciliation_case} (V42, {@code version} column added
+ * V49). At most one case of each {@link ReconciliationCaseType} per payment, enforced by
+ * {@code UNIQUE(payment_id, type)}.
  */
 @Entity
 @Table(name = "reconciliation_case",
@@ -51,12 +53,17 @@ public class JpaReconciliationCaseEntity {
     @Column(name = "resolved_at")
     private OffsetDateTime resolvedAt;
 
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
     protected JpaReconciliationCaseEntity() {
     }
 
     public JpaReconciliationCaseEntity(Long id, Long paymentId, ReconciliationCaseType type,
                                        ReconciliationCaseStatus status, OffsetDateTime openedAt,
-                                       Long resolvedByAdminId, String resolutionNote, OffsetDateTime resolvedAt) {
+                                       Long resolvedByAdminId, String resolutionNote, OffsetDateTime resolvedAt,
+                                       Long version) {
         this.id = id;
         this.paymentId = paymentId;
         this.type = type;
@@ -65,6 +72,7 @@ public class JpaReconciliationCaseEntity {
         this.resolvedByAdminId = resolvedByAdminId;
         this.resolutionNote = resolutionNote;
         this.resolvedAt = resolvedAt;
+        this.version = version;
     }
 
     public Long getId() { return id; }
@@ -83,4 +91,6 @@ public class JpaReconciliationCaseEntity {
     public void setResolutionNote(String resolutionNote) { this.resolutionNote = resolutionNote; }
     public OffsetDateTime getResolvedAt() { return resolvedAt; }
     public void setResolvedAt(OffsetDateTime resolvedAt) { this.resolvedAt = resolvedAt; }
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 }

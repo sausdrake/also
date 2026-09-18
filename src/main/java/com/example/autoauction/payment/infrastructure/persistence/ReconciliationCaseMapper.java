@@ -16,7 +16,8 @@ public class ReconciliationCaseMapper {
                 domain.getOpenedAt(),
                 domain.getResolvedByAdminId(),
                 domain.getResolutionNote(),
-                domain.getResolvedAt());
+                domain.getResolvedAt(),
+                domain.getVersion());
     }
 
     public ReconciliationCase toDomain(JpaReconciliationCaseEntity entity) {
@@ -29,6 +30,7 @@ public class ReconciliationCaseMapper {
                 entity.getOpenedAt(),
                 entity.getResolvedByAdminId(),
                 entity.getResolutionNote(),
-                entity.getResolvedAt());
+                entity.getResolvedAt(),
+                entity.getVersion());
     }
 }

@@ -5,6 +5,7 @@ import com.example.autoauction.deposit.domain.Deposit;
 import com.example.autoauction.deposit.domain.DepositTransaction;
 import com.example.autoauction.deposit.domain.port.DepositRepository;
 import com.example.autoauction.payment.domain.Payment;
+import com.example.autoauction.payment.domain.PaymentEvent;
 import com.example.autoauction.payment.domain.PaymentEventType;
 import com.example.autoauction.payment.domain.PaymentStatus;
 import com.example.autoauction.payment.domain.ReconciliationCaseStatus;
@@ -173,28 +174,43 @@ class PaymentConfirmationServiceIntegrationTest extends AbstractPostgresIntegrat
     // ==================== 5/20. amount mismatch ====================
 
     @Test
-    @DisplayName("5/20. amount mismatch: no credit, no SUCCEEDED transition, ReconciliationCase(MISMATCH) persisted")
+    @DisplayName("5/20. amount mismatch (underpayment): no credit, no SUCCEEDED transition, "
+            + "ReconciliationCase(MISMATCH) persisted, RECONCILIATION evidence preserves both amounts")
     void amountMismatch() {
         Long userId = newUserWithDeposit();
         String ref = "PAY-" + System.nanoTime();
         String providerRef = "PSP-" + System.nanoTime();
+        String providerTxnId = "TXN-" + System.nanoTime();
         Payment p = newPayment(userId, ref, PaymentStatus.PENDING, providerRef);
         fakeProvider.stubStatus(providerRef, new PaymentProviderPort.ProviderPaymentStatus(
-                PaymentProviderPort.ProviderPaymentState.SUCCEEDED, new BigDecimal("499.00"), "KGS", "TXN-" + System.nanoTime()));
+                PaymentProviderPort.ProviderPaymentState.SUCCEEDED, new BigDecimal("499.00"), "KGS", providerTxnId));
 
         Payment result = orchestrator.confirmPayment(ref);
 
         assertThat(result.getStatus()).as("Payment must remain non-terminal on mismatch").isEqualTo(PaymentStatus.PENDING);
+        assertThat(result.getAmountConfirmed()).as("amountConfirmed must stay unset on a mismatch").isNull();
         assertThat(paymentCreditCount(userId)).isZero();
         assertThat(reconciliationCaseRepository.findByPaymentIdAndType(p.getId(), ReconciliationCaseType.MISMATCH))
                 .isPresent()
                 .get().extracting(c -> c.getStatus()).isEqualTo(ReconciliationCaseStatus.OPEN);
+
+        List<PaymentEvent> events = paymentEventRepository.findByPaymentId(p.getId());
+        assertThat(events).filteredOn(e -> e.getType() == PaymentEventType.RECONCILIATION).hasSize(1);
+        String payload = events.stream().filter(e -> e.getType() == PaymentEventType.RECONCILIATION)
+                .findFirst().orElseThrow().getRawPayload();
+        assertThat(payload)
+                .contains("requestedAmount=500.00")
+                .contains("requestedCurrency=KGS")
+                .contains("providerConfirmedAmount=499.00")
+                .contains("providerCurrency=KGS")
+                .contains("providerTransactionId=" + providerTxnId);
     }
 
     // ==================== 6. currency mismatch ====================
 
     @Test
-    @DisplayName("6. currency mismatch: treated identically to amount mismatch (zero tolerance, KGS-only)")
+    @DisplayName("6. currency mismatch: treated identically to amount mismatch (zero tolerance, KGS-only), "
+            + "RECONCILIATION evidence preserves both currencies")
     void currencyMismatch() {
         Long userId = newUserWithDeposit();
         String ref = "PAY-" + System.nanoTime();
@@ -208,10 +224,40 @@ class PaymentConfirmationServiceIntegrationTest extends AbstractPostgresIntegrat
         assertThat(result.getStatus()).isEqualTo(PaymentStatus.PENDING);
         assertThat(paymentCreditCount(userId)).isZero();
         assertThat(reconciliationCaseRepository.findByPaymentIdAndType(p.getId(), ReconciliationCaseType.MISMATCH)).isPresent();
+
+        List<PaymentEvent> events = paymentEventRepository.findByPaymentId(p.getId());
+        assertThat(events).filteredOn(e -> e.getType() == PaymentEventType.RECONCILIATION).hasSize(1)
+                .first().extracting(PaymentEvent::getRawPayload)
+                .satisfies(payload -> assertThat((String) payload)
+                        .contains("requestedCurrency=KGS")
+                        .contains("providerCurrency=USD"));
     }
 
     @Test
-    @DisplayName("5b. repeated amount mismatch on the same payment: no duplicate MISMATCH case (UNIQUE(payment_id, type) respected)")
+    @DisplayName("5c. overpayment mismatch: no credit, RECONCILIATION evidence preserves the higher provider figure")
+    void overpaymentMismatch() {
+        Long userId = newUserWithDeposit();
+        String ref = "PAY-" + System.nanoTime();
+        String providerRef = "PSP-" + System.nanoTime();
+        Payment p = newPayment(userId, ref, PaymentStatus.PENDING, providerRef);
+        fakeProvider.stubStatus(providerRef, new PaymentProviderPort.ProviderPaymentStatus(
+                PaymentProviderPort.ProviderPaymentState.SUCCEEDED, new BigDecimal("550.00"), "KGS", "TXN-" + System.nanoTime()));
+
+        Payment result = orchestrator.confirmPayment(ref);
+
+        assertThat(result.getStatus()).isEqualTo(PaymentStatus.PENDING);
+        assertThat(paymentCreditCount(userId)).as("no partial or full credit on overpayment mismatch").isZero();
+        assertThat(reconciliationCaseRepository.findByPaymentIdAndType(p.getId(), ReconciliationCaseType.MISMATCH)).isPresent();
+
+        List<PaymentEvent> events = paymentEventRepository.findByPaymentId(p.getId());
+        assertThat(events).filteredOn(e -> e.getType() == PaymentEventType.RECONCILIATION).hasSize(1)
+                .first().extracting(PaymentEvent::getRawPayload)
+                .satisfies(payload -> assertThat((String) payload).contains("providerConfirmedAmount=550.00"));
+    }
+
+    @Test
+    @DisplayName("5b. repeated amount mismatch on the same payment: no duplicate MISMATCH case "
+            + "(UNIQUE(payment_id, type) respected), but each observation is its own immutable RECONCILIATION event")
     void repeatedAmountMismatch_NoDuplicateReconciliationCase() {
         Long userId = newUserWithDeposit();
         String ref = "PAY-" + System.nanoTime();
@@ -231,6 +277,13 @@ class PaymentConfirmationServiceIntegrationTest extends AbstractPostgresIntegrat
         assertThat(all).as("exactly one MISMATCH case, never duplicated").hasSize(1);
         Payment fresh = paymentRepository.findById(p.getId()).orElseThrow();
         assertThat(fresh.getStatus()).as("still non-terminal after the second mismatch too").isEqualTo(PaymentStatus.PENDING);
+
+        // Case creation is deduplicated; the underlying provider OBSERVATION is not - each poll
+        // is its own independently valuable, immutable fact (Phase 17 §3/§5 evidence semantics).
+        List<PaymentEvent> events = paymentEventRepository.findByPaymentId(p.getId());
+        assertThat(events).filteredOn(e -> e.getType() == PaymentEventType.RECONCILIATION)
+                .as("two independent observations -> two immutable events, even though only one case exists")
+                .hasSize(2);
     }
 
     // ==================== 7. provider identity/reference conflict (DB backstop) ====================

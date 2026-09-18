@@ -14,6 +14,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -140,5 +141,49 @@ class ReconciliationCasePersistencePgIntegrationTest extends AbstractPostgresInt
         ReconciliationCase other = reconciliationCaseRepository.save(
                 new ReconciliationCase(paymentId, ReconciliationCaseType.STUCK, T0));
         assertThat(other.getId()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Phase 17: optimistic locking - two stale concurrent resolutions, only the first wins")
+    void optimisticLocking_ConcurrentResolution_SecondStaleWriterRejected() {
+        Long paymentId = newPayment();
+        ReconciliationCase saved = reconciliationCaseRepository.save(
+                new ReconciliationCase(paymentId, ReconciliationCaseType.MISMATCH, T0));
+        assertThat(saved.getVersion()).as("a freshly-persisted case starts at version 0").isEqualTo(0L);
+
+        // Two independent loads of the SAME row - simulating two admins opening the case at the
+        // same time, each getting their own in-memory copy at version 0.
+        ReconciliationCase loadedByAdminA = reconciliationCaseRepository.findById(saved.getId()).orElseThrow();
+        ReconciliationCase loadedByAdminB = reconciliationCaseRepository.findById(saved.getId()).orElseThrow();
+
+        loadedByAdminA.resolve(1L, "admin A resolved first", T0.plusMinutes(1));
+        ReconciliationCase afterA = reconciliationCaseRepository.save(loadedByAdminA);
+        assertThat(afterA.getVersion()).as("version increments on the winning update").isEqualTo(1L);
+
+        loadedByAdminB.resolve(2L, "admin B resolved second, using stale data", T0.plusMinutes(2));
+        assertThatThrownBy(() -> reconciliationCaseRepository.save(loadedByAdminB))
+                .as("the second writer's version (0) no longer matches the row's current version (1) - no silent last-write-wins")
+                .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+
+        // Admin A's resolution remains intact and unmodified by the rejected second attempt.
+        ReconciliationCase finalState = reconciliationCaseRepository.findById(saved.getId()).orElseThrow();
+        assertThat(finalState.getStatus().name()).isEqualTo("RESOLVED");
+        assertThat(finalState.getResolvedByAdminId()).isEqualTo(1L);
+        assertThat(finalState.getResolutionNote()).isEqualTo("admin A resolved first");
+    }
+
+    @Test
+    @DisplayName("Phase 17: normal, non-concurrent save/load still works with the version column present")
+    void normalSaveAndLoad_StillWorksWithVersionColumn() {
+        Long paymentId = newPayment();
+        ReconciliationCase saved = reconciliationCaseRepository.save(
+                new ReconciliationCase(paymentId, ReconciliationCaseType.MISMATCH, T0));
+
+        saved.resolve(5L, "no conflict, sequential resolve", T0.plusMinutes(1));
+        ReconciliationCase resolved = reconciliationCaseRepository.save(saved);
+
+        ReconciliationCase loaded = reconciliationCaseRepository.findById(resolved.getId()).orElseThrow();
+        assertThat(loaded.getStatus().name()).isEqualTo("RESOLVED");
+        assertThat(loaded.getVersion()).isEqualTo(1L);
     }
 }

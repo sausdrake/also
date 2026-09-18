@@ -22,6 +22,12 @@ public class ReconciliationCase {
     private Long resolvedByAdminId;
     private String resolutionNote;
     private OffsetDateTime resolvedAt;
+    /**
+     * Phase 17: optimistic-lock version - persistence metadata, not business state. {@code 0} for
+     * a case that has never been saved; the persistence mapper overwrites this on every
+     * load/reconstruction. No domain behavior reads or branches on this field.
+     */
+    private Long version;
 
     /** Opens a new case in {@link ReconciliationCaseStatus#OPEN}. */
     public ReconciliationCase(Long paymentId, ReconciliationCaseType type, OffsetDateTime openedAt) {
@@ -29,12 +35,14 @@ public class ReconciliationCase {
         this.type = Objects.requireNonNull(type, "type не может быть null");
         this.openedAt = Objects.requireNonNull(openedAt, "openedAt не может быть null");
         this.status = ReconciliationCaseStatus.OPEN;
+        this.version = 0L;
     }
 
     /** Reconstruction constructor - persistence mapper only. */
     public ReconciliationCase(Long id, Long paymentId, ReconciliationCaseType type,
                               ReconciliationCaseStatus status, OffsetDateTime openedAt,
-                              Long resolvedByAdminId, String resolutionNote, OffsetDateTime resolvedAt) {
+                              Long resolvedByAdminId, String resolutionNote, OffsetDateTime resolvedAt,
+                              Long version) {
         this.id = id;
         this.paymentId = paymentId;
         this.type = type;
@@ -43,6 +51,7 @@ public class ReconciliationCase {
         this.resolvedByAdminId = resolvedByAdminId;
         this.resolutionNote = resolutionNote;
         this.resolvedAt = resolvedAt;
+        this.version = version;
     }
 
     /**
@@ -70,6 +79,7 @@ public class ReconciliationCase {
     public Long getResolvedByAdminId() { return resolvedByAdminId; }
     public String getResolutionNote() { return resolutionNote; }
     public OffsetDateTime getResolvedAt() { return resolvedAt; }
+    public Long getVersion() { return version; }
 
     public boolean isOpen() { return status == ReconciliationCaseStatus.OPEN; }
 }

@@ -156,6 +156,18 @@ public class PaymentConfirmationService {
             log.warn("confirmPayment: payment {} provider-confirmed amount/currency mismatch "
                             + "(requested={}, confirmed={}, currency={}) - opening MISMATCH case, no credit",
                     payment.getId(), payment.getAmountRequested(), providerStatus.confirmedAmount(), providerStatus.currency());
+            // Phase 17: the provider's own observation must survive past this log line - it was
+            // previously discarded entirely. Recorded via PaymentEventType.RECONCILIATION,
+            // mirroring the unconditional per-occurrence append semantics already used for the
+            // sibling POLL_RESULT branches above (one event per provider signal observed by this
+            // method, regardless of whether it changes any state) - the same treatment applies
+            // here since a mismatch is itself an observed provider signal, not a case-lifecycle
+            // event. Deliberately NOT gated on whether a new ReconciliationCase was actually
+            // created: a repeated mismatch observation for an already-OPEN case is still a
+            // distinct, independently valuable fact for an eventual investigator (was the
+            // mismatch consistent across polls, or did the provider's figure itself change?).
+            paymentEventRepository.append(new PaymentEvent(payment.getId(), PaymentEventType.RECONCILIATION,
+                    PaymentEventSource.PROVIDER_POLL, mismatchEvidence(payment, providerStatus), now()));
             openMismatchCaseIfAbsent(payment);
             return; // Payment remains non-terminal; no markSucceeded; no credit.
         }
@@ -180,6 +192,27 @@ public class PaymentConfirmationService {
         paymentEventRepository.append(new PaymentEvent(
                 payment.getId(), PaymentEventType.FAILED, PaymentEventSource.PROVIDER_POLL, null, now()));
         log.info("confirmPayment: payment {} confirmed FAILED", payment.getId());
+    }
+
+    /**
+     * Phase 17: a durable, structured snapshot of what the provider actually reported for a
+     * mismatched confirmation - requested vs. provider-confirmed amount/currency, plus the
+     * provider's own transaction id (always present here: this is only called from the branch
+     * where {@code providerStatus.state() == SUCCEEDED}, the one state for which {@link
+     * PaymentProviderPort.ProviderPaymentStatus#providerTransactionId()} is non-null). Plain
+     * key=value text, not JSON - {@code rawPayload} has no established structured-format
+     * convention elsewhere in this codebase to match, and this keeps the payload legible in a
+     * raw DB read without adding a JSON-mapping dependency for a single call site. Amounts use
+     * {@link BigDecimal#toPlainString()} - never a floating-point conversion - to preserve exact
+     * monetary precision.
+     */
+    private String mismatchEvidence(Payment payment, PaymentProviderPort.ProviderPaymentStatus providerStatus) {
+        return "requestedAmount=" + payment.getAmountRequested().toPlainString()
+                + ";requestedCurrency=" + payment.getCurrency()
+                + ";providerConfirmedAmount=" + providerStatus.confirmedAmount().toPlainString()
+                + ";providerCurrency=" + providerStatus.currency()
+                + ";providerTransactionId=" + providerStatus.providerTransactionId()
+                + ";providerState=" + providerStatus.state();
     }
 
     private void openMismatchCaseIfAbsent(Payment payment) {
