@@ -1,5 +1,6 @@
 package com.example.autoauction.payment.infrastructure.persistence;
 
+import com.example.autoauction.payment.domain.PaymentEventType;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -11,4 +12,7 @@ public interface SpringDataPaymentEventJpaRepository extends JpaRepository<JpaPa
 
     /** Phase 31: narrow "latest event" read - see {@code PaymentEventRepository.findLatestByPaymentId}. */
     Optional<JpaPaymentEventEntity> findTopByPaymentIdOrderByOccurredAtDescIdDesc(Long paymentId);
+
+    /** Phase 33: narrow "evidence of exactly this type" read - see {@code PaymentEventRepository.findByPaymentIdAndType}. */
+    List<JpaPaymentEventEntity> findByPaymentIdAndTypeOrderByOccurredAtAscIdAsc(Long paymentId, PaymentEventType type);
 }

@@ -121,4 +121,10 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     public List<String> findConfirmationCandidateReferences() {
         return jpaRepository.findMerchantReferencesByStatusInAndProviderReferenceIsNotNull(CONFIRMATION_POLLABLE);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Long> findCreatedWithInitiationEvidenceCandidateIds() {
+        return jpaRepository.findCreatedIdsWithInitiationEvidence();
+    }
 }

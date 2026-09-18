@@ -1,6 +1,7 @@
 package com.example.autoauction.payment.domain.port;
 
 import com.example.autoauction.payment.domain.PaymentEvent;
+import com.example.autoauction.payment.domain.PaymentEventType;
 
 import java.util.List;
 import java.util.Optional;
@@ -23,4 +24,14 @@ public interface PaymentEventRepository {
      * full event history the way {@link #findByPaymentId} does.
      */
     Optional<PaymentEvent> findLatestByPaymentId(Long paymentId);
+
+    /**
+     * Phase 33: every event of exactly this type for this payment, oldest first (deterministic:
+     * {@code occurredAt ASC, id ASC}, mirroring {@link #findByPaymentId}'s own ordering). Used
+     * only by the initiation-recovery path to retrieve {@code INITIATION_ACCEPTED} evidence -
+     * deliberately narrower than {@link #findByPaymentId} (never loads unrelated event types),
+     * and deliberately returns every match rather than just the latest, so a caller can detect
+     * conflicting evidence rather than silently trusting whichever happens to be newest.
+     */
+    List<PaymentEvent> findByPaymentIdAndType(Long paymentId, PaymentEventType type);
 }

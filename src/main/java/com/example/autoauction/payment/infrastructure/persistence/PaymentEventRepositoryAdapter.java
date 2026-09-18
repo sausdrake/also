@@ -1,6 +1,7 @@
 package com.example.autoauction.payment.infrastructure.persistence;
 
 import com.example.autoauction.payment.domain.PaymentEvent;
+import com.example.autoauction.payment.domain.PaymentEventType;
 import com.example.autoauction.payment.domain.port.PaymentEventRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,5 +37,12 @@ public class PaymentEventRepositoryAdapter implements PaymentEventRepository {
     @Transactional(readOnly = true)
     public Optional<PaymentEvent> findLatestByPaymentId(Long paymentId) {
         return jpaRepository.findTopByPaymentIdOrderByOccurredAtDescIdDesc(paymentId).map(mapper::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PaymentEvent> findByPaymentIdAndType(Long paymentId, PaymentEventType type) {
+        return jpaRepository.findByPaymentIdAndTypeOrderByOccurredAtAscIdAsc(paymentId, type).stream()
+                .map(mapper::toDomain).toList();
     }
 }

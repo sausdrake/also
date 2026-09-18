@@ -148,6 +148,28 @@ public class PaymentCreationService {
         return payment;
     }
 
+    /**
+     * Phase 33: durable checkpoint only - records that {@code PaymentProviderPort#initiatePayment}
+     * genuinely returned a usable {@code providerReference}, BEFORE {@link #finalizeAccepted} is
+     * ever attempted. A pure append: does not load, lock, or mutate the {@code Payment} row, and
+     * has no financial effect. Solves recovery only for a process crash or transaction failure
+     * AFTER this call commits and before {@link #finalizeAccepted} commits - it does NOT
+     * guarantee capture of every successful provider response: if this checkpoint transaction
+     * itself fails to commit (e.g. a concurrent DB outage), the {@code providerReference} is lost
+     * exactly as it always was, an unresolved, disclosed residual limitation of this slice.
+     *
+     * @throws IllegalArgumentException if providerReference is null or blank
+     */
+    @Transactional
+    public void recordInitiationAccepted(Long paymentId, String providerReference) {
+        if (providerReference == null || providerReference.isBlank()) {
+            throw new IllegalArgumentException("providerReference не может быть пустым");
+        }
+        paymentEventRepository.append(new PaymentEvent(
+                paymentId, PaymentEventType.INITIATION_ACCEPTED, PaymentEventSource.CLIENT,
+                "providerReference=" + providerReference, now()));
+    }
+
     /** TX2 (explicit synchronous rejection path). */
     @Transactional
     public Payment finalizeRejected(Long paymentId) {

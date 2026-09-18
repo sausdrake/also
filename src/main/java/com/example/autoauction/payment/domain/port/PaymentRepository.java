@@ -110,4 +110,19 @@ public interface PaymentRepository {
      * Payment} itself before acting.
      */
     List<String> findConfirmationCandidateReferences();
+
+    /**
+     * Phase 33: provider-initiation recovery candidates - {@code CREATED} payments that have at
+     * least one durable {@code INITIATION_ACCEPTED} {@code PaymentEvent} (see {@code
+     * PaymentCreationService#recordInitiationAccepted}) - i.e. the application received a
+     * successful provider response but the {@code CREATED -&gt; PENDING} transition
+     * ({@code finalizeAccepted}) never committed (process crash or transaction failure in that
+     * window). Deliberately returns bare ids, not entities - not authoritative; the caller MUST
+     * re-resolve the evidence and go through the existing, unmodified {@code finalizeAccepted}
+     * (via {@code PaymentCreationOrchestrator#recoverFromInitiationEvidence}), which itself
+     * re-loads and locks the {@code Payment} and re-checks its status before mutating - the same
+     * non-authoritative-candidate contract as {@link #findExpiredCandidateIds} and {@link
+     * #findConfirmationCandidateReferences}.
+     */
+    List<Long> findCreatedWithInitiationEvidenceCandidateIds();
 }

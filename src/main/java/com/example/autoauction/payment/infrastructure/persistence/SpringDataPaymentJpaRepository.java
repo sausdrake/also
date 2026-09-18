@@ -93,6 +93,23 @@ public interface SpringDataPaymentJpaRepository extends JpaRepository<JpaPayment
     List<JpaPaymentEntity> findAllByLateSuccessAfterExpiryTrueOrderByUpdatedAtDesc();
 
     /**
+     * Phase 33: provider-initiation recovery candidates - see {@code
+     * PaymentRepository.findCreatedWithInitiationEvidenceCandidateIds} for the full rationale.
+     * Native SQL for the same reason as {@link #findSucceededWithoutLedgerCredit}: an
+     * {@code EXISTS} correlated subquery against the sibling {@code payment_event} table is not
+     * this project's JPQL convention for cross-table membership checks. Works identically on
+     * PostgreSQL and H2 (PostgreSQL mode).
+     */
+    @Query(nativeQuery = true, value =
+            "SELECT p.id FROM payment p "
+            + "WHERE p.status = 'CREATED' "
+            + "  AND EXISTS ("
+            + "    SELECT 1 FROM payment_event pe "
+            + "    WHERE pe.payment_id = p.id AND pe.type = 'INITIATION_ACCEPTED'"
+            + "  )")
+    List<Long> findCreatedIdsWithInitiationEvidence();
+
+    /**
      * Phase 29: confirmation-polling candidates - see {@code PaymentRepository.findConfirmationCandidateReferences}
      * for the full rationale. {@code CREATED} is deliberately not in {@code :statuses} here; the
      * {@code providerReference IS NOT NULL} filter additionally excludes any {@code EXPIRED}

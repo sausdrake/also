@@ -1,12 +1,16 @@
 package com.example.autoauction.payment.application;
 
 import com.example.autoauction.payment.domain.Payment;
+import com.example.autoauction.payment.domain.PaymentEvent;
+import com.example.autoauction.payment.domain.PaymentEventType;
+import com.example.autoauction.payment.domain.port.PaymentEventRepository;
 import com.example.autoauction.payment.domain.port.PaymentProviderPort;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * P1.5: the single public entry point for payment creation. Mirrors
@@ -44,11 +48,14 @@ public class PaymentCreationOrchestrator {
 
     private final PaymentCreationService paymentCreationService;
     private final PaymentProviderPort paymentProviderPort;
+    private final PaymentEventRepository paymentEventRepository;
 
     public PaymentCreationOrchestrator(PaymentCreationService paymentCreationService,
-                                        PaymentProviderPort paymentProviderPort) {
+                                        PaymentProviderPort paymentProviderPort,
+                                        PaymentEventRepository paymentEventRepository) {
         this.paymentCreationService = paymentCreationService;
         this.paymentProviderPort = paymentProviderPort;
+        this.paymentEventRepository = paymentEventRepository;
     }
 
     public PaymentCreationView createPayment(Long userId, BigDecimal amountRequested, String idempotencyKey) {
@@ -92,9 +99,66 @@ public class PaymentCreationOrchestrator {
             return PaymentCreationView.withoutPresentationData(payment);
         }
 
+        // Phase 33: durable checkpoint - record the accepted providerReference BEFORE attempting
+        // the CREATED -> PENDING transition, so a crash/rollback in that specific window can
+        // still be recovered later (see recoverFromInitiationEvidence). Never called on explicit
+        // rejection or ambiguous failure - only on a normal, successful provider return.
+        paymentCreationService.recordInitiationAccepted(payment.getId(), result.providerReference());
+
         Payment pending = paymentCreationService.finalizeAccepted(payment.getId(), result.providerReference());
         return new PaymentCreationView(pending,
                 result.checkoutUrl().orElse(null),
                 result.qrPayload().orElse(null));
+    }
+
+    /**
+     * Phase 33: recovers a {@code CREATED} payment whose {@code PaymentProviderPort#initiatePayment}
+     * call genuinely succeeded - durably evidenced by an {@code INITIATION_ACCEPTED} event written
+     * before {@link PaymentCreationService#finalizeAccepted} was ever attempted - but whose own
+     * {@code finalizeAccepted} transition never committed (a process crash or transaction failure
+     * in that window). Never calls {@link PaymentProviderPort} again; only ever completes the
+     * existing, already-guarded {@link PaymentCreationService#finalizeAccepted} using a
+     * {@code providerReference} this application already durably received once. Reuses that
+     * method's own pessimistic lock and {@code status != CREATED} no-op guard for concurrency
+     * safety - no new locking is introduced here.
+     *
+     * <p>Does NOT solve the case where the provider's response was itself lost (a timeout with no
+     * {@code PaymentInitiationResult} ever returned to this application) - no evidence exists to
+     * recover from in that case, and this method has nothing to act on. That remains a disclosed,
+     * unresolved limitation requiring a provider-side lookup capability this codebase does not
+     * have.
+     *
+     * @throws IllegalStateException if no evidence exists for this payment, or if multiple
+     *         evidence events disagree on the providerReference (fail-closed: never guesses)
+     */
+    public Payment recoverFromInitiationEvidence(Long paymentId) {
+        List<PaymentEvent> evidence = paymentEventRepository.findByPaymentIdAndType(
+                paymentId, PaymentEventType.INITIATION_ACCEPTED);
+        if (evidence.isEmpty()) {
+            throw new IllegalStateException(
+                    "Платёж " + paymentId + " не имеет свидетельства инициации для восстановления");
+        }
+
+        String providerReference = extractProviderReference(evidence.get(0));
+        for (PaymentEvent event : evidence) {
+            String candidate = extractProviderReference(event);
+            if (!candidate.equals(providerReference)) {
+                throw new IllegalStateException(
+                        "Платёж " + paymentId + " имеет конфликтующие свидетельства инициации ('"
+                                + providerReference + "' и '" + candidate + "') - восстановление отклонено");
+            }
+        }
+
+        return paymentCreationService.finalizeAccepted(paymentId, providerReference);
+    }
+
+    private static String extractProviderReference(PaymentEvent event) {
+        String payload = event.getRawPayload();
+        String prefix = "providerReference=";
+        if (payload == null || !payload.startsWith(prefix) || payload.length() <= prefix.length()) {
+            throw new IllegalStateException(
+                    "PaymentEvent " + event.getId() + " содержит некорректные данные инициации: " + payload);
+        }
+        return payload.substring(prefix.length());
     }
 }

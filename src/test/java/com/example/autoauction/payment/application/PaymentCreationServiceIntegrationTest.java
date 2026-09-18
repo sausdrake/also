@@ -224,10 +224,12 @@ class PaymentCreationServiceIntegrationTest extends AbstractPostgresIntegrationT
     }
 
     @Test
-    @DisplayName("14. orchestrator end-to-end: provider accepted -> PENDING, providerReference set, PaymentEvent(PENDING) appended")
+    @DisplayName("14. orchestrator end-to-end: provider accepted -> PENDING, providerReference set, "
+            + "PaymentEvent(INITIATION_ACCEPTED) durably recorded before PaymentEvent(PENDING)")
     void providerAccepted_endToEnd_transitionsToPending() {
         Long userId = newUserWithDeposit();
-        fakeProvider.stubDefaultAccepted("PSP-REF-" + System.nanoTime());
+        String providerRef = "PSP-REF-" + System.nanoTime();
+        fakeProvider.stubDefaultAccepted(providerRef);
 
         PaymentCreationView view = paymentCreationOrchestrator.createPayment(userId, new BigDecimal("1000"), null);
         assertThat(view.payment().getStatus()).isEqualTo(PaymentStatus.PENDING);
@@ -235,7 +237,8 @@ class PaymentCreationServiceIntegrationTest extends AbstractPostgresIntegrationT
 
         var events = paymentEventRepository.findByPaymentId(view.payment().getId());
         assertThat(events).extracting(e -> e.getType())
-                .containsExactly(PaymentEventType.CREATED, PaymentEventType.PENDING);
+                .containsExactly(PaymentEventType.CREATED, PaymentEventType.INITIATION_ACCEPTED, PaymentEventType.PENDING);
+        assertThat(events.get(1).getRawPayload()).isEqualTo("providerReference=" + providerRef);
     }
 
     @Test
