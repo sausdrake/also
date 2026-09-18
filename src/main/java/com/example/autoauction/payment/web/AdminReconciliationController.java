@@ -1,7 +1,10 @@
 package com.example.autoauction.payment.web;
 
 import com.example.autoauction.payment.application.AdminReconciliationService;
+import com.example.autoauction.payment.domain.ReconciliationCaseStatus;
+import com.example.autoauction.payment.domain.ReconciliationCaseType;
 import com.example.autoauction.payment.web.dto.AdminReconciliationCaseDetailResponse;
+import com.example.autoauction.payment.web.dto.AdminReconciliationCaseListItemResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
@@ -9,7 +12,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * Phase 20: admin-only, strictly read-only reconciliation case inspection. URL-level
@@ -35,5 +41,13 @@ public class AdminReconciliationController {
     @Operation(summary = "Просмотреть дело сверки платежа")
     public ResponseEntity<AdminReconciliationCaseDetailResponse> getCaseDetail(@PathVariable Long caseId) {
         return ResponseEntity.ok(adminReconciliationService.getCaseDetail(caseId));
+    }
+
+    @GetMapping("/cases")
+    @Operation(summary = "Список дел сверки платежей (фильтры: status, type)")
+    public List<AdminReconciliationCaseListItemResponse> listCases(
+            @RequestParam(required = false) ReconciliationCaseStatus status,
+            @RequestParam(required = false) ReconciliationCaseType type) {
+        return adminReconciliationService.listCases(status, type);
     }
 }

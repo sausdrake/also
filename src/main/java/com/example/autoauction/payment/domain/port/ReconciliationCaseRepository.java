@@ -19,4 +19,10 @@ public interface ReconciliationCaseRepository {
     Optional<ReconciliationCase> findByPaymentIdAndType(Long paymentId, ReconciliationCaseType type);
 
     List<ReconciliationCase> findOpen();
+
+    /** All cases, newest-opened first ({@code openedAt DESC}), with {@code id DESC} as a
+     * deterministic tiebreaker for coincident timestamps. Named explicitly (not {@code
+     * findAll()}) so the ordering guarantee is visible at the call site, not hidden behind a
+     * generic name. */
+    List<ReconciliationCase> findAllNewestFirst();
 }

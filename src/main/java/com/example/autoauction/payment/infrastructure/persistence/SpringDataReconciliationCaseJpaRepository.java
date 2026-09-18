@@ -12,4 +12,6 @@ public interface SpringDataReconciliationCaseJpaRepository extends JpaRepository
     Optional<JpaReconciliationCaseEntity> findByPaymentIdAndType(Long paymentId, ReconciliationCaseType type);
 
     List<JpaReconciliationCaseEntity> findByStatus(ReconciliationCaseStatus status);
+
+    List<JpaReconciliationCaseEntity> findAllByOrderByOpenedAtDescIdDesc();
 }

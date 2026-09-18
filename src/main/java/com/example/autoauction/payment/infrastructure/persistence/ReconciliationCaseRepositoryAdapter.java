@@ -45,4 +45,10 @@ public class ReconciliationCaseRepositoryAdapter implements ReconciliationCaseRe
     public List<ReconciliationCase> findOpen() {
         return jpaRepository.findByStatus(ReconciliationCaseStatus.OPEN).stream().map(mapper::toDomain).toList();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ReconciliationCase> findAllNewestFirst() {
+        return jpaRepository.findAllByOrderByOpenedAtDescIdDesc().stream().map(mapper::toDomain).toList();
+    }
 }

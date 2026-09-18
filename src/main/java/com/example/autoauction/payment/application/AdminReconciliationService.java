@@ -4,10 +4,13 @@ import com.example.autoauction.payment.domain.Payment;
 import com.example.autoauction.payment.domain.PaymentEvent;
 import com.example.autoauction.payment.domain.PaymentEventType;
 import com.example.autoauction.payment.domain.ReconciliationCase;
+import com.example.autoauction.payment.domain.ReconciliationCaseStatus;
+import com.example.autoauction.payment.domain.ReconciliationCaseType;
 import com.example.autoauction.payment.domain.port.PaymentEventRepository;
 import com.example.autoauction.payment.domain.port.PaymentRepository;
 import com.example.autoauction.payment.domain.port.ReconciliationCaseRepository;
 import com.example.autoauction.payment.web.dto.AdminReconciliationCaseDetailResponse;
+import com.example.autoauction.payment.web.dto.AdminReconciliationCaseListItemResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,5 +57,27 @@ public class AdminReconciliationService {
                 .toList();
 
         return AdminReconciliationCaseDetailResponse.assemble(reconciliationCase, payment, reconciliationEvidence);
+    }
+
+    /**
+     * Phase 22: read-only case list, newest-opened first, with optional {@code status}/{@code
+     * type} filtering (AND semantics when both given) applied AFTER retrieval - preserving
+     * {@link ReconciliationCaseRepository#findAllNewestFirst()}'s ordering, never re-sorting.
+     * Enriches each row with its Payment's requested amount/currency via a per-row {@link
+     * PaymentRepository#findById}; a missing Payment does not drop the row or fail the request -
+     * it is returned with {@code paymentExists=false} and null amount/currency, mirroring {@code
+     * AdminUserController.listUsers(withBalance=true)}'s own per-row-resilience precedent. Never
+     * loads {@link PaymentEvent} data - the list DTO has no field capable of holding it.
+     */
+    @Transactional(readOnly = true)
+    public List<AdminReconciliationCaseListItemResponse> listCases(ReconciliationCaseStatus status,
+                                                                     ReconciliationCaseType type) {
+        return reconciliationCaseRepository.findAllNewestFirst().stream()
+                .filter(c -> status == null || c.getStatus() == status)
+                .filter(c -> type == null || c.getType() == type)
+                .map(c -> paymentRepository.findById(c.getPaymentId())
+                        .map(payment -> AdminReconciliationCaseListItemResponse.withPayment(c, payment))
+                        .orElseGet(() -> AdminReconciliationCaseListItemResponse.withoutPayment(c)))
+                .toList();
     }
 }
