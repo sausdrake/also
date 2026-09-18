@@ -128,37 +128,39 @@ public class PaymentCreationOrchestrator {
      * unresolved limitation requiring a provider-side lookup capability this codebase does not
      * have.
      *
-     * @throws IllegalStateException if no evidence exists for this payment, or if multiple
+     * <p>Phase 35: parsing/validation of the evidence is delegated entirely to {@link
+     * InitiationEvidenceClassifier} - the same pure classifier {@code AdminPaymentService} uses
+     * for read-only observability, so the two can never disagree. {@code Malformed}/{@code
+     * Conflicting} evidence throws {@link PermanentInitiationEvidenceException} - a distinct type
+     * from the {@code IllegalStateException} thrown for the (structurally-should-not-happen-for-a
+     * -real-candidate) {@code None} case - never mutates {@code Payment}, never appends an event,
+     * never calls {@link PaymentProviderPort} or {@code DepositService}, never creates a
+     * {@code ReconciliationCase}.
+     *
+     * @throws IllegalStateException if no evidence exists for this payment
+     * @throws PermanentInitiationEvidenceException if the evidence is malformed or multiple
      *         evidence events disagree on the providerReference (fail-closed: never guesses)
      */
     public Payment recoverFromInitiationEvidence(Long paymentId) {
         List<PaymentEvent> evidence = paymentEventRepository.findByPaymentIdAndType(
                 paymentId, PaymentEventType.INITIATION_ACCEPTED);
-        if (evidence.isEmpty()) {
+        InitiationEvidenceClassification classification = InitiationEvidenceClassifier.classify(evidence);
+
+        if (classification instanceof InitiationEvidenceClassification.None) {
             throw new IllegalStateException(
                     "Платёж " + paymentId + " не имеет свидетельства инициации для восстановления");
         }
-
-        String providerReference = extractProviderReference(evidence.get(0));
-        for (PaymentEvent event : evidence) {
-            String candidate = extractProviderReference(event);
-            if (!candidate.equals(providerReference)) {
-                throw new IllegalStateException(
-                        "Платёж " + paymentId + " имеет конфликтующие свидетельства инициации ('"
-                                + providerReference + "' и '" + candidate + "') - восстановление отклонено");
-            }
+        if (classification instanceof InitiationEvidenceClassification.Malformed malformed) {
+            throw new PermanentInitiationEvidenceException(
+                    "Платёж " + paymentId + " имеет некорректное свидетельство инициации: " + malformed.reason());
+        }
+        if (classification instanceof InitiationEvidenceClassification.Conflicting conflicting) {
+            throw new PermanentInitiationEvidenceException(
+                    "Платёж " + paymentId + " имеет конфликтующие свидетельства инициации: "
+                            + conflicting.providerReferences() + " - восстановление отклонено");
         }
 
+        String providerReference = ((InitiationEvidenceClassification.Valid) classification).providerReference();
         return paymentCreationService.finalizeAccepted(paymentId, providerReference);
-    }
-
-    private static String extractProviderReference(PaymentEvent event) {
-        String payload = event.getRawPayload();
-        String prefix = "providerReference=";
-        if (payload == null || !payload.startsWith(prefix) || payload.length() <= prefix.length()) {
-            throw new IllegalStateException(
-                    "PaymentEvent " + event.getId() + " содержит некорректные данные инициации: " + payload);
-        }
-        return payload.substring(prefix.length());
     }
 }

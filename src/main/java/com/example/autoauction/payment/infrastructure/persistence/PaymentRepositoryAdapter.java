@@ -127,4 +127,11 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     public List<Long> findCreatedWithInitiationEvidenceCandidateIds() {
         return jpaRepository.findCreatedIdsWithInitiationEvidence();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Payment> findCreatedWithInitiationEvidence() {
+        return jpaRepository.findCreatedEntitiesWithInitiationEvidence().stream()
+                .map(mapper::toDomain).toList();
+    }
 }

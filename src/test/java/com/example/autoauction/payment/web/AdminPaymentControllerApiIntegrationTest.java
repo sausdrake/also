@@ -4,7 +4,11 @@ import com.example.autoauction.auth.domain.TestUserPrincipal;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.deposit.domain.DepositTransaction;
 import com.example.autoauction.deposit.domain.port.DepositRepository;
+import com.example.autoauction.payment.application.PaymentCreationService;
 import com.example.autoauction.payment.domain.Payment;
+import com.example.autoauction.payment.domain.PaymentEvent;
+import com.example.autoauction.payment.domain.PaymentEventSource;
+import com.example.autoauction.payment.domain.PaymentEventType;
 import com.example.autoauction.payment.domain.PaymentStatus;
 import com.example.autoauction.payment.domain.ReconciliationCaseType;
 import com.example.autoauction.payment.domain.port.PaymentEventRepository;
@@ -56,9 +60,11 @@ class AdminPaymentControllerApiIntegrationTest {
     @Autowired private DepositService depositService;
     @Autowired private PaymentEventRepository paymentEventRepository;
     @Autowired private ReconciliationCaseRepository reconciliationCaseRepository;
+    @Autowired private PaymentCreationService paymentCreationService;
     @Autowired private ObjectMapper objectMapper;
 
     private static final String URL = "/api/v1/admin/payments/late-successes";
+    private static final String STUCK_URL = "/api/v1/admin/payments/stuck-initiations";
 
     private static RequestPostProcessor user(Long userId, String... roles) {
         return SecurityMockMvcRequestPostProcessors.user(TestUserPrincipal.createWithRoles(userId, "u" + userId, roles));
@@ -276,5 +282,152 @@ class AdminPaymentControllerApiIntegrationTest {
     @DisplayName("no late-success payments exist for this filter -> 200 with a (possibly empty) list, never 404")
     void emptyOrNonEmptyResult_Always200() throws Exception {
         mockMvc.perform(get(URL).with(user(999312L, "ADMIN"))).andExpect(status().isOk());
+    }
+
+    // ==================== Phase 35: /stuck-initiations ====================
+
+    @SuppressWarnings("unchecked")
+    private static List<String> providerReferencesOf(java.util.Map<String, Object> row) {
+        return (List<String>) row.get("providerReferences");
+    }
+
+    private List<java.util.Map<String, Object>> listStuckInitiations(Long adminId) throws Exception {
+        String json = mockMvc.perform(get(STUCK_URL).with(user(adminId, "ADMIN")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return objectMapper.readValue(json, new TypeReference<>() {});
+    }
+
+    private Payment newCreatedPayment(Long userId) {
+        OffsetDateTime now = OffsetDateTime.now();
+        Payment p = new Payment(userId, "stuck-ref-" + System.nanoTime(), new BigDecimal("500.00"), null, now, now.plusMinutes(30));
+        return paymentRepository.save(p);
+    }
+
+    @Test
+    @DisplayName("GET /stuck-initiations without authentication -> 401")
+    void stuckInitiations_Unauthenticated_401() throws Exception {
+        mockMvc.perform(get(STUCK_URL)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("GET /stuck-initiations as a plain USER -> 403")
+    void stuckInitiations_User_403() throws Exception {
+        mockMvc.perform(get(STUCK_URL).with(user(999401L, "USER"))).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("GET /stuck-initiations as ADMIN -> 200")
+    void stuckInitiations_Admin_200() throws Exception {
+        mockMvc.perform(get(STUCK_URL).with(user(999402L, "ADMIN"))).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("empty result -> 200 with a (possibly empty) list, never 404")
+    void stuckInitiations_EmptyOrNonEmpty_Always200() throws Exception {
+        mockMvc.perform(get(STUCK_URL).with(user(999403L, "ADMIN"))).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("CREATED payment with valid, single-reference evidence -> classification=VALID")
+    void stuckInitiations_ValidEvidence_RepresentedCorrectly() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newCreatedPayment(userId);
+        String ref = "PSP-STUCK-VALID-" + System.nanoTime();
+        paymentCreationService.recordInitiationAccepted(p.getId(), ref);
+
+        List<java.util.Map<String, Object>> items = listStuckInitiations(999404L);
+        java.util.Map<String, Object> row = items.stream()
+                .filter(i -> Long.valueOf(((Number) i.get("id")).longValue()).equals(p.getId()))
+                .findFirst().orElseThrow();
+
+        assertThat(row.get("classification")).isEqualTo("VALID");
+        assertThat(providerReferencesOf(row)).containsExactly(ref);
+        assertThat(row.get("malformedReason")).isNull();
+        assertThat(((Number) row.get("userId")).longValue()).isEqualTo(userId);
+        assertThat(new BigDecimal(row.get("amountRequested").toString())).isEqualByComparingTo("500.00");
+    }
+
+    @Test
+    @DisplayName("CREATED payment with malformed evidence -> classification=MALFORMED, reason exposed")
+    void stuckInitiations_MalformedEvidence_RepresentedCorrectly() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newCreatedPayment(userId);
+        // Not reachable via recordInitiationAccepted's own guard (it rejects blank up front) -
+        // reconstructs exactly the stored-data-corruption shape this endpoint exists to surface.
+        paymentEventRepository.append(new PaymentEvent(
+                p.getId(), PaymentEventType.INITIATION_ACCEPTED, PaymentEventSource.CLIENT,
+                "not-a-valid-payload", OffsetDateTime.now()));
+
+        List<java.util.Map<String, Object>> items = listStuckInitiations(999405L);
+        java.util.Map<String, Object> row = items.stream()
+                .filter(i -> Long.valueOf(((Number) i.get("id")).longValue()).equals(p.getId()))
+                .findFirst().orElseThrow();
+
+        assertThat(row.get("classification")).isEqualTo("MALFORMED");
+        assertThat((List<?>) row.get("providerReferences")).isEmpty();
+        assertThat(row.get("malformedReason")).isNotNull().asString().contains("not-a-valid-payload");
+    }
+
+    @Test
+    @DisplayName("CREATED payment with conflicting evidence -> classification=CONFLICTING, both references exposed")
+    void stuckInitiations_ConflictingEvidence_RepresentedCorrectly() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newCreatedPayment(userId);
+        String refA = "PSP-STUCK-CONFLICT-A-" + System.nanoTime();
+        String refB = "PSP-STUCK-CONFLICT-B-" + System.nanoTime();
+        paymentCreationService.recordInitiationAccepted(p.getId(), refA);
+        paymentCreationService.recordInitiationAccepted(p.getId(), refB);
+
+        List<java.util.Map<String, Object>> items = listStuckInitiations(999406L);
+        java.util.Map<String, Object> row = items.stream()
+                .filter(i -> Long.valueOf(((Number) i.get("id")).longValue()).equals(p.getId()))
+                .findFirst().orElseThrow();
+
+        assertThat(row.get("classification")).isEqualTo("CONFLICTING");
+        assertThat(providerReferencesOf(row)).containsExactly(refA, refB);
+        assertThat(row.get("malformedReason")).isNull();
+    }
+
+    @Test
+    @DisplayName("a CREATED payment with no evidence at all does not appear")
+    void stuckInitiations_NoEvidence_Excluded() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newCreatedPayment(userId);
+
+        List<java.util.Map<String, Object>> items = listStuckInitiations(999407L);
+        assertThat(items).noneMatch(i -> Long.valueOf(((Number) i.get("id")).longValue()).equals(p.getId()));
+    }
+
+    @Test
+    @DisplayName("a PENDING payment (already recovered/normal) does not appear, even though it has a providerReference")
+    void stuckInitiations_PendingPayment_Excluded() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newPaymentInStatus(userId, PaymentStatus.PENDING);
+
+        List<java.util.Map<String, Object>> items = listStuckInitiations(999408L);
+        assertThat(items).noneMatch(i -> Long.valueOf(((Number) i.get("id")).longValue()).equals(p.getId()));
+    }
+
+    @Test
+    @DisplayName("GET /stuck-initiations causes zero mutation: Payment and PaymentEvent counts unchanged")
+    void stuckInitiations_IsReadOnly_NoMutationAnywhere() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newCreatedPayment(userId);
+        paymentCreationService.recordInitiationAccepted(p.getId(), "PSP-STUCK-RO-" + System.nanoTime());
+
+        Payment paymentBefore = paymentRepository.findById(p.getId()).orElseThrow();
+        int eventCountBefore = paymentEventRepository.findByPaymentId(p.getId()).size();
+        long caseCountBefore = reconciliationCaseRepository.findOpen().size();
+
+        listStuckInitiations(999409L);
+
+        Payment paymentAfter = paymentRepository.findById(p.getId()).orElseThrow();
+        int eventCountAfter = paymentEventRepository.findByPaymentId(p.getId()).size();
+        long caseCountAfter = reconciliationCaseRepository.findOpen().size();
+
+        assertThat(paymentAfter.getStatus()).isEqualTo(paymentBefore.getStatus());
+        assertThat(eventCountAfter).as("GET must never append a PaymentEvent").isEqualTo(eventCountBefore);
+        assertThat(caseCountAfter).as("GET must never create a ReconciliationCase").isEqualTo(caseCountBefore);
     }
 }

@@ -170,7 +170,7 @@ class PaymentInitiationRecoveryPgIntegrationTest extends AbstractPostgresIntegra
         paymentCreationService.recordInitiationAccepted(p.getId(), "PSP-CONFLICT-B-" + System.nanoTime());
 
         assertThatThrownBy(() -> paymentCreationOrchestrator.recoverFromInitiationEvidence(p.getId()))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(PermanentInitiationEvidenceException.class);
 
         assertThat(paymentRepository.findById(p.getId()).orElseThrow().getStatus())
                 .as("must remain CREATED - no arbitrary choice between conflicting references")

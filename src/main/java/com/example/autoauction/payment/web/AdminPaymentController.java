@@ -2,6 +2,7 @@ package com.example.autoauction.payment.web;
 
 import com.example.autoauction.payment.application.AdminPaymentService;
 import com.example.autoauction.payment.web.dto.AdminLateSuccessPaymentResponse;
+import com.example.autoauction.payment.web.dto.AdminStuckInitiationResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -35,5 +36,11 @@ public class AdminPaymentController {
     @Operation(summary = "Платежи с поздним успешным подтверждением поставщика (после истечения срока)")
     public List<AdminLateSuccessPaymentResponse> listLateSuccesses() {
         return adminPaymentService.listLateSuccesses();
+    }
+
+    @GetMapping("/stuck-initiations")
+    @Operation(summary = "Платежи CREATED с застрявшим восстановлением инициации (некорректное или отсутствующее свидетельство)")
+    public List<AdminStuckInitiationResponse> listStuckInitiations() {
+        return adminPaymentService.listStuckInitiations();
     }
 }

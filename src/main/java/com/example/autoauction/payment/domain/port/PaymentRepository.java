@@ -125,4 +125,14 @@ public interface PaymentRepository {
      * #findConfirmationCandidateReferences}.
      */
     List<Long> findCreatedWithInitiationEvidenceCandidateIds();
+
+    /**
+     * Phase 35: admin observability only - the same {@code CREATED + INITIATION_ACCEPTED}
+     * predicate as {@link #findCreatedWithInitiationEvidenceCandidateIds}, but returning full
+     * {@code Payment} entities instead of bare ids, for read-only display. Never used by the
+     * recovery scheduler/orchestrator - that path uses the bare-id candidate query above and
+     * remains the sole authority for actually mutating anything. Read-only; no caller may mutate
+     * the returned rows through this method.
+     */
+    List<Payment> findCreatedWithInitiationEvidence();
 }

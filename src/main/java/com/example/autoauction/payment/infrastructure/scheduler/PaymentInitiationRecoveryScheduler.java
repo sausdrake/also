@@ -1,6 +1,7 @@
 package com.example.autoauction.payment.infrastructure.scheduler;
 
 import com.example.autoauction.payment.application.PaymentCreationOrchestrator;
+import com.example.autoauction.payment.application.PermanentInitiationEvidenceException;
 import com.example.autoauction.payment.domain.Payment;
 import com.example.autoauction.payment.domain.PaymentStatus;
 import com.example.autoauction.payment.domain.port.PaymentRepository;
@@ -59,6 +60,14 @@ public class PaymentInitiationRecoveryScheduler {
                 if (result.getStatus() == PaymentStatus.PENDING) {
                     recovered++;
                 }
+            } catch (PermanentInitiationEvidenceException e) {
+                // Phase 35: a permanent, evidence-shape problem - retrying will never resolve it
+                // without intervention. Logged distinctly from a transient failure below so an
+                // operator can tell the two apart at a glance; the candidate remains selectable
+                // and IS retried again next cycle (no suppression, no counter, no timeout) -
+                // retrying costs one cheap local read, never a provider call.
+                log.error("Payment initiation recovery PERMANENTLY blocked for payment {} (invalid evidence): {}",
+                        paymentId, e.getMessage(), e);
             } catch (Exception e) {
                 log.error("Payment initiation recovery failed for payment {}: {}", paymentId, e.getMessage(), e);
             }

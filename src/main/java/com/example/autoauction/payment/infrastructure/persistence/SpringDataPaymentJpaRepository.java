@@ -118,4 +118,19 @@ public interface SpringDataPaymentJpaRepository extends JpaRepository<JpaPayment
     @Query("SELECT p.merchantReference FROM JpaPaymentEntity p "
             + "WHERE p.status IN :statuses AND p.providerReference IS NOT NULL")
     List<String> findMerchantReferencesByStatusInAndProviderReferenceIsNotNull(@Param("statuses") List<PaymentStatus> statuses);
+
+    /**
+     * Phase 35: admin observability - the same predicate as {@link
+     * #findCreatedIdsWithInitiationEvidence}, returning full entities for display. Reuses the
+     * same indexes ({@code idx_payment_status} to narrow candidate rows, {@code
+     * idx_payment_event_payment_id} for the correlated {@code EXISTS} lookup) - no new index.
+     */
+    @Query(nativeQuery = true, value =
+            "SELECT p.* FROM payment p "
+            + "WHERE p.status = 'CREATED' "
+            + "  AND EXISTS ("
+            + "    SELECT 1 FROM payment_event pe "
+            + "    WHERE pe.payment_id = p.id AND pe.type = 'INITIATION_ACCEPTED'"
+            + "  )")
+    List<JpaPaymentEntity> findCreatedEntitiesWithInitiationEvidence();
 }
