@@ -84,6 +84,13 @@ public class PaymentCreationOrchestrator {
             return PaymentCreationView.withoutPresentationData(payment);
         }
 
+        // Phase 38: durable, purely forensic checkpoint - recorded BEFORE the provider is ever
+        // called, in its own transaction, only on this confirmed-new-creation path (a replay
+        // returned above and never reaches this line). If this call throws, it propagates
+        // uncaught: the provider is never invoked, and the Payment remains CREATED with no
+        // INITIATION_ATTEMPTED evidence - exactly like any other pre-provider-call failure today.
+        paymentCreationService.recordInitiationAttempted(payment.getId());
+
         PaymentProviderPort.PaymentInitiationCommand command = new PaymentProviderPort.PaymentInitiationCommand(
                 payment.getMerchantReference(), payment.getAmountRequested(), payment.getCurrency(), null);
 

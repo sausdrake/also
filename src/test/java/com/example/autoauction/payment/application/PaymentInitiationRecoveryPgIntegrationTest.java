@@ -150,6 +150,32 @@ class PaymentInitiationRecoveryPgIntegrationTest extends AbstractPostgresIntegra
     }
 
     @Test
+    @DisplayName("Phase 38 scenario F: a CREATED payment with only INITIATION_ATTEMPTED (no INITIATION_ACCEPTED) "
+            + "is excluded from the recovery candidate query and cannot be recovered")
+    void candidateQuery_ExcludesInitiationAttemptedAlone() {
+        Long userId = newUserWithDeposit();
+        Payment attemptedOnly = paymentCreationService.createPayment(userId, new BigDecimal("500.00"), null).payment();
+        paymentCreationService.recordInitiationAttempted(attemptedOnly.getId());
+
+        assertThat(paymentEventRepository.findByPaymentId(attemptedOnly.getId()))
+                .extracting(e -> e.getType())
+                .containsExactly(PaymentEventType.CREATED, PaymentEventType.INITIATION_ATTEMPTED);
+
+        List<Long> candidates = paymentRepository.findCreatedWithInitiationEvidenceCandidateIds();
+        assertThat(candidates)
+                .as("INITIATION_ATTEMPTED must never be mistaken for recovery-authoritative INITIATION_ACCEPTED evidence")
+                .doesNotContain(attemptedOnly.getId());
+
+        assertThatThrownBy(() -> paymentCreationOrchestrator.recoverFromInitiationEvidence(attemptedOnly.getId()))
+                .as("the checkpoint alone must never let recovery move this payment to PENDING")
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(paymentRepository.findById(attemptedOnly.getId()).orElseThrow().getStatus())
+                .isEqualTo(PaymentStatus.CREATED);
+        assertThat(paymentCreditCount(userId)).isZero();
+    }
+
+    @Test
     @DisplayName("recovery with no evidence fails closed - IllegalStateException, no transition")
     void recovery_NoEvidence_FailsClosed() {
         Long userId = newUserWithDeposit();

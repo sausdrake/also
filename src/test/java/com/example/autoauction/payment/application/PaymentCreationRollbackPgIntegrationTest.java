@@ -3,8 +3,10 @@ package com.example.autoauction.payment.application;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.payment.domain.Payment;
 import com.example.autoauction.payment.domain.PaymentEvent;
+import com.example.autoauction.payment.domain.PaymentEventType;
 import com.example.autoauction.payment.domain.PaymentStatus;
 import com.example.autoauction.payment.domain.port.PaymentEventRepository;
+import com.example.autoauction.payment.domain.port.PaymentProviderPort;
 import com.example.autoauction.payment.domain.port.PaymentRepository;
 import com.example.autoauction.support.AbstractPostgresIntegrationTest;
 import com.example.autoauction.user.domain.Role;
@@ -22,7 +24,9 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
  * P1.5 §28: real-PostgreSQL proof of genuine transactional rollback at both TX boundaries of
@@ -36,6 +40,7 @@ import static org.mockito.Mockito.doThrow;
 class PaymentCreationRollbackPgIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Autowired private PaymentCreationService paymentCreationService;
+    @Autowired private PaymentCreationOrchestrator paymentCreationOrchestrator;
     @Autowired private PaymentRepository paymentRepository;
     @Autowired private DepositService depositService;
     @Autowired private UserRepository userRepository;
@@ -43,6 +48,9 @@ class PaymentCreationRollbackPgIntegrationTest extends AbstractPostgresIntegrati
 
     @SpyBean
     private PaymentEventRepository paymentEventRepository;
+
+    @SpyBean
+    private PaymentProviderPort paymentProviderPort;
 
     private Long newUserWithDeposit() {
         Role role = roleRepository.findByName("ROLE_USER")
@@ -99,5 +107,39 @@ class PaymentCreationRollbackPgIntegrationTest extends AbstractPostgresIntegrati
         Payment afterRetry = paymentCreationService.finalizeAccepted(created.getId(), "PSP-REF-RB");
         assertThat(afterRetry.getStatus()).isEqualTo(PaymentStatus.PENDING);
         assertThat(afterRetry.getProviderReference()).isEqualTo("PSP-REF-RB");
+    }
+
+    @Test
+    @DisplayName("Phase 38 scenario B: INITIATION_ATTEMPTED checkpoint-transaction failure -> CREATED+CREATED-event "
+            + "survive, no INITIATION_ATTEMPTED event exists, and the provider is never invoked")
+    void checkpointTransactionRollback_onInitiationAttemptedFailure_providerNeverCalled() {
+        Long userId = newUserWithDeposit();
+        String key = "idem-ckpt-rb-" + System.nanoTime();
+
+        // Scoped narrowly to the INITIATION_ATTEMPTED append only - the preceding CREATED event
+        // append (inside paymentCreationService.createPayment, a separate, already-committed
+        // transaction) must succeed for real, exactly as §28's own convention requires.
+        doThrow(new RuntimeException("P1.5 test-only injected checkpoint failure - not production behavior"))
+                .when(paymentEventRepository)
+                .append(argThat(e -> e != null && e.getType() == PaymentEventType.INITIATION_ATTEMPTED));
+
+        assertThatThrownBy(() -> paymentCreationOrchestrator.createPayment(userId, new BigDecimal("1000"), key))
+                .hasMessageContaining("injected checkpoint failure");
+
+        Payment reloaded = paymentRepository.findByCreationIdempotencyKey(key).orElseThrow();
+        assertThat(reloaded.getStatus())
+                .as("TX1 (CREATED + CREATED-event) already committed before the checkpoint call - it must survive")
+                .isEqualTo(PaymentStatus.CREATED);
+        assertThat(paymentEventRepository.findByPaymentId(reloaded.getId()))
+                .as("the failed checkpoint transaction must have rolled back entirely - no INITIATION_ATTEMPTED event")
+                .extracting(e -> e.getType())
+                .containsExactly(PaymentEventType.CREATED);
+
+        verifyNoInteractions(paymentProviderPort);
+
+        org.mockito.Mockito.reset(paymentEventRepository);
+
+        PaymentCreationView retried = paymentCreationOrchestrator.createPayment(userId, new BigDecimal("1000"), key);
+        assertThat(retried.payment().getId()).isEqualTo(reloaded.getId());
     }
 }

@@ -225,7 +225,8 @@ class PaymentCreationServiceIntegrationTest extends AbstractPostgresIntegrationT
 
     @Test
     @DisplayName("14. orchestrator end-to-end: provider accepted -> PENDING, providerReference set, "
-            + "PaymentEvent(INITIATION_ACCEPTED) durably recorded before PaymentEvent(PENDING)")
+            + "PaymentEvent(INITIATION_ATTEMPTED) durably recorded before the provider call, then "
+            + "PaymentEvent(INITIATION_ACCEPTED) before PaymentEvent(PENDING)")
     void providerAccepted_endToEnd_transitionsToPending() {
         Long userId = newUserWithDeposit();
         String providerRef = "PSP-REF-" + System.nanoTime();
@@ -237,12 +238,15 @@ class PaymentCreationServiceIntegrationTest extends AbstractPostgresIntegrationT
 
         var events = paymentEventRepository.findByPaymentId(view.payment().getId());
         assertThat(events).extracting(e -> e.getType())
-                .containsExactly(PaymentEventType.CREATED, PaymentEventType.INITIATION_ACCEPTED, PaymentEventType.PENDING);
-        assertThat(events.get(1).getRawPayload()).isEqualTo("providerReference=" + providerRef);
+                .containsExactly(PaymentEventType.CREATED, PaymentEventType.INITIATION_ATTEMPTED,
+                        PaymentEventType.INITIATION_ACCEPTED, PaymentEventType.PENDING);
+        assertThat(events.get(1).getRawPayload()).as("INITIATION_ATTEMPTED carries no payload").isNull();
+        assertThat(events.get(2).getRawPayload()).isEqualTo("providerReference=" + providerRef);
     }
 
     @Test
-    @DisplayName("15. orchestrator end-to-end: provider explicitly rejected -> FAILED, no credit, PaymentEvent(FAILED) appended")
+    @DisplayName("15. orchestrator end-to-end: provider explicitly rejected -> FAILED, no credit, "
+            + "PaymentEvent(INITIATION_ATTEMPTED) remains as historical evidence, PaymentEvent(FAILED) appended")
     void providerRejected_endToEnd_transitionsToFailed() {
         Long userId = newUserWithDeposit();
         fakeProvider.stubDefaultRejected();
@@ -252,11 +256,12 @@ class PaymentCreationServiceIntegrationTest extends AbstractPostgresIntegrationT
 
         var events = paymentEventRepository.findByPaymentId(view.payment().getId());
         assertThat(events).extracting(e -> e.getType())
-                .containsExactly(PaymentEventType.CREATED, PaymentEventType.FAILED);
+                .containsExactly(PaymentEventType.CREATED, PaymentEventType.INITIATION_ATTEMPTED, PaymentEventType.FAILED);
     }
 
     @Test
-    @DisplayName("16. orchestrator end-to-end: provider ambiguous (no stub) -> Payment remains CREATED, only the CREATED event exists")
+    @DisplayName("16. orchestrator end-to-end: provider ambiguous (no stub) -> Payment remains CREATED, "
+            + "CREATED + INITIATION_ATTEMPTED exist, no automatic retry, no other event")
     void providerAmbiguous_endToEnd_remainsCreated() {
         Long userId = newUserWithDeposit();
         fakeProvider.clearDefaultStub(); // explicit: no stub at all -> ambiguous
@@ -269,11 +274,13 @@ class PaymentCreationServiceIntegrationTest extends AbstractPostgresIntegrationT
 
         Payment reloaded = paymentRepository.findById(view.payment().getId()).orElseThrow();
         assertThat(reloaded.getStatus()).isEqualTo(PaymentStatus.CREATED);
-        // Only the CREATED event - ambiguity never appends anything (never FAILED, never a
-        // fabricated CALLBACK_RECEIVED/POLL_RESULT for something creation has no business
-        // observing).
+        // CREATED + INITIATION_ATTEMPTED only - ambiguity never appends anything beyond the
+        // pre-provider-call checkpoint (never FAILED, never a fabricated CALLBACK_RECEIVED/
+        // POLL_RESULT for something creation has no business observing, and never a second
+        // automatic provider retry).
         var events = paymentEventRepository.findByPaymentId(reloaded.getId());
-        assertThat(events).extracting(e -> e.getType()).containsExactly(PaymentEventType.CREATED);
+        assertThat(events).extracting(e -> e.getType())
+                .containsExactly(PaymentEventType.CREATED, PaymentEventType.INITIATION_ATTEMPTED);
     }
 
     @Test

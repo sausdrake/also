@@ -149,6 +149,27 @@ public class PaymentCreationService {
     }
 
     /**
+     * Phase 38: durable, purely forensic checkpoint - records that the application is about to
+     * invoke {@code PaymentProviderPort#initiatePayment} for this payment. A pure append: does
+     * not load, lock, or mutate the {@code Payment} row, has no financial effect, and is NEVER
+     * read by any recovery mechanism ({@code PaymentInitiationRecoveryScheduler} and {@link
+     * InitiationEvidenceClassifier} both consume {@code INITIATION_ACCEPTED} evidence only). This
+     * event does not and cannot prove the provider ever received or acted on the request - it
+     * proves only that the local application reached this exact point durably. Does not solve the
+     * crash window where the provider genuinely accepted but no further evidence was ever
+     * recorded (Case C/E) - that remains a disclosed, unresolved, provider-dependent limitation.
+     *
+     * <p>Deliberately carries no payload - {@code merchantReference} is already permanently
+     * available via the {@code Payment} row itself, and no {@code providerReference} exists yet
+     * at this point in the flow.
+     */
+    @Transactional
+    public void recordInitiationAttempted(Long paymentId) {
+        paymentEventRepository.append(new PaymentEvent(
+                paymentId, PaymentEventType.INITIATION_ATTEMPTED, PaymentEventSource.CLIENT, null, now()));
+    }
+
+    /**
      * Phase 33: durable checkpoint only - records that {@code PaymentProviderPort#initiatePayment}
      * genuinely returned a usable {@code providerReference}, BEFORE {@link #finalizeAccepted} is
      * ever attempted. A pure append: does not load, lock, or mutate the {@code Payment} row, and

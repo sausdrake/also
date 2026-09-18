@@ -3,6 +3,8 @@ package com.example.autoauction.payment.application;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.payment.domain.Payment;
 import com.example.autoauction.payment.domain.PaymentAmountPolicy;
+import com.example.autoauction.payment.domain.PaymentEventType;
+import com.example.autoauction.payment.domain.PaymentStatus;
 import com.example.autoauction.payment.domain.port.PaymentEventRepository;
 import com.example.autoauction.payment.domain.port.PaymentProviderPort;
 import com.example.autoauction.payment.domain.port.PaymentRepository;
@@ -17,6 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -28,6 +31,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 /**
  * P1.5 §26/§6/§13: real-PostgreSQL, real-thread proofs of the locked P1.5 concurrency invariants -
@@ -43,7 +49,7 @@ class PaymentCreationConcurrencyPgIntegrationTest extends AbstractPostgresIntegr
     @Autowired private com.example.autoauction.payment.application.PaymentConfirmationOrchestrator paymentConfirmationOrchestrator;
     @Autowired private PaymentRepository paymentRepository;
     @Autowired private PaymentEventRepository paymentEventRepository;
-    @Autowired private FakePaymentProviderPort fakeProvider;
+    @SpyBean private FakePaymentProviderPort fakeProvider;
     @Autowired private DepositService depositService;
     @Autowired private UserRepository userRepository;
     @Autowired private RoleRepository roleRepository;
@@ -125,6 +131,57 @@ class PaymentCreationConcurrencyPgIntegrationTest extends AbstractPostgresIntegr
 
         Payment winner = resultA.get();
         assertThat(paymentEventRepository.findByPaymentId(winner.getId())).hasSize(1);
+    }
+
+    @RepeatedTest(3)
+    @DisplayName("Phase 38: same user, same idempotency key, truly concurrent THROUGH THE ORCHESTRATOR - "
+            + "exactly one genuinely-new creation reaches the provider, exactly one INITIATION_ATTEMPTED "
+            + "checkpoint is ever written, and the replay never re-invokes the provider or the checkpoint")
+    void sameUserSameKeyConcurrent_throughOrchestrator_exactlyOneCheckpoint() throws InterruptedException {
+        // Defensive, not relying on Spring Boot's default post-test @SpyBean reset timing across
+        // @RepeatedTest invocations sharing the same context/spy instance - guarantees a clean
+        // invocation slate for this iteration's verify(times(1)) regardless of that timing.
+        org.mockito.Mockito.reset(fakeProvider);
+
+        Long userId = newUserWithDeposit();
+        String key = "idem-orch-race-" + System.nanoTime();
+        String providerRef = "PSP-ORCH-RACE-" + System.nanoTime();
+        fakeProvider.stubDefaultAccepted(providerRef);
+
+        AtomicReference<PaymentCreationView> resultA = new AtomicReference<>();
+        AtomicReference<PaymentCreationView> resultB = new AtomicReference<>();
+        AtomicReference<Throwable> errA = new AtomicReference<>();
+        AtomicReference<Throwable> errB = new AtomicReference<>();
+
+        runConcurrently(
+                () -> { try { resultA.set(paymentCreationOrchestrator.createPayment(userId, new BigDecimal("1000"), key)); }
+                        catch (Throwable t) { errA.set(t); } },
+                () -> { try { resultB.set(paymentCreationOrchestrator.createPayment(userId, new BigDecimal("1000"), key)); }
+                        catch (Throwable t) { errB.set(t); } });
+
+        assertThat(errA.get()).as("errA=%s", errA.get()).isNull();
+        assertThat(errB.get()).as("errB=%s", errB.get()).isNull();
+        assertThat(resultA.get().payment().getId()).isEqualTo(resultB.get().payment().getId());
+        Long paymentId = resultA.get().payment().getId();
+
+        // Deterministic, not a timing assumption: createPayment's PESSIMISTIC_WRITE lock on the
+        // SAME user's Deposit row (SpringDataDepositJpaRepository.findByUserIdWithLock) fully
+        // serializes the two calls. Whichever thread acquires the lock second necessarily observes
+        // the first thread's already-committed idempotencyKey and takes the early
+        // "!outcome.isNewCreation()" return in PaymentCreationOrchestrator.createPayment - it can
+        // never reach recordInitiationAttempted() or initiatePayment(), regardless of scheduling.
+        verify(fakeProvider, times(1)).initiatePayment(any());
+
+        assertThat(paymentEventRepository.findByPaymentId(paymentId))
+                .as("exactly one checkpoint, one acceptance-evidence event, one PENDING transition - "
+                        + "the replay contributes no event of its own")
+                .extracting(e -> e.getType())
+                .containsExactly(PaymentEventType.CREATED, PaymentEventType.INITIATION_ATTEMPTED,
+                        PaymentEventType.INITIATION_ACCEPTED, PaymentEventType.PENDING);
+
+        Payment finalPayment = paymentRepository.findById(paymentId).orElseThrow();
+        assertThat(finalPayment.getStatus()).isEqualTo(PaymentStatus.PENDING);
+        assertThat(finalPayment.getProviderReference()).isEqualTo(providerRef);
     }
 
     @RepeatedTest(3)

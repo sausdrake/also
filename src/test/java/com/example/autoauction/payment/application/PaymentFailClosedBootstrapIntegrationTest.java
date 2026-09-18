@@ -126,9 +126,10 @@ class PaymentFailClosedBootstrapIntegrationTest extends AbstractPostgresIntegrat
         assertThat(reloaded.getStatus()).isEqualTo(PaymentStatus.CREATED);
 
         assertThat(paymentEventRepository.findByPaymentId(payment.getId()))
-                .as("only the CREATED event exists - no PENDING/SUCCEEDED/FAILED event was ever appended")
+                .as("CREATED + INITIATION_ATTEMPTED only - the pre-provider-call checkpoint is recorded, " +
+                        "but no PENDING/SUCCEEDED/FAILED event was ever appended")
                 .extracting(e -> e.getType())
-                .containsExactly(PaymentEventType.CREATED);
+                .containsExactly(PaymentEventType.CREATED, PaymentEventType.INITIATION_ATTEMPTED);
 
         Deposit after = depositRepository.findByUserId(userId).orElseThrow();
         assertThat(after.getBalance()).as("no deposit credit occurred").isEqualByComparingTo(before.getBalance());
@@ -197,7 +198,7 @@ class PaymentFailClosedBootstrapIntegrationTest extends AbstractPostgresIntegrat
         assertThat(after.getBalance()).isEqualByComparingTo(before.getBalance());
         assertThat(paymentEventRepository.findByPaymentId(view.payment().getId()))
                 .extracting(e -> e.getType())
-                .containsExactly(PaymentEventType.CREATED);
+                .containsExactly(PaymentEventType.CREATED, PaymentEventType.INITIATION_ATTEMPTED);
     }
 
     // ======================================================================
@@ -230,6 +231,8 @@ class PaymentFailClosedBootstrapIntegrationTest extends AbstractPostgresIntegrat
                 .containsExactly(
                         org.assertj.core.groups.Tuple.tuple(PaymentEventType.CREATED,
                                 com.example.autoauction.payment.domain.PaymentEventSource.CLIENT),
+                        org.assertj.core.groups.Tuple.tuple(PaymentEventType.INITIATION_ATTEMPTED,
+                                com.example.autoauction.payment.domain.PaymentEventSource.CLIENT),
                         org.assertj.core.groups.Tuple.tuple(PaymentEventType.EXPIRED,
                                 com.example.autoauction.payment.domain.PaymentEventSource.SCHEDULER));
 
@@ -247,7 +250,8 @@ class PaymentFailClosedBootstrapIntegrationTest extends AbstractPostgresIntegrat
     // ======================================================================
 
     @Test
-    @DisplayName("Attack 7: repeated creation with the same idempotencyKey replays the same CREATED payment")
+    @DisplayName("Attack 7: repeated creation with the same idempotencyKey replays the same CREATED payment, " +
+            "and Phase 38's INITIATION_ATTEMPTED checkpoint is recorded exactly once - never on the replay")
     void attack7_idempotentReplay_unchanged() {
         Long userId = newUserWithDeposit();
         String key = "idem-fail-closed-" + System.nanoTime();
@@ -259,5 +263,11 @@ class PaymentFailClosedBootstrapIntegrationTest extends AbstractPostgresIntegrat
         assertThat(second.payment().getStatus()).isEqualTo(PaymentStatus.CREATED);
         assertThat(paymentRepository.findByCreationIdempotencyKey(key)).hasValueSatisfying(
                 p -> assertThat(p.getId()).isEqualTo(first.payment().getId()));
+
+        // Phase 38 scenario G: the replay must never invoke recordInitiationAttempted (or the
+        // provider) again - exactly one checkpoint exists for the one genuinely-new creation.
+        assertThat(paymentEventRepository.findByPaymentId(first.payment().getId()))
+                .extracting(e -> e.getType())
+                .containsExactly(PaymentEventType.CREATED, PaymentEventType.INITIATION_ATTEMPTED);
     }
 }
