@@ -25,7 +25,7 @@ public class ReconciliationCaseRepositoryAdapter implements ReconciliationCaseRe
     @Override
     @Transactional
     public ReconciliationCase save(ReconciliationCase reconciliationCase) {
-        return mapper.toDomain(jpaRepository.save(mapper.toEntity(reconciliationCase)));
+        return mapper.toDomain(jpaRepository.saveAndFlush(mapper.toEntity(reconciliationCase)));
     }
 
     @Override
