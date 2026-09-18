@@ -14,15 +14,17 @@ import com.example.autoauction.payment.web.dto.AdminReconciliationCaseListItemRe
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
- * Phase 20: read-only admin orchestration for one {@link ReconciliationCase} - assembles the
- * case, its linked {@link Payment}, and its {@link PaymentEventType#RECONCILIATION} evidence
- * into a single detail view. Deliberately a small, single-purpose read service, not a general
- * reconciliation domain service: it has no method that mutates anything, never calls {@code
- * ReconciliationCase.resolve()}, never saves a case/payment/event, and never touches {@code
- * DepositService} or {@code PaymentConfirmationService}.
+ * Phase 20/24: admin orchestration for {@link ReconciliationCase} inspection (detail/list) and
+ * administrative case closure. {@code resolveCase} performs ONLY the {@code ReconciliationCase}
+ * lifecycle transition ({@code OPEN -> RESOLVED} via the domain's own {@code resolve()}) - it is
+ * administrative metadata closure, never financial reconciliation. This class has no method that
+ * touches {@code DepositService}, {@code PaymentConfirmationService}, or any {@code Payment}/
+ * {@code PaymentEvent} mutation; {@code getCaseDetail}/{@code listCases} remain purely read-only
+ * as before.
  */
 @Service
 public class AdminReconciliationService {
@@ -79,5 +81,27 @@ public class AdminReconciliationService {
                         .map(payment -> AdminReconciliationCaseListItemResponse.withPayment(c, payment))
                         .orElseGet(() -> AdminReconciliationCaseListItemResponse.withoutPayment(c)))
                 .toList();
+    }
+
+    /**
+     * Phase 24: administrative closure only - {@code OPEN -> RESOLVED} via {@link
+     * ReconciliationCase#resolve}. {@code adminId} and {@code resolvedAt} are always
+     * caller-supplied from the authenticated principal / server clock (never client-supplied -
+     * enforced by the controller, not by this method). No financial collaborator is referenced:
+     * this method does not import or call {@code PaymentRepository}, {@code
+     * PaymentEventRepository}, or {@code DepositService}. An already-RESOLVED case's second
+     * resolution attempt is rejected by the domain method itself ({@code IllegalStateException},
+     * mapped to 409 by the existing {@code GlobalExceptionHandler}) - not swallowed into a
+     * silent no-op.
+     */
+    @Transactional
+    public AdminReconciliationCaseDetailResponse.CaseSummary resolveCase(Long caseId, Long adminId, String resolutionNote) {
+        ReconciliationCase reconciliationCase = reconciliationCaseRepository.findById(caseId)
+                .orElseThrow(() -> new IllegalArgumentException("Дело сверки не найдено: " + caseId));
+
+        reconciliationCase.resolve(adminId, resolutionNote, OffsetDateTime.now());
+        ReconciliationCase resolved = reconciliationCaseRepository.save(reconciliationCase);
+
+        return AdminReconciliationCaseDetailResponse.CaseSummary.fromDomain(resolved);
     }
 }

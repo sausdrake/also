@@ -36,8 +36,10 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
 
 /**
  * Phase 20 §15: HTTP-layer proof for {@code /api/v1/admin/reconciliation/**} - ADMIN-only access
@@ -438,5 +440,239 @@ class AdminReconciliationControllerApiIntegrationTest {
         assertThat(paymentAfter.getStatus()).isEqualTo(paymentBefore.getStatus());
         assertThat(paymentAfter.getAmountConfirmed()).isEqualTo(paymentBefore.getAmountConfirmed());
         assertThat(eventCountAfter).as("list must never append a PaymentEvent").isEqualTo(eventCountBefore);
+    }
+
+    // ==================== Resolve: authorization ====================
+
+    @Test
+    @DisplayName("POST /cases/{id}/resolve without authentication -> 401")
+    void resolve_Unauthenticated_401() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/reconciliation/cases/1/resolve"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("POST /cases/{id}/resolve as a plain USER -> 403")
+    void resolve_User_403() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newPayment(userId);
+        ReconciliationCase c = newCase(p.getId(), ReconciliationCaseType.MISMATCH);
+
+        mockMvc.perform(post("/api/v1/admin/reconciliation/cases/{id}/resolve", c.getId()).with(user(999201L, "USER")))
+                .andExpect(status().isForbidden());
+
+        assertThat(reconciliationCaseRepository.findById(c.getId()).orElseThrow().getStatus())
+                .as("a denied request must not resolve the case").isEqualTo(ReconciliationCaseStatus.OPEN);
+    }
+
+    @Test
+    @DisplayName("POST /cases/{id}/resolve as DIAGNOSTIC -> 403")
+    void resolve_Diagnostic_403() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newPayment(userId);
+        ReconciliationCase c = newCase(p.getId(), ReconciliationCaseType.MISMATCH);
+
+        mockMvc.perform(post("/api/v1/admin/reconciliation/cases/{id}/resolve", c.getId()).with(user(999202L, "DIAGNOSTIC")))
+                .andExpect(status().isForbidden());
+    }
+
+    // ==================== Resolve: success ====================
+
+    @Test
+    @DisplayName("ADMIN resolves an OPEN case: status becomes RESOLVED, resolvedByAdminId = caller, resolvedAt server-generated, note persisted")
+    void resolve_Admin_Success_SetsAllFieldsCorrectly() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newPayment(userId);
+        ReconciliationCase c = newCase(p.getId(), ReconciliationCaseType.MISMATCH);
+        Long adminId = 999203L;
+        OffsetDateTime before = OffsetDateTime.now();
+
+        mockMvc.perform(post("/api/v1/admin/reconciliation/cases/{id}/resolve", c.getId())
+                        .with(user(adminId, "ADMIN"))
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"resolutionNote\":\"handled out of band\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(c.getId()))
+                .andExpect(jsonPath("$.status").value("RESOLVED"))
+                .andExpect(jsonPath("$.resolvedByAdminId").value(adminId))
+                .andExpect(jsonPath("$.resolutionNote").value("handled out of band"))
+                .andExpect(jsonPath("$.resolvedAt").exists());
+
+        ReconciliationCase persisted = reconciliationCaseRepository.findById(c.getId()).orElseThrow();
+        assertThat(persisted.getStatus()).isEqualTo(ReconciliationCaseStatus.RESOLVED);
+        assertThat(persisted.getResolvedByAdminId()).isEqualTo(adminId);
+        assertThat(persisted.getResolutionNote()).isEqualTo("handled out of band");
+        assertThat(persisted.getResolvedAt()).isNotNull().isAfterOrEqualTo(before);
+    }
+
+    @Test
+    @DisplayName("two different admins resolving two different cases: resolvedByAdminId always tracks the actual caller, never a fixed/other value")
+    void resolve_ResolvedByAdminId_AlwaysTracksActualCaller() throws Exception {
+        Long userId = newOwningUser();
+        Payment p1 = newPayment(userId);
+        Payment p2 = newPayment(userId);
+        ReconciliationCase c1 = newCase(p1.getId(), ReconciliationCaseType.MISMATCH);
+        ReconciliationCase c2 = newCase(p2.getId(), ReconciliationCaseType.MISMATCH);
+        Long adminA = 999204L;
+        Long adminB = 999205L;
+
+        mockMvc.perform(post("/api/v1/admin/reconciliation/cases/{id}/resolve", c1.getId()).with(user(adminA, "ADMIN")))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/admin/reconciliation/cases/{id}/resolve", c2.getId()).with(user(adminB, "ADMIN")))
+                .andExpect(status().isOk());
+
+        assertThat(reconciliationCaseRepository.findById(c1.getId()).orElseThrow().getResolvedByAdminId()).isEqualTo(adminA);
+        assertThat(reconciliationCaseRepository.findById(c2.getId()).orElseThrow().getResolvedByAdminId()).isEqualTo(adminB);
+    }
+
+    // ==================== Resolve: not found / already resolved ====================
+
+    @Test
+    @DisplayName("resolve unknown case id -> 404 (existing case-not-found convention)")
+    void resolve_UnknownCase_404() throws Exception {
+        mockMvc.perform(post("/api/v1/admin/reconciliation/cases/{id}/resolve", 999_999_998L).with(user(999206L, "ADMIN")))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("resolving an already-RESOLVED case -> 409 (existing domain IllegalStateException / GlobalExceptionHandler convention)")
+    void resolve_AlreadyResolved_409() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newPayment(userId);
+        ReconciliationCase c = newCase(p.getId(), ReconciliationCaseType.MISMATCH);
+
+        mockMvc.perform(post("/api/v1/admin/reconciliation/cases/{id}/resolve", c.getId()).with(user(999207L, "ADMIN")))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/admin/reconciliation/cases/{id}/resolve", c.getId()).with(user(999207L, "ADMIN")))
+                .andExpect(status().isConflict());
+
+        // The rejected second attempt must not have overwritten the first resolution's fields.
+        assertThat(reconciliationCaseRepository.findById(c.getId()).orElseThrow().getResolvedByAdminId()).isEqualTo(999207L);
+    }
+
+    // ==================== Resolve: request body edge cases ====================
+
+    @Test
+    @DisplayName("omitted request body -> succeeds with null resolutionNote (domain permits null)")
+    void resolve_OmittedBody_SucceedsWithNullNote() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newPayment(userId);
+        ReconciliationCase c = newCase(p.getId(), ReconciliationCaseType.MISMATCH);
+
+        mockMvc.perform(post("/api/v1/admin/reconciliation/cases/{id}/resolve", c.getId()).with(user(999208L, "ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resolutionNote").value(org.hamcrest.Matchers.nullValue()));
+
+        assertThat(reconciliationCaseRepository.findById(c.getId()).orElseThrow().getResolutionNote()).isNull();
+    }
+
+    @Test
+    @DisplayName("empty JSON object body {} -> succeeds with null resolutionNote")
+    void resolve_EmptyObjectBody_SucceedsWithNullNote() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newPayment(userId);
+        ReconciliationCase c = newCase(p.getId(), ReconciliationCaseType.MISMATCH);
+
+        mockMvc.perform(post("/api/v1/admin/reconciliation/cases/{id}/resolve", c.getId())
+                        .with(user(999209L, "ADMIN")).contentType(APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk());
+
+        assertThat(reconciliationCaseRepository.findById(c.getId()).orElseThrow().getResolutionNote()).isNull();
+    }
+
+    @Test
+    @DisplayName("blank resolutionNote -> succeeds, domain does not enforce non-blank")
+    void resolve_BlankNote_Succeeds() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newPayment(userId);
+        ReconciliationCase c = newCase(p.getId(), ReconciliationCaseType.MISMATCH);
+
+        mockMvc.perform(post("/api/v1/admin/reconciliation/cases/{id}/resolve", c.getId())
+                        .with(user(999210L, "ADMIN")).contentType(APPLICATION_JSON).content("{\"resolutionNote\":\"\"}"))
+                .andExpect(status().isOk());
+
+        assertThat(reconciliationCaseRepository.findById(c.getId()).orElseThrow().getResolutionNote()).isEmpty();
+    }
+
+    // ==================== Resolve: security adversarial check ====================
+
+    @Test
+    @DisplayName("client-supplied adminId in the request body has no effect on resolvedByAdminId (field does not exist on the accepted DTO)")
+    void resolve_ClientSuppliedAdminId_HasNoEffect() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newPayment(userId);
+        ReconciliationCase c = newCase(p.getId(), ReconciliationCaseType.MISMATCH);
+        Long realAdmin = 999211L;
+        Long impersonatedAdmin = 424242L;
+
+        // AdminResolveReconciliationCaseRequest has no adminId field at all - this body either
+        // fails to deserialize (an unrecognized-property error, this app's existing Jackson
+        // convention for CreatePaymentRequest's own userId field per Phase 14) or is silently
+        // ignored; either way, the real caller's id must be the only one ever persisted.
+        mockMvc.perform(post("/api/v1/admin/reconciliation/cases/{id}/resolve", c.getId())
+                        .with(user(realAdmin, "ADMIN")).contentType(APPLICATION_JSON)
+                        .content("{\"adminId\":" + impersonatedAdmin + ",\"resolutionNote\":\"legit note\"}"));
+
+        // Regardless of whether the above request succeeded or was rejected at the JSON layer,
+        // the case must never end up resolved by the impersonated id.
+        ReconciliationCase after = reconciliationCaseRepository.findById(c.getId()).orElseThrow();
+        assertThat(after.getResolvedByAdminId()).as("impersonated adminId must never be persisted")
+                .isNotEqualTo(impersonatedAdmin);
+        if (after.getStatus() == ReconciliationCaseStatus.RESOLVED) {
+            assertThat(after.getResolvedByAdminId()).isEqualTo(realAdmin);
+        }
+    }
+
+    // ==================== Resolve: financial isolation ====================
+
+    @Test
+    @DisplayName("resolve causes zero financial mutation: Payment fields and PaymentEvent count unchanged, only ReconciliationCase changes")
+    void resolve_IsFinanciallyInert() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newPayment(userId);
+        ReconciliationCase c = newCase(p.getId(), ReconciliationCaseType.MISMATCH);
+        appendEvent(p.getId(), PaymentEventType.RECONCILIATION, PaymentEventSource.PROVIDER_POLL, "x", T0);
+
+        Payment paymentBefore = paymentRepository.findById(p.getId()).orElseThrow();
+        int eventCountBefore = paymentEventRepository.findByPaymentId(p.getId()).size();
+
+        mockMvc.perform(post("/api/v1/admin/reconciliation/cases/{id}/resolve", c.getId())
+                        .with(user(999212L, "ADMIN")).contentType(APPLICATION_JSON)
+                        .content("{\"resolutionNote\":\"no correction performed\"}"))
+                .andExpect(status().isOk());
+
+        Payment paymentAfter = paymentRepository.findById(p.getId()).orElseThrow();
+        int eventCountAfter = paymentEventRepository.findByPaymentId(p.getId()).size();
+
+        assertThat(paymentAfter.getStatus()).isEqualTo(paymentBefore.getStatus());
+        assertThat(paymentAfter.getAmountConfirmed()).isEqualTo(paymentBefore.getAmountConfirmed());
+        assertThat(paymentAfter.getProviderTransactionId()).isEqualTo(paymentBefore.getProviderTransactionId());
+        assertThat(eventCountAfter).as("resolve must never append a PaymentEvent").isEqualTo(eventCountBefore);
+
+        ReconciliationCase caseAfter = reconciliationCaseRepository.findById(c.getId()).orElseThrow();
+        assertThat(caseAfter.getStatus()).isEqualTo(ReconciliationCaseStatus.RESOLVED);
+    }
+
+    // ==================== Resolve: concurrency ====================
+
+    @Test
+    @DisplayName("concurrent resolution: first writer succeeds, stale second writer is rejected (optimistic lock, H2-portable)")
+    void resolve_ConcurrentResolution_StaleWriterRejected() {
+        Long userId = newOwningUser();
+        Payment p = newPayment(userId);
+        ReconciliationCase saved = newCase(p.getId(), ReconciliationCaseType.MISMATCH);
+
+        ReconciliationCase loadedByAdminA = reconciliationCaseRepository.findById(saved.getId()).orElseThrow();
+        ReconciliationCase loadedByAdminB = reconciliationCaseRepository.findById(saved.getId()).orElseThrow();
+
+        loadedByAdminA.resolve(1001L, "admin A resolved first", OffsetDateTime.now());
+        reconciliationCaseRepository.save(loadedByAdminA);
+
+        loadedByAdminB.resolve(1002L, "admin B resolved second, using stale data", OffsetDateTime.now());
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> reconciliationCaseRepository.save(loadedByAdminB))
+                .isInstanceOf(org.springframework.orm.ObjectOptimisticLockingFailureException.class);
+
+        ReconciliationCase finalState = reconciliationCaseRepository.findById(saved.getId()).orElseThrow();
+        assertThat(finalState.getResolvedByAdminId()).isEqualTo(1001L);
     }
 }
