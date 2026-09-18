@@ -81,4 +81,14 @@ public interface PaymentRepository {
      * missing and must be re-applied idempotently by reconciliation.
      */
     List<Payment> findSucceededWithoutLedgerCredit();
+
+    /**
+     * Phase 26: admin observability only - payments whose {@code lateSuccessAfterExpiry} flag is
+     * set (an authentic EXPIRED -&gt; SUCCEEDED provider report, already credited exactly once;
+     * see {@link Payment#markSucceeded}), newest-succeeded-first ({@code updatedAt DESC} - the
+     * already-proven success-instant timestamp for a terminal SUCCEEDED row, see {@link
+     * #sumSucceededConfirmedByUserSince}'s own Javadoc). Read-only; no caller may mutate the
+     * returned rows through this method.
+     */
+    List<Payment> findAllLateSuccessesNewestFirst();
 }

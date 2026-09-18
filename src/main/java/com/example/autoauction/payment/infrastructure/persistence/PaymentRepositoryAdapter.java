@@ -107,4 +107,11 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     public List<Payment> findSucceededWithoutLedgerCredit() {
         return jpaRepository.findSucceededWithoutLedgerCredit().stream().map(mapper::toDomain).toList();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Payment> findAllLateSuccessesNewestFirst() {
+        return jpaRepository.findAllByLateSuccessAfterExpiryTrueOrderByUpdatedAtDesc().stream()
+                .map(mapper::toDomain).toList();
+    }
 }

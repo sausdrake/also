@@ -88,4 +88,7 @@ public interface SpringDataPaymentJpaRepository extends JpaRepository<JpaPayment
             + "    WHERE dt.idempotency_key = 'PAYMENT:' || p.provider_transaction_id"
             + "  )")
     List<JpaPaymentEntity> findSucceededWithoutLedgerCredit();
+
+    /** Phase 26: admin observability - payments that succeeded after their own expiry, newest first. */
+    List<JpaPaymentEntity> findAllByLateSuccessAfterExpiryTrueOrderByUpdatedAtDesc();
 }
