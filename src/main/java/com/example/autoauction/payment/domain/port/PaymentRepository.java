@@ -91,4 +91,23 @@ public interface PaymentRepository {
      * returned rows through this method.
      */
     List<Payment> findAllLateSuccessesNewestFirst();
+
+    /**
+     * Phase 29: confirmation-polling candidates - merchant references of payments in
+     * {@code PENDING} or {@code EXPIRED} with a non-null {@code providerReference}. {@code
+     * CREATED} is deliberately excluded (it may legitimately have no {@code providerReference};
+     * {@link Payment}'s own confirmation flow already no-ops on it before ever touching the
+     * provider). An {@code EXPIRED} payment with a null {@code providerReference} (reachable via
+     * a direct {@code CREATED -&gt; EXPIRED} sweep - see {@code PaymentExpiryService}) is likewise
+     * excluded here, since the confirmation operation has no reference to poll the provider with
+     * for such a row. Returns merchant references, not ids: the sole caller ({@code
+     * PaymentConfirmationScheduler}) needs exactly the identifier {@link
+     * com.example.autoauction.payment.application.PaymentConfirmationOrchestrator#confirmPayment(String)}
+     * already takes, avoiding a second id-&gt;reference lookup per candidate. Deliberately
+     * non-authoritative, mirroring {@link #findExpiredCandidateIds}: a candidate may already be
+     * confirmed/expired by a concurrent operation by the time it is processed - the canonical
+     * confirmation operation remains the sole authority, re-loading and locking the {@code
+     * Payment} itself before acting.
+     */
+    List<String> findConfirmationCandidateReferences();
 }

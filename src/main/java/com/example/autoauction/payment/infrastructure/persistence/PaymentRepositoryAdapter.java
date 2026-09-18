@@ -15,6 +15,7 @@ import java.util.Optional;
 public class PaymentRepositoryAdapter implements PaymentRepository {
 
     private static final List<PaymentStatus> NON_TERMINAL = List.of(PaymentStatus.CREATED, PaymentStatus.PENDING);
+    private static final List<PaymentStatus> CONFIRMATION_POLLABLE = List.of(PaymentStatus.PENDING, PaymentStatus.EXPIRED);
 
     private final SpringDataPaymentJpaRepository jpaRepository;
     private final PaymentMapper mapper;
@@ -113,5 +114,11 @@ public class PaymentRepositoryAdapter implements PaymentRepository {
     public List<Payment> findAllLateSuccessesNewestFirst() {
         return jpaRepository.findAllByLateSuccessAfterExpiryTrueOrderByUpdatedAtDesc().stream()
                 .map(mapper::toDomain).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<String> findConfirmationCandidateReferences() {
+        return jpaRepository.findMerchantReferencesByStatusInAndProviderReferenceIsNotNull(CONFIRMATION_POLLABLE);
     }
 }

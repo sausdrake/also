@@ -91,4 +91,14 @@ public interface SpringDataPaymentJpaRepository extends JpaRepository<JpaPayment
 
     /** Phase 26: admin observability - payments that succeeded after their own expiry, newest first. */
     List<JpaPaymentEntity> findAllByLateSuccessAfterExpiryTrueOrderByUpdatedAtDesc();
+
+    /**
+     * Phase 29: confirmation-polling candidates - see {@code PaymentRepository.findConfirmationCandidateReferences}
+     * for the full rationale. {@code CREATED} is deliberately not in {@code :statuses} here; the
+     * {@code providerReference IS NOT NULL} filter additionally excludes any {@code EXPIRED}
+     * payment that reached that status directly from {@code CREATED} without ever having one.
+     */
+    @Query("SELECT p.merchantReference FROM JpaPaymentEntity p "
+            + "WHERE p.status IN :statuses AND p.providerReference IS NOT NULL")
+    List<String> findMerchantReferencesByStatusInAndProviderReferenceIsNotNull(@Param("statuses") List<PaymentStatus> statuses);
 }
