@@ -45,6 +45,7 @@ class PaymentInitiationRecoveryPgIntegrationTest extends AbstractPostgresIntegra
 
     @Autowired private PaymentCreationService paymentCreationService;
     @Autowired private PaymentCreationOrchestrator paymentCreationOrchestrator;
+    @Autowired private PaymentExpiryService paymentExpiryService;
     @Autowired private PaymentRepository paymentRepository;
     @Autowired private PaymentEventRepository paymentEventRepository;
     @Autowired private DepositService depositService;
@@ -264,5 +265,37 @@ class PaymentInitiationRecoveryPgIntegrationTest extends AbstractPostgresIntegra
                 .filteredOn(e -> e.getType() == PaymentEventType.PENDING)
                 .as("exactly one PENDING transition regardless of which side won the lock")
                 .hasSize(1);
+    }
+
+    // ==================== Phase 41: recovery races EXPIRY on a CREATED + evidence payment ====================
+
+    @RepeatedTest(3)
+    @DisplayName("T8: recovery racing expiry on a CREATED + valid-evidence payment past its TTL: whichever wins, EXPIRED with the reference bound, one PENDING, one EXPIRED, no credit")
+    void recoveryRacesExpiry_sameOutcomeWhoeverWins() throws InterruptedException {
+        Long userId = newUserWithDeposit();
+        String ref = "PSP-P41-T8-" + System.nanoTime();
+        Payment p = newCreatedWithEvidence(userId, ref);
+        Payment fresh = paymentRepository.findById(p.getId()).orElseThrow();
+        fresh.shortenExpiryTo(java.time.OffsetDateTime.now().minusMinutes(1));
+        paymentRepository.save(fresh);
+
+        AtomicReference<Throwable> errRecovery = new AtomicReference<>();
+        AtomicReference<Throwable> errExpiry = new AtomicReference<>();
+
+        runConcurrently(
+                () -> { try { paymentCreationOrchestrator.recoverFromInitiationEvidence(p.getId()); } catch (Throwable t) { errRecovery.set(t); } },
+                () -> { try { paymentExpiryService.expireOnePayment(p.getId()); } catch (Throwable t) { errExpiry.set(t); } });
+
+        assertThat(errRecovery.get()).as("errRecovery=%s", errRecovery.get()).isNull();
+        assertThat(errExpiry.get()).as("errExpiry=%s", errExpiry.get()).isNull();
+
+        Payment reloaded = paymentRepository.findById(p.getId()).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
+        assertThat(reloaded.getProviderReference()).isEqualTo(ref);
+        assertThat(paymentEventRepository.findByPaymentId(p.getId()))
+                .extracting(e -> e.getType())
+                .containsExactly(PaymentEventType.CREATED, PaymentEventType.INITIATION_ACCEPTED,
+                        PaymentEventType.PENDING, PaymentEventType.EXPIRED);
+        assertThat(paymentCreditCount(userId)).isZero();
     }
 }

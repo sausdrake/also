@@ -36,15 +36,21 @@ import java.util.List;
 @Service
 public class PaymentExpiryService {
 
+    /** Capacity of {@code payment.provider_reference} (V43 / {@code JpaPaymentEntity}, VARCHAR(128)). */
+    private static final int MAX_PROVIDER_REFERENCE_LENGTH = 128;
+
     private final PaymentRepository paymentRepository;
     private final PaymentEventRepository paymentEventRepository;
+    private final PaymentCreationService paymentCreationService;
     private final Clock clock;
 
     public PaymentExpiryService(PaymentRepository paymentRepository,
                                  PaymentEventRepository paymentEventRepository,
+                                 PaymentCreationService paymentCreationService,
                                  Clock clock) {
         this.paymentRepository = paymentRepository;
         this.paymentEventRepository = paymentEventRepository;
+        this.paymentCreationService = paymentCreationService;
         this.clock = clock;
     }
 
@@ -77,11 +83,43 @@ public class PaymentExpiryService {
             // the time this lock was acquired). Conservative no-op, never forced.
             return false;
         }
+        if (payment.getStatus() == PaymentStatus.CREATED) {
+            String acceptedReference = validAcceptedReference(payment.getId());
+            if (acceptedReference != null) {
+                // Durable proof that the provider accepted this initiation: bind its reference via
+                // the single existing acceptance transition (CREATED -> PENDING + PENDING event)
+                // instead of letting CREATED -> EXPIRED destroy the only local path to it, so the
+                // documented EXPIRED late-success polling stays possible. finalizeAccepted joins
+                // THIS transaction (plain REQUIRED, same physical transaction, lock already held),
+                // so PENDING can never commit without the EXPIRED that follows it.
+                // Continue with the aggregate it RETURNS: the instance loaded above still has a null
+                // providerReference, and saving it would silently overwrite the newly bound one.
+                payment = paymentCreationService.finalizeAccepted(payment.getId(), acceptedReference);
+                // Taken only now so the EXPIRED event can never precede the PENDING event.
+                now = OffsetDateTime.now(clock);
+            }
+        }
         payment.markExpired();
         paymentRepository.save(payment);
         paymentEventRepository.append(new PaymentEvent(
                 payment.getId(), PaymentEventType.EXPIRED, PaymentEventSource.SCHEDULER, null, now));
         log.info("expireOnePayment: payment {} expired (expiresAt={})", payment.getId(), payment.getExpiresAt());
         return true;
+    }
+
+    /**
+     * The accepted provider reference for a payment, or {@code null} when there is nothing safe to
+     * bind: no evidence, malformed or conflicting evidence, or a reference too long for its column
+     * (binding it would fail the flush on every sweep and the payment could then never expire).
+     * Every {@code null} case expires exactly as before. Must be called under the payment row lock.
+     */
+    private String validAcceptedReference(Long paymentId) {
+        InitiationEvidenceClassification classification = InitiationEvidenceClassifier.classify(
+                paymentEventRepository.findByPaymentIdAndType(paymentId, PaymentEventType.INITIATION_ACCEPTED));
+        if (classification instanceof InitiationEvidenceClassification.Valid valid
+                && valid.providerReference().length() <= MAX_PROVIDER_REFERENCE_LENGTH) {
+            return valid.providerReference();
+        }
+        return null;
     }
 }

@@ -1,7 +1,11 @@
 package com.example.autoauction.payment.application;
 
 import com.example.autoauction.deposit.application.DepositService;
+import com.example.autoauction.deposit.domain.DepositTransaction;
+import com.example.autoauction.deposit.domain.port.DepositRepository;
 import com.example.autoauction.payment.domain.Payment;
+import com.example.autoauction.payment.domain.PaymentEvent;
+import com.example.autoauction.payment.domain.PaymentEventSource;
 import com.example.autoauction.payment.domain.PaymentEventType;
 import com.example.autoauction.payment.domain.PaymentStatus;
 import com.example.autoauction.payment.domain.port.PaymentEventRepository;
@@ -21,11 +25,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,6 +44,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PaymentExpiryServiceIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Autowired private PaymentExpiryService paymentExpiryService;
+    @Autowired private PaymentCreationService paymentCreationService;
+    @Autowired private PaymentCreationOrchestrator paymentCreationOrchestrator;
+    @Autowired private DepositRepository depositRepository;
     @Autowired private com.example.autoauction.payment.application.PaymentConfirmationOrchestrator paymentConfirmationOrchestrator;
     @Autowired private PaymentRepository paymentRepository;
     @Autowired private PaymentEventRepository paymentEventRepository;
@@ -240,5 +249,215 @@ class PaymentExpiryServiceIntegrationTest extends AbstractPostgresIntegrationTes
         // only reachable terminal state here is SUCCEEDED.
         Payment reloaded = paymentRepository.findById(p.getId()).orElseThrow();
         assertThat(reloaded.getStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
+    }
+
+    // ==================== Phase 41: INITIATION_ACCEPTED evidence vs expiry ====================
+
+    /** A real CREATED payment (CREATED + INITIATION_ATTEMPTED events); the caller shortens its expiry. */
+    private Payment newCreatedWithAttempt(Long userId) {
+        Payment p = paymentCreationService.createPayment(userId, new BigDecimal("500.00"), null).payment();
+        paymentCreationService.recordInitiationAttempted(p.getId());
+        return p;
+    }
+
+    private long paymentCreditCount(Long userId) {
+        return depositRepository.findTransactionsByUserId(userId).stream()
+                .filter(tx -> tx.getType() == DepositTransaction.TransactionType.PAYMENT_CREDIT)
+                .count();
+    }
+
+    private List<PaymentEventType> eventTypes(Long paymentId) {
+        return paymentEventRepository.findByPaymentId(paymentId).stream().map(PaymentEvent::getType).toList();
+    }
+
+    private long countOf(Long paymentId, PaymentEventType type) {
+        return eventTypes(paymentId).stream().filter(t -> t == type).count();
+    }
+
+    @Test
+    @DisplayName("T1: CREATED + ATTEMPTED without acceptance evidence expires normally - no reference, no PENDING")
+    void t1_createdWithAttemptedOnly_expiresNormally() {
+        Long userId = newUserWithDeposit();
+        Payment p = newCreatedWithAttempt(userId);
+        forceIntoPast(p);
+
+        assertThat(paymentExpiryService.expireOnePayment(p.getId())).isTrue();
+
+        Payment reloaded = paymentRepository.findById(p.getId()).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
+        assertThat(reloaded.getProviderReference()).isNull();
+        assertThat(eventTypes(p.getId())).containsExactly(
+                PaymentEventType.CREATED, PaymentEventType.INITIATION_ATTEMPTED, PaymentEventType.EXPIRED);
+    }
+
+    /** Payment expired through the real sweep with valid acceptance evidence; returns the original row. */
+    private Payment expireWithValidAcceptance(Long userId, String providerRef) {
+        Payment p = newCreatedWithAttempt(userId);
+        paymentCreationService.recordInitiationAccepted(p.getId(), providerRef);
+        forceIntoPast(p);
+        assertThat(paymentExpiryService.expireOnePayment(p.getId())).isTrue();
+        return p;
+    }
+
+    @Test
+    @DisplayName("T2: CREATED + valid INITIATION_ACCEPTED expires as CREATED,ATTEMPTED,ACCEPTED,PENDING,EXPIRED with the reference bound")
+    void t2_createdWithValidAcceptance_expiresWithReferenceBound() {
+        Long userId = newUserWithDeposit();
+        String ref = "PSP-P41-T2-" + System.nanoTime();
+        Payment p = expireWithValidAcceptance(userId, ref);
+
+        Payment reloaded = paymentRepository.findById(p.getId()).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
+        assertThat(reloaded.getProviderReference()).as("bound reference must survive the final EXPIRED save").isEqualTo(ref);
+        assertThat(reloaded.getAmountConfirmed()).isNull();
+        assertThat(reloaded.isLateSuccessAfterExpiry()).isFalse();
+
+        assertThat(eventTypes(p.getId())).containsExactly(
+                PaymentEventType.CREATED, PaymentEventType.INITIATION_ATTEMPTED,
+                PaymentEventType.INITIATION_ACCEPTED, PaymentEventType.PENDING, PaymentEventType.EXPIRED);
+        assertThat(countOf(p.getId(), PaymentEventType.PENDING)).isEqualTo(1);
+        assertThat(countOf(p.getId(), PaymentEventType.EXPIRED)).isEqualTo(1);
+
+        List<PaymentEvent> events = paymentEventRepository.findByPaymentId(p.getId());
+        for (int i = 1; i < events.size(); i++) {
+            assertThat(events.get(i).getOccurredAt().isBefore(events.get(i - 1).getOccurredAt()))
+                    .as("event %d (%s) must not precede event %d (%s)", i, events.get(i).getType(),
+                            i - 1, events.get(i - 1).getType())
+                    .isFalse();
+        }
+        assertThat(paymentCreditCount(userId)).as("expiry must never credit").isZero();
+    }
+
+    @Test
+    @DisplayName("T3: after the evidence-backed expiry, a provider SUCCEEDED is a late success credited exactly once; a repeat adds nothing")
+    void t3_lateSuccessAfterEvidenceBackedExpiry_creditsExactlyOnce() {
+        Long userId = newUserWithDeposit();
+        String ref = "PSP-P41-T3-" + System.nanoTime();
+        Payment p = expireWithValidAcceptance(userId, ref);
+
+        assertThat(paymentRepository.findConfirmationCandidateReferences())
+                .as("the payment is now pollable - that is the point of binding the reference")
+                .contains(p.getMerchantReference());
+
+        fakeProvider.stubStatus(ref, new PaymentProviderPort.ProviderPaymentStatus(
+                PaymentProviderPort.ProviderPaymentState.SUCCEEDED, new BigDecimal("500.00"), "KGS", "TXN-P41-T3-" + System.nanoTime()));
+
+        Payment confirmed = paymentConfirmationOrchestrator.confirmPayment(p.getMerchantReference());
+        assertThat(confirmed.getStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
+        assertThat(confirmed.isLateSuccessAfterExpiry()).isTrue();
+        assertThat(paymentCreditCount(userId)).isEqualTo(1);
+
+        Payment again = paymentConfirmationOrchestrator.confirmPayment(p.getMerchantReference());
+        assertThat(again.getStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
+        assertThat(paymentCreditCount(userId)).as("second confirmation must not credit again").isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("T4: initiation recovery after the evidence-backed expiry is a no-op - stays EXPIRED, no second PENDING, not a candidate")
+    void t4_recoveryAfterExpiryBinding_isNoOp() {
+        Long userId = newUserWithDeposit();
+        String ref = "PSP-P41-T4-" + System.nanoTime();
+        Payment p = expireWithValidAcceptance(userId, ref);
+
+        Payment result = paymentCreationOrchestrator.recoverFromInitiationEvidence(p.getId());
+
+        assertThat(result.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
+        assertThat(paymentRepository.findById(p.getId()).orElseThrow().getProviderReference()).isEqualTo(ref);
+        assertThat(countOf(p.getId(), PaymentEventType.PENDING)).isEqualTo(1);
+        assertThat(paymentRepository.findCreatedWithInitiationEvidenceCandidateIds()).doesNotContain(p.getId());
+    }
+
+    @Test
+    @DisplayName("T5: malformed INITIATION_ACCEPTED evidence -> normal expiry, no reference, no PENDING")
+    void t5_malformedEvidence_expiresNormally() {
+        Long userId = newUserWithDeposit();
+        Payment p = newCreatedWithAttempt(userId);
+        paymentEventRepository.append(new PaymentEvent(p.getId(), PaymentEventType.INITIATION_ACCEPTED,
+                PaymentEventSource.CLIENT, "not-a-valid-payload", OffsetDateTime.now()));
+        forceIntoPast(p);
+
+        assertThat(paymentExpiryService.expireOnePayment(p.getId())).isTrue();
+
+        Payment reloaded = paymentRepository.findById(p.getId()).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
+        assertThat(reloaded.getProviderReference()).isNull();
+        assertThat(countOf(p.getId(), PaymentEventType.PENDING)).isZero();
+        assertThat(countOf(p.getId(), PaymentEventType.EXPIRED)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("T6: conflicting INITIATION_ACCEPTED evidence -> normal expiry, no reference, no PENDING")
+    void t6_conflictingEvidence_expiresNormally() {
+        Long userId = newUserWithDeposit();
+        Payment p = newCreatedWithAttempt(userId);
+        paymentCreationService.recordInitiationAccepted(p.getId(), "PSP-P41-T6-A-" + System.nanoTime());
+        paymentCreationService.recordInitiationAccepted(p.getId(), "PSP-P41-T6-B-" + System.nanoTime());
+        forceIntoPast(p);
+
+        assertThat(paymentExpiryService.expireOnePayment(p.getId())).isTrue();
+
+        Payment reloaded = paymentRepository.findById(p.getId()).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
+        assertThat(reloaded.getProviderReference()).isNull();
+        assertThat(countOf(p.getId(), PaymentEventType.PENDING)).isZero();
+    }
+
+    @Test
+    @DisplayName("T7: a 129-character reference (over VARCHAR(128)) -> expiry succeeds normally, no reference, no PENDING, no repeated failure")
+    void t7_overlongReference_expiresNormally() {
+        Long userId = newUserWithDeposit();
+        Payment p = newCreatedWithAttempt(userId);
+        paymentCreationService.recordInitiationAccepted(p.getId(), "R".repeat(129));
+        forceIntoPast(p);
+
+        assertThat(paymentExpiryService.expireOnePayment(p.getId())).isTrue();
+
+        Payment reloaded = paymentRepository.findById(p.getId()).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
+        assertThat(reloaded.getProviderReference()).isNull();
+        assertThat(countOf(p.getId(), PaymentEventType.PENDING)).isZero();
+        assertThat(paymentExpiryService.expireOnePayment(p.getId())).as("no repeated failure / re-processing").isFalse();
+    }
+
+    @Test
+    @DisplayName("T7b: a reference of exactly 128 characters is still bound (boundary of the length guard)")
+    void t7b_maxLengthReference_isBound() {
+        Long userId = newUserWithDeposit();
+        String ref = "R".repeat(128);
+        Payment p = expireWithValidAcceptance(userId, ref);
+
+        Payment reloaded = paymentRepository.findById(p.getId()).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
+        assertThat(reloaded.getProviderReference()).isEqualTo(ref);
+    }
+
+    @RepeatedTest(3)
+    @DisplayName("T9: two concurrent expiries of one CREATED + valid-evidence payment: exactly one succeeds, one PENDING, one EXPIRED, reference preserved")
+    void t9_concurrentExpiry_exactlyOneTransition() throws InterruptedException {
+        Long userId = newUserWithDeposit();
+        String ref = "PSP-P41-T9-" + System.nanoTime();
+        Payment p = newCreatedWithAttempt(userId);
+        paymentCreationService.recordInitiationAccepted(p.getId(), ref);
+        forceIntoPast(p);
+
+        AtomicInteger successes = new AtomicInteger();
+        AtomicReference<Throwable> errA = new AtomicReference<>();
+        AtomicReference<Throwable> errB = new AtomicReference<>();
+
+        runConcurrently(
+                () -> { try { if (paymentExpiryService.expireOnePayment(p.getId())) successes.incrementAndGet(); }
+                        catch (Throwable t) { errA.set(t); } },
+                () -> { try { if (paymentExpiryService.expireOnePayment(p.getId())) successes.incrementAndGet(); }
+                        catch (Throwable t) { errB.set(t); } });
+
+        assertThat(errA.get()).as("errA=%s", errA.get()).isNull();
+        assertThat(errB.get()).as("errB=%s", errB.get()).isNull();
+        assertThat(successes.get()).isEqualTo(1);
+
+        Payment reloaded = paymentRepository.findById(p.getId()).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
+        assertThat(reloaded.getProviderReference()).isEqualTo(ref);
+        assertThat(countOf(p.getId(), PaymentEventType.PENDING)).isEqualTo(1);
+        assertThat(countOf(p.getId(), PaymentEventType.EXPIRED)).isEqualTo(1);
     }
 }
