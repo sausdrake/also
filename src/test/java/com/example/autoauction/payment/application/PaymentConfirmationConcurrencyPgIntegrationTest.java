@@ -6,9 +6,11 @@ import com.example.autoauction.deposit.domain.port.DepositRepository;
 import com.example.autoauction.payment.domain.Payment;
 import com.example.autoauction.payment.domain.PaymentEventType;
 import com.example.autoauction.payment.domain.PaymentStatus;
+import com.example.autoauction.payment.domain.ReconciliationCaseType;
 import com.example.autoauction.payment.domain.port.PaymentEventRepository;
 import com.example.autoauction.payment.domain.port.PaymentProviderPort;
 import com.example.autoauction.payment.domain.port.PaymentRepository;
+import com.example.autoauction.payment.domain.port.ReconciliationCaseRepository;
 import com.example.autoauction.payment.infrastructure.provider.FakePaymentProviderPort;
 import com.example.autoauction.support.AbstractPostgresIntegrationTest;
 import com.example.autoauction.user.domain.Role;
@@ -46,6 +48,7 @@ class PaymentConfirmationConcurrencyPgIntegrationTest extends AbstractPostgresIn
     @Autowired private PaymentConfirmationOrchestrator orchestrator;
     @Autowired private PaymentRepository paymentRepository;
     @Autowired private PaymentEventRepository paymentEventRepository;
+    @Autowired private ReconciliationCaseRepository reconciliationCaseRepository;
     @Autowired private FakePaymentProviderPort fakeProvider;
     @Autowired private DepositService depositService;
     @Autowired private DepositRepository depositRepository;
@@ -222,5 +225,65 @@ class PaymentConfirmationConcurrencyPgIntegrationTest extends AbstractPostgresIn
         Payment fresh = paymentRepository.findById(p.getId()).orElseThrow();
         assertThat(fresh.getStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
         assertThat(fresh.isLateSuccessAfterExpiry()).isTrue();
+    }
+
+    @RepeatedTest(3)
+    @DisplayName("T8/R1: two DIFFERENT payments (different users) racing to claim the SAME providerTransactionId - "
+            + "exactly one legitimate credit total, the loser gets a DUPLICATE reconciliation case, no exception "
+            + "ever reaches either caller regardless of which safety layer (application-level ledger-idempotency "
+            + "check or the DB uniqueness constraint) actually fires for the loser")
+    void concurrentDuplicateProviderTransactionId_ExactlyOneCreditOtherGetsDuplicateCase() throws InterruptedException {
+        Long userA = newUserWithDeposit();
+        Long userB = newUserWithDeposit();
+        String sharedTxnId = "TXN-DUP-CONC-" + System.nanoTime();
+
+        String refA = "PAY-DUP-A-" + System.nanoTime();
+        String providerRefA = "PSP-DUP-A-" + System.nanoTime();
+        Payment pA = newPendingPayment(userA, refA, providerRefA);
+        fakeProvider.stubStatus(providerRefA, new PaymentProviderPort.ProviderPaymentStatus(
+                PaymentProviderPort.ProviderPaymentState.SUCCEEDED, new BigDecimal("500.00"), "KGS", sharedTxnId));
+
+        String refB = "PAY-DUP-B-" + System.nanoTime();
+        String providerRefB = "PSP-DUP-B-" + System.nanoTime();
+        Payment pB = newPendingPayment(userB, refB, providerRefB);
+        fakeProvider.stubStatus(providerRefB, new PaymentProviderPort.ProviderPaymentStatus(
+                PaymentProviderPort.ProviderPaymentState.SUCCEEDED, new BigDecimal("500.00"), "KGS", sharedTxnId));
+
+        AtomicReference<Throwable> errA = new AtomicReference<>();
+        AtomicReference<Throwable> errB = new AtomicReference<>();
+
+        // Neither caller should ever observe a thrown exception - R1's contract is that the
+        // conflict is fully absorbed (original attempt rolled back, DUPLICATE case recorded)
+        // inside PaymentConfirmationOrchestrator itself, regardless of timing/interleaving.
+        runConcurrently(
+                () -> { try { orchestrator.confirmPayment(refA); } catch (Throwable t) { errA.set(t); } },
+                () -> { try { orchestrator.confirmPayment(refB); } catch (Throwable t) { errB.set(t); } });
+
+        assertThat(errA.get()).as("errA=%s", errA.get()).isNull();
+        assertThat(errB.get()).as("errB=%s", errB.get()).isNull();
+
+        Payment freshA = paymentRepository.findById(pA.getId()).orElseThrow();
+        Payment freshB = paymentRepository.findById(pB.getId()).orElseThrow();
+
+        boolean aWon = freshA.getStatus() == PaymentStatus.SUCCEEDED;
+        boolean bWon = freshB.getStatus() == PaymentStatus.SUCCEEDED;
+        assertThat(aWon ^ bWon)
+                .as("exactly one of the two payments legitimately claims the shared providerTransactionId "
+                        + "(A=%s, B=%s)", freshA.getStatus(), freshB.getStatus())
+                .isTrue();
+
+        Payment loser = aWon ? freshB : freshA;
+        assertThat(loser.getStatus()).as("loser's own attempt rolled back, stays PENDING").isEqualTo(PaymentStatus.PENDING);
+
+        // Exactly one PAYMENT_CREDIT across BOTH users combined - the DB uniqueness backstop
+        // (uk_payment_provider_transaction_id / uk_deposit_transactions_idempotency_key) guarantees
+        // this regardless of which application-level safety layer actually fired first for the loser.
+        assertThat(paymentCreditCount(userA) + paymentCreditCount(userB))
+                .as("exactly one credit total across both payments, never two, never zero")
+                .isEqualTo(1);
+
+        assertThat(reconciliationCaseRepository.findByPaymentIdAndType(loser.getId(), ReconciliationCaseType.DUPLICATE))
+                .as("the losing payment has a DUPLICATE reconciliation case recorded")
+                .isPresent();
     }
 }

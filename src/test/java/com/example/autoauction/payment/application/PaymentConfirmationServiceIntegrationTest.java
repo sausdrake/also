@@ -32,7 +32,6 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * P1.4: sequential (non-concurrent) proof of the canonical confirmation operation's every branch,
@@ -288,11 +287,70 @@ class PaymentConfirmationServiceIntegrationTest extends AbstractPostgresIntegrat
                 .hasSize(2);
     }
 
-    // ==================== 7. provider identity/reference conflict (DB backstop) ====================
+    // ==================== 7/R1. provider identity/reference conflict ====================
 
     @Test
-    @DisplayName("7. conflicting providerTransactionId across two payments: rejected and rolled back (by whichever safety layer fires first)")
-    void conflictingProviderTransactionId_RejectedAndRolledBack() {
+    @DisplayName("7/T2/T3/T4/T5. conflicting providerTransactionId across two payments: original attempt rolled back, "
+            + "no second credit, payment A unaffected, DUPLICATE reconciliation case opened")
+    void conflictingProviderTransactionId_OpensDuplicateCase() {
+        Long userA = newUserWithDeposit();
+        Long userB = newUserWithDeposit();
+        String sharedTxnId = "TXN-SHARED-" + System.nanoTime();
+
+        String refA = "PAY-A-" + System.nanoTime();
+        String providerRefA = "PSP-A-" + System.nanoTime();
+        Payment pA = newPayment(userA, refA, PaymentStatus.PENDING, providerRefA);
+        fakeProvider.stubStatus(providerRefA, new PaymentProviderPort.ProviderPaymentStatus(
+                PaymentProviderPort.ProviderPaymentState.SUCCEEDED, new BigDecimal("500.00"), "KGS", sharedTxnId));
+        orchestrator.confirmPayment(refA); // first payment legitimately claims sharedTxnId
+
+        String refB = "PAY-B-" + System.nanoTime();
+        String providerRefB = "PSP-B-" + System.nanoTime();
+        Payment pB = newPayment(userB, refB, PaymentStatus.PENDING, providerRefB);
+        // A real provider would never issue the same transaction id twice; simulated here only to
+        // prove a cross-payment conflict is caught, its own attempt rolled back, and durably
+        // recorded as a DUPLICATE reconciliation case (R1) instead of silently retried forever
+        // with no admin visibility.
+        fakeProvider.stubStatus(providerRefB, new PaymentProviderPort.ProviderPaymentStatus(
+                PaymentProviderPort.ProviderPaymentState.SUCCEEDED, new BigDecimal("500.00"), "KGS", sharedTxnId));
+
+        // R1: PaymentConfirmationOrchestrator now catches the conflict internally - either
+        // LedgerIdempotencyConflictException (the dominant, sequential case: PaymentRepositoryAdapter
+        // .save() does not flush synchronously, so DepositService.creditFromPayment's own ledger
+        // fingerprint check is what actually fires here) or, on a genuine concurrent-flush race,
+        // DataIntegrityViolationException - and opens a DUPLICATE case instead of letting the
+        // exception propagate to the caller.
+        Payment resultB = orchestrator.confirmPayment(refB);
+        assertThat(resultB).isNotNull();
+
+        Payment freshB = paymentRepository.findById(pB.getId()).orElseThrow();
+        assertThat(freshB.getStatus()).as("original attempt rolled back - must remain PENDING").isEqualTo(PaymentStatus.PENDING);
+        assertThat(paymentCreditCount(userB)).as("T3: no second ledger credit").isZero();
+
+        assertThat(reconciliationCaseRepository.findByPaymentIdAndType(pB.getId(), ReconciliationCaseType.DUPLICATE))
+                .as("T5: DUPLICATE case opened for the conflicting payment")
+                .isPresent()
+                .get()
+                .satisfies(c -> {
+                    assertThat(c.getStatus()).isEqualTo(ReconciliationCaseStatus.OPEN);
+                    assertThat(c.getPaymentId()).isEqualTo(pB.getId());
+                });
+
+        assertThat(paymentEventRepository.findByPaymentId(pB.getId()))
+                .as("the observation is durably recorded, not just logged")
+                .extracting(PaymentEvent::getType)
+                .containsExactly(PaymentEventType.RECONCILIATION);
+
+        Payment freshA = paymentRepository.findById(pA.getId()).orElseThrow();
+        assertThat(freshA.getStatus()).as("T4: payment A remains financially correct, unaffected by B's failed attempt")
+                .isEqualTo(PaymentStatus.SUCCEEDED);
+        assertThat(paymentCreditCount(userA)).as("T4: payment A's own credit is untouched").isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("T6/T7. repeated confirmation of the same duplicate does not multiply DUPLICATE cases "
+            + "(each poll still durably records its own RECONCILIATION observation, same as MISMATCH)")
+    void repeatedDuplicateConfirmation_OpensCaseAtMostOnce() {
         Long userA = newUserWithDeposit();
         Long userB = newUserWithDeposit();
         String sharedTxnId = "TXN-SHARED-" + System.nanoTime();
@@ -302,34 +360,26 @@ class PaymentConfirmationServiceIntegrationTest extends AbstractPostgresIntegrat
         newPayment(userA, refA, PaymentStatus.PENDING, providerRefA);
         fakeProvider.stubStatus(providerRefA, new PaymentProviderPort.ProviderPaymentStatus(
                 PaymentProviderPort.ProviderPaymentState.SUCCEEDED, new BigDecimal("500.00"), "KGS", sharedTxnId));
-        orchestrator.confirmPayment(refA); // first payment legitimately claims sharedTxnId
+        orchestrator.confirmPayment(refA);
 
         String refB = "PAY-B-" + System.nanoTime();
         String providerRefB = "PSP-B-" + System.nanoTime();
         Payment pB = newPayment(userB, refB, PaymentStatus.PENDING, providerRefB);
-        // A real provider would never issue the same transaction id twice; simulated here only to
-        // prove a cross-payment conflict is rejected and rolled back rather than silently
-        // succeeding. Per P1.4 scope, a DUPLICATE ReconciliationCase is explicitly deferred to a
-        // later slice - this test only proves fail-closed rollback, not case creation.
         fakeProvider.stubStatus(providerRefB, new PaymentProviderPort.ProviderPaymentStatus(
                 PaymentProviderPort.ProviderPaymentState.SUCCEEDED, new BigDecimal("500.00"), "KGS", sharedTxnId));
 
-        // NOTE (discovered during P1.4 testing, not fixed here - see implementation report):
-        // PaymentRepositoryAdapter.save() uses plain save(), not saveAndFlush(), unlike the
-        // identity module's equivalent adapter. This means the payment table's own
-        // uk_payment_provider_transaction_id violation is NOT guaranteed to surface synchronously
-        // inside confirmPayment()'s own method body - in practice, DepositService.creditFromPayment's
-        // OWN independent ledger-idempotency-key fingerprint check (a different, legitimate safety
-        // layer - the same key "PAYMENT:<txnId>" is already claimed by payment A's credit) fires
-        // first and throws IllegalStateException. Either way the whole transaction rolls back
-        // correctly; only WHICH layer's exception is observed differs.
-        assertThatThrownBy(() -> orchestrator.confirmPayment(refB))
-                .isInstanceOf(RuntimeException.class);
+        orchestrator.confirmPayment(refB); // 1st conflict observation
+        orchestrator.confirmPayment(refB); // 2nd conflict observation - simulates the next scheduler poll
 
-        Payment freshB = paymentRepository.findById(pB.getId()).orElseThrow();
-        assertThat(freshB.getStatus()).as("rolled back - must remain PENDING").isEqualTo(PaymentStatus.PENDING);
-        assertThat(paymentCreditCount(userB)).isZero();
-        assertThat(paymentEventRepository.findByPaymentId(pB.getId())).as("no event committed either").isEmpty();
+        assertThat(reconciliationCaseRepository.findAllNewestFirst().stream()
+                .filter(c -> c.getPaymentId().equals(pB.getId()) && c.getType() == ReconciliationCaseType.DUPLICATE)
+                .count())
+                .as("case is opened at most once, never duplicated across repeated polling")
+                .isEqualTo(1);
+
+        assertThat(paymentEventRepository.findByPaymentId(pB.getId()))
+                .as("R3 (pre-existing, unchanged by this fix): event growth is not bounded across repeated polls")
+                .hasSize(2);
     }
 
     // ==================== 8/9/10/14. already-terminal no-ops ====================

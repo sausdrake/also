@@ -243,4 +243,33 @@ public class PaymentConfirmationService {
             reconciliationCaseRepository.save(new ReconciliationCase(payment.getId(), ReconciliationCaseType.MISMATCH, now()));
         }
     }
+
+    /**
+     * R1: recovery-only entry point for a cross-payment duplicate provider-transaction-identity
+     * conflict. Invoked EXCLUSIVELY by {@link PaymentConfirmationOrchestrator}, as a genuine
+     * cross-bean call, in a fresh transaction started only after the conflicting {@link
+     * #confirmPayment} attempt has already thrown and its own transaction has fully rolled back -
+     * never called from within this class, and never called while that original transaction is
+     * still open (see {@link PaymentConfirmationOrchestrator} for why that would be unsafe: this
+     * bean's own confirmPayment is the transaction owner, so a self-invocation here would silently
+     * run inside the doomed transaction instead of a new one).
+     *
+     * <p>Mirrors {@link #openMismatchCaseIfAbsent}'s dedup semantics exactly - {@code
+     * UNIQUE(payment_id, type)} plus an existence check first, so an already-open OR
+     * already-resolved {@code DUPLICATE} case is left untouched, never reopened. Deliberately does
+     * NOT touch the Payment's lifecycle state and does NOT apply any credit: the conflicting
+     * attempt's original transaction already rolled back on its own, so there is no partial
+     * Payment/credit state left to reconcile here - only the observation itself needs recording.
+     */
+    @Transactional
+    public void openDuplicateCaseIfAbsent(Long paymentId, String evidence) {
+        if (reconciliationCaseRepository.findByPaymentIdAndType(paymentId, ReconciliationCaseType.DUPLICATE).isEmpty()) {
+            reconciliationCaseRepository.save(new ReconciliationCase(paymentId, ReconciliationCaseType.DUPLICATE, now()));
+        }
+        // Deliberately unconditional, same as the sibling mismatchEvidence append above - a
+        // repeated duplicate observation for an already-OPEN case is still a distinct,
+        // independently valuable fact for an eventual investigator.
+        paymentEventRepository.append(new PaymentEvent(
+                paymentId, PaymentEventType.RECONCILIATION, PaymentEventSource.PROVIDER_POLL, evidence, now()));
+    }
 }

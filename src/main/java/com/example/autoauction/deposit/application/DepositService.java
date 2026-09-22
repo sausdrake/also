@@ -7,6 +7,7 @@ import com.example.autoauction.deposit.domain.Deposit;
 import com.example.autoauction.deposit.domain.DepositTransaction;
 import com.example.autoauction.deposit.domain.FreezeReason;
 import com.example.autoauction.deposit.domain.FrozenDeposit;
+import com.example.autoauction.deposit.domain.LedgerIdempotencyConflictException;
 import com.example.autoauction.deposit.domain.port.DepositRepository;
 import com.example.autoauction.deposit.web.dto.DepositResponse;
 import com.example.autoauction.deposit.web.dto.DepositTransactionResponse;
@@ -914,7 +915,11 @@ public class DepositService {
                     && command.ledgerReference().equals(prev.getReference())
                     && command.ledgerIdempotencyKey().equals(prev.getIdempotencyKey());
             if (!sameFingerprint) {
-                throw new IllegalStateException(
+                // R1: a distinct, catchable type (not the generic IllegalStateException this
+                // module otherwise uses) specifically so a payment.* caller can recognize and
+                // react to exactly this cross-payment-identity conflict without swallowing every
+                // other IllegalStateException this method - and this class - can throw.
+                throw new LedgerIdempotencyConflictException(command.ledgerIdempotencyKey(),
                         "Ключ идемпотентности '" + command.ledgerIdempotencyKey() + "' уже использован для другой операции " +
                         "(другой пользователь, сумма, ссылка или тип операции) - автоматическое зачисление отклонено");
             }
