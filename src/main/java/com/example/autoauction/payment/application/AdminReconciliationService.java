@@ -54,9 +54,12 @@ public class AdminReconciliationService {
                         "Платёж " + reconciliationCase.getPaymentId() + ", связанный с делом сверки " + caseId
                                 + ", не найден"));
 
-        List<PaymentEvent> reconciliationEvidence = paymentEventRepository.findByPaymentId(payment.getId()).stream()
-                .filter(event -> event.getType() == PaymentEventType.RECONCILIATION)
-                .toList();
+        // F5: query-level filtering (was: load every event for this payment via findByPaymentId,
+        // then filter to RECONCILIATION in Java). findByPaymentIdAndType already exists for
+        // exactly this purpose and shares findByPaymentId's own ordering (occurredAt ASC, id ASC)
+        // - the externally visible evidence list/order is unchanged, only where the filter runs.
+        List<PaymentEvent> reconciliationEvidence =
+                paymentEventRepository.findByPaymentIdAndType(payment.getId(), PaymentEventType.RECONCILIATION);
 
         return AdminReconciliationCaseDetailResponse.assemble(reconciliationCase, payment, reconciliationEvidence);
     }

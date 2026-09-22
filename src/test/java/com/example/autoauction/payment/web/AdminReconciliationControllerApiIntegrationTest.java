@@ -176,6 +176,140 @@ class AdminReconciliationControllerApiIntegrationTest {
                 .andExpect(jsonPath("$.evidence.length()").value(0));
     }
 
+    // ==================== F5/F3: query-level filtering + recurrence-after-resolution signal ====================
+
+    @Test
+    @DisplayName("F5/T1: multiple RECONCILIATION observations still all returned, same chronological order, after the query-level filtering change")
+    void detail_QueryLevelFiltering_StillReturnsAllEvidenceInOrder() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newPayment(userId);
+        ReconciliationCase c = newCase(p.getId(), ReconciliationCaseType.MISMATCH);
+
+        appendEvent(p.getId(), PaymentEventType.CREATED, PaymentEventSource.CLIENT, null, T0.minusMinutes(5));
+        appendEvent(p.getId(), PaymentEventType.POLL_RESULT, PaymentEventSource.PROVIDER_POLL, null, T0.minusMinutes(1));
+        appendEvent(p.getId(), PaymentEventType.RECONCILIATION, PaymentEventSource.PROVIDER_POLL, "obs-1", T0.plusMinutes(1));
+        appendEvent(p.getId(), PaymentEventType.RECONCILIATION, PaymentEventSource.PROVIDER_POLL, "obs-2", T0.plusMinutes(2));
+        appendEvent(p.getId(), PaymentEventType.RECONCILIATION, PaymentEventSource.PROVIDER_POLL, "obs-3", T0.plusMinutes(3));
+
+        mockMvc.perform(get("/api/v1/admin/reconciliation/cases/{id}", c.getId()).with(user(999009L, "ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.evidence.length()").value(3))
+                .andExpect(jsonPath("$.evidence[0].rawPayload").value("obs-1"))
+                .andExpect(jsonPath("$.evidence[1].rawPayload").value("obs-2"))
+                .andExpect(jsonPath("$.evidence[2].rawPayload").value("obs-3"));
+    }
+
+    @Test
+    @DisplayName("F3/T5: OPEN case -> recurredAfterResolution is null/absent")
+    void detail_OpenCase_RecurredAfterResolutionIsNull() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newPayment(userId);
+        ReconciliationCase c = newCase(p.getId(), ReconciliationCaseType.MISMATCH);
+        appendEvent(p.getId(), PaymentEventType.RECONCILIATION, PaymentEventSource.PROVIDER_POLL, "x", T0.plusMinutes(1));
+
+        mockMvc.perform(get("/api/v1/admin/reconciliation/cases/{id}", c.getId()).with(user(999010L, "ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reconciliationCase.status").value("OPEN"))
+                .andExpect(jsonPath("$.reconciliationCase.recurredAfterResolution").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    @DisplayName("F3/T3: RESOLVED case, no observation after resolvedAt -> recurredAfterResolution = false")
+    void detail_ResolvedCase_NoRecurrence_False() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newPayment(userId);
+        ReconciliationCase c = newCase(p.getId(), ReconciliationCaseType.MISMATCH);
+        // All evidence strictly BEFORE resolution.
+        appendEvent(p.getId(), PaymentEventType.RECONCILIATION, PaymentEventSource.PROVIDER_POLL, "before", T0.plusMinutes(1));
+        c.resolve(999011L, "handled", T0.plusHours(1));
+        reconciliationCaseRepository.save(c);
+
+        mockMvc.perform(get("/api/v1/admin/reconciliation/cases/{id}", c.getId()).with(user(999011L, "ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reconciliationCase.status").value("RESOLVED"))
+                .andExpect(jsonPath("$.reconciliationCase.recurredAfterResolution").value(false));
+    }
+
+    @Test
+    @DisplayName("F3/T4: RESOLVED case, an observation after resolvedAt -> recurredAfterResolution = true")
+    void detail_ResolvedCase_LaterRecurrence_True() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newPayment(userId);
+        ReconciliationCase c = newCase(p.getId(), ReconciliationCaseType.MISMATCH);
+        appendEvent(p.getId(), PaymentEventType.RECONCILIATION, PaymentEventSource.PROVIDER_POLL, "before", T0.plusMinutes(1));
+        c.resolve(999012L, "handled", T0.plusHours(1));
+        reconciliationCaseRepository.save(c);
+        // Recurs AFTER resolution - the exact scenario the scheduler could still produce.
+        appendEvent(p.getId(), PaymentEventType.RECONCILIATION, PaymentEventSource.PROVIDER_POLL, "after", T0.plusHours(2));
+
+        mockMvc.perform(get("/api/v1/admin/reconciliation/cases/{id}", c.getId()).with(user(999012L, "ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reconciliationCase.status").value("RESOLVED"))
+                .andExpect(jsonPath("$.reconciliationCase.recurredAfterResolution").value(true));
+    }
+
+    @Test
+    @DisplayName("F3/T6: an observation strictly BEFORE resolvedAt alone does not trigger recurrence")
+    void detail_ObservationBeforeResolution_DoesNotTriggerRecurrence() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newPayment(userId);
+        ReconciliationCase c = newCase(p.getId(), ReconciliationCaseType.MISMATCH);
+        appendEvent(p.getId(), PaymentEventType.RECONCILIATION, PaymentEventSource.PROVIDER_POLL, "way-before", T0.minusDays(1));
+        c.resolve(999013L, "handled", T0);
+        reconciliationCaseRepository.save(c);
+
+        mockMvc.perform(get("/api/v1/admin/reconciliation/cases/{id}", c.getId()).with(user(999013L, "ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reconciliationCase.recurredAfterResolution").value(false));
+    }
+
+    @Test
+    @DisplayName("F3/T7: an observation at EXACTLY resolvedAt is NOT treated as recurrence (strict 'after', deterministic tie semantics)")
+    void detail_ObservationExactlyAtResolvedAt_IsNotRecurrence() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newPayment(userId);
+        ReconciliationCase c = newCase(p.getId(), ReconciliationCaseType.MISMATCH);
+        OffsetDateTime resolutionInstant = T0.plusMinutes(30);
+        appendEvent(p.getId(), PaymentEventType.RECONCILIATION, PaymentEventSource.PROVIDER_POLL, "tied", resolutionInstant);
+        c.resolve(999014L, "handled", resolutionInstant);
+        reconciliationCaseRepository.save(c);
+
+        mockMvc.perform(get("/api/v1/admin/reconciliation/cases/{id}", c.getId()).with(user(999014L, "ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reconciliationCase.recurredAfterResolution").value(false));
+    }
+
+    @Test
+    @DisplayName("F3: RESOLVED case with zero RECONCILIATION evidence at all -> recurredAfterResolution = false, not an error")
+    void detail_ResolvedCase_ZeroEvidence_False() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newPayment(userId);
+        ReconciliationCase c = newCase(p.getId(), ReconciliationCaseType.STUCK);
+        c.resolve(999015L, "handled", T0.plusHours(1));
+        reconciliationCaseRepository.save(c);
+
+        mockMvc.perform(get("/api/v1/admin/reconciliation/cases/{id}", c.getId()).with(user(999015L, "ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.evidence.length()").value(0))
+                .andExpect(jsonPath("$.reconciliationCase.recurredAfterResolution").value(false));
+    }
+
+    @Test
+    @DisplayName("F1 preserved: repeated identical MISMATCH observations are NOT deduplicated/suppressed by this change")
+    void detail_RepeatedIdenticalObservations_AllStillPersistedAndReturned() throws Exception {
+        Long userId = newOwningUser();
+        Payment p = newPayment(userId);
+        ReconciliationCase c = newCase(p.getId(), ReconciliationCaseType.MISMATCH);
+        String identicalPayload = "requestedAmount=500.00;providerConfirmedAmount=480.00";
+        appendEvent(p.getId(), PaymentEventType.RECONCILIATION, PaymentEventSource.PROVIDER_POLL, identicalPayload, T0.plusMinutes(1));
+        appendEvent(p.getId(), PaymentEventType.RECONCILIATION, PaymentEventSource.PROVIDER_POLL, identicalPayload, T0.plusMinutes(2));
+        appendEvent(p.getId(), PaymentEventType.RECONCILIATION, PaymentEventSource.PROVIDER_POLL, identicalPayload, T0.plusMinutes(3));
+
+        mockMvc.perform(get("/api/v1/admin/reconciliation/cases/{id}", c.getId()).with(user(999016L, "ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.evidence.length()").value(3));
+    }
+
     @Test
     @DisplayName("unknown case id -> 404")
     void detail_UnknownCase_404() throws Exception {
