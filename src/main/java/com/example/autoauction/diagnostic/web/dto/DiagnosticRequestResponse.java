@@ -32,6 +32,20 @@ public class DiagnosticRequestResponse {
     private Long vehicleId;
     private String rejectedReason;
     private String rejectionCategory;
+
+    /**
+     * Seller-violation-resolution UI: the SellerDiagnosticCommitment's own status
+     * (FROZEN/AWAITING_FINALIZATION/FINALIZED) for this request, null if no commitment was
+     * ever frozen. Populated post-hoc, same enrichment pattern as vehicleId.
+     */
+    private String commitmentStatus;
+
+    /**
+     * Seller-violation-resolution UI: the existing seller-violation resolution for this
+     * request's commitment, if it has been finalized as one - null otherwise. Populated
+     * post-hoc from SellerDiagnosticCommitmentService, never computed here.
+     */
+    private SellerViolationResolutionResponse violationResolution;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 

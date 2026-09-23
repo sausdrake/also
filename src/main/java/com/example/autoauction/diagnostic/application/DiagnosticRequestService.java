@@ -2,6 +2,8 @@ package com.example.autoauction.diagnostic.application;
 
 import com.example.autoauction.admin.application.SystemSettingsService;
 import com.example.autoauction.diagnostic.commitment.application.SellerDiagnosticCommitmentService;
+import com.example.autoauction.diagnostic.commitment.domain.CommitmentStatus;
+import com.example.autoauction.diagnostic.commitment.domain.SellerViolationResolution;
 import com.example.autoauction.diagnostic.domain.DiagnosticRejectionCategory;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
 import com.example.autoauction.vehicle.application.VehicleService;
@@ -15,6 +17,7 @@ import com.example.autoauction.diagnostic.domain.port.InspectionTemplateReposito
 import com.example.autoauction.diagnostic.web.dto.CreateDiagnosticRequest;
 import com.example.autoauction.diagnostic.web.dto.DiagnosticRequestResponse;
 import com.example.autoauction.diagnostic.web.dto.InspectionAnswerDto;
+import com.example.autoauction.diagnostic.web.dto.SellerViolationResolutionResponse;
 import com.example.autoauction.diagnostic.web.dto.SubmitInspectionRequest;
 import com.example.autoauction.diagnostic.web.dto.TemplateBackfillResult;
 import com.example.autoauction.notification.application.NotificationService;
@@ -598,8 +601,33 @@ public class DiagnosticRequestService {
 
         response.setTemplate(resolveTemplateForReport(request));
         response.setVehicleId(vehicleService.findVehicleIdByDiagnosticRequestId(request.getId()));
+        enrichWithCommitmentAndViolationResolution(response, requestId);
 
         return response;
+    }
+
+    /**
+     * Seller-violation-resolution UI: enriches with the commitment's current status and, if
+     * finalized, the existing resolution's audit summary - read-only, no financial logic,
+     * mirrors the vehicleId enrichment pattern exactly. No commitment ever frozen -> both
+     * fields stay null, not an error.
+     */
+    private void enrichWithCommitmentAndViolationResolution(DiagnosticRequestResponse response, Long requestId) {
+        sellerDiagnosticCommitmentService.findByDiagnosticRequestId(requestId).ifPresent(commitment -> {
+            response.setCommitmentStatus(commitment.getStatus().name());
+            if (commitment.getStatus() == CommitmentStatus.FINALIZED) {
+                sellerDiagnosticCommitmentService.findViolationResolution(commitment.getId())
+                        .ifPresent(resolution -> response.setViolationResolution(toResolutionResponse(resolution)));
+            }
+        });
+    }
+
+    private SellerViolationResolutionResponse toResolutionResponse(SellerViolationResolution resolution) {
+        List<Long> violationIds = sellerDiagnosticCommitmentService.findViolationIdsForResolution(resolution.getId());
+        return new SellerViolationResolutionResponse(
+                resolution.getSellerDiagnosticCommitmentId(), violationIds,
+                resolution.getRawPenaltyAmount(), resolution.getAppliedPenaltyAmount(),
+                resolution.getRefundAmount(), resolution.getResolvedAt());
     }
 
     @Transactional(readOnly = true)

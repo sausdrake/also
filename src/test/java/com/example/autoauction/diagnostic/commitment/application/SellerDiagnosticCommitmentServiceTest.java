@@ -6,6 +6,7 @@ import com.example.autoauction.deposit.web.dto.DepositResponse;
 import com.example.autoauction.diagnostic.commitment.domain.CommitmentStatus;
 import com.example.autoauction.diagnostic.commitment.domain.SellerDiagnosticCommitment;
 import com.example.autoauction.diagnostic.commitment.domain.port.SellerDiagnosticCommitmentRepository;
+import com.example.autoauction.diagnostic.commitment.domain.port.SellerViolationResolutionRepository;
 import com.example.autoauction.policy.application.PolicyVersionService;
 import com.example.autoauction.policy.domain.PolicyVersion;
 import org.junit.jupiter.api.DisplayName;
@@ -43,6 +44,9 @@ class SellerDiagnosticCommitmentServiceTest {
     @Mock
     private PolicyVersionService policyVersionService;
 
+    @Mock
+    private SellerViolationResolutionRepository violationResolutionRepository;
+
     private SellerDiagnosticCommitmentService service;
 
     private final Long sellerId = 1L;
@@ -53,7 +57,7 @@ class SellerDiagnosticCommitmentServiceTest {
     private final BigDecimal feeAmount = new BigDecimal("4000");
 
     private void createService() {
-        service = new SellerDiagnosticCommitmentService(repository, depositService, policyVersionService);
+        service = new SellerDiagnosticCommitmentService(repository, depositService, policyVersionService, violationResolutionRepository);
     }
 
     /**

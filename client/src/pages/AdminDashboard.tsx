@@ -8,6 +8,8 @@ import { PhotoLightbox } from '../components/PhotoLightbox';
 import { PolicyPage } from './admin/PolicyPage';
 import { LateSuccessPaymentsPage } from './admin/LateSuccessPaymentsPage';
 import { AdminSalePage } from './admin/AdminSalePage';
+import { RejectReportModal } from '../components/admin/diagnostic/RejectReportModal';
+import { SellerViolationResolutionPanel, type ViolationResolution } from '../components/admin/diagnostic/SellerViolationResolutionPanel';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
@@ -36,6 +38,9 @@ interface Report {
   id: number; brand: string; model: string; year: number; vin: string;
   status: string; createdAt: string; userName?: string; diagnosticName?: string;
   rejectedReason?: string;
+  rejectionCategory?: string | null;
+  commitmentStatus?: string | null;
+  violationResolution?: ViolationResolution | null;
   template?: { name: string; groups: DiagGroup[] };
   existingAnswers?: DiagAnswer[];
 }
@@ -134,31 +139,6 @@ function Modal({ children, onClose }: { children: React.ReactNode; onClose: () =
         {children}
       </div>
     </div>
-  );
-}
-
-function InlinePrompt({ title, placeholder, onConfirm, onCancel }: {
-  title: string; placeholder: string;
-  onConfirm: (v: string) => void; onCancel: () => void;
-}) {
-  const [val, setVal] = useState('');
-  return (
-    <Modal onClose={onCancel}>
-      <div className="p-6 space-y-4">
-        <h3 className="font-semibold text-gray-900">{title}</h3>
-        <textarea autoFocus value={val} onChange={e => setVal(e.target.value)}
-          placeholder={placeholder} rows={4} maxLength={500}
-          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-        <p className="text-xs text-gray-400 text-right">{val.length}/500</p>
-        <div className="flex gap-2 justify-end">
-          <button onClick={onCancel} className="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">Отмена</button>
-          <button onClick={() => val.trim() && onConfirm(val.trim())} disabled={!val.trim()}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 disabled:opacity-50">
-            Подтвердить
-          </button>
-        </div>
-      </div>
-    </Modal>
   );
 }
 
@@ -908,10 +888,11 @@ function ReportsPage() {
     catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); }
   };
 
-  const reject = async (reason: string) => {
+  const reject = async (reason: string, category: string) => {
     if (rejectTarget == null) return;
     try {
-      await api.post(`/admin/diagnostic/reports/${rejectTarget}/reject?reason=${encodeURIComponent(reason)}`);
+      await api.post(`/admin/diagnostic/reports/${rejectTarget}/reject`
+        + `?reason=${encodeURIComponent(reason)}&category=${encodeURIComponent(category)}`);
       notify(`Отчёт #${rejectTarget} отклонён`);
       setRejectTarget(null); load();
     } catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); setRejectTarget(null); }
@@ -927,9 +908,8 @@ function ReportsPage() {
   return (
     <div className="space-y-4">
       {rejectTarget != null && (
-        <InlinePrompt
-          title={`Причина отклонения отчёта #${rejectTarget}`}
-          placeholder="Опишите, что нужно исправить диагносту..."
+        <RejectReportModal
+          requestId={rejectTarget}
           onConfirm={reject} onCancel={() => setRejectTarget(null)}
         />
       )}
@@ -1002,6 +982,15 @@ function ReportsPage() {
                   <p className="text-red-700 font-semibold text-sm mb-1">Причина отклонения</p>
                   <p className="text-red-600 text-sm">{detailReport.rejectedReason}</p>
                 </div>
+              )}
+
+              {detailReport.rejectionCategory === 'SELLER_VIOLATION' && (
+                <SellerViolationResolutionPanel
+                  requestId={detailReport.id}
+                  commitmentStatus={detailReport.commitmentStatus}
+                  violationResolution={detailReport.violationResolution}
+                  onDone={() => loadDetail(detailReport.id)}
+                />
               )}
 
               {detailReport.template && detailReport.existingAnswers ? (

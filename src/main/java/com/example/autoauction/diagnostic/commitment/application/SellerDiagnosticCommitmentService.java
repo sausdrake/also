@@ -4,7 +4,10 @@ package com.example.autoauction.diagnostic.commitment.application;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.diagnostic.commitment.domain.CommitmentStatus;
 import com.example.autoauction.diagnostic.commitment.domain.SellerDiagnosticCommitment;
+import com.example.autoauction.diagnostic.commitment.domain.SellerViolationResolution;
+import com.example.autoauction.diagnostic.commitment.domain.SellerViolationResolutionItem;
 import com.example.autoauction.diagnostic.commitment.domain.port.SellerDiagnosticCommitmentRepository;
+import com.example.autoauction.diagnostic.commitment.domain.port.SellerViolationResolutionRepository;
 import com.example.autoauction.policy.application.PolicyVersionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -13,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -36,13 +40,16 @@ public class SellerDiagnosticCommitmentService {
     private final SellerDiagnosticCommitmentRepository repository;
     private final DepositService depositService;
     private final PolicyVersionService policyVersionService;
+    private final SellerViolationResolutionRepository violationResolutionRepository;
 
     public SellerDiagnosticCommitmentService(SellerDiagnosticCommitmentRepository repository,
                                              DepositService depositService,
-                                             PolicyVersionService policyVersionService) {
+                                             PolicyVersionService policyVersionService,
+                                             SellerViolationResolutionRepository violationResolutionRepository) {
         this.repository = repository;
         this.depositService = depositService;
         this.policyVersionService = policyVersionService;
+        this.violationResolutionRepository = violationResolutionRepository;
     }
 
     /**
@@ -174,5 +181,37 @@ public class SellerDiagnosticCommitmentService {
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public boolean hasActiveCommitment(Long diagnosticRequestId) {
         return repository.existsByDiagnosticRequestId(diagnosticRequestId);
+    }
+
+    /**
+     * Seller-violation-resolution UI (X3-E companion): the commitment tied to this diagnostic
+     * request, if one has ever been frozen for it - read-only, used to derive the UI's
+     * eligibility/state contract (FROZEN / AWAITING_FINALIZATION / FINALIZED). Thin wrapper,
+     * mirrors this class's existing findByDiagnosticRequestId usage pattern elsewhere.
+     */
+    @Transactional(readOnly = true)
+    public Optional<SellerDiagnosticCommitment> findByDiagnosticRequestId(Long diagnosticRequestId) {
+        return repository.findByDiagnosticRequestId(diagnosticRequestId);
+    }
+
+    /**
+     * Seller-violation-resolution UI companion: the immutable resolution header for this
+     * commitment, if it has been finalized as a seller violation - read-only.
+     */
+    @Transactional(readOnly = true)
+    public Optional<SellerViolationResolution> findViolationResolution(Long sellerDiagnosticCommitmentId) {
+        return violationResolutionRepository.findBySellerDiagnosticCommitmentId(sellerDiagnosticCommitmentId);
+    }
+
+    /**
+     * Seller-violation-resolution UI companion: the exact violation-definition ids applied by
+     * a given resolution - read-only, mirrors SellerViolationResolutionEngine's own
+     * isSameViolationSet reconstruction of this same data.
+     */
+    @Transactional(readOnly = true)
+    public List<Long> findViolationIdsForResolution(Long resolutionId) {
+        return violationResolutionRepository.findItemsByResolutionId(resolutionId).stream()
+                .map(SellerViolationResolutionItem::getViolationDefinitionId)
+                .toList();
     }
 }

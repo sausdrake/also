@@ -2,6 +2,10 @@ package com.example.autoauction.diagnostic.application;
 
 import com.example.autoauction.admin.application.SystemSettingsService;
 import com.example.autoauction.diagnostic.commitment.application.SellerDiagnosticCommitmentService;
+import com.example.autoauction.diagnostic.commitment.domain.CommitmentStatus;
+import com.example.autoauction.diagnostic.commitment.domain.SellerDiagnosticCommitment;
+import com.example.autoauction.diagnostic.commitment.domain.SellerViolationResolution;
+import com.example.autoauction.diagnostic.commitment.domain.TriggerSource;
 import com.example.autoauction.diagnostic.domain.DiagnosticRejectionCategory;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
 import com.example.autoauction.diagnostic.domain.InspectionAnswer;
@@ -969,6 +973,64 @@ class DiagnosticRequestServiceTest {
             DiagnosticRequestResponse response = requestService.getRequestDetails(requestId);
 
             assertThat(response.getVehicleId()).isNull();
+        }
+
+        @Test
+        @DisplayName("Seller-violation-resolution UI: commitmentStatus/violationResolution остаются null, если commitment никогда не замораживался")
+        void getRequestDetails_NoCommitment_StatusAndResolutionNull() {
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+            when(answerRepository.findByDiagnosticRequestId(requestId)).thenReturn(List.of());
+            when(sellerDiagnosticCommitmentService.findByDiagnosticRequestId(requestId)).thenReturn(Optional.empty());
+
+            DiagnosticRequestResponse response = requestService.getRequestDetails(requestId);
+
+            assertThat(response.getCommitmentStatus()).isNull();
+            assertThat(response.getViolationResolution()).isNull();
+        }
+
+        @Test
+        @DisplayName("Seller-violation-resolution UI: commitmentStatus проставляется, violationResolution остаётся null, пока commitment не FINALIZED")
+        void getRequestDetails_CommitmentAwaitingFinalization_StatusSetResolutionNull() {
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+            when(answerRepository.findByDiagnosticRequestId(requestId)).thenReturn(List.of());
+
+            SellerDiagnosticCommitment commitment = new SellerDiagnosticCommitment();
+            commitment.setId(77L);
+            commitment.setStatus(CommitmentStatus.AWAITING_FINALIZATION);
+            when(sellerDiagnosticCommitmentService.findByDiagnosticRequestId(requestId)).thenReturn(Optional.of(commitment));
+
+            DiagnosticRequestResponse response = requestService.getRequestDetails(requestId);
+
+            assertThat(response.getCommitmentStatus()).isEqualTo("AWAITING_FINALIZATION");
+            assertThat(response.getViolationResolution()).isNull();
+            verify(sellerDiagnosticCommitmentService, never()).findViolationResolution(anyLong());
+        }
+
+        @Test
+        @DisplayName("Seller-violation-resolution UI: violationResolution проставляется целиком из существующего разрешения, если commitment FINALIZED")
+        void getRequestDetails_CommitmentFinalized_PopulatesViolationResolution() {
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+            when(answerRepository.findByDiagnosticRequestId(requestId)).thenReturn(List.of());
+
+            SellerDiagnosticCommitment commitment = new SellerDiagnosticCommitment();
+            commitment.setId(77L);
+            commitment.setStatus(CommitmentStatus.FINALIZED);
+            when(sellerDiagnosticCommitmentService.findByDiagnosticRequestId(requestId)).thenReturn(Optional.of(commitment));
+
+            OffsetDateTime resolvedAt = OffsetDateTime.now();
+            SellerViolationResolution resolution = new SellerViolationResolution(77L, TriggerSource.DIAGNOSTIC_REJECTION,
+                    null, 9L, new BigDecimal("5000.00"), new BigDecimal("4000.00"), new BigDecimal("1000.00"),
+                    5L, resolvedAt, resolvedAt);
+            when(sellerDiagnosticCommitmentService.findViolationResolution(77L)).thenReturn(Optional.of(resolution));
+            when(sellerDiagnosticCommitmentService.findViolationIdsForResolution(resolution.getId())).thenReturn(List.of(3L, 4L));
+
+            DiagnosticRequestResponse response = requestService.getRequestDetails(requestId);
+
+            assertThat(response.getCommitmentStatus()).isEqualTo("FINALIZED");
+            assertThat(response.getViolationResolution()).isNotNull();
+            assertThat(response.getViolationResolution().violationDefinitionIds()).containsExactly(3L, 4L);
+            assertThat(response.getViolationResolution().appliedPenaltyAmount()).isEqualByComparingTo("4000.00");
+            assertThat(response.getViolationResolution().refundAmount()).isEqualByComparingTo("1000.00");
         }
 
         @Test
