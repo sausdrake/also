@@ -6,6 +6,7 @@ import { useDepositStore } from '../store/depositStore';
 import { parseDate } from '../utils/formatDate';
 import { formatDateTime } from '../utils/formatDate';
 import { RequestVehicleStatus } from '../components/seller/RequestVehicleStatus';
+import { IdentityVerificationTab } from '../components/identity/IdentityVerificationTab';
 
 interface WatchedAuction {
   auctionId: number;
@@ -718,6 +719,7 @@ const USER_TABS = [
   { path: 'won', label: 'Выигранные' },
   { path: 'requests', label: 'Заявки' },
   { path: 'watched', label: 'Отслеживаемые' },
+  { path: 'identity', label: 'Подтверждение личности' },
   { path: 'settings', label: 'Профиль' },
 ];
 
@@ -766,6 +768,7 @@ export function ProfilePage() {
             <Route path="won" element={<WonTab />} />
             <Route path="requests" element={<RequestsTab />} />
             <Route path="watched" element={<WatchedTab />} />
+            <Route path="identity" element={<IdentityVerificationTab />} />
             <Route path="settings" element={<ProfileTab />} />
           </>
         )}

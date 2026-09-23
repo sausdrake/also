@@ -8,6 +8,7 @@ import { PhotoLightbox } from '../components/PhotoLightbox';
 import { PolicyPage } from './admin/PolicyPage';
 import { LateSuccessPaymentsPage } from './admin/LateSuccessPaymentsPage';
 import { AdminSalePage } from './admin/AdminSalePage';
+import { AdminIdentityPage } from './admin/AdminIdentityPage';
 import { RejectReportModal } from '../components/admin/diagnostic/RejectReportModal';
 import { SellerViolationResolutionPanel, type ViolationResolution } from '../components/admin/diagnostic/SellerViolationResolutionPanel';
 
@@ -185,6 +186,11 @@ const NAV_ITEMS = [
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
     </svg>
   )},
+  { path: '/admin/identity', label: 'Личность', icon: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  )},
 ];
 
 function AdminSidebar() {
@@ -322,6 +328,16 @@ function AdminSidebar() {
             }`}>
           {NAV_ITEMS[4].icon}
           Настройки
+        </NavLink>
+
+        {/* Подтверждение личности */}
+        <NavLink to="/admin/identity"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+              isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            }`}>
+          {NAV_ITEMS[5].icon}
+          Личность
         </NavLink>
       </nav>
 
@@ -2622,6 +2638,7 @@ export function AdminDashboard() {
             <Route path="diagnostic/reports" element={<ReportsPage />} />
             <Route path="auctions" element={<AuctionsPage />} />
             <Route path="sale/:auctionId" element={<AdminSalePage />} />
+            <Route path="identity" element={<AdminIdentityPage />} />
             <Route path="policy" element={<PolicyPage />} />
             <Route path="deposits" element={<DepositsPage />} />
             <Route path="payments/late-successes" element={<LateSuccessPaymentsPage />} />
