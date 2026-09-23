@@ -434,6 +434,13 @@ public class VehicleService {
         return vehicleRepository.findAll().size();
     }
 
+    /** Sale-UI: the id of the Vehicle created from this request, or null if none exists yet. */
+    public Long findVehicleIdByDiagnosticRequestId(Long diagnosticRequestId) {
+        return vehicleRepository.findByDiagnosticRequestId(diagnosticRequestId)
+                .map(Vehicle::getId)
+                .orElse(null);
+    }
+
     @Transactional
     public VehicleResponse rejectVehicle(Long vehicleId, Long adminId, String adminName, String reason) {
         log.info("=== ОТКЛОНЕНИЕ АВТОМОБИЛЯ ID: {} ===", vehicleId);

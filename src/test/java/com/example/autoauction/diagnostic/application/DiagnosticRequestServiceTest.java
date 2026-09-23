@@ -948,6 +948,30 @@ class DiagnosticRequestServiceTest {
         }
 
         @Test
+        @DisplayName("Sale-UI Gap #1: vehicleId проставляется из VehicleService, если Vehicle уже создан")
+        void getRequestDetails_VehicleExists_PopulatesVehicleId() {
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+            when(answerRepository.findByDiagnosticRequestId(requestId)).thenReturn(List.of());
+            when(vehicleService.findVehicleIdByDiagnosticRequestId(requestId)).thenReturn(42L);
+
+            DiagnosticRequestResponse response = requestService.getRequestDetails(requestId);
+
+            assertThat(response.getVehicleId()).isEqualTo(42L);
+        }
+
+        @Test
+        @DisplayName("Sale-UI Gap #1: vehicleId остаётся null, если Vehicle ещё не создан")
+        void getRequestDetails_NoVehicleYet_VehicleIdNull() {
+            when(requestRepository.findById(requestId)).thenReturn(Optional.of(savedRequest));
+            when(answerRepository.findByDiagnosticRequestId(requestId)).thenReturn(List.of());
+            when(vehicleService.findVehicleIdByDiagnosticRequestId(requestId)).thenReturn(null);
+
+            DiagnosticRequestResponse response = requestService.getRequestDetails(requestId);
+
+            assertThat(response.getVehicleId()).isNull();
+        }
+
+        @Test
         @DisplayName("MEDIA-3.1B: templateId привязан - резолвится напрямую по ID, без обращения к ответам")
         void getRequestDetails_TemplateBound_ResolvesDirectly() {
             savedRequest.setAssignedTo(diagnosticId);
@@ -983,6 +1007,24 @@ class DiagnosticRequestServiceTest {
             verify(templateRepository, never()).findItemById(any());
             verify(templateRepository, never()).findGroupById(any());
             verify(templateRepository, never()).findActiveTemplates(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("Получение заявок пользователя (мои заявки)")
+    class GetUserRequestsTests {
+
+        @Test
+        @DisplayName("Sale-UI Gap #1: каждая строка обогащается своим vehicleId")
+        void getUserRequests_PopulatesVehicleIdPerRow() {
+            when(requestRepository.findByUserId(eq(userId), any(Pageable.class)))
+                    .thenReturn(new PageImpl<>(List.of(savedRequest)));
+            when(vehicleService.findVehicleIdByDiagnosticRequestId(requestId)).thenReturn(7L);
+
+            Page<DiagnosticRequestResponse> page = requestService.getUserRequests(userId, PageRequest.of(0, 20));
+
+            assertThat(page.getContent()).hasSize(1);
+            assertThat(page.getContent().get(0).getVehicleId()).isEqualTo(7L);
         }
     }
 

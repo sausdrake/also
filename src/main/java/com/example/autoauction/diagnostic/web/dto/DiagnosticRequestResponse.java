@@ -21,6 +21,15 @@ public class DiagnosticRequestResponse {
     private String status;
     private Long assignedTo;
     private String diagnosticName;
+
+    /**
+     * Sale-UI: the Vehicle auto-created from this request once its report is approved (see
+     * {@code DiagnosticRequestService.approveReport} -> {@code VehicleService
+     * .createFromDiagnosticRequest}) - null until then. Populated post-hoc by the service layer
+     * (mirrors this class's existing diagnosticName/userName enrichment pattern), never by
+     * {@link #fromDomain} itself, since {@link DiagnosticRequest} carries no such reference.
+     */
+    private Long vehicleId;
     private String rejectedReason;
     private String rejectionCategory;
     private OffsetDateTime createdAt;

@@ -94,6 +94,13 @@ public class JpaVehicleRepositoryAdapter implements VehicleRepository {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Optional<Vehicle> findByDiagnosticRequestId(Long diagnosticRequestId) {
+        return jpaRepository.findByDiagnosticRequestId(diagnosticRequestId)
+                .map(mapper::toDomain);
+    }
+
+    @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
     }

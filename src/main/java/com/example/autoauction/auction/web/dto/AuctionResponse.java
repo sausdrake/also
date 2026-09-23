@@ -75,7 +75,13 @@ public record AuctionResponse(
 
         @Schema(description = "Требуемая фиксированная сумма депозита для участия в этом аукционе " +
                 "(задаётся администратором индивидуально для лота); null, если ещё не настроена", example = "10000")
-        BigDecimal requiredDepositAmount
+        BigDecimal requiredDepositAmount,
+
+        @Schema(description = "Платёжный дедлайн (актуален только для WAITING_FOR_PAYMENT)")
+        OffsetDateTime paymentDeadline,
+
+        @Schema(description = "Дедлайн уже прошёл (справочно; не влияет автоматически на статус)")
+        boolean overdue
 ) {
     /**
      * Обратно-совместимый конструктор для существующего кода/тестов, построенных до
@@ -90,7 +96,25 @@ public record AuctionResponse(
                             int extensionCount) {
         this(id, vehicleId, vehicleInfo, startingPrice, currentPrice, reservePrice, buyNowPrice,
                 minBidStep, startTime, endTime, status, totalBids, winnerId, winningBid, createdBy,
-                createdAt, confirmedStart, mainPhotoUrl, additionalPhotoUrls, videoUrl, extensionCount, null);
+                createdAt, confirmedStart, mainPhotoUrl, additionalPhotoUrls, videoUrl, extensionCount,
+                null, null, false);
+    }
+
+    /**
+     * Обратно-совместимый конструктор для кода/тестов, построенных до появления
+     * paymentDeadline/overdue (Sale-UI slice).
+     */
+    public AuctionResponse(Long id, Long vehicleId, String vehicleInfo, BigDecimal startingPrice,
+                            BigDecimal currentPrice, BigDecimal reservePrice, BigDecimal buyNowPrice,
+                            BigDecimal minBidStep, OffsetDateTime startTime, OffsetDateTime endTime,
+                            AuctionStatus status, Integer totalBids, Long winnerId, BigDecimal winningBid,
+                            Long createdBy, OffsetDateTime createdAt, boolean confirmedStart,
+                            String mainPhotoUrl, String additionalPhotoUrls, String videoUrl,
+                            int extensionCount, BigDecimal requiredDepositAmount) {
+        this(id, vehicleId, vehicleInfo, startingPrice, currentPrice, reservePrice, buyNowPrice,
+                minBidStep, startTime, endTime, status, totalBids, winnerId, winningBid, createdBy,
+                createdAt, confirmedStart, mainPhotoUrl, additionalPhotoUrls, videoUrl, extensionCount,
+                requiredDepositAmount, null, false);
     }
 
     /**
@@ -104,6 +128,13 @@ public record AuctionResponse(
      * ignored entirely for legacy auctions, so null is always safe to pass for those.
      */
     public static AuctionResponse fromDomain(Auction auction, BigDecimal commissionRate) {
+        // Sale-UI: overdue is informational-only (never persisted, never acted upon
+        // automatically), mirroring PaymentDeadlineResponse.fromDomain's own derivation exactly -
+        // computed here rather than threaded through a Clock because this static factory has 18
+        // existing call sites across 3 controllers and none of them currently need a Clock;
+        // adding one for a purely-presentational flag would be a much larger, unrelated change.
+        OffsetDateTime deadline = auction.getPaymentDeadline();
+        boolean overdue = deadline != null && OffsetDateTime.now().isAfter(deadline);
         return new AuctionResponse(
                 auction.getId(),
                 auction.getVehicleId(),
@@ -126,7 +157,9 @@ public record AuctionResponse(
                 auction.getAdditionalPhotoUrls(),
                 auction.getVideoUrl(),
                 auction.getExtensionCount(),
-                auction.getRequiredDepositAmount()
+                auction.getRequiredDepositAmount(),
+                deadline,
+                overdue
         );
     }
 }

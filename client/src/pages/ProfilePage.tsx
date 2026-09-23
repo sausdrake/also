@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import { useDepositStore } from '../store/depositStore';
 import { parseDate } from '../utils/formatDate';
 import { formatDateTime } from '../utils/formatDate';
+import { RequestVehicleStatus } from '../components/seller/RequestVehicleStatus';
 
 interface WatchedAuction {
   auctionId: number;
@@ -195,19 +196,23 @@ function DepositTab() {
 // ─────────────────── Shared helpers ───────────────────
 
 const STATUS_STYLE: Record<string, string> = {
-  ACTIVE:    'bg-green-100 text-green-700',
-  COMPLETED: 'bg-blue-100 text-blue-700',
-  SOLD:      'bg-purple-100 text-purple-700',
-  CANCELLED: 'bg-gray-100 text-gray-500',
-  CREATED:   'bg-yellow-100 text-yellow-700',
+  ACTIVE:               'bg-green-100 text-green-700',
+  COMPLETED:            'bg-blue-100 text-blue-700',
+  WAITING_FOR_PAYMENT:  'bg-amber-100 text-amber-700',
+  SOLD:                 'bg-purple-100 text-purple-700',
+  SALE_FAILED:          'bg-red-100 text-red-700',
+  CANCELLED:            'bg-gray-100 text-gray-500',
+  CREATED:              'bg-yellow-100 text-yellow-700',
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  ACTIVE:    'Активен',
-  COMPLETED: 'Завершён',
-  SOLD:      'Продан',
-  CANCELLED: 'Отменён',
-  CREATED:   'Ожидает',
+  ACTIVE:               'Активен',
+  COMPLETED:            'Завершён',
+  WAITING_FOR_PAYMENT:  'Ожидание оплаты',
+  SOLD:                 'Продан',
+  SALE_FAILED:          'Сделка не состоялась',
+  CANCELLED:            'Отменён',
+  CREATED:              'Ожидает',
 };
 
 function fmt(val: any) {
@@ -468,22 +473,27 @@ function RequestsTab() {
           {requests.map((req: any) => {
             const statusInfo = statusLabels[req.status] || { label: req.status, color: 'bg-gray-100 text-gray-600' };
             return (
-              <div key={req.id} className="bg-white border rounded-xl p-4 flex justify-between items-center">
-                <div>
-                  <p className="font-medium">{req.brand} {req.model} {req.year}</p>
-                  <p className="text-sm text-gray-500">VIN: {req.vin}</p>
+              <div key={req.id} className="bg-white border rounded-xl p-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="font-medium">{req.brand} {req.model} {req.year}</p>
+                    <p className="text-sm text-gray-500">VIN: {req.vin}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}>
+                      {statusInfo.label}
+                    </span>
+                    {req.status === 'PENDING' && (
+                      <button onClick={() => handleCancel(req.id)}
+                        className="text-red-500 hover:text-red-700 text-sm border border-red-200 px-3 py-1 rounded-lg">
+                        Отозвать
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}>
-                    {statusInfo.label}
-                  </span>
-                  {req.status === 'PENDING' && (
-                    <button onClick={() => handleCancel(req.id)}
-                      className="text-red-500 hover:text-red-700 text-sm border border-red-200 px-3 py-1 rounded-lg">
-                      Отозвать
-                    </button>
-                  )}
-                </div>
+                {req.status === 'APPROVED' && (
+                  <RequestVehicleStatus vehicleId={req.vehicleId ?? null} />
+                )}
               </div>
             );
           })}

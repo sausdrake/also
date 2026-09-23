@@ -21,4 +21,6 @@ public interface SpringDataVehicleJpaRepository extends JpaRepository<JpaVehicle
     List<JpaVehicleEntity> findByDiagnosticIdAndStatus(Long diagnosticId, VehicleStatus status);
 
     List<JpaVehicleEntity> findByStatusIn(List<VehicleStatus> statuses);
+
+    Optional<JpaVehicleEntity> findByDiagnosticRequestId(Long diagnosticRequestId);
 }

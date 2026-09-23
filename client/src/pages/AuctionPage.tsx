@@ -5,6 +5,7 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import { AuctionTimer } from '../components/AuctionTimer';
 import { useAuthStore } from '../store/authStore';
 import { PhotoLightbox } from '../components/PhotoLightbox';
+import { BuyerSaleStatusPanel } from '../components/sale/BuyerSaleStatusPanel';
 import api from '../api/client';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
@@ -26,6 +27,9 @@ interface AuctionDetail {
   mainPhotoUrl?: string;
   additionalPhotoUrls?: string;
   videoUrl?: string;
+  winnerId?: number | null;
+  paymentDeadline?: string | null;
+  overdue?: boolean;
 }
 
 interface VehicleDetail {
@@ -387,7 +391,9 @@ export const AuctionPage = () => {
   const minNextBid = auction.currentPrice + auction.minBidStep;
   const isActive    = auction.status === 'ACTIVE';
   const isCreated   = auction.status === 'CREATED';
-  const isCompleted = ['COMPLETED', 'SOLD', 'EXPIRED', 'CANCELLED'].includes(auction.status);
+  const isCompleted = ['COMPLETED', 'SOLD', 'EXPIRED', 'CANCELLED', 'WAITING_FOR_PAYMENT', 'SALE_FAILED'].includes(auction.status);
+  const isWinner    = isAuthenticated && user?.id != null && auction.winnerId === user.id
+    && ['WAITING_FOR_PAYMENT', 'SOLD', 'SALE_FAILED'].includes(auction.status);
 
   const reserveProgress = auction.reservePrice
     ? Math.min((auction.currentPrice / auction.reservePrice) * 100, 100) : 0;
@@ -749,10 +755,18 @@ export const AuctionPage = () => {
                 </div>
               )}
 
-              {isCompleted && (
+              {isCompleted && !isWinner && (
                 <div className="text-center py-3 text-gray-500 text-sm border-t border-gray-100">
                   Аукцион завершён
                 </div>
+              )}
+
+              {isWinner && (
+                <BuyerSaleStatusPanel
+                  status={auction.status}
+                  paymentDeadline={auction.paymentDeadline}
+                  overdue={auction.overdue}
+                />
               )}
 
               {isAuthenticated && (

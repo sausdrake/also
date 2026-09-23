@@ -114,7 +114,11 @@ public class DiagnosticRequestService {
     @Transactional(readOnly = true)
     public Page<DiagnosticRequestResponse> getUserRequests(Long userId, Pageable pageable) {
         return requestRepository.findByUserId(userId, pageable)
-                .map(DiagnosticRequestResponse::fromDomain);
+                .map(r -> {
+                    DiagnosticRequestResponse response = DiagnosticRequestResponse.fromDomain(r);
+                    response.setVehicleId(vehicleService.findVehicleIdByDiagnosticRequestId(r.getId()));
+                    return response;
+                });
     }
 
     /**
@@ -593,6 +597,7 @@ public class DiagnosticRequestService {
                 .ifPresent(user -> response.setUserName(user.getUsername()));
 
         response.setTemplate(resolveTemplateForReport(request));
+        response.setVehicleId(vehicleService.findVehicleIdByDiagnosticRequestId(request.getId()));
 
         return response;
     }

@@ -16,5 +16,7 @@ public interface VehicleRepository {
     List<Vehicle> findByStatusIn(List<VehicleStatus> statuses);
     Optional<Vehicle> findByVin(String vin);
     boolean existsByVin(String vin);
+    /** Sale-UI: the one Vehicle created from this request, if any (diagnostic_request_id is UNIQUE). */
+    Optional<Vehicle> findByDiagnosticRequestId(Long diagnosticRequestId);
     void deleteById(Long id);
 }

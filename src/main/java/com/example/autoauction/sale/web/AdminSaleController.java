@@ -6,6 +6,7 @@ import com.example.autoauction.auction.application.SaleAdministrationService;
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.sale.application.HandoverEvidenceService;
 import com.example.autoauction.sale.application.PaymentEvidenceService;
+import com.example.autoauction.sale.application.SaleStatusQueryService;
 import com.example.autoauction.sale.domain.HandoverEvidence;
 import com.example.autoauction.sale.domain.PaymentEvidence;
 import com.example.autoauction.sale.domain.SaleResolution;
@@ -19,6 +20,7 @@ import com.example.autoauction.sale.web.dto.PaymentEvidenceResponse;
 import com.example.autoauction.sale.web.dto.PaymentRequest;
 import com.example.autoauction.sale.web.dto.RecordPayoutRequest;
 import com.example.autoauction.sale.web.dto.SaleResolutionResponse;
+import com.example.autoauction.sale.web.dto.SaleStatusResponse;
 import com.example.autoauction.sale.web.dto.SettlementCorrectionRequest;
 import com.example.autoauction.sale.web.dto.SettlementCorrectionResponse;
 import com.example.autoauction.sale.web.dto.SettlementResponse;
@@ -75,18 +77,29 @@ public class AdminSaleController {
     private final HandoverEvidenceService handoverEvidenceService;
     private final SaleAdministrationService saleAdministrationService;
     private final SettlementService settlementService;
+    private final SaleStatusQueryService saleStatusQueryService;
     private final Clock clock;
 
     public AdminSaleController(PaymentEvidenceService paymentEvidenceService,
                               HandoverEvidenceService handoverEvidenceService,
                               SaleAdministrationService saleAdministrationService,
                               SettlementService settlementService,
+                              SaleStatusQueryService saleStatusQueryService,
                               Clock clock) {
         this.paymentEvidenceService = paymentEvidenceService;
         this.handoverEvidenceService = handoverEvidenceService;
         this.saleAdministrationService = saleAdministrationService;
         this.settlementService = settlementService;
+        this.saleStatusQueryService = saleStatusQueryService;
         this.clock = clock;
+    }
+
+    @GetMapping("/{auctionId}")
+    @Operation(summary = "Текущее состояние продажи: дедлайн + payment/handover evidence + resolution (только чтение)")
+    public ResponseEntity<SaleStatusResponse> getSaleStatus(
+            @Parameter(description = "ID аукциона", required = true) @PathVariable Long auctionId
+    ) {
+        return ResponseEntity.ok(saleStatusQueryService.getSaleStatus(auctionId));
     }
 
     @PostMapping("/{auctionId}/payment")

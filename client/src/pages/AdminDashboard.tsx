@@ -7,6 +7,7 @@ import { useAuthStore } from '../store/authStore';
 import { PhotoLightbox } from '../components/PhotoLightbox';
 import { PolicyPage } from './admin/PolicyPage';
 import { LateSuccessPaymentsPage } from './admin/LateSuccessPaymentsPage';
+import { AdminSalePage } from './admin/AdminSalePage';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
@@ -1802,6 +1803,7 @@ function TemplatesPage() {
 // ─── Auctions ─────────────────────────────────────────────────────────────────
 
 function AuctionsPage() {
+  const navigate = useNavigate();
   const [allAuctions, setAllAuctions] = useState<Auction[]>([]);
   const [loading, setLoading]         = useState(true);
   const [msg, setMsg]                 = useState('');
@@ -2179,6 +2181,12 @@ function AuctionsPage() {
                           <button onClick={() => releaseWinner(a.id)}
                             className="text-xs px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 font-medium border border-amber-200 whitespace-nowrap">
                             Освободить депозит
+                          </button>
+                        )}
+                        {(a.status === 'WAITING_FOR_PAYMENT' || a.status === 'SOLD' || a.status === 'SALE_FAILED') && (
+                          <button onClick={() => navigate(`/admin/sale/${a.id}`)}
+                            className="text-xs px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium border border-blue-200 whitespace-nowrap">
+                            Продажа
                           </button>
                         )}
                         <button onClick={() => openDetail(a)}
@@ -2624,6 +2632,7 @@ export function AdminDashboard() {
             <Route path="diagnostic/templates" element={<TemplatesPage />} />
             <Route path="diagnostic/reports" element={<ReportsPage />} />
             <Route path="auctions" element={<AuctionsPage />} />
+            <Route path="sale/:auctionId" element={<AdminSalePage />} />
             <Route path="policy" element={<PolicyPage />} />
             <Route path="deposits" element={<DepositsPage />} />
             <Route path="payments/late-successes" element={<LateSuccessPaymentsPage />} />

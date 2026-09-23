@@ -41,6 +41,7 @@ import java.time.OffsetDateTime;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -743,5 +744,101 @@ class AdminSaleApiIntegrationTest {
                         .content("{\"correctionType\": \"PAYOUT_INVALIDATED\", \"reason\": \"\", "
                                 + "\"idempotencyKey\": \"corr-key-4\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    // ==================== Sale-UI Gap #4: GET /{auctionId} (SaleStatusResponse) ====================
+
+    @Test
+    @DisplayName("GET status: anonymous -> 401")
+    void getSaleStatus_anonymous_401() throws Exception {
+        mockMvc.perform(get(base(1L))).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @org.springframework.security.test.context.support.WithMockUser(roles = {"USER"})
+    @DisplayName("GET status: role USER -> 403")
+    void getSaleStatus_userRole_403() throws Exception {
+        mockMvc.perform(get(base(1L))).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockCustomUser(userId = 1L, roles = {"ADMIN"})
+    @DisplayName("GET status: unknown auction -> 404")
+    void getSaleStatus_unknownAuction_404() throws Exception {
+        mockMvc.perform(get(base(999_999_999L))).andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockCustomUser(userId = 1L, roles = {"ADMIN"})
+    @DisplayName("GET status: fresh WAITING_FOR_PAYMENT -> all evidence null")
+    void getSaleStatus_freshWaitingForPayment_AssemblesCorrectly() throws Exception {
+        // waitingForPayment()'s fixture sets status directly (bypassing the real
+        // winner-identification flow that would compute a deadline) - this test is about the
+        // evidence/resolution assembly, not deadline serialization, which is covered separately
+        // below with an explicitly-set deadline.
+        Fixture f = waitingForPayment();
+        mockMvc.perform(get(base(f.auctionId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.auctionId").value(f.auctionId()))
+                .andExpect(jsonPath("$.auctionStatus").value("WAITING_FOR_PAYMENT"))
+                .andExpect(jsonPath("$.paymentEvidence").doesNotExist())
+                .andExpect(jsonPath("$.handoverEvidence").doesNotExist())
+                .andExpect(jsonPath("$.saleResolution").doesNotExist());
+    }
+
+    @Test
+    @WithMockCustomUser(userId = 1L, roles = {"ADMIN"})
+    @DisplayName("GET status: explicit payment deadline -> serialized correctly, overdue derived server-side")
+    void getSaleStatus_ExplicitDeadline_SerializesAndDerivesOverdue() throws Exception {
+        Fixture past = waitingForPayment();
+        Auction pastAuction = auctionRepository.findById(past.auctionId()).orElseThrow();
+        pastAuction.setPaymentDeadline(OffsetDateTime.now().minusHours(2));
+        auctionRepository.save(pastAuction);
+
+        mockMvc.perform(get(base(past.auctionId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paymentDeadline").exists())
+                .andExpect(jsonPath("$.overdue").value(true));
+
+        Fixture future = waitingForPayment();
+        Auction futureAuction = auctionRepository.findById(future.auctionId()).orElseThrow();
+        futureAuction.setPaymentDeadline(OffsetDateTime.now().plusHours(2));
+        auctionRepository.save(futureAuction);
+
+        mockMvc.perform(get(base(future.auctionId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paymentDeadline").exists())
+                .andExpect(jsonPath("$.overdue").value(false));
+    }
+
+    @Test
+    @WithMockCustomUser(userId = 1L, roles = {"ADMIN"})
+    @DisplayName("GET status: after payment+handover recorded -> both reflected, resolution still null")
+    void getSaleStatus_AfterPaymentAndHandover_ReflectsBoth() throws Exception {
+        Fixture f = waitingForPayment();
+        recordPaymentAndHandover(f.auctionId());
+
+        mockMvc.perform(get(base(f.auctionId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paymentEvidence.auctionId").value(f.auctionId()))
+                .andExpect(jsonPath("$.paymentEvidence.amount").value(1020000.00))
+                .andExpect(jsonPath("$.handoverEvidence.auctionId").value(f.auctionId()))
+                .andExpect(jsonPath("$.saleResolution").doesNotExist());
+    }
+
+    @Test
+    @WithMockCustomUser(userId = 1L, roles = {"ADMIN"})
+    @DisplayName("GET status: after complete -> saleResolution reflects SUCCESS")
+    void getSaleStatus_AfterComplete_ReflectsResolution() throws Exception {
+        SettlementFixture f = waitingForPaymentWithSettlementPrerequisites(new BigDecimal("0.02"));
+        recordPaymentAndHandover(f.auctionId());
+        mockMvc.perform(post(base(f.auctionId()) + "/complete")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get(base(f.auctionId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.saleResolution.result").value("SUCCESS"))
+                .andExpect(jsonPath("$.saleResolution.auctionId").value(f.auctionId()));
     }
 }
