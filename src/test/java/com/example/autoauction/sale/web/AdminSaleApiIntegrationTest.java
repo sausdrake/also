@@ -783,7 +783,10 @@ class AdminSaleApiIntegrationTest {
                 .andExpect(jsonPath("$.auctionStatus").value("WAITING_FOR_PAYMENT"))
                 .andExpect(jsonPath("$.paymentEvidence").doesNotExist())
                 .andExpect(jsonPath("$.handoverEvidence").doesNotExist())
-                .andExpect(jsonPath("$.saleResolution").doesNotExist());
+                .andExpect(jsonPath("$.saleResolution").doesNotExist())
+                .andExpect(jsonPath("$.settlement").doesNotExist())
+                .andExpect(jsonPath("$.settlementCorrections").isArray())
+                .andExpect(jsonPath("$.settlementCorrections").isEmpty());
     }
 
     @Test
@@ -839,6 +842,129 @@ class AdminSaleApiIntegrationTest {
         mockMvc.perform(get(base(f.auctionId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.saleResolution.result").value("SUCCESS"))
-                .andExpect(jsonPath("$.saleResolution.auctionId").value(f.auctionId()));
+                .andExpect(jsonPath("$.saleResolution.auctionId").value(f.auctionId()))
+                .andExpect(jsonPath("$.settlement.auctionId").value(f.auctionId()))
+                .andExpect(jsonPath("$.settlement.status").value("PENDING"))
+                .andExpect(jsonPath("$.settlement.expectedBuyerPaidAmount").value(1020000.00))
+                .andExpect(jsonPath("$.settlement.expectedSellerAmount").value(1000000.00))
+                .andExpect(jsonPath("$.settlement.expectedCommission").value(20000.00))
+                .andExpect(jsonPath("$.settlement.attestedPayoutAmount").doesNotExist())
+                .andExpect(jsonPath("$.settlementCorrections").isArray())
+                .andExpect(jsonPath("$.settlementCorrections").isEmpty());
+    }
+
+    // ==================== Step 2C read-model: settlement/settlementCorrections in GET status ====================
+
+    @Test
+    @WithMockCustomUser(userId = 42L, roles = {"ADMIN"})
+    @DisplayName("GET status: после payout -> settlement.status = PAYOUT_RECORDED, attestedPayoutAmount виден")
+    void getSaleStatus_AfterPayout_ReflectsPayout() throws Exception {
+        SettlementFixture f = waitingForPaymentWithSettlementPrerequisites(new BigDecimal("0.02"));
+        recordPaymentAndHandover(f.auctionId());
+        mockMvc.perform(post(base(f.auctionId()) + "/complete")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(base(f.auctionId()) + "/settlement/payout")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"attestedAmount\": 970000.00}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get(base(f.auctionId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.settlement.status").value("PAYOUT_RECORDED"))
+                .andExpect(jsonPath("$.settlement.attestedPayoutAmount").value(970000.00))
+                .andExpect(jsonPath("$.settlement.recordedByAdminId").value(42))
+                .andExpect(jsonPath("$.settlementCorrections").isEmpty());
+
+        // GET performs no mutation - re-fetching yields the identical persisted state.
+        assertThat(settlementRepository.findByAuctionId(f.auctionId()).orElseThrow().getStatus())
+                .isEqualTo(SettlementStatus.PAYOUT_RECORDED);
+        assertThat(settlementRepository.findByAuctionId(f.auctionId()).orElseThrow().getAttestedPayoutAmount())
+                .isEqualByComparingTo("970000.00");
+    }
+
+    @Test
+    @WithMockCustomUser(userId = 42L, roles = {"ADMIN"})
+    @DisplayName("GET status: одна корректировка -> появляется в settlementCorrections")
+    void getSaleStatus_OneCorrection_AppearsInSettlementCorrections() throws Exception {
+        SettlementFixture f = waitingForPaymentWithSettlementPrerequisites(new BigDecimal("0.02"));
+        recordPaymentAndHandover(f.auctionId());
+        mockMvc.perform(post(base(f.auctionId()) + "/complete")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(base(f.auctionId()) + "/settlement/payout")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"attestedAmount\": 970000.00}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(base(f.auctionId()) + "/settlement/corrections")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correctionType\": \"AMOUNT_CORRECTION\", \"correctedAmount\": 960000.00, "
+                                + "\"reason\": \"recount of physical cash\", \"idempotencyKey\": \"read-model-key-1\"}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get(base(f.auctionId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.settlementCorrections").isArray())
+                .andExpect(jsonPath("$.settlementCorrections.length()").value(1))
+                .andExpect(jsonPath("$.settlementCorrections[0].correctionType").value("AMOUNT_CORRECTION"))
+                .andExpect(jsonPath("$.settlementCorrections[0].correctedAmount").value(960000.00))
+                .andExpect(jsonPath("$.settlementCorrections[0].reason").value("recount of physical cash"));
+    }
+
+    @Test
+    @WithMockCustomUser(userId = 42L, roles = {"ADMIN"})
+    @DisplayName("GET status: несколько корректировок -> хронологический порядок сохранён, не схлопнуты")
+    void getSaleStatus_MultipleCorrections_PreserveChronologicalOrder() throws Exception {
+        SettlementFixture f = waitingForPaymentWithSettlementPrerequisites(new BigDecimal("0.02"));
+        recordPaymentAndHandover(f.auctionId());
+        mockMvc.perform(post(base(f.auctionId()) + "/complete")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(base(f.auctionId()) + "/settlement/payout")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"attestedAmount\": 970000.00}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post(base(f.auctionId()) + "/settlement/corrections")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correctionType\": \"AMOUNT_CORRECTION\", \"correctedAmount\": 960000.00, "
+                                + "\"reason\": \"first correction\", \"idempotencyKey\": \"read-model-key-2a\"}"))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post(base(f.auctionId()) + "/settlement/corrections")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correctionType\": \"PAYOUT_INVALIDATED\", "
+                                + "\"reason\": \"second correction\", \"idempotencyKey\": \"read-model-key-2b\"}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get(base(f.auctionId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.settlementCorrections.length()").value(2))
+                .andExpect(jsonPath("$.settlementCorrections[0].reason").value("first correction"))
+                .andExpect(jsonPath("$.settlementCorrections[0].correctionType").value("AMOUNT_CORRECTION"))
+                .andExpect(jsonPath("$.settlementCorrections[1].reason").value("second correction"))
+                .andExpect(jsonPath("$.settlementCorrections[1].correctionType").value("PAYOUT_INVALIDATED"));
+
+        // Multiple corrections are not collapsed - both rows remain independently persisted.
+        Long settlementId = settlementRepository.findByAuctionId(f.auctionId()).orElseThrow().getId();
+        assertThat(settlementCorrectionRepository.findBySettlementIdOrderByCorrectedAtAscIdAsc(settlementId))
+                .hasSize(2);
+    }
+
+    @Test
+    @WithMockCustomUser(userId = 1L, roles = {"ADMIN"})
+    @DisplayName("GET status: SOLD legacy аукцион без Settlement (минуя completeSale) -> 200, settlement=null, НЕ 500")
+    void getSaleStatus_SoldLegacyWithoutSettlement_Returns200NotError() throws Exception {
+        // Simulates a legacy auction that reached SOLD before this Settlement feature existed -
+        // status set directly, never through completeSale(), so no Settlement row is ever created.
+        Fixture f = waitingForPayment();
+        Auction auction = auctionRepository.findById(f.auctionId()).orElseThrow();
+        auction.setStatus(AuctionStatus.SOLD);
+        auctionRepository.save(auction);
+
+        assertThat(settlementRepository.findByAuctionId(f.auctionId())).isEmpty();
+
+        mockMvc.perform(get(base(f.auctionId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.auctionStatus").value("SOLD"))
+                .andExpect(jsonPath("$.settlement").doesNotExist())
+                .andExpect(jsonPath("$.settlementCorrections").isArray())
+                .andExpect(jsonPath("$.settlementCorrections").isEmpty());
     }
 }

@@ -330,4 +330,21 @@ public class SettlementService {
         return settlementRepository.findByAuctionId(auctionId)
                 .orElseThrow(() -> new IllegalArgumentException("Settlement не найден для аукциона " + auctionId));
     }
+
+    /**
+     * Pure read pass-through for cross-module read-model assembly (e.g. by
+     * {@code SaleStatusQueryService}). Unlike {@link #getByAuctionId}, never throws when no
+     * Settlement exists yet - the caller decides how to represent that absence in its own
+     * response shape (e.g. a nullable field), never this service's job.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Settlement> findByAuctionId(Long auctionId) {
+        return settlementRepository.findByAuctionId(auctionId);
+    }
+
+    /** Pure read pass-through - the ordered correction history for a given settlement id. */
+    @Transactional(readOnly = true)
+    public List<SettlementCorrection> getCorrections(Long settlementId) {
+        return settlementCorrectionRepository.findBySettlementIdOrderByCorrectedAtAscIdAsc(settlementId);
+    }
 }
