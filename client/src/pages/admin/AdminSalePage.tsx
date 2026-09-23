@@ -7,6 +7,7 @@ import { HandoverConfirmPanel } from '../../components/admin/sale/HandoverConfir
 import { SaleCompletionPanel } from '../../components/admin/sale/SaleCompletionPanel';
 import { SaleFailurePanel } from '../../components/admin/sale/SaleFailurePanel';
 import { PaymentDeadlineExtendForm } from '../../components/admin/sale/PaymentDeadlineExtendForm';
+import { SettlementPanel } from '../../components/admin/sale/SettlementPanel';
 
 export interface PaymentEvidence {
   id: number;
@@ -39,6 +40,31 @@ export interface SaleResolution {
   financialResolutionStatus: string | null;
 }
 
+export interface SettlementResponse {
+  id: number;
+  auctionId: number;
+  sellerId: number;
+  expectedBuyerPaidAmount: number;
+  expectedSellerAmount: number;
+  expectedCommission: number;
+  status: string;
+  attestedPayoutAmount: number | null;
+  recordedByAdminId: number | null;
+  recordedAt: string | null;
+  createdAt: string;
+}
+
+export interface SettlementCorrectionResponse {
+  id: number;
+  settlementId: number;
+  correctionType: string;
+  correctedAmount: number | null;
+  correctedSellerId: number | null;
+  reason: string;
+  correctedByAdminId: number;
+  correctedAt: string;
+}
+
 export interface SaleStatus {
   auctionId: number;
   auctionStatus: string;
@@ -47,6 +73,8 @@ export interface SaleStatus {
   paymentEvidence: PaymentEvidence | null;
   handoverEvidence: HandoverEvidence | null;
   saleResolution: SaleResolution | null;
+  settlement: SettlementResponse | null;
+  settlementCorrections: SettlementCorrectionResponse[];
 }
 
 /**
@@ -128,6 +156,8 @@ export function AdminSalePage() {
               <SaleFailurePanel auctionId={id} status={status} onDone={refresh} notify={notify} />
             </>
           )}
+
+          <SettlementPanel auctionId={id} status={status} onDone={refresh} notify={notify} />
 
           <PaymentDeadlineExtendForm auctionId={id} status={status} onDone={refresh} notify={notify} />
         </div>
