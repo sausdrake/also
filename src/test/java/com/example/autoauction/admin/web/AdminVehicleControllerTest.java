@@ -159,7 +159,7 @@ class AdminVehicleControllerTest {
             when(vehicleService.getVehiclesByStatus(VehicleStatus.PENDING_REVIEW))
                     .thenReturn(List.of(pendingVehicle, needsFixesVehicle));
 
-            mockMvc.perform(get("/api/admin/vehicles/pending"))
+            mockMvc.perform(get("/api/v1/admin/vehicles/pending"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$").isArray())
                     .andExpect(jsonPath("$.length()").value(2))
@@ -176,7 +176,7 @@ class AdminVehicleControllerTest {
             when(vehicleService.getVehiclesByStatus(VehicleStatus.PENDING_REVIEW))
                     .thenReturn(List.of());
 
-            mockMvc.perform(get("/api/admin/vehicles/pending"))
+            mockMvc.perform(get("/api/v1/admin/vehicles/pending"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$").isArray())
                     .andExpect(jsonPath("$.length()").value(0));
@@ -188,7 +188,7 @@ class AdminVehicleControllerTest {
         @WithMockCustomUser(userId = 2L, username = "user", roles = {"USER"})
         @DisplayName("Доступ запрещён для не-админа")
         void getPendingVehicles_ByNonAdmin_ShouldReturnForbidden() throws Exception {
-            mockMvc.perform(get("/api/admin/vehicles/pending"))
+            mockMvc.perform(get("/api/v1/admin/vehicles/pending"))
                     .andExpect(status().isForbidden());
 
             verify(vehicleService, never()).getVehiclesByStatus(any());
@@ -208,7 +208,7 @@ class AdminVehicleControllerTest {
             when(vehicleService.getVehiclesByStatus(VehicleStatus.NEEDS_FIXES))
                     .thenReturn(List.of(needsFixesVehicle));
 
-            mockMvc.perform(get("/api/admin/vehicles/needs-fixes"))
+            mockMvc.perform(get("/api/v1/admin/vehicles/needs-fixes"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$").isArray())
                     .andExpect(jsonPath("$.length()").value(1))
@@ -230,7 +230,7 @@ class AdminVehicleControllerTest {
         void getVehicleDetails_ExistingId_ShouldReturnVehicle() throws Exception {
             when(vehicleService.getVehicleDetails(1L)).thenReturn(pendingVehicle);
 
-            mockMvc.perform(get("/api/admin/vehicles/1"))
+            mockMvc.perform(get("/api/v1/admin/vehicles/1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.id").value(1))
                     .andExpect(jsonPath("$.brand").value("BMW"));
@@ -245,7 +245,7 @@ class AdminVehicleControllerTest {
             when(vehicleService.getVehicleDetails(999L))
                     .thenThrow(new IllegalArgumentException("Автомобиль не найден: 999"));
 
-            mockMvc.perform(get("/api/admin/vehicles/999"))
+            mockMvc.perform(get("/api/v1/admin/vehicles/999"))
                     .andExpect(status().isNotFound());
 
             verify(vehicleService, times(1)).getVehicleDetails(999L);
@@ -265,7 +265,7 @@ class AdminVehicleControllerTest {
             when(vehicleService.approveVehicle(eq(1L), eq(adminId), eq(adminName)))
                     .thenReturn(approvedVehicle);
 
-            mockMvc.perform(post("/api/admin/vehicles/1/approve")
+            mockMvc.perform(post("/api/v1/admin/vehicles/1/approve")
                             .contentType(MediaType.APPLICATION_JSON))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status").value("APPROVED"));
@@ -280,7 +280,7 @@ class AdminVehicleControllerTest {
             when(vehicleService.approveVehicle(eq(1L), eq(adminId), eq(adminName)))
                     .thenThrow(new IllegalStateException("Only PENDING_REVIEW can be approved"));
 
-            mockMvc.perform(post("/api/admin/vehicles/1/approve")
+            mockMvc.perform(post("/api/v1/admin/vehicles/1/approve")
                             .contentType(MediaType.APPLICATION_JSON))
                     .andExpect(status().isConflict());
 
@@ -309,7 +309,7 @@ class AdminVehicleControllerTest {
             when(vehicleService.rejectVehicle(eq(1L), eq(adminId), eq(adminName), eq(reason)))
                     .thenReturn(rejectedWithReason);
 
-            mockMvc.perform(post("/api/admin/vehicles/1/reject")
+            mockMvc.perform(post("/api/v1/admin/vehicles/1/reject")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(rejectRequest)))
                     .andExpect(status().isOk())
@@ -344,7 +344,7 @@ class AdminVehicleControllerTest {
         void rejectVehicle_EmptyReason_ShouldReturnBadRequest() throws Exception {
             VehicleRejectRequest rejectRequest = new VehicleRejectRequest(1L, adminId, adminName, "");
 
-            mockMvc.perform(post("/api/admin/vehicles/1/reject")
+            mockMvc.perform(post("/api/v1/admin/vehicles/1/reject")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(rejectRequest)))
                     .andExpect(status().isBadRequest());
@@ -358,7 +358,7 @@ class AdminVehicleControllerTest {
         void rejectVehicle_NullReason_ShouldReturnBadRequest() throws Exception {
             VehicleRejectRequest rejectRequest = new VehicleRejectRequest(1L, adminId, adminName, null);
 
-            mockMvc.perform(post("/api/admin/vehicles/1/reject")
+            mockMvc.perform(post("/api/v1/admin/vehicles/1/reject")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(rejectRequest)))
                     .andExpect(status().isBadRequest());
@@ -380,7 +380,7 @@ class AdminVehicleControllerTest {
             when(vehicleService.getVehiclesByStatus(VehicleStatus.APPROVED))
                     .thenReturn(List.of(approvedVehicle, inAuctionVehicle));
 
-            mockMvc.perform(get("/api/admin/vehicles/approved"))
+            mockMvc.perform(get("/api/v1/admin/vehicles/approved"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$").isArray())
                     .andExpect(jsonPath("$.length()").value(2))
@@ -394,7 +394,7 @@ class AdminVehicleControllerTest {
         @WithMockCustomUser(userId = 2L, username = "user", roles = {"USER"})
         @DisplayName("Доступ запрещён для не-админа")
         void getApprovedVehicles_ByNonAdmin_ShouldReturnForbidden() throws Exception {
-            mockMvc.perform(get("/api/admin/vehicles/approved"))
+            mockMvc.perform(get("/api/v1/admin/vehicles/approved"))
                     .andExpect(status().isForbidden());
 
             verify(vehicleService, never()).getVehiclesByStatus(any());
@@ -414,7 +414,7 @@ class AdminVehicleControllerTest {
             when(vehicleService.getVehiclesByStatus(VehicleStatus.IN_AUCTION))
                     .thenReturn(List.of(inAuctionVehicle));
 
-            mockMvc.perform(get("/api/admin/vehicles/in-auction"))
+            mockMvc.perform(get("/api/v1/admin/vehicles/in-auction"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$").isArray())
                     .andExpect(jsonPath("$.length()").value(1))
@@ -427,7 +427,7 @@ class AdminVehicleControllerTest {
         @WithMockCustomUser(userId = 2L, username = "user", roles = {"USER"})
         @DisplayName("Доступ запрещён для не-админа")
         void getInAuctionVehicles_ByNonAdmin_ShouldReturnForbidden() throws Exception {
-            mockMvc.perform(get("/api/admin/vehicles/in-auction"))
+            mockMvc.perform(get("/api/v1/admin/vehicles/in-auction"))
                     .andExpect(status().isForbidden());
 
             verify(vehicleService, never()).getVehiclesByStatus(any());

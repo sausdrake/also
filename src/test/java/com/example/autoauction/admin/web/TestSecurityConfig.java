@@ -19,7 +19,7 @@ public class TestSecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(new AntPathRequestMatcher("/api/admin/**")).hasRole("ADMIN")
+                        .requestMatchers(new AntPathRequestMatcher("/api/v1/admin/**")).hasRole("ADMIN")
                         .anyRequest().authenticated()
                 );
 

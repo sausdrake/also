@@ -135,7 +135,7 @@ class AdminAuctionControllerTest {
             when(adminAuctionService.createAuction(any(AuctionCreateRequest.class), eq(adminId)))
                     .thenReturn(auctionResponse);
 
-            mockMvc.perform(post("/api/admin/auctions")
+            mockMvc.perform(post("/api/v1/admin/auctions")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validCreateRequest)))
                     .andExpect(status().isCreated())
@@ -155,7 +155,7 @@ class AdminAuctionControllerTest {
                     null, null
             );
 
-            mockMvc.perform(post("/api/admin/auctions")
+            mockMvc.perform(post("/api/v1/admin/auctions")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(invalidRequest)))
                     .andExpect(status().isBadRequest());
@@ -167,7 +167,7 @@ class AdminAuctionControllerTest {
         @WithMockCustomUser(userId = 2L, username = "user", roles = {"USER"})
         @DisplayName("Создание аукциона пользователем без прав ADMIN - должно вернуть 403")
         void createAuction_ByNonAdmin_ShouldReturnForbidden() throws Exception {
-            mockMvc.perform(post("/api/admin/auctions")
+            mockMvc.perform(post("/api/v1/admin/auctions")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validCreateRequest)))
                     .andExpect(status().isForbidden());
@@ -192,7 +192,7 @@ class AdminAuctionControllerTest {
 
             when(adminAuctionService.getAllAuctions(any(Pageable.class))).thenReturn(page);
 
-            mockMvc.perform(get("/api/admin/auctions")
+            mockMvc.perform(get("/api/v1/admin/auctions")
                             .param("page", "0")
                             .param("size", "20"))
                     .andExpect(status().isOk())
@@ -209,7 +209,7 @@ class AdminAuctionControllerTest {
         @WithMockCustomUser(userId = 2L, username = "user", roles = {"USER"})
         @DisplayName("Получение списка аукционов пользователем без прав ADMIN - должно вернуть 403")
         void getAllAuctions_ByNonAdmin_ShouldReturnForbidden() throws Exception {
-            mockMvc.perform(get("/api/admin/auctions"))
+            mockMvc.perform(get("/api/v1/admin/auctions"))
                     .andExpect(status().isForbidden());
 
             verify(adminAuctionService, never()).getAllAuctions(any());
@@ -228,7 +228,7 @@ class AdminAuctionControllerTest {
         void getAuction_ExistingId_ShouldReturnAuction() throws Exception {
             when(adminAuctionService.getAuction(1L)).thenReturn(auctionResponse);
 
-            mockMvc.perform(get("/api/admin/auctions/1"))
+            mockMvc.perform(get("/api/v1/admin/auctions/1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.id").value(1));
 
@@ -242,7 +242,7 @@ class AdminAuctionControllerTest {
             when(adminAuctionService.getAuction(999L))
                     .thenThrow(new IllegalArgumentException("Аукцион с ID 999 не найден"));
 
-            mockMvc.perform(get("/api/admin/auctions/999"))
+            mockMvc.perform(get("/api/v1/admin/auctions/999"))
                     .andExpect(status().isNotFound());
 
             verify(adminAuctionService, times(1)).getAuction(999L);
@@ -261,7 +261,7 @@ class AdminAuctionControllerTest {
         void startAuction_WhenCreated_ShouldReturnOk() throws Exception {
             when(adminAuctionService.startAuction(1L, adminId)).thenReturn(activeAuctionResponse);
 
-            mockMvc.perform(post("/api/admin/auctions/1/start"))
+            mockMvc.perform(post("/api/v1/admin/auctions/1/start"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status").value("ACTIVE"));
 
@@ -275,7 +275,7 @@ class AdminAuctionControllerTest {
             when(adminAuctionService.startAuction(1L, adminId))
                     .thenThrow(new IllegalStateException("Аукцион уже запущен"));
 
-            mockMvc.perform(post("/api/admin/auctions/1/start"))
+            mockMvc.perform(post("/api/v1/admin/auctions/1/start"))
                     .andExpect(status().isConflict());
 
             verify(adminAuctionService, times(1)).startAuction(1L, adminId);
@@ -294,7 +294,7 @@ class AdminAuctionControllerTest {
         void cancelAuction_WhenCreated_ShouldReturnOk() throws Exception {
             when(adminAuctionService.cancelAuction(1L, adminId)).thenReturn(cancelledAuctionResponse);
 
-            mockMvc.perform(post("/api/admin/auctions/1/cancel"))
+            mockMvc.perform(post("/api/v1/admin/auctions/1/cancel"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status").value("CANCELLED"));
 
@@ -308,7 +308,7 @@ class AdminAuctionControllerTest {
             when(adminAuctionService.cancelAuction(1L, adminId))
                     .thenThrow(new IllegalStateException("Невозможно отменить аукцион в статусе COMPLETED"));
 
-            mockMvc.perform(post("/api/admin/auctions/1/cancel"))
+            mockMvc.perform(post("/api/v1/admin/auctions/1/cancel"))
                     .andExpect(status().isConflict());
 
             verify(adminAuctionService, times(1)).cancelAuction(1L, adminId);
@@ -327,7 +327,7 @@ class AdminAuctionControllerTest {
         void completeAuction_ShouldReturnOk() throws Exception {
             when(adminAuctionService.completeAuction(1L, adminId)).thenReturn(waitingForPaymentAuctionResponse);
 
-            mockMvc.perform(post("/api/admin/auctions/1/complete"))
+            mockMvc.perform(post("/api/v1/admin/auctions/1/complete"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status").value("WAITING_FOR_PAYMENT"));
 
@@ -338,7 +338,7 @@ class AdminAuctionControllerTest {
         @WithMockCustomUser(userId = 2L, username = "user", roles = {"USER"})
         @DisplayName("Принудительное завершение аукциона пользователем без прав ADMIN - должно вернуть 403")
         void completeAuction_ByNonAdmin_ShouldReturnForbidden() throws Exception {
-            mockMvc.perform(post("/api/admin/auctions/1/complete"))
+            mockMvc.perform(post("/api/v1/admin/auctions/1/complete"))
                     .andExpect(status().isForbidden());
 
             verify(adminAuctionService, never()).completeAuction(any(), any());
@@ -362,7 +362,7 @@ class AdminAuctionControllerTest {
             when(adminAuctionService.getAuctionsByStatus(eq("CREATED"), any(Pageable.class)))
                     .thenReturn(page);
 
-            mockMvc.perform(get("/api/admin/auctions/by-status")
+            mockMvc.perform(get("/api/v1/admin/auctions/by-status")
                             .param("status", "CREATED")
                             .param("page", "0")
                             .param("size", "20"))
@@ -380,7 +380,7 @@ class AdminAuctionControllerTest {
             when(adminAuctionService.getAuctionsByStatus(eq("INVALID_STATUS"), any(Pageable.class)))
                     .thenThrow(new IllegalArgumentException("Неверный статус аукциона: INVALID_STATUS"));
 
-            mockMvc.perform(get("/api/admin/auctions/by-status")
+            mockMvc.perform(get("/api/v1/admin/auctions/by-status")
                             .param("status", "INVALID_STATUS")
                             .param("page", "0")
                             .param("size", "20"))
@@ -403,7 +403,7 @@ class AdminAuctionControllerTest {
             List<AuctionResponse> auctions = List.of(auctionResponse);
             when(adminAuctionService.getAuctionsByVehicleId(1L)).thenReturn(auctions);
 
-            mockMvc.perform(get("/api/admin/auctions/vehicle/1"))
+            mockMvc.perform(get("/api/v1/admin/auctions/vehicle/1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$", hasSize(1)));
 

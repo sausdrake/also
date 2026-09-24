@@ -17,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,6 +27,7 @@ import java.util.regex.Pattern;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/admin/auctions")
+@PreAuthorize("hasRole('ADMIN')")
 @Tag(name = "Администрирование аукционов", description = "Управление аукционами (только для администраторов)")
 public class AdminAuctionController {
 
