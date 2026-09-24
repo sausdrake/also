@@ -1,5 +1,6 @@
 package com.example.autoauction.diagnostic.media.infrastructure.scheduler;
 
+import com.example.autoauction.admin.application.SchedulerHealthSignal;
 import com.example.autoauction.diagnostic.media.application.VideoProcessingService;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -61,12 +62,15 @@ public class VideoProcessingScheduler {
 
     private final int batchSize;
     private final VideoProcessingService videoProcessingService;
+    private final SchedulerHealthSignal schedulerHealthSignal;
 
     public VideoProcessingScheduler(
             VideoProcessingService videoProcessingService,
-            @Value("${diagnostic.media.processing.batch-size}") int batchSize) {
+            @Value("${diagnostic.media.processing.batch-size}") int batchSize,
+            SchedulerHealthSignal schedulerHealthSignal) {
         this.videoProcessingService = videoProcessingService;
         this.batchSize = batchSize;
+        this.schedulerHealthSignal = schedulerHealthSignal;
         log.info("VideoProcessingScheduler initialized (batchSize={})", batchSize);
     }
 
@@ -91,18 +95,24 @@ public class VideoProcessingScheduler {
     public void processVideos() {
         try {
             videoProcessingService.processPending(batchSize);
+            schedulerHealthSignal.reportSuccess("VideoProcessingScheduler.processPending");
         } catch (Exception e) {
             log.error("Video processing sweep failed: {}", e.getMessage(), e);
+            schedulerHealthSignal.reportFailure("VideoProcessingScheduler.processPending");
         }
         try {
             videoProcessingService.reconcileStale(batchSize);
+            schedulerHealthSignal.reportSuccess("VideoProcessingScheduler.reconcileStale");
         } catch (Exception e) {
             log.error("Stale video-processing reconciliation sweep failed: {}", e.getMessage(), e);
+            schedulerHealthSignal.reportFailure("VideoProcessingScheduler.reconcileStale");
         }
         try {
             videoProcessingService.reconcilePendingThumbnailOrphans(batchSize);
+            schedulerHealthSignal.reportSuccess("VideoProcessingScheduler.reconcilePendingThumbnailOrphans");
         } catch (Exception e) {
             log.error("Pending thumbnail orphan reconciliation sweep failed: {}", e.getMessage(), e);
+            schedulerHealthSignal.reportFailure("VideoProcessingScheduler.reconcilePendingThumbnailOrphans");
         }
     }
 }

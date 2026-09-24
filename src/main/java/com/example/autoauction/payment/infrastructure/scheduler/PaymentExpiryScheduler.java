@@ -1,5 +1,6 @@
 package com.example.autoauction.payment.infrastructure.scheduler;
 
+import com.example.autoauction.admin.application.SchedulerHealthSignal;
 import com.example.autoauction.payment.application.PaymentExpiryService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -18,9 +19,11 @@ import java.util.List;
 public class PaymentExpiryScheduler {
 
     private final PaymentExpiryService paymentExpiryService;
+    private final SchedulerHealthSignal schedulerHealthSignal;
 
-    public PaymentExpiryScheduler(PaymentExpiryService paymentExpiryService) {
+    public PaymentExpiryScheduler(PaymentExpiryService paymentExpiryService, SchedulerHealthSignal schedulerHealthSignal) {
         this.paymentExpiryService = paymentExpiryService;
+        this.schedulerHealthSignal = schedulerHealthSignal;
         log.info("PaymentExpiryScheduler initialized");
     }
 
@@ -31,6 +34,7 @@ public class PaymentExpiryScheduler {
             candidates = paymentExpiryService.findExpiredCandidateIds();
         } catch (Exception e) {
             log.error("Payment expiry candidate scan failed: {}", e.getMessage(), e);
+            schedulerHealthSignal.reportFailure("PaymentExpiryScheduler.sweepExpiredPayments");
             return;
         }
         int expired = 0;
@@ -46,5 +50,6 @@ public class PaymentExpiryScheduler {
         if (expired > 0) {
             log.info("Payment expiry sweep: {} of {} candidate(s) expired", expired, candidates.size());
         }
+        schedulerHealthSignal.reportSuccess("PaymentExpiryScheduler.sweepExpiredPayments");
     }
 }

@@ -1,5 +1,6 @@
 package com.example.autoauction.payment.infrastructure.scheduler;
 
+import com.example.autoauction.admin.application.SchedulerHealthSignal;
 import com.example.autoauction.payment.application.PaymentCreationOrchestrator;
 import com.example.autoauction.payment.application.PermanentInitiationEvidenceException;
 import com.example.autoauction.payment.domain.Payment;
@@ -36,11 +37,14 @@ public class PaymentInitiationRecoveryScheduler {
 
     private final PaymentRepository paymentRepository;
     private final PaymentCreationOrchestrator paymentCreationOrchestrator;
+    private final SchedulerHealthSignal schedulerHealthSignal;
 
     public PaymentInitiationRecoveryScheduler(PaymentRepository paymentRepository,
-                                               PaymentCreationOrchestrator paymentCreationOrchestrator) {
+                                               PaymentCreationOrchestrator paymentCreationOrchestrator,
+                                               SchedulerHealthSignal schedulerHealthSignal) {
         this.paymentRepository = paymentRepository;
         this.paymentCreationOrchestrator = paymentCreationOrchestrator;
+        this.schedulerHealthSignal = schedulerHealthSignal;
         log.info("PaymentInitiationRecoveryScheduler initialized");
     }
 
@@ -51,6 +55,7 @@ public class PaymentInitiationRecoveryScheduler {
             candidates = paymentRepository.findCreatedWithInitiationEvidenceCandidateIds();
         } catch (Exception e) {
             log.error("Payment initiation recovery candidate scan failed: {}", e.getMessage(), e);
+            schedulerHealthSignal.reportFailure("PaymentInitiationRecoveryScheduler.recoverInterruptedInitiations");
             return;
         }
         int recovered = 0;
@@ -75,5 +80,6 @@ public class PaymentInitiationRecoveryScheduler {
         if (recovered > 0) {
             log.info("Payment initiation recovery: {} of {} candidate(s) recovered", recovered, candidates.size());
         }
+        schedulerHealthSignal.reportSuccess("PaymentInitiationRecoveryScheduler.recoverInterruptedInitiations");
     }
 }

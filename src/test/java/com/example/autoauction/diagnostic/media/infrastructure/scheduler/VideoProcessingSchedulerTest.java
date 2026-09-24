@@ -1,5 +1,6 @@
 package com.example.autoauction.diagnostic.media.infrastructure.scheduler;
 
+import com.example.autoauction.admin.application.SchedulerHealthSignal;
 import com.example.autoauction.diagnostic.media.application.VideoProcessingService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,7 @@ class VideoProcessingSchedulerTest {
     @DisplayName("1: планировщик вызывает processPending(batchSize)")
     void invokesProcessPendingWithConfiguredBatchSize() {
         VideoProcessingService service = mock(VideoProcessingService.class);
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE, new SchedulerHealthSignal());
 
         scheduler.processVideos();
 
@@ -47,7 +48,7 @@ class VideoProcessingSchedulerTest {
     @DisplayName("2: планировщик вызывает reconcileStale(batchSize)")
     void invokesReconcileStaleWithConfiguredBatchSize() {
         VideoProcessingService service = mock(VideoProcessingService.class);
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE, new SchedulerHealthSignal());
 
         scheduler.processVideos();
 
@@ -59,7 +60,7 @@ class VideoProcessingSchedulerTest {
     void processPendingThrows_ReconcileStaleStillRunsSameTick() {
         VideoProcessingService service = mock(VideoProcessingService.class);
         doThrow(new RuntimeException("simulated processPending failure")).when(service).processPending(anyInt());
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE, new SchedulerHealthSignal());
 
         scheduler.processVideos(); // must not throw
 
@@ -71,7 +72,7 @@ class VideoProcessingSchedulerTest {
     void reconcileStaleThrows_FutureInvocationsRemainPossible() {
         VideoProcessingService service = mock(VideoProcessingService.class);
         doThrow(new RuntimeException("simulated reconcileStale failure")).when(service).reconcileStale(anyInt());
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE, new SchedulerHealthSignal());
 
         scheduler.processVideos(); // must not throw
         scheduler.processVideos(); // a second tick must still run normally
@@ -84,7 +85,7 @@ class VideoProcessingSchedulerTest {
     @DisplayName("5: одинаковый сконфигурированный batchSize передаётся в оба вызова")
     void sameBatchSizePassedToBothCalls() {
         VideoProcessingService service = mock(VideoProcessingService.class);
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE, new SchedulerHealthSignal());
 
         scheduler.processVideos();
 
@@ -96,7 +97,7 @@ class VideoProcessingSchedulerTest {
     @DisplayName("12 (Phase 10): нестандартный сконфигурированный batchSize передаётся в оба вызова (не только значение по умолчанию 1)")
     void nonDefaultConfiguredBatchSizePassedToBothCalls() {
         VideoProcessingService service = mock(VideoProcessingService.class);
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, 3);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, 3, new SchedulerHealthSignal());
 
         scheduler.processVideos();
 
@@ -118,13 +119,13 @@ class VideoProcessingSchedulerTest {
     void invalidBatchSizeRejectedAtStartup() {
         VideoProcessingService service = mock(VideoProcessingService.class);
 
-        VideoProcessingScheduler zero = new VideoProcessingScheduler(service, 0);
+        VideoProcessingScheduler zero = new VideoProcessingScheduler(service, 0, new SchedulerHealthSignal());
         assertThatThrownBy(zero::validateBatchSize).isInstanceOf(IllegalStateException.class);
 
-        VideoProcessingScheduler negative = new VideoProcessingScheduler(service, -1);
+        VideoProcessingScheduler negative = new VideoProcessingScheduler(service, -1, new SchedulerHealthSignal());
         assertThatThrownBy(negative::validateBatchSize).isInstanceOf(IllegalStateException.class);
 
-        VideoProcessingScheduler valid = new VideoProcessingScheduler(service, 1);
+        VideoProcessingScheduler valid = new VideoProcessingScheduler(service, 1, new SchedulerHealthSignal());
         valid.validateBatchSize(); // must not throw
     }
 
@@ -146,7 +147,7 @@ class VideoProcessingSchedulerTest {
     @DisplayName("7: один вызов processVideos() вызывает каждый сервисный метод ровно один раз")
     void singleTickInvokesEachServiceMethodExactlyOnce() {
         VideoProcessingService service = mock(VideoProcessingService.class);
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE, new SchedulerHealthSignal());
 
         scheduler.processVideos();
 
@@ -158,7 +159,7 @@ class VideoProcessingSchedulerTest {
     @DisplayName("11 (Phase 9): планировщик никогда не вызывает retryProcessing() - FAILED->PENDING остаётся только ручной admin-операцией")
     void neverCallsRetryProcessing() {
         VideoProcessingService service = mock(VideoProcessingService.class);
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE, new SchedulerHealthSignal());
 
         scheduler.processVideos();
 
@@ -171,7 +172,7 @@ class VideoProcessingSchedulerTest {
     @DisplayName("15 (MEDIA-HARDENING-1): планировщик вызывает reconcilePendingThumbnailOrphans(batchSize)")
     void invokesReconcilePendingThumbnailOrphansWithConfiguredBatchSize() {
         VideoProcessingService service = mock(VideoProcessingService.class);
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE, new SchedulerHealthSignal());
 
         scheduler.processVideos();
 
@@ -182,7 +183,7 @@ class VideoProcessingSchedulerTest {
     @DisplayName("16 (MEDIA-HARDENING-1): один вызов processVideos() вызывает все три сервисных метода ровно один раз")
     void singleTickInvokesAllThreeServiceMethodsExactlyOnce() {
         VideoProcessingService service = mock(VideoProcessingService.class);
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE, new SchedulerHealthSignal());
 
         scheduler.processVideos();
 
@@ -196,7 +197,7 @@ class VideoProcessingSchedulerTest {
     void processPendingThrows_ReconcileStaleAndPendingThumbnailOrphansStillRunSameTick() {
         VideoProcessingService service = mock(VideoProcessingService.class);
         doThrow(new RuntimeException("simulated processPending failure")).when(service).processPending(anyInt());
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE, new SchedulerHealthSignal());
 
         scheduler.processVideos(); // must not throw
 
@@ -209,7 +210,7 @@ class VideoProcessingSchedulerTest {
     void reconcileStaleThrows_ProcessPendingAndPendingThumbnailOrphansStillRunSameTick() {
         VideoProcessingService service = mock(VideoProcessingService.class);
         doThrow(new RuntimeException("simulated reconcileStale failure")).when(service).reconcileStale(anyInt());
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE, new SchedulerHealthSignal());
 
         scheduler.processVideos(); // must not throw
 
@@ -223,7 +224,7 @@ class VideoProcessingSchedulerTest {
         VideoProcessingService service = mock(VideoProcessingService.class);
         doThrow(new RuntimeException("simulated reconcilePendingThumbnailOrphans failure"))
                 .when(service).reconcilePendingThumbnailOrphans(anyInt());
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE, new SchedulerHealthSignal());
 
         scheduler.processVideos(); // must not throw
 
@@ -237,7 +238,7 @@ class VideoProcessingSchedulerTest {
         VideoProcessingService service = mock(VideoProcessingService.class);
         doThrow(new RuntimeException("simulated reconcilePendingThumbnailOrphans failure"))
                 .when(service).reconcilePendingThumbnailOrphans(anyInt());
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE, new SchedulerHealthSignal());
 
         scheduler.processVideos(); // must not throw
         scheduler.processVideos(); // a second tick must still run normally
@@ -251,7 +252,7 @@ class VideoProcessingSchedulerTest {
     @DisplayName("21 (MEDIA-HARDENING-1): сконфигурированный batchSize передаётся в reconcilePendingThumbnailOrphans, как и в остальные два вызова")
     void sameBatchSizePassedToReconcilePendingThumbnailOrphans() {
         VideoProcessingService service = mock(VideoProcessingService.class);
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, EXPECTED_BATCH_SIZE, new SchedulerHealthSignal());
 
         scheduler.processVideos();
 
@@ -264,7 +265,7 @@ class VideoProcessingSchedulerTest {
     @DisplayName("22 (MEDIA-HARDENING-1): нестандартный сконфигурированный batchSize передаётся в reconcilePendingThumbnailOrphans")
     void nonDefaultConfiguredBatchSizePassedToReconcilePendingThumbnailOrphans() {
         VideoProcessingService service = mock(VideoProcessingService.class);
-        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, 3);
+        VideoProcessingScheduler scheduler = new VideoProcessingScheduler(service, 3, new SchedulerHealthSignal());
 
         scheduler.processVideos();
 

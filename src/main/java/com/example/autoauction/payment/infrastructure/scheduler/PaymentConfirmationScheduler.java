@@ -1,5 +1,6 @@
 package com.example.autoauction.payment.infrastructure.scheduler;
 
+import com.example.autoauction.admin.application.SchedulerHealthSignal;
 import com.example.autoauction.payment.application.PaymentConfirmationOrchestrator;
 import com.example.autoauction.payment.domain.port.PaymentRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -34,11 +35,14 @@ public class PaymentConfirmationScheduler {
 
     private final PaymentRepository paymentRepository;
     private final PaymentConfirmationOrchestrator paymentConfirmationOrchestrator;
+    private final SchedulerHealthSignal schedulerHealthSignal;
 
     public PaymentConfirmationScheduler(PaymentRepository paymentRepository,
-                                         PaymentConfirmationOrchestrator paymentConfirmationOrchestrator) {
+                                         PaymentConfirmationOrchestrator paymentConfirmationOrchestrator,
+                                         SchedulerHealthSignal schedulerHealthSignal) {
         this.paymentRepository = paymentRepository;
         this.paymentConfirmationOrchestrator = paymentConfirmationOrchestrator;
+        this.schedulerHealthSignal = schedulerHealthSignal;
         log.info("PaymentConfirmationScheduler initialized");
     }
 
@@ -49,6 +53,7 @@ public class PaymentConfirmationScheduler {
             candidates = paymentRepository.findConfirmationCandidateReferences();
         } catch (Exception e) {
             log.error("Payment confirmation candidate scan failed: {}", e.getMessage(), e);
+            schedulerHealthSignal.reportFailure("PaymentConfirmationScheduler.pollPendingConfirmations");
             return;
         }
         int processed = 0;
@@ -64,5 +69,6 @@ public class PaymentConfirmationScheduler {
         if (processed > 0) {
             log.info("Payment confirmation poll: {} of {} candidate(s) processed", processed, candidates.size());
         }
+        schedulerHealthSignal.reportSuccess("PaymentConfirmationScheduler.pollPendingConfirmations");
     }
 }

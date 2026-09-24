@@ -1,5 +1,6 @@
 package com.example.autoauction.auction.infrastructure.scheduler;
 
+import com.example.autoauction.admin.application.SchedulerHealthSignal;
 import com.example.autoauction.auction.application.AuctionFinalizer;
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
@@ -28,6 +29,9 @@ class AuctionCompletionSchedulerOptimizedTest {
 
     @Mock
     private AuctionFinalizer auctionFinalizer;
+
+    @Mock
+    private SchedulerHealthSignal schedulerHealthSignal;
 
     @InjectMocks
     private AuctionCompletionScheduler scheduler;

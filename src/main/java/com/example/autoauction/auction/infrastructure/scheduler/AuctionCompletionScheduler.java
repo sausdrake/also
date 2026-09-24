@@ -1,5 +1,6 @@
 package com.example.autoauction.auction.infrastructure.scheduler;
 
+import com.example.autoauction.admin.application.SchedulerHealthSignal;
 import com.example.autoauction.auction.application.AuctionFinalizer;
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
@@ -26,6 +27,7 @@ public class AuctionCompletionScheduler {
     private final AuctionFinalizer auctionFinalizer;
     private final AuctionParticipantRepository participantRepository;
     private final NotificationService notificationService;
+    private final SchedulerHealthSignal schedulerHealthSignal;
 
     private final Set<String> sentEndingWarnings = ConcurrentHashMap.newKeySet();
 
@@ -35,11 +37,13 @@ public class AuctionCompletionScheduler {
     public AuctionCompletionScheduler(AuctionRepository auctionRepository,
                                       AuctionFinalizer auctionFinalizer,
                                       AuctionParticipantRepository participantRepository,
-                                      NotificationService notificationService) {
+                                      NotificationService notificationService,
+                                      SchedulerHealthSignal schedulerHealthSignal) {
         this.auctionRepository = auctionRepository;
         this.auctionFinalizer = auctionFinalizer;
         this.participantRepository = participantRepository;
         this.notificationService = notificationService;
+        this.schedulerHealthSignal = schedulerHealthSignal;
         log.info("AuctionCompletionScheduler initialized");
     }
 
@@ -59,17 +63,29 @@ public class AuctionCompletionScheduler {
      */
     @Scheduled(fixedDelay = 60_000)
     public void completeExpiredAuctions() {
-        OffsetDateTime now = OffsetDateTime.now();
-        List<Auction> expired = auctionRepository.findByStatusAndEndTimeBefore(AuctionStatus.ACTIVE, now);
+        // Phase 73 (G-N4): the try/catch below exists ONLY to report the operational signal -
+        // it re-throws unconditionally, preserving this method's deliberate R-3 propagation
+        // design exactly (see class Javadoc above) rather than swallowing anything new here.
+        try {
+            OffsetDateTime now = OffsetDateTime.now();
+            List<Auction> expired = auctionRepository.findByStatusAndEndTimeBefore(AuctionStatus.ACTIVE, now);
 
-        if (expired.isEmpty()) return;
+            if (expired.isEmpty()) {
+                schedulerHealthSignal.reportSuccess("AuctionCompletionScheduler.completeExpiredAuctions");
+                return;
+            }
 
-        int count = 0;
-        for (Auction auction : expired) {
-            log.info("Finalizing expired auction {} (vehicle {})", auction.getId(), auction.getVehicleId());
-            if (auctionFinalizer.finalizeAuction(auction)) count++;
+            int count = 0;
+            for (Auction auction : expired) {
+                log.info("Finalizing expired auction {} (vehicle {})", auction.getId(), auction.getVehicleId());
+                if (auctionFinalizer.finalizeAuction(auction)) count++;
+            }
+            log.info("Finalized {} expired auctions", count);
+            schedulerHealthSignal.reportSuccess("AuctionCompletionScheduler.completeExpiredAuctions");
+        } catch (RuntimeException e) {
+            schedulerHealthSignal.reportFailure("AuctionCompletionScheduler.completeExpiredAuctions");
+            throw e;
         }
-        log.info("Finalized {} expired auctions", count);
     }
 
     /**
@@ -92,7 +108,10 @@ public class AuctionCompletionScheduler {
         OffsetDateTime now = OffsetDateTime.now();
         List<Auction> ready = auctionRepository.findConfirmedAuctionsReadyToStart(now);
 
-        if (ready.isEmpty()) return;
+        if (ready.isEmpty()) {
+            schedulerHealthSignal.reportSuccess("AuctionCompletionScheduler.startConfirmedAuctions");
+            return;
+        }
 
         for (Auction auction : ready) {
             try {
@@ -102,6 +121,7 @@ public class AuctionCompletionScheduler {
                 log.error("Failed to auto-start auction {}: {}", auction.getId(), e.getMessage());
             }
         }
+        schedulerHealthSignal.reportSuccess("AuctionCompletionScheduler.startConfirmedAuctions");
     }
 
     /** Каждую минуту: предупреждения за 1 час, 15 минут, 5 минут до окончания */
@@ -138,6 +158,7 @@ public class AuctionCompletionScheduler {
                 }
             }
         }
+        schedulerHealthSignal.reportSuccess("AuctionCompletionScheduler.sendEndingSoonWarnings");
     }
 
     /**
@@ -155,7 +176,10 @@ public class AuctionCompletionScheduler {
         OffsetDateTime deadline = OffsetDateTime.now().plusHours(confirmHours);
         List<Auction> overdue = auctionRepository.findUnconfirmedAuctionsPastDeadline(deadline);
 
-        if (overdue.isEmpty()) return;
+        if (overdue.isEmpty()) {
+            schedulerHealthSignal.reportSuccess("AuctionCompletionScheduler.cancelUnconfirmedAuctions");
+            return;
+        }
 
         for (Auction auction : overdue) {
             try {
@@ -175,5 +199,6 @@ public class AuctionCompletionScheduler {
                 log.error("Failed to auto-cancel auction {}: {}", auction.getId(), e.getMessage());
             }
         }
+        schedulerHealthSignal.reportSuccess("AuctionCompletionScheduler.cancelUnconfirmedAuctions");
     }
 }
