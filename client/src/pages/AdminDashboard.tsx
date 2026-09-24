@@ -10,6 +10,7 @@ import { LateSuccessPaymentsPage } from './admin/LateSuccessPaymentsPage';
 import { AdminSalePage } from './admin/AdminSalePage';
 import { AdminIdentityPage } from './admin/AdminIdentityPage';
 import { AdminReconciliationPage } from './admin/AdminReconciliationPage';
+import { AdminVehiclesNeedsRediagnosticPage } from './admin/AdminVehiclesNeedsRediagnosticPage';
 import { RejectReportModal } from '../components/admin/diagnostic/RejectReportModal';
 import { SellerViolationResolutionPanel, type ViolationResolution } from '../components/admin/diagnostic/SellerViolationResolutionPanel';
 
@@ -2656,6 +2657,7 @@ export function AdminDashboard() {
             <Route path="sale/:auctionId" element={<AdminSalePage />} />
             <Route path="identity" element={<AdminIdentityPage />} />
             <Route path="reconciliation" element={<AdminReconciliationPage />} />
+            <Route path="vehicles/needs-rediagnostic" element={<AdminVehiclesNeedsRediagnosticPage />} />
             <Route path="policy" element={<PolicyPage />} />
             <Route path="deposits" element={<DepositsPage />} />
             <Route path="payments/late-successes" element={<LateSuccessPaymentsPage />} />

@@ -91,4 +91,10 @@ public class AdminVehicleController {
     public List<VehicleResponse> getInAuctionVehicles() {
         return vehicleService.getVehiclesByStatus(VehicleStatus.IN_AUCTION);
     }
+
+    @GetMapping("/needs-rediagnostic")
+    @Operation(summary = "Получить автомобили, требующие повторной диагностики")
+    public List<VehicleResponse> getNeedsRediagnosticVehicles() {
+        return vehicleService.getVehiclesByStatus(VehicleStatus.NEEDS_REDIAGNOSTIC);
+    }
 }

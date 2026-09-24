@@ -55,6 +55,7 @@ class AdminVehicleControllerTest {
     private VehicleResponse rejectedVehicle;
     private VehicleResponse needsFixesVehicle;
     private VehicleResponse inAuctionVehicle;
+    private VehicleResponse needsRediagnosticVehicle;
     private final Long adminId = 1L;
     private final Long diagnosticId = 16L;
     private final String adminName = "admin";
@@ -144,6 +145,24 @@ class AdminVehicleControllerTest {
         inAuctionDomain.approve(adminId, adminName);
         inAuctionDomain.markInAuction();
         inAuctionVehicle = VehicleResponse.fromDomain(inAuctionDomain);
+
+        Vehicle needsRediagnosticDomain = new Vehicle(
+                "Toyota", "Camry", 2022, "4T1BF1FK5GU123456",
+                VehicleType.SEDAN, diagnosticId, diagnosticName
+        );
+        needsRediagnosticDomain.setId(4L);
+        needsRediagnosticDomain.setLicensePlate("D012HK");
+        needsRediagnosticDomain.setColor("white");
+        needsRediagnosticDomain.setMileage(20000);
+        needsRediagnosticDomain.setEngineCapacity(2.5);
+        needsRediagnosticDomain.setFuelType(FuelType.PETROL);
+        needsRediagnosticDomain.setTransmission("auto");
+        needsRediagnosticDomain.setDescription("Needs rediagnostic after sale failure");
+        needsRediagnosticDomain.submitForReview();
+        needsRediagnosticDomain.approve(adminId, adminName);
+        needsRediagnosticDomain.markInAuction();
+        needsRediagnosticDomain.markNeedsRediagnostic();
+        needsRediagnosticVehicle = VehicleResponse.fromDomain(needsRediagnosticDomain);
     }
 
     // ==================== GET PENDING VEHICLES TESTS ====================
@@ -428,6 +447,56 @@ class AdminVehicleControllerTest {
         @DisplayName("Доступ запрещён для не-админа")
         void getInAuctionVehicles_ByNonAdmin_ShouldReturnForbidden() throws Exception {
             mockMvc.perform(get("/api/v1/admin/vehicles/in-auction"))
+                    .andExpect(status().isForbidden());
+
+            verify(vehicleService, never()).getVehiclesByStatus(any());
+        }
+    }
+
+    // ==================== GET NEEDS REDIAGNOSTIC VEHICLES TESTS ====================
+
+    @Nested
+    @DisplayName("GET /api/admin/vehicles/needs-rediagnostic - Получение требующих повторной диагностики")
+    class GetNeedsRediagnosticVehiclesTests {
+
+        @Test
+        @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
+        @DisplayName("Успешное получение списка")
+        void getNeedsRediagnosticVehicles_ShouldReturnList() throws Exception {
+            when(vehicleService.getVehiclesByStatus(VehicleStatus.NEEDS_REDIAGNOSTIC))
+                    .thenReturn(List.of(needsRediagnosticVehicle));
+
+            mockMvc.perform(get("/api/v1/admin/vehicles/needs-rediagnostic"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$").isArray())
+                    .andExpect(jsonPath("$.length()").value(1))
+                    .andExpect(jsonPath("$[0].status").value("NEEDS_REDIAGNOSTIC"));
+
+            // Guards against a copy/paste mistake calling the wrong VehicleStatus constant
+            // (e.g. PENDING_REVIEW, NEEDS_FIXES, APPROVED, IN_AUCTION).
+            verify(vehicleService, times(1)).getVehiclesByStatus(VehicleStatus.NEEDS_REDIAGNOSTIC);
+        }
+
+        @Test
+        @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
+        @DisplayName("Пустой список")
+        void getNeedsRediagnosticVehicles_EmptyList_ShouldReturnEmptyArray() throws Exception {
+            when(vehicleService.getVehiclesByStatus(VehicleStatus.NEEDS_REDIAGNOSTIC))
+                    .thenReturn(List.of());
+
+            mockMvc.perform(get("/api/v1/admin/vehicles/needs-rediagnostic"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$").isArray())
+                    .andExpect(jsonPath("$.length()").value(0));
+
+            verify(vehicleService, times(1)).getVehiclesByStatus(VehicleStatus.NEEDS_REDIAGNOSTIC);
+        }
+
+        @Test
+        @WithMockCustomUser(userId = 2L, username = "user", roles = {"USER"})
+        @DisplayName("Доступ запрещён для не-админа")
+        void getNeedsRediagnosticVehicles_ByNonAdmin_ShouldReturnForbidden() throws Exception {
+            mockMvc.perform(get("/api/v1/admin/vehicles/needs-rediagnostic"))
                     .andExpect(status().isForbidden());
 
             verify(vehicleService, never()).getVehiclesByStatus(any());
