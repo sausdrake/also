@@ -59,6 +59,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Публичные — без авторизации
                         .requestMatchers(
+                                new AntPathRequestMatcher("/api/health"),
                                 new AntPathRequestMatcher("/api/auth/**"),
                                 new AntPathRequestMatcher("/api/public/**"),
                                 new AntPathRequestMatcher("/api/v1/public/**"),
