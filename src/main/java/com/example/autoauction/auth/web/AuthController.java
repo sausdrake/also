@@ -1,8 +1,11 @@
 package com.example.autoauction.auth.web;
 
+import com.example.autoauction.auction.application.RateLimitException;
+import com.example.autoauction.auth.application.AuthRateLimitService;
 import com.example.autoauction.auth.application.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -18,16 +21,22 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final AuthRateLimitService authRateLimitService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, AuthRateLimitService authRateLimitService) {
         this.authService = authService;
+        this.authRateLimitService = authRateLimitService;
     }
 
     @PostMapping("/register")
     @Operation(summary = "Регистрация нового пользователя")
     public ResponseEntity<AuthService.AuthResponse> register(
-            @Valid @RequestBody RegisterRequest request
+            @Valid @RequestBody RegisterRequest request,
+            HttpServletRequest httpRequest
     ) {
+        if (!authRateLimitService.tryAcquire(AuthRateLimitService.Scope.REGISTER, httpRequest.getRemoteAddr())) {
+            throw new RateLimitException("Слишком много попыток регистрации. Попробуйте позже.");
+        }
         log.info("Registration request for username: {}", request.username());
         AuthService.AuthResponse response = authService.register(
                 new AuthService.RegisterRequest(
@@ -43,8 +52,12 @@ public class AuthController {
     @PostMapping("/login")
     @Operation(summary = "Вход в систему")
     public ResponseEntity<AuthService.AuthResponse> login(
-            @Valid @RequestBody LoginRequest request
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest
     ) {
+        if (!authRateLimitService.tryAcquire(AuthRateLimitService.Scope.LOGIN, httpRequest.getRemoteAddr())) {
+            throw new RateLimitException("Слишком много попыток входа. Попробуйте позже.");
+        }
         log.info("Login attempt for username: {}", request.username());
         AuthService.AuthResponse response = authService.authenticate(
                 new AuthService.LoginRequest(
@@ -80,7 +93,10 @@ public class AuthController {
 
     @GetMapping("/create-hash")
     @Operation(summary = "Создать хеш пароля (временный)")
-    public String createHash(@RequestParam String password) {
+    public String createHash(@RequestParam String password, HttpServletRequest httpRequest) {
+        if (!authRateLimitService.tryAcquire(AuthRateLimitService.Scope.CREATE_HASH, httpRequest.getRemoteAddr())) {
+            throw new RateLimitException("Слишком много запросов. Попробуйте позже.");
+        }
         log.warn("Password hash generation endpoint used (temporary)");
         return authService.createPasswordHash(password);
     }
