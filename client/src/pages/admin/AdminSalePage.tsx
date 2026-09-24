@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../api/client';
 import { SaleStatusCard } from '../../components/admin/sale/SaleStatusCard';
@@ -100,13 +100,22 @@ export function AdminSalePage() {
     setTimeout(() => setMsg(null), 4000);
   };
 
+  // Guards against a stale response overwriting a newer one - e.g. the admin navigates from
+  // this auction's sale page to a different one (the route param changes, but this component
+  // is not remounted) while a fetch for the old auction is still in flight, or a mutation
+  // child's onDone fires a refresh() that resolves after a newer one already has. Every
+  // refresh() call bumps the generation before its request starts; only the response whose
+  // captured generation still matches the current one may mutate state.
+  const requestGeneration = useRef(0);
+
   const refresh = useCallback(() => {
+    const generation = ++requestGeneration.current;
     setLoading(true);
     setNotFound(false);
     api.get<SaleStatus>(`/admin/sale/${id}`)
-      .then(r => setStatus(r.data))
-      .catch(e => { if (e.response?.status === 404) setNotFound(true); })
-      .finally(() => setLoading(false));
+      .then(r => { if (generation === requestGeneration.current) setStatus(r.data); })
+      .catch(e => { if (generation === requestGeneration.current && e.response?.status === 404) setNotFound(true); })
+      .finally(() => { if (generation === requestGeneration.current) setLoading(false); });
   }, [id]);
 
   useEffect(() => {
