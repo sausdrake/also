@@ -35,7 +35,7 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       JWT_SECRET: ${JWT_SECRET}
     ports:
-      - "8080:8080"
+      - "8081:8081"
     networks:
       - autoauction-network
 

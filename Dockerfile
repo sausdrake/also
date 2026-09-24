@@ -26,7 +26,7 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 
 # Открываем порт
-EXPOSE 8080
+EXPOSE 8081
 
 # Точка входа
 ENTRYPOINT ["java", "-jar", "app.jar"]
