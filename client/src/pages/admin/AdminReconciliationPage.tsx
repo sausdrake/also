@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../../api/client';
 import { ReconciliationCaseList, type ReconciliationCaseListItem } from '../../components/admin/reconciliation/ReconciliationCaseList';
 import { ReconciliationCaseDetail, type ReconciliationCaseDetailResponse } from '../../components/admin/reconciliation/ReconciliationCaseDetail';
@@ -36,6 +36,13 @@ export function AdminReconciliationPage() {
   const [detail, setDetail] = useState<ReconciliationCaseDetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // Phase 66: monotonically increasing generation guarding every detail-fetch's async callbacks -
+  // loadDetail bumps it and captures its own value locally; handleActioned also bumps it (with no
+  // request of its own) so an already-in-flight loadDetail response can never resurrect detail
+  // state after the admin has explicitly cleared it via resolve. Any callback whose captured
+  // generation no longer matches the ref's current value performs no state mutation at all.
+  const detailRequestGeneration = useRef(0);
+
   const refresh = useCallback(() => {
     setLoading(true);
     const params: Record<string, string> = {};
@@ -51,17 +58,21 @@ export function AdminReconciliationPage() {
 
   const loadDetail = (id: number) => {
     setSelectedId(id);
+    const generation = ++detailRequestGeneration.current;
     setDetailLoading(true);
     api.get<ReconciliationCaseDetailResponse>(`/admin/reconciliation/cases/${id}`)
-      .then(r => setDetail(r.data))
-      .catch(() => setDetail(null))
-      .finally(() => setDetailLoading(false));
+      .then(r => { if (generation === detailRequestGeneration.current) setDetail(r.data); })
+      .catch(() => { if (generation === detailRequestGeneration.current) setDetail(null); })
+      .finally(() => { if (generation === detailRequestGeneration.current) setDetailLoading(false); });
   };
 
   // After any action (success OR 409/404), the acted-on case's state may have changed and the
   // list is stale - always re-fetch the authoritative list and drop the (now possibly stale)
   // selection rather than assume the action succeeded or that the case still belongs in view.
+  // Invalidating the generation here ensures an already-in-flight loadDetail response (fired
+  // before this action settled) can never overwrite the cleared state once it arrives.
   const handleActioned = () => {
+    detailRequestGeneration.current++;
     refresh();
     setSelectedId(null);
     setDetail(null);
