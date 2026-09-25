@@ -8,11 +8,11 @@ import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.auction.web.AuctionWebSocketController;
 import com.example.autoauction.auction.web.dto.BidResponse;
 import com.example.autoauction.deposit.application.DepositService;
-import com.example.autoauction.notification.application.NotificationService;
 import com.example.autoauction.policy.application.PolicyVersionService;
 import com.example.autoauction.user.application.UserService;
 import com.example.autoauction.user.domain.User;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.retry.annotation.Backoff;
@@ -34,7 +34,7 @@ public class BidService {
     private final AuctionFinalizer auctionFinalizer;
     private final RateLimitService rateLimitService;
     private final AuctionWebSocketController webSocketController;
-    private final NotificationService notificationService;
+    private final ApplicationEventPublisher eventPublisher;
     private final PolicyVersionService policyVersionService;
     private final UserService userService;
 
@@ -44,7 +44,7 @@ public class BidService {
                       AuctionFinalizer auctionFinalizer,
                       RateLimitService rateLimitService,
                       AuctionWebSocketController webSocketController,
-                      NotificationService notificationService,
+                      ApplicationEventPublisher eventPublisher,
                       PolicyVersionService policyVersionService,
                       UserService userService) {
         this.auctionRepository = auctionRepository;
@@ -53,7 +53,7 @@ public class BidService {
         this.auctionFinalizer = auctionFinalizer;
         this.rateLimitService = rateLimitService;
         this.webSocketController = webSocketController;
-        this.notificationService = notificationService;
+        this.eventPublisher = eventPublisher;
         this.policyVersionService = policyVersionService;
         this.userService = userService;
         log.info("BidService initialized with WebSocket and Notification support");
@@ -258,54 +258,10 @@ public class BidService {
                 auctionExtended = true;
                 wasAuctionExtended = true;
                 log.info("Аукцион {} продлен! Новое время окончания: {}", auctionId, auction.getEndTime());
-
-                // ✅ Отправляем уведомление о продлении
-                webSocketController.sendAuctionExtended(auctionId, auction.getEndTime());
             }
 
             log.info("Ставка {} успешно принята, новая цена: {}, лидер: {}",
                     amount, auction.getCurrentPrice(), bidderId);
-
-            // ✅ Отправляем уведомление о новой ставке
-            webSocketController.sendAuctionUpdate(auction, "BID_PLACED");
-
-            // Уведомление предыдущему лидеру о том, что его ставку перебили
-            if (prevLeaderId != null && !prevLeaderId.equals(bidderId)) {
-                try {
-                    notificationService.send(prevLeaderId, "OUTBID",
-                            "Вашу ставку перебили",
-                            String.format("В аукционе \"%s\" сделана новая ставка: %s сом. Успейте сделать новую ставку!",
-                                    auction.getVehicleInfo(), amount.toPlainString()),
-                            auctionId, "AUCTION");
-                } catch (Exception e2) {
-                    log.warn("Failed to send outbid notification to user {}: {}", prevLeaderId, e2.getMessage());
-                }
-            }
-
-            // Notify seller about new bid on their vehicle
-            Long sellerId = auction.getCreatedBy();
-            if (sellerId != null && !sellerId.equals(bidderId)) {
-                try {
-                    notificationService.send(sellerId, "NEW_BID_ON_VEHICLE",
-                            "Новая ставка на ваш автомобиль",
-                            String.format("На ваш автомобиль \"%s\" была сделана новая ставка %s сом.",
-                                    auction.getVehicleInfo(), amount.toPlainString()),
-                            auctionId, "AUCTION");
-                } catch (Exception e) {
-                    log.warn("Failed to notify seller {} about new bid: {}", sellerId, e.getMessage());
-                }
-            }
-
-            // Notify bidder that they are now leading
-            try {
-                notificationService.send(bidderId, "AUCTION_LEADER",
-                        "Вы лидер торгов!",
-                        String.format("Ваша ставка %s сом является максимальной по лоту \"%s\".",
-                                amount.toPlainString(), auction.getVehicleInfo()),
-                        auctionId, "AUCTION");
-            } catch (Exception e) {
-                log.warn("Failed to notify bidder {} about leadership: {}", bidderId, e.getMessage());
-            }
 
         } catch (IllegalStateException | IllegalArgumentException e) {
             log.warn("Ошибка при создании ставки: {}", e.getMessage());
@@ -323,6 +279,11 @@ public class BidService {
 
         Auction saved = auctionRepository.save(auction);
         log.debug("Аукцион сохранен, версия: {}", saved.getVersion());
+
+        // Deferred to AFTER_COMMIT (see BidPlacedEventListener): a retried/rolled-back attempt's
+        // WebSocket/notification side effects must never fire, and a WS/notification failure must
+        // never invalidate an already-committed bid (MVP-001).
+        eventPublisher.publishEvent(new BidPlacedEvent(saved, bidderId, amount, prevLeaderId, auctionExtended));
 
         log.info("Ставка успешно создана! Итоговый статус аукциона: {}, продление: {}",
                 saved.getStatus(), auctionExtended);

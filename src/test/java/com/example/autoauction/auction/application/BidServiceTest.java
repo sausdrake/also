@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -51,6 +52,9 @@ class BidServiceTest {
 
     @Mock
     private AuctionWebSocketController webSocketController;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @Mock
     private PolicyVersionService policyVersionService;
@@ -183,6 +187,9 @@ class BidServiceTest {
             verify(depositService, times(1)).freezeForAuction(bidderId1, auctionId, requiredDeposit);
             verify(participantRepository, times(1)).registerParticipant(eq(auctionId), eq(bidderId1), any(BigDecimal.class));
             verify(auctionRepository, times(1)).save(any(Auction.class));
+            // MVP-001: side effects are deferred via an AFTER_COMMIT event, never called directly.
+            verify(eventPublisher, times(1)).publishEvent(any(BidPlacedEvent.class));
+            verifyNoInteractions(webSocketController);
         }
 
         @Test
@@ -299,6 +306,8 @@ class BidServiceTest {
             assertTrue(exception.getMessage().contains("слишком мала"));
 
             verify(depositService, times(1)).unfreezeForAuction(bidderId1, auctionId);
+            // MVP-001: a rejected bid must never publish a side-effect event.
+            verifyNoInteractions(eventPublisher);
         }
 
         @Test
