@@ -91,16 +91,6 @@ public class AuthController {
         return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/create-hash")
-    @Operation(summary = "Создать хеш пароля (временный)")
-    public String createHash(@RequestParam String password, HttpServletRequest httpRequest) {
-        if (!authRateLimitService.tryAcquire(AuthRateLimitService.Scope.CREATE_HASH, httpRequest.getRemoteAddr())) {
-            throw new RateLimitException("Слишком много запросов. Попробуйте позже.");
-        }
-        log.warn("Password hash generation endpoint used (temporary)");
-        return authService.createPasswordHash(password);
-    }
-
     public record RegisterRequest(
             @NotBlank @Size(min = 3, max = 50) String username,
             @NotBlank @Email String email,

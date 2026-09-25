@@ -60,7 +60,7 @@ class AuthRateLimitServiceTest {
         }
 
         @Test
-        @DisplayName("Разные scope одного IP независимы (LOGIN не влияет на REGISTER/CREATE_HASH)")
+        @DisplayName("Разные scope одного IP независимы (LOGIN не влияет на REGISTER)")
         void differentScopes_SameIp_HaveIndependentLimits() {
             String ip = "10.0.0.30";
             for (int i = 0; i < AuthRateLimitService.LOGIN_PER_MINUTE; i++) {
@@ -69,11 +69,10 @@ class AuthRateLimitServiceTest {
             assertThat(service.tryAcquire(AuthRateLimitService.Scope.LOGIN, ip)).isFalse();
 
             assertThat(service.tryAcquire(AuthRateLimitService.Scope.REGISTER, ip)).isTrue();
-            assertThat(service.tryAcquire(AuthRateLimitService.Scope.CREATE_HASH, ip)).isTrue();
         }
 
         @Test
-        @DisplayName("REGISTER имеет собственный (меньший) лимит, отдельный от LOGIN/CREATE_HASH")
+        @DisplayName("REGISTER имеет собственный (меньший) лимит, отдельный от LOGIN")
         void registerScope_HasOwnCapacity() {
             String ip = "10.0.0.31";
             for (int i = 0; i < AuthRateLimitService.REGISTER_PER_MINUTE; i++) {
@@ -106,7 +105,7 @@ class AuthRateLimitServiceTest {
         void bucketCount_ReflectsActiveKeys() {
             service.tryAcquire(AuthRateLimitService.Scope.LOGIN, "10.0.1.1");
             service.tryAcquire(AuthRateLimitService.Scope.REGISTER, "10.0.1.1");
-            service.tryAcquire(AuthRateLimitService.Scope.CREATE_HASH, "10.0.1.2");
+            service.tryAcquire(AuthRateLimitService.Scope.LOGIN, "10.0.1.2");
 
             assertThat(service.bucketCount()).isEqualTo(3);
         }

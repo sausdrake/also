@@ -662,52 +662,6 @@ class AuthServiceTest {
         }
     }
 
-    // ==================== ТЕСТЫ ДЛЯ createPasswordHash ====================
-
-    @Nested
-    @DisplayName("Хеширование пароля - расширенные сценарии")
-    class ExtendedPasswordHashTests {
-
-        @Test
-        @DisplayName("Хеширование очень длинного пароля - должен быть отклонён")
-        void createPasswordHash_WithVeryLongPassword_ShouldThrowException() {
-            // Пароль длиной 256 символов (превышает MAX_PASSWORD_LENGTH = 255)
-            String veryLongPassword = "a".repeat(256);
-
-            assertThrows(IllegalArgumentException.class,
-                    () -> authService.createPasswordHash(veryLongPassword));
-        }
-
-        @Test
-        @DisplayName("Хеширование пароля с Unicode символами")
-        void createPasswordHash_WithUnicodePassword_ShouldSucceed() {
-            String unicodePassword = "пароль🔐123";
-            when(passwordEncoder.encode(unicodePassword)).thenReturn(encodedPassword);
-
-            String hash = authService.createPasswordHash(unicodePassword);
-
-            assertEquals(encodedPassword, hash);
-        }
-
-        @Test
-        @DisplayName("Хеширование пароля с пробелами")
-        void createPasswordHash_WithSpacesInPassword_ShouldSucceed() {
-            String passwordWithSpaces = "my secret password 123";
-            when(passwordEncoder.encode(passwordWithSpaces)).thenReturn(encodedPassword);
-
-            String hash = authService.createPasswordHash(passwordWithSpaces);
-
-            assertEquals(encodedPassword, hash);
-        }
-
-        @Test
-        @DisplayName("Хеширование пароля с null - исключение")
-        void createPasswordHash_WithNull_ShouldThrowException() {
-            assertThrows(IllegalArgumentException.class,
-                    () -> authService.createPasswordHash(null));
-        }
-    }
-
     // ==================== ТЕСТЫ НА ВРЕМЯ ЖИЗНИ ТОКЕНОВ ====================
 
     @Nested

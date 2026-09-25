@@ -16,24 +16,23 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.util.Set;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Phase 64: HTTP-layer proof that {@code /api/auth/login}, {@code /register}, and {@code
- * /create-hash} are IP-keyed rate-limited via {@code AuthRateLimitService}, and that {@code
- * /refresh}/{@code /logout} (bearer-token-protected, not a guessable-credential surface) remain
- * untouched. Each test uses its own distinct fake remote address (via {@link #fromIp}) so the
- * shared, Spring-managed {@code AuthRateLimitService} bean's buckets never cross-contaminate
- * between test methods, mirroring the isolation {@code RateLimitServiceTest} achieves via
- * per-method user ids for the bidding limiter.
+ * Phase 64: HTTP-layer proof that {@code /api/auth/login} and {@code /register} are IP-keyed
+ * rate-limited via {@code AuthRateLimitService}, and that {@code /refresh}/{@code /logout}
+ * (bearer-token-protected, not a guessable-credential surface) remain untouched. Each test uses
+ * its own distinct fake remote address (via {@link #fromIp}) so the shared, Spring-managed
+ * {@code AuthRateLimitService} bean's buckets never cross-contaminate between test methods,
+ * mirroring the isolation {@code RateLimitServiceTest} achieves via per-method user ids for the
+ * bidding limiter.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@DisplayName("Auth rate limiting - IP-keyed throttling for login/register/create-hash")
+@DisplayName("Auth rate limiting - IP-keyed throttling for login/register")
 class AuthRateLimitApiIntegrationTest {
 
     @Autowired private MockMvc mockMvc;
@@ -121,25 +120,8 @@ class AuthRateLimitApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("create-hash: below-limit executes normally, (N+1)th returns 429")
-    void createHash_BelowLimit_ThenExceeded429() throws Exception {
-        String ip = "10.10.3.1";
-
-        for (int i = 0; i < 5; i++) {
-            mockMvc.perform(get("/api/auth/create-hash").with(fromIp(ip))
-                            .param("password", "somePassword123"))
-                    .andExpect(status().isOk());
-        }
-
-        mockMvc.perform(get("/api/auth/create-hash").with(fromIp(ip))
-                        .param("password", "somePassword123"))
-                .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.status").value(429));
-    }
-
-    @Test
-    @DisplayName("cross-scope independence: exhausting LOGIN from one IP does not affect REGISTER or CREATE_HASH from the same IP")
-    void exhaustingLogin_DoesNotAffectRegisterOrCreateHash() throws Exception {
+    @DisplayName("cross-scope independence: exhausting LOGIN from one IP does not affect REGISTER from the same IP")
+    void exhaustingLogin_DoesNotAffectRegister() throws Exception {
         String ip = "10.10.4.1";
         String loginBody = "{\"username\":\"crossscope-nonexistent\",\"password\":\"wrongpass\"}";
 
@@ -157,11 +139,6 @@ class AuthRateLimitApiIntegrationTest {
                 System.nanoTime(), System.nanoTime());
         mockMvc.perform(post("/api/auth/register").with(fromIp(ip))
                         .contentType("application/json").content(registerBody))
-                .andExpect(status().isOk());
-
-        // CREATE_HASH from the same IP is still fully available.
-        mockMvc.perform(get("/api/auth/create-hash").with(fromIp(ip))
-                        .param("password", "anotherPassword123"))
                 .andExpect(status().isOk());
     }
 }

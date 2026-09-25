@@ -37,9 +37,8 @@ public class AuthRateLimitService {
 
     static final int LOGIN_PER_MINUTE = 5;
     static final int REGISTER_PER_MINUTE = 3;
-    static final int CREATE_HASH_PER_MINUTE = 5;
 
-    public enum Scope { LOGIN, REGISTER, CREATE_HASH }
+    public enum Scope { LOGIN, REGISTER }
 
     // Bucket + timestamp последнего использования для eviction
     private final Map<String, BucketEntry> buckets = new ConcurrentHashMap<>();
@@ -83,7 +82,6 @@ public class AuthRateLimitService {
         int capacity = switch (scope) {
             case LOGIN -> LOGIN_PER_MINUTE;
             case REGISTER -> REGISTER_PER_MINUTE;
-            case CREATE_HASH -> CREATE_HASH_PER_MINUTE;
         };
         Bandwidth limit = Bandwidth.builder()
                 .capacity(capacity)

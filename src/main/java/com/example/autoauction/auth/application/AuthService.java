@@ -333,27 +333,6 @@ public class AuthService {
         return refreshTokenString;
     }
 
-    // ==================== ХЕШИРОВАНИЕ ПАРОЛЯ ====================
-
-    public String createPasswordHash(String rawPassword) {
-        log.debug("Creating password hash");
-
-        if (rawPassword == null || rawPassword.trim().isEmpty()) {
-            log.warn("Cannot create hash for empty password");
-            throw new IllegalArgumentException("Password cannot be empty");
-        }
-
-        if (rawPassword.length() < MIN_PASSWORD_LENGTH) {
-            throw new IllegalArgumentException("Password must be at least " + MIN_PASSWORD_LENGTH + " characters");
-        }
-
-        if (rawPassword.length() > MAX_PASSWORD_LENGTH) {
-            throw new IllegalArgumentException("Password must be at most " + MAX_PASSWORD_LENGTH + " characters");
-        }
-
-        return passwordEncoder.encode(rawPassword);
-    }
-
     // ==================== ВАЛИДАЦИЯ ====================
 
     private void validateRegisterRequest(RegisterRequest request) {
