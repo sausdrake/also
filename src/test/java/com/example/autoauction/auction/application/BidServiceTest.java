@@ -5,7 +5,6 @@ import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionParticipantRepository;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
-import com.example.autoauction.auction.web.AuctionWebSocketController;
 import com.example.autoauction.auction.web.dto.BidResponse;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.policy.application.PolicyVersionService;
@@ -49,9 +48,6 @@ class BidServiceTest {
 
     @Mock
     private RateLimitService rateLimitService;
-
-    @Mock
-    private AuctionWebSocketController webSocketController;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -189,7 +185,6 @@ class BidServiceTest {
             verify(auctionRepository, times(1)).save(any(Auction.class));
             // MVP-001: side effects are deferred via an AFTER_COMMIT event, never called directly.
             verify(eventPublisher, times(1)).publishEvent(any(BidPlacedEvent.class));
-            verifyNoInteractions(webSocketController);
         }
 
         @Test
@@ -659,13 +654,14 @@ class BidServiceTest {
             // when
             BidResponse response = bidService.buyNow(2L, bidderId1);
 
-            // then: finalizer, WebSocket notification and the response all use the SAME
-            // buyer-facing amount - never the raw stored buyNowPrice
+            // then: the finalizer and the response both use the SAME buyer-facing amount - never
+            // the raw stored buyNowPrice. (MVP-002: BidService.buyNow() no longer calls
+            // webSocketController directly - finalizeWithBuyNow's AFTER_COMMIT event carries this
+            // same amount downstream to the WebSocket/notification dispatch, covered by
+            // BuyNowFinalizedEventListenerTest and the real-Postgres integration test.)
             BigDecimal expected = new BigDecimal("1530000.00");
             assertEquals(0, expected.compareTo(response.amount()));
             verify(auctionFinalizer, times(1)).finalizeWithBuyNow(eq(createdAuction), eq(bidderId1),
-                    argThat(amount -> expected.compareTo(amount) == 0));
-            verify(webSocketController, times(1)).sendBuyNowNotification(eq(2L), eq(bidderId1),
                     argThat(amount -> expected.compareTo(amount) == 0));
         }
 

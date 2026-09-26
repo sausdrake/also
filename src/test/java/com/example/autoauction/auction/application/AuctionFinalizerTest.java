@@ -25,6 +25,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -77,6 +78,9 @@ class AuctionFinalizerTest {
 
     @Mock
     private PaymentDeadlineHistoryRepository paymentDeadlineHistoryRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private AuctionFinalizer auctionFinalizer;
@@ -551,6 +555,9 @@ class AuctionFinalizerTest {
                             && h.getNewDeadline().equals(deadline)
                             && h.getChangedByAdminId() == null
                             && h.getPreviousDeadline() == null));
+            // MVP-002: WS/notification side effects are deferred via an AFTER_COMMIT event,
+            // never called directly from finalizeWithBuyNow anymore.
+            verify(eventPublisher, times(1)).publishEvent(any(BuyNowFinalizedEvent.class));
         }
 
         @Test
@@ -566,6 +573,9 @@ class AuctionFinalizerTest {
             // then - статус не изменился
             assertThat(activeAuction.getStatus()).isEqualTo(AuctionStatus.COMPLETED);
             verify(auctionRepository, never()).save(any());
+            // MVP-002: the early-return guard must publish zero side-effect events, same as it
+            // performs zero other side effects today.
+            verifyNoInteractions(eventPublisher);
         }
     }
 

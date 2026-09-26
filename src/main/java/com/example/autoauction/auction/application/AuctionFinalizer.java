@@ -18,6 +18,7 @@ import com.example.autoauction.sale.domain.SaleResolution;
 import com.example.autoauction.settlement.application.SettlementService;
 import com.example.autoauction.vehicle.application.VehicleService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +44,7 @@ public class AuctionFinalizer {
     private final SettlementService settlementService;
     private final StandardPaymentDeadlineCalculator standardPaymentDeadlineCalculator;
     private final PaymentDeadlineHistoryRepository paymentDeadlineHistoryRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public AuctionFinalizer(AuctionRepository auctionRepository,
                             DepositService depositService,
@@ -56,7 +58,8 @@ public class AuctionFinalizer {
                             SaleCommitmentResolutionOrchestrator saleCommitmentResolutionOrchestrator,
                             SettlementService settlementService,
                             StandardPaymentDeadlineCalculator standardPaymentDeadlineCalculator,
-                            PaymentDeadlineHistoryRepository paymentDeadlineHistoryRepository) {
+                            PaymentDeadlineHistoryRepository paymentDeadlineHistoryRepository,
+                            ApplicationEventPublisher eventPublisher) {
         this.auctionRepository = auctionRepository;
         this.depositService = depositService;
         this.participantRepository = participantRepository;
@@ -70,6 +73,7 @@ public class AuctionFinalizer {
         this.settlementService = settlementService;
         this.standardPaymentDeadlineCalculator = standardPaymentDeadlineCalculator;
         this.paymentDeadlineHistoryRepository = paymentDeadlineHistoryRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -456,24 +460,10 @@ public class AuctionFinalizer {
 
         participantRepository.clearParticipants(auction.getId());
 
-        // Уведомление победителю о Buy Now
-        try {
-            notificationService.send(winnerId, "AUCTION_WON",
-                    "Вы выиграли аукцион!",
-                    String.format("Поздравляем! Вы купили \"%s\" по цене %s сом (Buy Now).",
-                            auction.getVehicleInfo(), buyNowAmount.toPlainString()),
-                    auction.getId(), "AUCTION");
-        } catch (Exception e) {
-            log.warn("Failed to send Buy Now win notification to user {}: {}", winnerId, e.getMessage());
-        }
-
-        // ✅ Отправляем уведомление о Buy Now
-        try {
-            webSocketController.sendBuyNowNotification(auction.getId(), winnerId, buyNowAmount);
-            webSocketController.sendAuctionUpdate(auction, "BUY_NOW");
-        } catch (Exception e) {
-            log.warn("Failed to send Buy Now WebSocket notification for auction {}: {}", auction.getId(), e.getMessage());
-        }
+        // Deferred to AFTER_COMMIT (see BuyNowFinalizedEventListener): a rolled-back Buy Now must
+        // never publish a notification/WebSocket update, and a post-commit WS/notification
+        // failure must never invalidate an already-committed sale (MVP-002).
+        eventPublisher.publishEvent(new BuyNowFinalizedEvent(auction, winnerId, buyNowAmount));
 
         log.info("Auction {} completed via Buy Now. Winner: {}", auction.getId(), winnerId);
     }

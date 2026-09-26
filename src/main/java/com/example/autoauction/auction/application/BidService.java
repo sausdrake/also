@@ -5,7 +5,6 @@ import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionParticipantRepository;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
-import com.example.autoauction.auction.web.AuctionWebSocketController;
 import com.example.autoauction.auction.web.dto.BidResponse;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.policy.application.PolicyVersionService;
@@ -33,7 +32,6 @@ public class BidService {
     private final AuctionParticipantRepository participantRepository;
     private final AuctionFinalizer auctionFinalizer;
     private final RateLimitService rateLimitService;
-    private final AuctionWebSocketController webSocketController;
     private final ApplicationEventPublisher eventPublisher;
     private final PolicyVersionService policyVersionService;
     private final UserService userService;
@@ -43,7 +41,6 @@ public class BidService {
                       AuctionParticipantRepository participantRepository,
                       AuctionFinalizer auctionFinalizer,
                       RateLimitService rateLimitService,
-                      AuctionWebSocketController webSocketController,
                       ApplicationEventPublisher eventPublisher,
                       PolicyVersionService policyVersionService,
                       UserService userService) {
@@ -52,7 +49,6 @@ public class BidService {
         this.participantRepository = participantRepository;
         this.auctionFinalizer = auctionFinalizer;
         this.rateLimitService = rateLimitService;
-        this.webSocketController = webSocketController;
         this.eventPublisher = eventPublisher;
         this.policyVersionService = policyVersionService;
         this.userService = userService;
@@ -158,10 +154,6 @@ public class BidService {
         BigDecimal buyerFacingBuyNowPrice = resolveBuyerFacingBuyNowPrice(auction);
 
         auctionFinalizer.finalizeWithBuyNow(auction, buyerId, buyerFacingBuyNowPrice);
-
-        // ✅ Отправляем WebSocket уведомление о Buy Now
-        webSocketController.sendBuyNowNotification(auctionId, buyerId, buyerFacingBuyNowPrice);
-        webSocketController.sendAuctionUpdate(auction, "BUY_NOW");
 
         log.info("Аукцион {} завершен по Buy Now. Покупатель: {}", auctionId, buyerId);
         return BidResponse.fromDomain(auction, buyerFacingBuyNowPrice, true, false);
