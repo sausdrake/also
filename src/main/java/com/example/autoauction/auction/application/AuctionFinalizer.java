@@ -328,23 +328,11 @@ public class AuctionFinalizer {
         auctionRepository.save(auction);
         participantRepository.clearParticipants(auction.getId());
 
-        try {
-            webSocketController.sendAuctionEnded(auction.getId(), null, null);
-        } catch (Exception e) {
-            log.warn("Failed to send WebSocket notification for cancelled auction {}: {}", auction.getId(), e.getMessage());
-        }
-
-        for (Long participantId : participants) {
-            try {
-                notificationService.send(participantId, "AUCTION_CANCELLED",
-                        "Аукцион отменён",
-                        String.format("Аукцион \"%s\" был отменён администратором. Ваши средства разблокированы.",
-                                auction.getVehicleInfo()),
-                        auction.getId(), "AUCTION");
-            } catch (Exception e) {
-                log.warn("Failed to send AUCTION_CANCELLED to user {}: {}", participantId, e.getMessage());
-            }
-        }
+        // Deferred to AFTER_COMMIT (see AuctionCancelledEventListener): a rolled-back
+        // cancellation (e.g. a genuine optimistic-lock conflict on this method's own save())
+        // must never publish a notification/WebSocket update, and a post-commit WS/notification
+        // failure must never invalidate an already-committed cancellation (MVP-004).
+        eventPublisher.publishEvent(new AuctionCancelledEvent(auction, participants));
 
         log.info("Auction {} cancelled, {} participant(s) unfrozen", auction.getId(), participants.size());
         return true;

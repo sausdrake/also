@@ -206,6 +206,15 @@ class AuctionFinalizerTest {
             verify(depositService, times(1)).unfreezeForAuction(loserId, auctionId);
             verify(participantRepository, times(1)).clearParticipants(auctionId);
             verify(auctionRepository, times(1)).save(activeAuction);
+
+            // MVP-004: side effects are deferred via an AFTER_COMMIT event, never called
+            // directly. participantIds must still carry the original participant list even
+            // though clearParticipants() already ran.
+            ArgumentCaptor<AuctionCancelledEvent> captor = ArgumentCaptor.forClass(AuctionCancelledEvent.class);
+            verify(eventPublisher, times(1)).publishEvent(captor.capture());
+            AuctionCancelledEvent event = captor.getValue();
+            assertThat(event.auction()).isSameAs(activeAuction);
+            assertThat(event.participantIds()).containsExactly(winnerId, loserId);
         }
 
         @Test
@@ -239,6 +248,8 @@ class AuctionFinalizerTest {
             verify(auctionRepository, never()).save(any());
             verify(participantRepository, never()).clearParticipants(anyLong());
             verifyNoInteractions(depositService);
+            // MVP-004: the early-return guard must publish zero side-effect events.
+            verifyNoInteractions(eventPublisher);
         }
     }
 
