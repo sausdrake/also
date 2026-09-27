@@ -13,6 +13,7 @@ import com.example.autoauction.deposit.web.dto.DepositResponse;
 import com.example.autoauction.deposit.web.dto.DepositTransactionResponse;
 import com.example.autoauction.notification.application.NotificationService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,15 +31,18 @@ public class DepositService {
     private final FailedOperationService failedOperationService;
     private final NotificationService notificationService;
     private final DepositUnfreezeTransactionService depositUnfreezeTransactionService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public DepositService(DepositRepository depositRepository,
                           FailedOperationService failedOperationService,
                           NotificationService notificationService,
-                          DepositUnfreezeTransactionService depositUnfreezeTransactionService) {
+                          DepositUnfreezeTransactionService depositUnfreezeTransactionService,
+                          ApplicationEventPublisher eventPublisher) {
         this.depositRepository = depositRepository;
         this.failedOperationService = failedOperationService;
         this.notificationService = notificationService;
         this.depositUnfreezeTransactionService = depositUnfreezeTransactionService;
+        this.eventPublisher = eventPublisher;
         log.info("DepositService initialized");
     }
 
@@ -182,14 +186,10 @@ public class DepositService {
         depositRepository.save(deposit);
         log.info("Deposit frozen. New available balance: {}", deposit.getAvailableBalance());
 
-        try {
-            notificationService.send(userId, "DEPOSIT_FROZEN",
-                    "Депозит заморожен",
-                    String.format("Для участия в аукционе #%d заморожено %s сом.",
-                            auctionId, requiredAmount.toPlainString()));
-        } catch (Exception e) {
-            log.warn("Failed to send deposit freeze notification to user {}: {}", userId, e.getMessage());
-        }
+        // Deferred to AFTER_COMMIT (see DepositFrozenEventListener): a rolled-back/retried freeze
+        // must never publish a duplicate/phantom notification, and a post-commit notification
+        // failure must never invalidate an already-committed freeze (G1).
+        eventPublisher.publishEvent(new DepositFrozenEvent(userId, auctionId, requiredAmount));
     }
 
     /**

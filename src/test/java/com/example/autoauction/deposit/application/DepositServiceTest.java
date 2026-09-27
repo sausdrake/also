@@ -15,6 +15,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -43,6 +44,9 @@ class DepositServiceTest {
 
     @Mock
     private DepositUnfreezeTransactionService depositUnfreezeTransactionService;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private DepositService depositService;
@@ -332,6 +336,26 @@ class DepositServiceTest {
             assertEquals(DepositTransaction.TransactionType.BLOCK, transaction.getType());
             assertEquals(requiredDeposit, transaction.getAmount());
             assertEquals(auctionId, transaction.getAuctionId());
+
+            // G1: side effect is deferred via an AFTER_COMMIT event, never called directly.
+            ArgumentCaptor<DepositFrozenEvent> eventCaptor = ArgumentCaptor.forClass(DepositFrozenEvent.class);
+            verify(eventPublisher, times(1)).publishEvent(eventCaptor.capture());
+            DepositFrozenEvent event = eventCaptor.getValue();
+            assertEquals(userId, event.userId());
+            assertEquals(auctionId, event.auctionId());
+            assertEquals(0, requiredDeposit.compareTo(event.requiredAmount()));
+        }
+
+        @Test
+        @DisplayName("Уже заморожено для этого аукциона - идемпотентный ранний выход, событие не публикуется")
+        void freezeForAuction_AlreadyFrozen_NoEventPublished() {
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBalance));
+            when(depositRepository.isFrozenForAuction(depositId, auctionId)).thenReturn(true);
+
+            depositService.freezeForAuction(userId, auctionId, requiredDeposit);
+
+            verify(depositRepository, never()).save(any(Deposit.class));
+            verifyNoInteractions(eventPublisher);
         }
 
         @Test
