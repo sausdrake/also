@@ -6,6 +6,7 @@ import com.example.autoauction.deposit.domain.*;
 import com.example.autoauction.deposit.domain.port.DepositRepository;
 import com.example.autoauction.deposit.web.dto.DepositResponse;
 import com.example.autoauction.deposit.web.dto.DepositTransactionResponse;
+import com.example.autoauction.notification.application.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -47,6 +48,13 @@ class DepositServiceTest {
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
+
+    // G2: previously absent from this fixture - notificationService was implicitly null
+    // (harmless only because every existing inline notificationService.send(...) call site is
+    // itself wrapped in its own try/catch). Needed now to assert releaseWinnerDeposit no longer
+    // calls it directly for DEPOSIT_RELEASED.
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private DepositService depositService;
@@ -504,6 +512,77 @@ class DepositServiceTest {
 
             assertThrows(IllegalArgumentException.class,
                     () -> depositService.markAsWinner(userId, auctionId));
+        }
+    }
+
+    // ==================== RELEASE WINNER DEPOSIT TESTS (G2) ====================
+
+    @Nested
+    @DisplayName("Освобождение депозита победителя (releaseWinnerDeposit)")
+    class ReleaseWinnerDepositTests {
+
+        private FrozenDeposit winnerFrozenDeposit() {
+            FrozenDeposit frozen = new FrozenDeposit(auctionId, requiredDeposit, FreezeReason.FIRST_BID);
+            frozen.markAsWinner();
+            return frozen;
+        }
+
+        @Test
+        @DisplayName("Успешное освобождение - публикуется ровно один DepositReleasedEvent с точным payload")
+        void releaseWinnerDeposit_Success_PublishesExactlyOneEvent() {
+            // given
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
+            when(depositRepository.getFrozenDepositsByDepositId(depositId))
+                    .thenReturn(List.of(winnerFrozenDeposit()));
+            when(depositRepository.save(any(Deposit.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(depositRepository.saveTransaction(any(DepositTransaction.class)))
+                    .thenAnswer(inv -> inv.getArgument(0));
+
+            // when
+            depositService.releaseWinnerDeposit(userId, auctionId);
+
+            // then - deposit mutation + ledger unchanged from before G2
+            verify(depositRepository, times(1)).unfreezeForAuction(depositId, auctionId);
+            ArgumentCaptor<DepositTransaction> txCaptor = ArgumentCaptor.forClass(DepositTransaction.class);
+            verify(depositRepository, times(1)).saveTransaction(txCaptor.capture());
+            assertEquals(DepositTransaction.TransactionType.UNBLOCK, txCaptor.getValue().getType());
+            assertEquals(0, txCaptor.getValue().getAmount().compareTo(requiredDeposit));
+            verify(depositRepository, times(1)).save(any(Deposit.class));
+
+            // G2: side effect is deferred via an AFTER_COMMIT event, never called directly.
+            ArgumentCaptor<DepositReleasedEvent> eventCaptor = ArgumentCaptor.forClass(DepositReleasedEvent.class);
+            verify(eventPublisher, times(1)).publishEvent(eventCaptor.capture());
+            DepositReleasedEvent event = eventCaptor.getValue();
+            assertEquals(userId, event.userId());
+            assertEquals(auctionId, event.auctionId());
+            assertEquals(0, requiredDeposit.compareTo(event.amount()));
+
+            // G2: releaseWinnerDeposit must no longer call NotificationService directly.
+            verifyNoInteractions(notificationService);
+        }
+
+        @Test
+        @DisplayName("Нет замороженного депозита победителя -> IllegalStateException, событие не публикуется")
+        void releaseWinnerDeposit_NoWinnerFrozenDeposit_ThrowsWithoutEvent() {
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
+            when(depositRepository.getFrozenDepositsByDepositId(depositId)).thenReturn(List.of());
+
+            assertThrows(IllegalStateException.class,
+                    () -> depositService.releaseWinnerDeposit(userId, auctionId));
+
+            verify(depositRepository, never()).save(any());
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("Депозит не найден -> IllegalArgumentException, событие не публикуется")
+        void releaseWinnerDeposit_DepositNotFound_ThrowsWithoutEvent() {
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.empty());
+
+            assertThrows(IllegalArgumentException.class,
+                    () -> depositService.releaseWinnerDeposit(userId, auctionId));
+
+            verifyNoInteractions(eventPublisher);
         }
     }
 

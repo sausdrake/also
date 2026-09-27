@@ -651,14 +651,11 @@ public class DepositService {
         depositRepository.save(deposit);
         log.info("Winner deposit released for user {}, auction {}. Amount: {}", userId, auctionId, frozenAmount);
 
-        try {
-            notificationService.send(userId, "DEPOSIT_RELEASED",
-                    "Депозит освобождён",
-                    String.format("Заморозка %s сом по аукциону #%d снята администратором.",
-                            frozenAmount.toPlainString(), auctionId));
-        } catch (Exception e) {
-            log.warn("Failed to send deposit release notification to user {}: {}", userId, e.getMessage());
-        }
+        // Deferred to AFTER_COMMIT (see DepositReleasedEventListener): a rolled-back completeSale
+        // (e.g. a later settlement/commitment-resolution failure in the same transaction) must
+        // never publish a duplicate/phantom notification, and a post-commit notification failure
+        // must never invalidate an already-committed release (G2).
+        eventPublisher.publishEvent(new DepositReleasedEvent(userId, auctionId, frozenAmount));
     }
 
     /**
