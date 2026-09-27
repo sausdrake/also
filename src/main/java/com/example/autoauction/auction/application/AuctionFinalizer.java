@@ -121,13 +121,6 @@ public class AuctionFinalizer {
                 unfreezeDepositSafely(participantId, auction.getId());
             }
 
-            // ✅ Отправляем уведомление об истечении
-            try {
-                webSocketController.sendAuctionEnded(auction.getId(), null, null);
-            } catch (Exception e) {
-                log.warn("Failed to send WebSocket notification for auction {}: {}", auction.getId(), e.getMessage());
-            }
-
         } else {
             BigDecimal buyerFacingReserve = resolveBuyerFacingReserve(auction);
             boolean reserveMet = buyerFacingReserve == null ||
@@ -153,20 +146,6 @@ public class AuctionFinalizer {
 
                 if (winnerId != null) {
                     markWinnerSafely(winnerId, auction.getId());
-                    try {
-                        webSocketController.sendPersonalUpdate(winnerId, auction, "YOU_WON");
-                    } catch (Exception e) {
-                        log.warn("Failed to send personal WebSocket notification to user {}: {}", winnerId, e.getMessage());
-                    }
-                    try {
-                        notificationService.send(winnerId, "AUCTION_WON",
-                                "Вы выиграли аукцион!",
-                                String.format("Поздравляем! Вы выиграли аукцион \"%s\" с ценой %s сом.",
-                                        auction.getVehicleInfo(), winningBid.toPlainString()),
-                                auction.getId(), "AUCTION");
-                    } catch (Exception e) {
-                        log.warn("Failed to send win notification to user {}: {}", winnerId, e.getMessage());
-                    }
                 }
 
                 for (Long participantId : participants) {
@@ -175,53 +154,12 @@ public class AuctionFinalizer {
                     }
                 }
 
-                // Notify each loser
-                for (Long participantId : participants) {
-                    if (!participantId.equals(winnerId)) {
-                        try {
-                            notificationService.send(participantId, "AUCTION_LOST",
-                                    "Вы не выиграли аукцион",
-                                    String.format("Аукцион \"%s\" завершён. Победителем стал другой участник. Ваши средства разблокированы.",
-                                            auction.getVehicleInfo()),
-                                    auction.getId(), "AUCTION");
-                        } catch (Exception e) {
-                            log.warn("Failed to send AUCTION_LOST to user {}: {}", participantId, e.getMessage());
-                        }
-                    }
-                }
-                // Notify seller about auction completion
-                Long sellerId = auction.getCreatedBy();
-                if (sellerId != null) {
-                    try {
-                        notificationService.send(sellerId, "AUCTION_COMPLETED",
-                                "Аукцион завершён",
-                                String.format("Аукцион \"%s\" завершён. Победитель определён.", auction.getVehicleInfo()),
-                                auction.getId(), "AUCTION");
-                    } catch (Exception e) {
-                        log.warn("Failed to send AUCTION_COMPLETED to seller {}: {}", sellerId, e.getMessage());
-                    }
-                }
-
-                // ✅ Отправляем уведомление о завершении
-                try {
-                    webSocketController.sendAuctionEnded(auction.getId(), winnerId, winningBid);
-                } catch (Exception e) {
-                    log.warn("Failed to send WebSocket notification for auction {}: {}", auction.getId(), e.getMessage());
-                }
-
             } else {
                 finalStatus = AuctionStatus.EXPIRED;
                 log.info("Auction {} expired - reserve price not met", auction.getId());
 
                 for (Long participantId : participants) {
                     unfreezeDepositSafely(participantId, auction.getId());
-                }
-
-                // ✅ Отправляем уведомление об истечении
-                try {
-                    webSocketController.sendAuctionEnded(auction.getId(), null, null);
-                } catch (Exception e) {
-                    log.warn("Failed to send WebSocket notification for auction {}: {}", auction.getId(), e.getMessage());
                 }
             }
         }
@@ -243,12 +181,11 @@ public class AuctionFinalizer {
                     PaymentDeadlineHistory.initial(auction.getId(), paymentDeadline, now()));
         }
 
-        // ✅ Отправляем финальное обновление
-        try {
-            webSocketController.sendAuctionUpdate(auction, "AUCTION_FINALIZED");
-        } catch (Exception e) {
-            log.warn("Failed to send final WebSocket update for auction {}: {}", auction.getId(), e.getMessage());
-        }
+        // Deferred to AFTER_COMMIT (see AuctionFinalizedEventListener): a rolled-back
+        // finalization (e.g. a genuine optimistic-lock conflict on this method's own save())
+        // must never publish a notification/WebSocket update, and a post-commit WS/notification
+        // failure must never invalidate an already-committed finalization (MVP-003).
+        eventPublisher.publishEvent(new AuctionFinalizedEvent(auction, winnerId, winningBid, participants));
 
         log.info("Auction {} finalized with status: {}", auction.getId(), finalStatus);
         return true;

@@ -21,6 +21,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -146,6 +147,35 @@ class AuctionFinalizerTest {
             verify(depositService, times(2)).unfreezeForAuction(anyLong(), eq(auctionId));
             verify(participantRepository, times(1)).clearParticipants(auctionId);
             verify(auctionRepository, times(1)).save(activeAuction);
+
+            // MVP-003: side effects are deferred via an AFTER_COMMIT event, never called
+            // directly. No winner - winnerId/winningBid must be null, and participantIds must
+            // still carry the original participant list even though clearParticipants() already ran.
+            ArgumentCaptor<AuctionFinalizedEvent> captor = ArgumentCaptor.forClass(AuctionFinalizedEvent.class);
+            verify(eventPublisher, times(1)).publishEvent(captor.capture());
+            AuctionFinalizedEvent event = captor.getValue();
+            assertThat(event.auction()).isSameAs(activeAuction);
+            assertThat(event.winnerId()).isNull();
+            assertThat(event.winningBid()).isNull();
+            assertThat(event.participantIds()).containsExactly(winnerId, loserId);
+        }
+    }
+
+    @Nested
+    @DisplayName("MVP-003: finalizeAuction на уже завершённом аукционе")
+    class FinalizeAuctionAlreadyFinishedGuardTests {
+
+        @Test
+        @DisplayName("Аукцион уже завершён -> метод не делает ничего, событие не публикуется")
+        void finalizeAuction_OnAlreadyFinishedAuction_PublishesNoEvent() {
+            activeAuction.setStatus(AuctionStatus.COMPLETED);
+
+            boolean result = auctionFinalizer.finalizeAuction(activeAuction);
+
+            assertThat(result).isFalse();
+            assertThat(activeAuction.getStatus()).isEqualTo(AuctionStatus.COMPLETED);
+            verify(auctionRepository, never()).save(any());
+            verifyNoInteractions(eventPublisher);
         }
     }
 
@@ -619,6 +649,15 @@ class AuctionFinalizerTest {
             InOrder inOrder = inOrder(auctionRepository, paymentDeadlineHistoryRepository);
             inOrder.verify(auctionRepository).save(activeAuction);
             inOrder.verify(paymentDeadlineHistoryRepository).save(any());
+
+            // MVP-003: side effects are deferred via an AFTER_COMMIT event, never called directly.
+            ArgumentCaptor<AuctionFinalizedEvent> captor = ArgumentCaptor.forClass(AuctionFinalizedEvent.class);
+            verify(eventPublisher, times(1)).publishEvent(captor.capture());
+            AuctionFinalizedEvent event = captor.getValue();
+            assertThat(event.auction()).isSameAs(activeAuction);
+            assertThat(event.winnerId()).isEqualTo(winnerId);
+            assertThat(event.winningBid()).isEqualByComparingTo(new BigDecimal("1200000"));
+            assertThat(event.participantIds()).containsExactly(winnerId);
         }
 
         @Test
@@ -653,6 +692,18 @@ class AuctionFinalizerTest {
             assertThat(policyBound.getStatus()).isEqualTo(AuctionStatus.EXPIRED);
             assertThat(policyBound.getPaymentDeadline()).isNull();
             verifyNoInteractions(standardPaymentDeadlineCalculator, paymentDeadlineHistoryRepository);
+
+            // MVP-003: reserve not met -> no winner in the published event, even though the
+            // Auction object was pre-seeded with a winnerId/winningBid from bidding (both must be
+            // cleared by finalization to null, matching the local winnerId/winningBid variables
+            // finalizeAuction actually uses - not the auction's pre-existing bid state).
+            ArgumentCaptor<AuctionFinalizedEvent> captor = ArgumentCaptor.forClass(AuctionFinalizedEvent.class);
+            verify(eventPublisher, times(1)).publishEvent(captor.capture());
+            AuctionFinalizedEvent event = captor.getValue();
+            assertThat(event.auction()).isSameAs(policyBound);
+            assertThat(event.winnerId()).isNull();
+            assertThat(event.winningBid()).isNull();
+            assertThat(event.participantIds()).containsExactly(winnerId);
         }
 
         @Test
