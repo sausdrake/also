@@ -21,6 +21,10 @@
 	<properties>
 		<java.version>17</java.version>
 		<lombok.version>1.18.30</lombok.version>
+		<!-- Slice 2: override the Spring Boot 3.1.5 BOM's Testcontainers version (1.18.3) with a
+		     current one compatible with Spring Boot 3.1. Lifts the whole testcontainers-bom, not
+		     just one artifact. -->
+		<testcontainers.version>1.19.8</testcontainers.version>
 	</properties>
 
 	<dependencies>
@@ -150,6 +154,29 @@
 		<dependency>
 			<groupId>org.springframework.security</groupId>
 			<artifactId>spring-security-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- Testcontainers: real PostgreSQL for financial money-path tests (Slice 2).
+		     Versions managed by the Spring Boot 3.1.5 parent (testcontainers-bom). -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-testcontainers</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>postgresql</artifactId>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
