@@ -1454,6 +1454,7 @@ const VEHICLE_TYPES = ['SEDAN', 'SUV', 'TRUCK', 'VAN', 'MOTORCYCLE', 'OTHER'];
 interface TItem {
   id: number; title: string; description?: string;
   fieldType: string; isRequired: boolean;
+  hasPhoto?: boolean; hasVideo?: boolean; hasRating?: boolean; sortOrder?: number | null;
 }
 interface TSection { id: number; name: string; sortOrder: number; items: TItem[]; }
 interface Template { id: number; name: string; vehicleType: string; isActive: boolean; groups?: TSection[]; }
@@ -1604,6 +1605,36 @@ function TemplatesPage() {
     catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); }
   };
 
+  // Scenario 14.3: deleting a group removes every item in it - ask first.
+  const [confirmDeleteSection, setConfirmDeleteSection] = useState<number | null>(null);
+
+  // Scenario 14.2: ✏️ next to an item opens an edit modal (title, description, required).
+  // The PUT replaces every item attribute, so type, media/rating flags and order are sent
+  // back unchanged.
+  const [editItem, setEditItem] = useState<TItem | null>(null);
+  const [savingItem, setSavingItem] = useState(false);
+
+  const saveItem = async () => {
+    if (!editItem || !editItem.title.trim() || !selected) return;
+    setSavingItem(true);
+    try {
+      await api.put(`/admin/diagnostic/items/${editItem.id}`, {
+        title: editItem.title.trim(),
+        description: editItem.description?.trim() || null,
+        fieldType: editItem.fieldType,
+        isRequired: editItem.isRequired,
+        hasPhoto: !!editItem.hasPhoto,
+        hasVideo: !!editItem.hasVideo,
+        hasRating: !!editItem.hasRating,
+        sortOrder: editItem.sortOrder ?? null,
+      });
+      notify('Пункт сохранён');
+      setEditItem(null);
+      loadTemplate(selected.id);
+    } catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); }
+    finally { setSavingItem(false); }
+  };
+
   const addField = async (groupId: number) => {
     if (!itemTitle.trim()) return;
     try {
@@ -1639,6 +1670,41 @@ function TemplatesPage() {
           onYes={() => { setConfirmSeed(false); seedAllTemplates(); }}
           onNo={() => setConfirmSeed(false)}
         />
+      )}
+
+      {confirmDeleteSection != null && (
+        <ConfirmModal
+          message="Удалить группу и все пункты внутри?"
+          onYes={() => { const id = confirmDeleteSection; setConfirmDeleteSection(null); deleteSection(id); }}
+          onNo={() => setConfirmDeleteSection(null)}
+        />
+      )}
+
+      {editItem && (
+        <Modal onClose={() => setEditItem(null)}>
+          <div className="p-5 space-y-3">
+            <h3 className="font-semibold text-gray-900">Редактировать пункт</h3>
+            <input value={editItem.title} onChange={e => setEditItem({ ...editItem, title: e.target.value })}
+              aria-label="Название пункта" placeholder="Название пункта *"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+            <input value={editItem.description ?? ''} onChange={e => setEditItem({ ...editItem, description: e.target.value })}
+              aria-label="Описание пункта" placeholder="Описание / подсказка (необязательно)"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={editItem.isRequired}
+                onChange={e => setEditItem({ ...editItem, isRequired: e.target.checked })} />
+              <span className="text-gray-700">Обязательный пункт</span>
+            </label>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setEditItem(null)} disabled={savingItem}
+                className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg">Отмена</button>
+              <button onClick={saveItem} disabled={savingItem || !editItem.title.trim()}
+                className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg disabled:opacity-50">
+                {savingItem ? 'Сохранение...' : 'Сохранить'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {copySource && (
@@ -1793,7 +1859,7 @@ function TemplatesPage() {
                       <div className="flex gap-2">
                         <button onClick={() => setActiveSection(activeSection === section.id ? null : section.id)}
                           className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg hover:bg-blue-100">+ Поле</button>
-                        <button onClick={() => deleteSection(section.id)}
+                        <button onClick={() => setConfirmDeleteSection(section.id)}
                           className="text-xs bg-red-50 text-red-500 px-2 py-1 rounded-lg hover:bg-red-100">Удалить</button>
                       </div>
                     </div>
@@ -1864,6 +1930,9 @@ function TemplatesPage() {
                             </div>
                             <div className="flex items-center gap-2 ml-3 shrink-0">
                               <span className="text-xs text-gray-400 hidden sm:block">{ft.label}</span>
+                              <button onClick={() => setEditItem({ ...field })}
+                                title="Редактировать" aria-label={`Редактировать пункт ${field.title}`}
+                                className="text-gray-400 hover:text-blue-600 text-xs px-1">✏️</button>
                               <button onClick={() => deleteField(field.id)}
                                 className="text-red-400 hover:text-red-600 text-xs px-1">✕</button>
                             </div>
