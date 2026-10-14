@@ -1922,22 +1922,32 @@ function AuctionsPage() {
     } catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); setCancelTarget(null); }
   };
 
+  // Guards the detail panel's participant list (and their frozen deposits) against stale
+  // responses - an earlier auction's participants, or a force-unfreeze refresh, resolving after
+  // the admin opened another auction. Every openDetail() bumps the generation (and resets the
+  // list); only a response whose captured generation is still current may update the panel
+  // (same pattern as ReportsPage's detailGeneration). Closing needs no bump: the panel is hidden
+  // and the next openDetail() supersedes anything still in flight.
+  const participantsGeneration = useRef(0);
+
   const openDetail = async (auction: Auction) => {
+    const generation = ++participantsGeneration.current;
     setAuctionDetail(auction);
     setDetailLoading(true);
     setDetailParticipants([]);
     try {
       const r = await api.get(`/admin/auctions/${auction.id}/participants`);
-      setDetailParticipants(r.data);
-    } catch {} finally { setDetailLoading(false); }
+      if (generation === participantsGeneration.current) setDetailParticipants(r.data);
+    } catch {} finally { if (generation === participantsGeneration.current) setDetailLoading(false); }
   };
 
   const forceUnfreeze = async (auctionId: number) => {
+    const generation = participantsGeneration.current;
     try {
       const r = await api.post(`/admin/auctions/${auctionId}/force-unfreeze-all`);
       notify(r.data.message || 'Разморозка выполнена');
       const r2 = await api.get(`/admin/auctions/${auctionId}/participants`);
-      setDetailParticipants(r2.data);
+      if (generation === participantsGeneration.current) setDetailParticipants(r2.data);
     } catch (e: any) { notify(e.response?.data?.message || 'Ошибка при разморозке', true); }
   };
 
