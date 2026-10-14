@@ -70,7 +70,7 @@ class AdminIdentityControllerApiIntegrationTest {
         Long docId = documentRepository.save(new IdentityDocument(key, userId, "image/jpeg", 3L, OffsetDateTime.now())).getId();
         String canonical = "ADM" + System.nanoTime() % 1_000_000;
         IdentityVerification iv = identityVerificationRepository.save(IdentityVerification.firstSubmission(
-                userId, "KG", DocumentType.NATIONAL_ID, canonical, docId, OffsetDateTime.now()));
+                userId, "KG", DocumentType.NATIONAL_ID, canonical, docId, docId, OffsetDateTime.now()));
         historyRepository.save(IdentityVerificationHistory.submission(iv.getId(), canonical, docId, OffsetDateTime.now()));
         return iv.getId();
     }

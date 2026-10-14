@@ -88,7 +88,7 @@ class KycProtectedOperationsApiIntegrationTest {
         Long documentId = identityDocumentRepository.save(new IdentityDocument(
                 "identity-documents/" + UUID.randomUUID(), userId, "image/jpeg", 1000L, now)).getId();
         IdentityVerification iv = IdentityVerification.firstSubmission(
-                userId, "KG", DocumentType.NATIONAL_ID, "AN" + System.nanoTime(), documentId, now);
+                userId, "KG", DocumentType.NATIONAL_ID, "AN" + System.nanoTime(), documentId, documentId, now);
         switch (status) {
             case PENDING_REVIEW -> { }
             case VERIFIED -> iv.approve(now);

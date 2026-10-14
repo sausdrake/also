@@ -27,20 +27,25 @@ public class IdentityVerification {
     private DocumentType documentType;
     private String canonicalDocumentNumber;
     private Long currentDocumentId;
+    private Long currentSelfieDocumentId;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
     private Long version;
 
-    /** First-ever submission for a user who has no existing row. */
+    /**
+     * First-ever submission for a user who has no existing row. MVP-004: every submission carries
+     * both the identity-document image and the live selfie taken through the platform camera.
+     */
     public static IdentityVerification firstSubmission(Long userId, String issuingCountry, DocumentType documentType,
                                                          String canonicalDocumentNumber, Long documentId,
-                                                         OffsetDateTime now) {
+                                                         Long selfieDocumentId, OffsetDateTime now) {
         IdentityVerification iv = new IdentityVerification(userId);
         iv.status = IdentityVerificationStatus.PENDING_REVIEW;
         iv.issuingCountry = Objects.requireNonNull(issuingCountry, "issuingCountry не может быть null");
         iv.documentType = Objects.requireNonNull(documentType, "documentType не может быть null");
         iv.canonicalDocumentNumber = Objects.requireNonNull(canonicalDocumentNumber, "canonicalDocumentNumber не может быть null");
         iv.currentDocumentId = Objects.requireNonNull(documentId, "documentId не может быть null");
+        iv.currentSelfieDocumentId = Objects.requireNonNull(selfieDocumentId, "selfieDocumentId не может быть null");
         iv.createdAt = now;
         iv.updatedAt = now;
         iv.version = 0L;
@@ -54,7 +59,8 @@ public class IdentityVerification {
     /** Reconstruction constructor, used exclusively by the persistence mapper. */
     public IdentityVerification(Long id, Long userId, IdentityVerificationStatus status, String issuingCountry,
                                  DocumentType documentType, String canonicalDocumentNumber, Long currentDocumentId,
-                                 OffsetDateTime createdAt, OffsetDateTime updatedAt, Long version) {
+                                 Long currentSelfieDocumentId, OffsetDateTime createdAt, OffsetDateTime updatedAt,
+                                 Long version) {
         this.id = id;
         this.userId = Objects.requireNonNull(userId, "userId не может быть null");
         this.status = Objects.requireNonNull(status, "status не может быть null");
@@ -62,6 +68,7 @@ public class IdentityVerification {
         this.documentType = documentType;
         this.canonicalDocumentNumber = canonicalDocumentNumber;
         this.currentDocumentId = currentDocumentId;
+        this.currentSelfieDocumentId = currentSelfieDocumentId;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.version = version;
@@ -76,17 +83,20 @@ public class IdentityVerification {
      * identity) or {@code VERIFIED} - both of which must fail closed with no state change.
      */
     public void resubmit(String issuingCountry, DocumentType documentType, String canonicalDocumentNumber,
-                          Long documentId, OffsetDateTime now) {
+                          Long documentId, Long selfieDocumentId, OffsetDateTime now) {
         if (status != IdentityVerificationStatus.REJECTED && status != IdentityVerificationStatus.REVOKED) {
             throw new IllegalStateException(String.format(
                     "Невозможно отправить новую заявку для пользователя %d в статусе '%s'. Повторная отправка доступна только после REJECTED или REVOKED",
                     userId, status));
         }
+        // MVP-004: validated before any mutation - a resubmission without a selfie changes nothing.
+        Objects.requireNonNull(selfieDocumentId, "selfieDocumentId не может быть null");
         this.status = IdentityVerificationStatus.PENDING_REVIEW;
         this.issuingCountry = Objects.requireNonNull(issuingCountry, "issuingCountry не может быть null");
         this.documentType = Objects.requireNonNull(documentType, "documentType не может быть null");
         this.canonicalDocumentNumber = Objects.requireNonNull(canonicalDocumentNumber, "canonicalDocumentNumber не может быть null");
         this.currentDocumentId = Objects.requireNonNull(documentId, "documentId не может быть null");
+        this.currentSelfieDocumentId = selfieDocumentId;
         this.updatedAt = now;
     }
 
@@ -104,6 +114,14 @@ public class IdentityVerification {
      */
     public void approve(OffsetDateTime now) {
         requireStatus(IdentityVerificationStatus.PENDING_REVIEW, "подтвердить");
+        // MVP-004: the administrator approves the selfie AND the document - a submission made
+        // before the live selfie became mandatory cannot be approved; it must be rejected and
+        // resubmitted.
+        if (currentSelfieDocumentId == null) {
+            throw new IllegalStateException(String.format(
+                    "Невозможно подтвердить заявку пользователя %d: в ней нет живого селфи. "
+                            + "Отклоните заявку, чтобы пользователь отправил её повторно", userId));
+        }
         this.status = IdentityVerificationStatus.VERIFIED;
         this.updatedAt = now;
     }
@@ -137,6 +155,7 @@ public class IdentityVerification {
     public DocumentType getDocumentType() { return documentType; }
     public String getCanonicalDocumentNumber() { return canonicalDocumentNumber; }
     public Long getCurrentDocumentId() { return currentDocumentId; }
+    public Long getCurrentSelfieDocumentId() { return currentSelfieDocumentId; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }
     public Long getVersion() { return version; }

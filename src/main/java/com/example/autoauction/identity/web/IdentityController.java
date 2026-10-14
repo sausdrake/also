@@ -67,7 +67,8 @@ public class IdentityController {
         DocumentType documentType = DocumentType.valueOf(request.documentType());
         log.info("User {} submitting identity verification", userId);
         IdentityVerification iv = identityVerificationService.submit(
-                userId, request.issuingCountry(), documentType, request.rawDocumentNumber(), request.documentStorageKey());
+                userId, request.issuingCountry(), documentType, request.rawDocumentNumber(), request.documentStorageKey(),
+                request.selfieStorageKey());
         return ResponseEntity.ok(IdentityStatusResponse.fromDomain(iv));
     }
 

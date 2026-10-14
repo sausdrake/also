@@ -77,6 +77,18 @@ public class AdminIdentityVerificationService {
         return storageClient.createPresignedReadUrl(document.getStorageKey(), READ_URL_TTL);
     }
 
+    /** MVP-004: the live selfie the administrator compares with the document. */
+    @Transactional(readOnly = true)
+    public URI getSelfieUrl(Long id) {
+        IdentityVerification iv = inspect(id);
+        if (iv.getCurrentSelfieDocumentId() == null) {
+            throw new IllegalArgumentException("Селфи не найдено");
+        }
+        IdentityDocument selfie = documentRepository.findById(iv.getCurrentSelfieDocumentId())
+                .orElseThrow(() -> new IllegalArgumentException("Селфи не найдено"));
+        return storageClient.createPresignedReadUrl(selfie.getStorageKey(), READ_URL_TTL);
+    }
+
     @Transactional(readOnly = true)
     public List<IdentityVerificationHistory> getHistory(Long id) {
         inspect(id); // 404 if the parent row does not exist

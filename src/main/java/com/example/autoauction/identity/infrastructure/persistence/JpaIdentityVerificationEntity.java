@@ -44,6 +44,9 @@ public class JpaIdentityVerificationEntity {
     @Column(name = "current_document_id")
     private Long currentDocumentId;
 
+    @Column(name = "current_selfie_document_id")
+    private Long currentSelfieDocumentId;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -71,6 +74,8 @@ public class JpaIdentityVerificationEntity {
     public void setCanonicalDocumentNumber(String canonicalDocumentNumber) { this.canonicalDocumentNumber = canonicalDocumentNumber; }
     public Long getCurrentDocumentId() { return currentDocumentId; }
     public void setCurrentDocumentId(Long currentDocumentId) { this.currentDocumentId = currentDocumentId; }
+    public Long getCurrentSelfieDocumentId() { return currentSelfieDocumentId; }
+    public void setCurrentSelfieDocumentId(Long currentSelfieDocumentId) { this.currentSelfieDocumentId = currentSelfieDocumentId; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }

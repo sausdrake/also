@@ -5,6 +5,7 @@ import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.identity.domain.DocumentType;
 import com.example.autoauction.identity.domain.IdentityDocument;
 import com.example.autoauction.identity.domain.IdentityVerification;
+import com.example.autoauction.identity.domain.IdentityVerificationStatus;
 import com.example.autoauction.identity.domain.port.IdentityDocumentRepository;
 import com.example.autoauction.identity.domain.port.IdentityVerificationRepository;
 import com.example.autoauction.payment.domain.port.PaymentRepository;
@@ -55,16 +56,30 @@ class PaymentControllerTest {
     @Autowired private IdentityDocumentRepository identityDocumentRepository;
     @Autowired private IdentityVerificationRepository identityVerificationRepository;
 
-    /** MVP-004: payment creation is KYC-gated - the principal needs a VERIFIED identity. */
+    /**
+     * MVP-004: payment creation is KYC-gated - the fixed principal id needs a VERIFIED identity.
+     * The Spring context (and so the H2 database) is shared with other test classes, which may
+     * already have given this user id a verification in another state - bring it to VERIFIED.
+     */
     private void ensureVerifiedIdentity(Long userId) {
-        if (identityVerificationRepository.findByUserId(userId).isPresent()) {
+        OffsetDateTime now = OffsetDateTime.now();
+        IdentityVerification existing = identityVerificationRepository.findByUserId(userId).orElse(null);
+        if (existing != null && existing.getStatus() == IdentityVerificationStatus.VERIFIED) {
             return;
         }
-        OffsetDateTime now = OffsetDateTime.now();
         Long documentId = identityDocumentRepository.save(new IdentityDocument(
-                "identity-documents/pc-" + userId, userId, "image/jpeg", 1000L, now)).getId();
-        IdentityVerification iv = IdentityVerification.firstSubmission(
-                userId, "KG", DocumentType.NATIONAL_ID, "PC" + userId, documentId, now);
+                "identity-documents/pc-" + userId + "-" + System.nanoTime(), userId, "image/jpeg", 1000L, now)).getId();
+        IdentityVerification iv;
+        if (existing == null) {
+            iv = IdentityVerification.firstSubmission(
+                    userId, "KG", DocumentType.NATIONAL_ID, "PC" + System.nanoTime(), documentId, documentId, now);
+        } else {
+            iv = existing;
+            if (iv.getStatus() == IdentityVerificationStatus.PENDING_REVIEW) {
+                iv.reject(now);
+            }
+            iv.resubmit("KG", DocumentType.NATIONAL_ID, "PC" + System.nanoTime(), documentId, documentId, now);
+        }
         iv.approve(now);
         identityVerificationRepository.save(iv);
     }
@@ -119,6 +134,9 @@ class PaymentControllerTest {
             Long savedId = userRepository.save(user).getId();
             depositService.createDeposit(savedId, BigDecimal.ZERO);
         }
+        // The shared test database may already hold user id 1 (created by another class) without a
+        // deposit; createDeposit is idempotent, so make the principal's own deposit explicit.
+        depositService.createDeposit(1L, BigDecimal.ZERO);
         ensureVerifiedIdentity(1L);
 
         mockMvc.perform(post("/api/v1/payments")
@@ -141,6 +159,7 @@ class PaymentControllerTest {
             Long savedId = userRepository.save(user).getId();
             depositService.createDeposit(savedId, BigDecimal.ZERO);
         }
+        depositService.createDeposit(2L, BigDecimal.ZERO);
         ensureVerifiedIdentity(2L);  // MVP-004: so the 4xx below is the amount policy, not KYC
 
         mockMvc.perform(post("/api/v1/payments")
@@ -160,6 +179,7 @@ class PaymentControllerTest {
             Long savedId = userRepository.save(user).getId();
             depositService.createDeposit(savedId, BigDecimal.ZERO);
         }
+        depositService.createDeposit(3L, BigDecimal.ZERO);
         ensureVerifiedIdentity(3L);
 
         Map<String, Object> bodyWithForbiddenFields = new LinkedHashMap<>();

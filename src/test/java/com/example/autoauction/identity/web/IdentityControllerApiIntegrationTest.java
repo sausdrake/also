@@ -100,12 +100,14 @@ class IdentityControllerApiIntegrationTest {
 
         // Simulate the real browser upload directly into the shared FakeStorageClient bean.
         uploadFakeObject(storageKey);
+        String selfieKey = uploadedSelfieKey(userId);
 
         mockMvc.perform(post("/api/v1/identity/submissions")
                         .with(user(userId, "USER"))
                         .contentType("application/json")
                         .content("{\"issuingCountry\":\"KG\",\"documentType\":\"NATIONAL_ID\","
-                                + "\"rawDocumentNumber\":\"AB1234567\",\"documentStorageKey\":\"" + storageKey + "\"}"))
+                                + "\"rawDocumentNumber\":\"AB1234567\",\"documentStorageKey\":\"" + storageKey + "\","
+                                + "\"selfieStorageKey\":\"" + selfieKey + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PENDING_REVIEW"))
                 .andExpect(jsonPath("$.userId").value(userId));
@@ -127,12 +129,14 @@ class IdentityControllerApiIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         String storageKey = com.jayway.jsonpath.JsonPath.read(uploadResponse, "$.storageKey");
         uploadFakeObject(storageKey);
+        String selfieKey = uploadedSelfieKey(userId);
 
         mockMvc.perform(post("/api/v1/identity/submissions")
                 .with(user(userId, "USER"))
                 .contentType("application/json")
                 .content("{\"issuingCountry\":\"KG\",\"documentType\":\"NATIONAL_ID\","
-                        + "\"rawDocumentNumber\":\"CD7654321\",\"documentStorageKey\":\"" + storageKey + "\"}"));
+                        + "\"rawDocumentNumber\":\"CD7654321\",\"documentStorageKey\":\"" + storageKey + "\","
+                        + "\"selfieStorageKey\":\"" + selfieKey + "\"}"));
 
         String statusJson = mockMvc.perform(get("/api/v1/identity/me").with(user(userId, "USER")))
                 .andReturn().getResponse().getContentAsString();
@@ -144,6 +148,19 @@ class IdentityControllerApiIntegrationTest {
         mockMvc.perform(get("/api/v1/identity/me/history").with(user(userId, "USER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[1].reviewerAdminId").doesNotExist());
+    }
+
+    /** MVP-004: a live-selfie upload slot obtained and filled exactly like the document's. */
+    private String uploadedSelfieKey(Long userId) throws Exception {
+        String response = mockMvc.perform(post("/api/v1/identity/documents/upload-url")
+                        .with(user(userId, "USER"))
+                        .contentType("application/json")
+                        .content("{\"contentType\":\"image/jpeg\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String key = com.jayway.jsonpath.JsonPath.read(response, "$.storageKey");
+        uploadFakeObject(key);
+        return key;
     }
 
     private void uploadFakeObject(String storageKey) {

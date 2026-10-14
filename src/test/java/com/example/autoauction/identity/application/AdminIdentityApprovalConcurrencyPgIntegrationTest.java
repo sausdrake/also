@@ -62,7 +62,7 @@ class AdminIdentityApprovalConcurrencyPgIntegrationTest extends AbstractPostgres
         Long docId = documentRepository.save(new IdentityDocument(
                 "identity-documents/" + System.nanoTime(), userId, "image/jpeg", 1000L, OffsetDateTime.now())).getId();
         IdentityVerification iv = identityVerificationRepository.save(IdentityVerification.firstSubmission(
-                userId, "KG", DocumentType.NATIONAL_ID, canonicalDocumentNumber, docId, OffsetDateTime.now()));
+                userId, "KG", DocumentType.NATIONAL_ID, canonicalDocumentNumber, docId, docId, OffsetDateTime.now()));
         historyRepository.save(IdentityVerificationHistory.submission(iv.getId(), canonicalDocumentNumber, docId, OffsetDateTime.now()));
         return iv.getId();
     }

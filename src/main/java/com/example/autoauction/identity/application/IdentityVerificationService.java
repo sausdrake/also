@@ -84,7 +84,7 @@ public class IdentityVerificationService {
      */
     @Transactional
     public IdentityVerification submit(Long userId, String issuingCountry, DocumentType documentType,
-                                        String rawDocumentNumber, String documentStorageKey) {
+                                        String rawDocumentNumber, String documentStorageKey, String selfieStorageKey) {
         if (!SUPPORTED_ISSUING_COUNTRY.equals(issuingCountry)) {
             throw new IllegalArgumentException("Неподдерживаемая страна выдачи документа: " + issuingCountry);
         }
@@ -92,20 +92,30 @@ public class IdentityVerificationService {
         String canonical = CanonicalDocumentNumber.from(rawDocumentNumber).value();
 
         // Phase 3.1 §4 step 3: ownership + purpose + existence verification before trusting the key.
-        IdentityDocument document = documentRepository.findByStorageKey(documentStorageKey)
-                .orElseThrow(() -> new IllegalArgumentException("Указанный документ не найден"));
-        if (!document.isOwnedBy(userId)) {
-            throw new SecurityException("Документ не принадлежит текущему пользователю");
+        IdentityDocument document = requireOwnedUpload(userId, documentStorageKey,
+                "Указанный документ не найден", "Документ не принадлежит текущему пользователю",
+                "Файл документа не был загружен");
+
+        // MVP-004: the live selfie (taken through the platform camera) is a separate upload,
+        // validated by exactly the same ownership/existence rules as the document image.
+        if (selfieStorageKey == null || selfieStorageKey.isBlank()) {
+            throw new IllegalArgumentException("Требуется живое селфи, сделанное камерой на платформе");
         }
-        if (storageClient.headObject(documentStorageKey).isEmpty()) {
-            throw new IllegalArgumentException("Файл документа не был загружен");
+        if (selfieStorageKey.equals(documentStorageKey)) {
+            throw new IllegalArgumentException("Селфи должно быть отдельным снимком, а не файлом документа");
+        }
+        IdentityDocument selfie = requireOwnedUpload(userId, selfieStorageKey,
+                "Указанное селфи не найдено", "Селфи не принадлежит текущему пользователю",
+                "Файл селфи не был загружен");
+        if (selfie.getMimeType() == null || !selfie.getMimeType().startsWith("image/")) {
+            throw new IllegalArgumentException("Селфи должно быть изображением");
         }
 
         IdentityVerification existing = identityVerificationRepository.findByUserIdWithLock(userId).orElse(null);
 
         if (existing == null) {
             IdentityVerification created = IdentityVerification.firstSubmission(
-                    userId, issuingCountry, documentType, canonical, document.getId(), now());
+                    userId, issuingCountry, documentType, canonical, document.getId(), selfie.getId(), now());
             // save() returns the persisted instance carrying the generated id - the mapper
             // reconstructs a NEW IdentityVerification rather than mutating `created` in place, so
             // the return value must be captured, never discarded.
@@ -130,11 +140,24 @@ public class IdentityVerificationService {
         }
 
         // REJECTED or REVOKED -> resubmission allowed, unlimited (Phase 2 §5).
-        existing.resubmit(issuingCountry, documentType, canonical, document.getId(), now());
+        existing.resubmit(issuingCountry, documentType, canonical, document.getId(), selfie.getId(), now());
         identityVerificationRepository.save(existing);
         historyRepository.save(IdentityVerificationHistory.submission(existing.getId(), canonical, document.getId(), now()));
         log.info("User {} resubmitted a new identity verification", userId);
         return existing;
+    }
+
+    private IdentityDocument requireOwnedUpload(Long userId, String storageKey, String notFoundMessage,
+                                                String foreignMessage, String notUploadedMessage) {
+        IdentityDocument document = documentRepository.findByStorageKey(storageKey)
+                .orElseThrow(() -> new IllegalArgumentException(notFoundMessage));
+        if (!document.isOwnedBy(userId)) {
+            throw new SecurityException(foreignMessage);
+        }
+        if (storageClient.headObject(storageKey).isEmpty()) {
+            throw new IllegalArgumentException(notUploadedMessage);
+        }
+        return document;
     }
 
     @Transactional(readOnly = true)

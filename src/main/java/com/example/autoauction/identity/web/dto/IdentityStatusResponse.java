@@ -17,7 +17,9 @@ public record IdentityStatusResponse(
         String documentType,
         String canonicalDocumentNumber,
         OffsetDateTime createdAt,
-        OffsetDateTime updatedAt
+        OffsetDateTime updatedAt,
+        // MVP-004: false only for submissions made before the live selfie became mandatory
+        boolean selfieProvided
 ) {
     public static IdentityStatusResponse fromDomain(IdentityVerification iv) {
         return new IdentityStatusResponse(
@@ -28,6 +30,7 @@ public record IdentityStatusResponse(
                 iv.getDocumentType() == null ? null : iv.getDocumentType().name(),
                 iv.getCanonicalDocumentNumber(),
                 iv.getCreatedAt(),
-                iv.getUpdatedAt());
+                iv.getUpdatedAt(),
+                iv.getCurrentSelfieDocumentId() != null);
     }
 }

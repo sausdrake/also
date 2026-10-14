@@ -19,6 +19,10 @@ public record IdentitySubmissionRequest(
         String rawDocumentNumber,
 
         @NotBlank(message = "documentStorageKey обязателен")
-        String documentStorageKey
+        String documentStorageKey,
+
+        // MVP-004: storage key of the live selfie captured through the platform camera
+        @NotBlank(message = "selfieStorageKey обязателен")
+        String selfieStorageKey
 ) {
 }

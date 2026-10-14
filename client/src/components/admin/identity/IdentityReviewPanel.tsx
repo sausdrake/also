@@ -4,6 +4,7 @@ import {
   approve,
   getDocumentUrlAdmin,
   getHistoryAdmin,
+  getSelfieUrlAdmin,
   reject,
   revoke,
   type IdentityHistoryEventResponse,
@@ -56,6 +57,8 @@ export function IdentityReviewPanel({ item, onActioned }: Props) {
   const [docUrl, setDocUrl] = useState<string | null>(null);
   const [docLoading, setDocLoading] = useState(false);
   const [docError, setDocError] = useState<string | null>(null);
+  const [selfieLoading, setSelfieLoading] = useState(false);
+  const [selfieError, setSelfieError] = useState<string | null>(null);
 
   const [activeAction, setActiveAction] = useState<Action>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -72,6 +75,7 @@ export function IdentityReviewPanel({ item, onActioned }: Props) {
     setMsg(null);
     setDocUrl(null);
     setDocError(null);
+    setSelfieError(null);
     getHistoryAdmin(item.id).then(setHistory).catch(() => setHistory([]));
   }, [item.id]);
 
@@ -84,6 +88,16 @@ export function IdentityReviewPanel({ item, onActioned }: Props) {
       .then(url => { setDocUrl(url); window.open(url, '_blank', 'noopener'); })
       .catch(() => setDocError('Не удалось получить ссылку на документ'))
       .finally(() => setDocLoading(false));
+  };
+
+  // MVP-004: the administrator compares the live selfie with the document before deciding.
+  const viewSelfie = () => {
+    setSelfieError(null);
+    setSelfieLoading(true);
+    getSelfieUrlAdmin(item.id)
+      .then(url => { window.open(url, '_blank', 'noopener'); })
+      .catch(() => setSelfieError('Не удалось получить ссылку на селфи'))
+      .finally(() => setSelfieLoading(false));
   };
 
   const cancel = () => {
@@ -173,6 +187,21 @@ export function IdentityReviewPanel({ item, onActioned }: Props) {
         {docUrl && !docError && <p className="text-xs text-gray-400 mt-1">Документ открыт в новой вкладке.</p>}
       </div>
 
+      <div>
+        {item.selfieProvided ? (
+          <button onClick={viewSelfie} disabled={selfieLoading}
+            className="text-xs px-3 py-1.5 rounded-lg border text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+            {selfieLoading ? 'Загрузка...' : 'Просмотреть селфи'}
+          </button>
+        ) : (
+          <p className="text-xs rounded-lg px-3 py-1.5 bg-amber-50 text-amber-800">
+            В заявке нет живого селфи — она подана до введения обязательного селфи. Подтвердить её нельзя:
+            отклоните заявку, чтобы пользователь отправил её повторно с селфи.
+          </p>
+        )}
+        {selfieError && <p className="text-xs text-red-600 mt-1">{selfieError}</p>}
+      </div>
+
       {history.length > 0 && (
         <div className="space-y-1">
           <p className="text-xs text-gray-500">История:</p>
@@ -193,10 +222,12 @@ export function IdentityReviewPanel({ item, onActioned }: Props) {
         <div className="space-y-2 pt-2 border-t border-gray-100">
           {activeAction === null && (
             <div className="flex gap-2">
-              <button onClick={() => setActiveAction('approve')}
-                className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700">
-                Подтвердить личность
-              </button>
+              {item.selfieProvided && (
+                <button onClick={() => setActiveAction('approve')}
+                  className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700">
+                  Подтвердить личность
+                </button>
+              )}
               <button onClick={() => setActiveAction('reject')}
                 className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700">
                 Отклонить

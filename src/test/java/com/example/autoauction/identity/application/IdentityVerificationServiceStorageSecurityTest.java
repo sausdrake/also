@@ -48,6 +48,7 @@ class IdentityVerificationServiceStorageSecurityTest {
 
     private static final Long USER_ID = 1L;
     private static final Long OTHER_USER_ID = 2L;
+    private static final String SELFIE_KEY = "identity-documents/own-selfie";
 
     @BeforeEach
     void setUp() {
@@ -55,6 +56,10 @@ class IdentityVerificationServiceStorageSecurityTest {
         Clock clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
         service = new IdentityVerificationService(identityVerificationRepository, historyRepository, documentRepository, storageClient, clock);
         lenient().when(identityVerificationRepository.findByUserIdWithLock(any())).thenReturn(Optional.empty());
+        // MVP-004: every submission also carries the user's own, uploaded live selfie.
+        IdentityDocument ownSelfie = new IdentityDocument(11L, SELFIE_KEY, USER_ID, "image/jpeg", 3L, OffsetDateTime.now());
+        lenient().when(documentRepository.findByStorageKey(SELFIE_KEY)).thenReturn(Optional.of(ownSelfie));
+        storageClient.simulateUpload(SELFIE_KEY, new byte[]{4, 5, 6}, "image/jpeg");
         // Simulates the real repository adapter assigning a generated id on first insert - a bare
         // passthrough stub would leave getId() null and break history.save()'s own NPE guard.
         lenient().when(identityVerificationRepository.save(any())).thenAnswer(inv -> {
@@ -84,7 +89,7 @@ class IdentityVerificationServiceStorageSecurityTest {
     void submit_ArbitraryUnknownKey_Rejected() {
         when(documentRepository.findByStorageKey("client-made-up-key")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", "client-made-up-key"))
+        assertThatThrownBy(() -> service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", "client-made-up-key", SELFIE_KEY))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -94,7 +99,7 @@ class IdentityVerificationServiceStorageSecurityTest {
         IdentityDocument foreignDoc = new IdentityDocument(10L, "identity-documents/foreign", OTHER_USER_ID, "image/jpeg", 100L, OffsetDateTime.now());
         when(documentRepository.findByStorageKey("identity-documents/foreign")).thenReturn(Optional.of(foreignDoc));
 
-        assertThatThrownBy(() -> service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", "identity-documents/foreign"))
+        assertThatThrownBy(() -> service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", "identity-documents/foreign", SELFIE_KEY))
                 .isInstanceOf(SecurityException.class);
     }
 
@@ -105,7 +110,7 @@ class IdentityVerificationServiceStorageSecurityTest {
         when(documentRepository.findByStorageKey("identity-documents/never-uploaded")).thenReturn(Optional.of(ownDoc));
         // Deliberately never call storageClient.simulateUpload() - the object genuinely does not exist.
 
-        assertThatThrownBy(() -> service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", "identity-documents/never-uploaded"))
+        assertThatThrownBy(() -> service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", "identity-documents/never-uploaded", SELFIE_KEY))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -117,7 +122,7 @@ class IdentityVerificationServiceStorageSecurityTest {
         when(documentRepository.findByStorageKey(key)).thenReturn(Optional.of(ownDoc));
         storageClient.simulateUpload(key, new byte[]{1, 2, 3}, "image/jpeg");
 
-        IdentityVerification result = service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", key);
+        IdentityVerification result = service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", key, SELFIE_KEY);
 
         assertThat(result.getStatus()).isEqualTo(IdentityVerificationStatus.PENDING_REVIEW);
         assertThat(result.getCurrentDocumentId()).isEqualTo(10L);
@@ -132,11 +137,11 @@ class IdentityVerificationServiceStorageSecurityTest {
         storageClient.simulateUpload(key, new byte[]{1, 2, 3}, "image/jpeg");
 
         // First submission creates the row; simulate a REJECTED state so a second submission is permitted.
-        IdentityVerification first = IdentityVerification.firstSubmission(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", 10L, OffsetDateTime.now());
+        IdentityVerification first = IdentityVerification.firstSubmission(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", 10L, 10L, OffsetDateTime.now());
         first.reject(OffsetDateTime.now());
         when(identityVerificationRepository.findByUserIdWithLock(USER_ID)).thenReturn(Optional.of(first));
 
-        IdentityVerification result = service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", key);
+        IdentityVerification result = service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", key, SELFIE_KEY);
 
         assertThat(result.getStatus()).isEqualTo(IdentityVerificationStatus.PENDING_REVIEW);
         assertThat(result.getCurrentDocumentId()).isEqualTo(10L);
@@ -145,7 +150,7 @@ class IdentityVerificationServiceStorageSecurityTest {
     @Test
     @DisplayName("getOwnDocumentUrl() denies a user whose own verification row points to a document NOT owned by them")
     void getOwnDocumentUrl_DocumentNotOwnedByCaller_Denied() {
-        IdentityVerification iv = IdentityVerification.firstSubmission(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", 10L, OffsetDateTime.now());
+        IdentityVerification iv = IdentityVerification.firstSubmission(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", 10L, 10L, OffsetDateTime.now());
         when(identityVerificationRepository.findByUserId(USER_ID)).thenReturn(Optional.of(iv));
         IdentityDocument foreignDoc = new IdentityDocument(10L, "identity-documents/foreign", OTHER_USER_ID, "image/jpeg", 100L, OffsetDateTime.now());
         when(documentRepository.findById(10L)).thenReturn(Optional.of(foreignDoc));
@@ -156,7 +161,7 @@ class IdentityVerificationServiceStorageSecurityTest {
     @Test
     @DisplayName("getOwnDocumentUrl() returns a fresh presigned read URL for the caller's own document")
     void getOwnDocumentUrl_OwnDocument_ReturnsFreshUrl() {
-        IdentityVerification iv = IdentityVerification.firstSubmission(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", 10L, OffsetDateTime.now());
+        IdentityVerification iv = IdentityVerification.firstSubmission(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", 10L, 10L, OffsetDateTime.now());
         when(identityVerificationRepository.findByUserId(USER_ID)).thenReturn(Optional.of(iv));
         IdentityDocument ownDoc = new IdentityDocument(10L, "identity-documents/own", USER_ID, "image/jpeg", 100L, OffsetDateTime.now());
         when(documentRepository.findById(10L)).thenReturn(Optional.of(ownDoc));

@@ -63,10 +63,10 @@ class IdentityPersistencePgIntegrationTest extends AbstractPostgresIntegrationTe
         Long docId = newDocument(userId);
         OffsetDateTime now = OffsetDateTime.now();
         identityVerificationRepository.save(
-                IdentityVerification.firstSubmission(userId, "KG", DocumentType.NATIONAL_ID, "AA1111", docId, now));
+                IdentityVerification.firstSubmission(userId, "KG", DocumentType.NATIONAL_ID, "AA1111", docId, docId, now));
 
         assertThatThrownBy(() -> identityVerificationRepository.save(
-                IdentityVerification.firstSubmission(userId, "KG", DocumentType.NATIONAL_ID, "BB2222", docId, now)))
+                IdentityVerification.firstSubmission(userId, "KG", DocumentType.NATIONAL_ID, "BB2222", docId, docId, now)))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -78,12 +78,12 @@ class IdentityPersistencePgIntegrationTest extends AbstractPostgresIntegrationTe
         OffsetDateTime now = OffsetDateTime.now();
 
         IdentityVerification ivA = IdentityVerification.firstSubmission(
-                userA, "KG", DocumentType.NATIONAL_ID, "SAMEID123", newDocument(userA), now);
+                userA, "KG", DocumentType.NATIONAL_ID, "SAMEID123", newDocument(userA), newDocument(userA), now);
         ivA.approve(now.plusMinutes(1));
         identityVerificationRepository.save(ivA);
 
         IdentityVerification ivB = IdentityVerification.firstSubmission(
-                userB, "KG", DocumentType.NATIONAL_ID, "SAMEID123", newDocument(userB), now);
+                userB, "KG", DocumentType.NATIONAL_ID, "SAMEID123", newDocument(userB), newDocument(userB), now);
         ivB.approve(now.plusMinutes(1));
 
         assertThatThrownBy(() -> identityVerificationRepository.save(ivB))
@@ -98,9 +98,9 @@ class IdentityPersistencePgIntegrationTest extends AbstractPostgresIntegrationTe
         OffsetDateTime now = OffsetDateTime.now();
 
         identityVerificationRepository.save(IdentityVerification.firstSubmission(
-                userA, "KG", DocumentType.NATIONAL_ID, "DUPPENDING1", newDocument(userA), now));
+                userA, "KG", DocumentType.NATIONAL_ID, "DUPPENDING1", newDocument(userA), newDocument(userA), now));
         IdentityVerification saved = identityVerificationRepository.save(IdentityVerification.firstSubmission(
-                userB, "KG", DocumentType.NATIONAL_ID, "DUPPENDING1", newDocument(userB), now));
+                userB, "KG", DocumentType.NATIONAL_ID, "DUPPENDING1", newDocument(userB), newDocument(userB), now));
 
         assertThat(saved.getId()).isNotNull();
     }
@@ -113,13 +113,13 @@ class IdentityPersistencePgIntegrationTest extends AbstractPostgresIntegrationTe
         OffsetDateTime now = OffsetDateTime.now();
 
         IdentityVerification ivA = IdentityVerification.firstSubmission(
-                userA, "KG", DocumentType.NATIONAL_ID, "FREEDAFTER1", newDocument(userA), now);
+                userA, "KG", DocumentType.NATIONAL_ID, "FREEDAFTER1", newDocument(userA), newDocument(userA), now);
         ivA.approve(now.plusMinutes(1));
         ivA.revoke(now.plusMinutes(2));
         identityVerificationRepository.save(ivA);
 
         IdentityVerification ivB = IdentityVerification.firstSubmission(
-                userB, "KG", DocumentType.NATIONAL_ID, "FREEDAFTER1", newDocument(userB), now);
+                userB, "KG", DocumentType.NATIONAL_ID, "FREEDAFTER1", newDocument(userB), newDocument(userB), now);
         ivB.approve(now.plusMinutes(3));
         IdentityVerification saved = identityVerificationRepository.save(ivB);
 
@@ -133,7 +133,7 @@ class IdentityPersistencePgIntegrationTest extends AbstractPostgresIntegrationTe
         Long docId = newDocument(userId);
         OffsetDateTime now = OffsetDateTime.now();
         IdentityVerification iv = identityVerificationRepository.save(
-                IdentityVerification.firstSubmission(userId, "KG", DocumentType.NATIONAL_ID, "HIST001", docId, now));
+                IdentityVerification.firstSubmission(userId, "KG", DocumentType.NATIONAL_ID, "HIST001", docId, docId, now));
 
         historyRepository.save(IdentityVerificationHistory.submission(iv.getId(), "HIST001", docId, now));
         historyRepository.save(IdentityVerificationHistory.approval(iv.getId(), "HIST001", 99L, now.plusMinutes(1)));
@@ -164,7 +164,7 @@ class IdentityPersistencePgIntegrationTest extends AbstractPostgresIntegrationTe
         Long docId = newDocument(userId);
         OffsetDateTime now = OffsetDateTime.now();
         return identityVerificationRepository.save(
-                IdentityVerification.firstSubmission(userId, "KG", DocumentType.NATIONAL_ID, "BAREROW1", docId, now)).getId();
+                IdentityVerification.firstSubmission(userId, "KG", DocumentType.NATIONAL_ID, "BAREROW1", docId, docId, now)).getId();
     }
 
     @Test
@@ -186,7 +186,7 @@ class IdentityPersistencePgIntegrationTest extends AbstractPostgresIntegrationTe
         Long docId = newDocument(userId);
         OffsetDateTime now = OffsetDateTime.now();
         IdentityVerification iv = identityVerificationRepository.save(
-                IdentityVerification.firstSubmission(userId, "KG", DocumentType.NATIONAL_ID, "REVREASON1", docId, now));
+                IdentityVerification.firstSubmission(userId, "KG", DocumentType.NATIONAL_ID, "REVREASON1", docId, docId, now));
 
         historyRepository.save(IdentityVerificationHistory.revocation(
                 iv.getId(), "REVREASON1", 55L, RevocationReason.FRAUD_DISCOVERED, null, now.plusMinutes(1)));
@@ -195,5 +195,26 @@ class IdentityPersistencePgIntegrationTest extends AbstractPostgresIntegrationTe
                 historyRepository.findByIdentityVerificationIdOrderByOccurredAtAscIdAsc(iv.getId());
         assertThat(rows).hasSize(1);
         assertThat(rows.get(0).getRevocationReasonCode()).isEqualTo(RevocationReason.FRAUD_DISCOVERED);
+    }
+
+    @Test
+    @DisplayName("MVP-004 (V52): the live-selfie document id round-trips and must reference a real identity_document")
+    void identityVerification_SelfieDocument_RoundTripsAndIsForeignKeyChecked() {
+        Long userId = newUser();
+        Long docId = newDocument(userId);
+        Long selfieId = newDocument(userId);
+        OffsetDateTime now = OffsetDateTime.now();
+
+        identityVerificationRepository.save(
+                IdentityVerification.firstSubmission(userId, "KG", DocumentType.NATIONAL_ID, "SELFIE01", docId, selfieId, now));
+        IdentityVerification reloaded = identityVerificationRepository.findByUserId(userId).orElseThrow();
+        assertThat(reloaded.getCurrentDocumentId()).isEqualTo(docId);
+        assertThat(reloaded.getCurrentSelfieDocumentId()).isEqualTo(selfieId);
+
+        Long otherUser = newUser();
+        Long otherDoc = newDocument(otherUser);
+        assertThatThrownBy(() -> identityVerificationRepository.save(IdentityVerification.firstSubmission(
+                otherUser, "KG", DocumentType.NATIONAL_ID, "SELFIE02", otherDoc, 987_654_321L, now)))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 }

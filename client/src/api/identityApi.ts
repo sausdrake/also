@@ -17,6 +17,8 @@ export interface IdentityStatusResponse {
   canonicalDocumentNumber: string;
   createdAt: string;
   updatedAt: string;
+  /** MVP-004: false only for submissions made before the live selfie became mandatory. */
+  selfieProvided: boolean;
 }
 
 export interface IdentityHistoryEventResponse {
@@ -56,12 +58,14 @@ export async function submitIdentity(
   documentType: DocumentType,
   rawDocumentNumber: string,
   documentStorageKey: string,
+  selfieStorageKey: string,
 ): Promise<IdentityStatusResponse> {
   const { data } = await api.post<IdentityStatusResponse>('/identity/submissions', {
     issuingCountry: SUPPORTED_ISSUING_COUNTRY,
     documentType,
     rawDocumentNumber,
     documentStorageKey,
+    selfieStorageKey,
   });
   return data;
 }
@@ -95,6 +99,12 @@ export async function getById(id: number): Promise<IdentityStatusResponse> {
 
 export async function getDocumentUrlAdmin(id: number): Promise<string> {
   const { data } = await api.get<{ url: string }>(`/admin/identity/${id}/document-url`);
+  return data.url;
+}
+
+/** MVP-004: the live selfie the administrator compares with the document. */
+export async function getSelfieUrlAdmin(id: number): Promise<string> {
+  const { data } = await api.get<{ url: string }>(`/admin/identity/${id}/selfie-url`);
   return data.url;
 }
 
