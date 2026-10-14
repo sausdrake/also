@@ -64,6 +64,52 @@ public class InspectionTemplateService {
         return templateRepository.saveTemplate(template);
     }
 
+    /**
+     * Scenario 14.4: an exact copy of the template - vehicle type, description, every group and
+     * every item with all its settings and order - under a new name. The copy starts inactive, so
+     * diagnosticians only see it once the admin has finished it and activated it. The source
+     * template is not changed.
+     */
+    @Transactional
+    public InspectionTemplate copyTemplate(Long sourceId, String newName, Long adminId) {
+        if (newName == null || newName.isBlank()) {
+            throw new IllegalArgumentException("Название нового шаблона обязательно");
+        }
+        InspectionTemplate source = getFullTemplateById(sourceId);
+
+        InspectionTemplate copy = new InspectionTemplate();
+        copy.setName(newName.trim());
+        copy.setVehicleType(source.getVehicleType());
+        copy.setDescription(source.getDescription());
+        copy.setActive(false);
+        copy.setCreatedBy(adminId);
+        Long copyId = templateRepository.saveTemplate(copy).getId();
+
+        for (InspectionGroup sourceGroup : source.getGroups()) {
+            InspectionGroup group = new InspectionGroup();
+            group.setTemplateId(copyId);
+            group.setName(sourceGroup.getName());
+            group.setSortOrder(sourceGroup.getSortOrder());
+            Long groupId = templateRepository.saveGroup(group).getId();
+
+            for (InspectionItem sourceItem : sourceGroup.getItems()) {
+                InspectionItem item = new InspectionItem();
+                item.setGroupId(groupId);
+                item.setTitle(sourceItem.getTitle());
+                item.setDescription(sourceItem.getDescription());
+                item.setFieldType(sourceItem.getFieldType());
+                item.setHasPhoto(sourceItem.isHasPhoto());
+                item.setHasVideo(sourceItem.isHasVideo());
+                item.setHasRating(sourceItem.isHasRating());
+                item.setRequired(sourceItem.isRequired());
+                item.setSortOrder(sourceItem.getSortOrder());
+                templateRepository.saveItem(item);
+            }
+        }
+        log.info("Admin {} copied inspection template {} as {}", adminId, sourceId, copyId);
+        return getFullTemplateById(copyId);
+    }
+
     @Transactional
     public void deleteTemplate(Long id) {
         templateRepository.deleteTemplate(id);

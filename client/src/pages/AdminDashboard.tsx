@@ -1561,6 +1561,24 @@ function TemplatesPage() {
     } catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); }
   };
 
+  // Scenario 14.4: "Копировать" -> new name -> an exact, inactive copy opens in the constructor.
+  const [copySource, setCopySource] = useState<Template | null>(null);
+  const [copyName, setCopyName] = useState('');
+  const [copying, setCopying] = useState(false);
+
+  const copyTemplate = async () => {
+    if (!copySource || !copyName.trim()) return;
+    setCopying(true);
+    try {
+      const r = await api.post(`/admin/diagnostic/templates/${copySource.id}/copy`, { name: copyName.trim() });
+      notify(`Шаблон «${copySource.name}» скопирован как «${r.data.name}» (неактивен)`);
+      setCopySource(null); setCopyName('');
+      loadTemplates();
+      setSelected(r.data);
+    } catch (e: any) { notify(e.response?.data?.message || 'Ошибка копирования', true); }
+    finally { setCopying(false); }
+  };
+
   const deleteTemplate = async (id: number) => {
     try {
       await api.delete(`/admin/diagnostic/templates/${id}`);
@@ -1621,6 +1639,28 @@ function TemplatesPage() {
           onYes={() => { setConfirmSeed(false); seedAllTemplates(); }}
           onNo={() => setConfirmSeed(false)}
         />
+      )}
+
+      {copySource && (
+        <Modal onClose={() => setCopySource(null)}>
+          <div className="p-5 space-y-3">
+            <h3 className="font-semibold text-gray-900">Новое название шаблона</h3>
+            <p className="text-xs text-gray-500">
+              Будет создана точная копия шаблона «{copySource.name}» со всеми группами и пунктами. Копия создаётся неактивной.
+            </p>
+            <input value={copyName} onChange={e => setCopyName(e.target.value)} placeholder="Название нового шаблона"
+              aria-label="Название нового шаблона"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setCopySource(null)} disabled={copying}
+                className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg">Отмена</button>
+              <button onClick={copyTemplate} disabled={copying || !copyName.trim()}
+                className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg disabled:opacity-50">
+                {copying ? 'Копирование...' : 'Сохранить копию'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       <div>
@@ -1695,6 +1735,9 @@ function TemplatesPage() {
                         className={`text-xs px-1.5 py-0.5 rounded ${t.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                         {t.isActive ? '✓' : '○'}
                       </button>
+                      <button onClick={e => { e.stopPropagation(); setCopySource(t); setCopyName(''); }}
+                        title="Копировать" aria-label={`Копировать шаблон ${t.name}`}
+                        className="text-xs text-gray-400 hover:text-blue-600 px-1">⧉</button>
                       <button onClick={e => { e.stopPropagation(); deleteTemplate(t.id); }}
                         className="text-xs text-red-400 hover:text-red-600 px-1">✕</button>
                     </div>

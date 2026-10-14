@@ -16,6 +16,7 @@ import com.example.autoauction.diagnostic.domain.DiagnosticRejectionCategory;
 import com.example.autoauction.diagnostic.domain.InspectionGroup;
 import com.example.autoauction.diagnostic.domain.InspectionItem;
 import com.example.autoauction.diagnostic.domain.InspectionTemplate;
+import com.example.autoauction.diagnostic.web.dto.CopyInspectionTemplateRequest;
 import com.example.autoauction.diagnostic.web.dto.DiagnosticRequestResponse;
 import com.example.autoauction.diagnostic.web.dto.InspectionGroupDto;
 import com.example.autoauction.diagnostic.web.dto.InspectionItemDto;
@@ -89,6 +90,17 @@ public class AdminDiagnosticController {
             @Valid @RequestBody InspectionTemplateDto dto
     ) {
         return ResponseEntity.ok(templateService.updateTemplate(id, dto));
+    }
+
+    @PostMapping("/templates/{id}/copy")
+    @Operation(summary = "Скопировать шаблон под новым названием (копия создаётся неактивной)")
+    public ResponseEntity<InspectionTemplate> copyTemplate(
+            @PathVariable Long id,
+            @Valid @RequestBody CopyInspectionTemplateRequest request,
+            @CurrentUser UserPrincipal currentUser
+    ) {
+        InspectionTemplate copy = templateService.copyTemplate(id, request.name(), currentUser.getUserId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(copy);
     }
 
     @DeleteMapping("/templates/{id}")
