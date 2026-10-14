@@ -16,7 +16,7 @@ public class AuctionPricesValidator implements ConstraintValidator<ValidAuctionP
         context.disableDefaultConstraintViolation();
 
         // Проверка резервной цены
-        if (request.reservePrice() != null) {
+        if (request.reservePrice() != null && request.startingPrice() != null) {
             if (request.reservePrice().compareTo(request.startingPrice()) < 0) {
                 context.buildConstraintViolationWithTemplate(
                                 String.format("Резервная цена (%s) не может быть меньше стартовой (%s)",
@@ -28,7 +28,7 @@ public class AuctionPricesValidator implements ConstraintValidator<ValidAuctionP
         }
 
         // Проверка цены мгновенной покупки
-        if (request.buyNowPrice() != null) {
+        if (request.buyNowPrice() != null && request.startingPrice() != null) {
             if (request.buyNowPrice().compareTo(request.startingPrice()) <= 0) {
                 context.buildConstraintViolationWithTemplate(
                                 String.format("Цена мгновенной покупки (%s) должна быть больше стартовой (%s)",
