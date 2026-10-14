@@ -2,6 +2,11 @@ package com.example.autoauction.payment.web;
 
 import com.example.autoauction.auth.infrastructure.security.WithMockCustomUser;
 import com.example.autoauction.deposit.application.DepositService;
+import com.example.autoauction.identity.domain.DocumentType;
+import com.example.autoauction.identity.domain.IdentityDocument;
+import com.example.autoauction.identity.domain.IdentityVerification;
+import com.example.autoauction.identity.domain.port.IdentityDocumentRepository;
+import com.example.autoauction.identity.domain.port.IdentityVerificationRepository;
 import com.example.autoauction.payment.domain.port.PaymentRepository;
 import com.example.autoauction.user.domain.Role;
 import com.example.autoauction.user.domain.User;
@@ -18,6 +23,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -46,6 +52,22 @@ class PaymentControllerTest {
     @Autowired private UserRepository userRepository;
     @Autowired private RoleRepository roleRepository;
     @Autowired private PaymentRepository paymentRepository;
+    @Autowired private IdentityDocumentRepository identityDocumentRepository;
+    @Autowired private IdentityVerificationRepository identityVerificationRepository;
+
+    /** MVP-004: payment creation is KYC-gated - the principal needs a VERIFIED identity. */
+    private void ensureVerifiedIdentity(Long userId) {
+        if (identityVerificationRepository.findByUserId(userId).isPresent()) {
+            return;
+        }
+        OffsetDateTime now = OffsetDateTime.now();
+        Long documentId = identityDocumentRepository.save(new IdentityDocument(
+                "identity-documents/pc-" + userId, userId, "image/jpeg", 1000L, now)).getId();
+        IdentityVerification iv = IdentityVerification.firstSubmission(
+                userId, "KG", DocumentType.NATIONAL_ID, "PC" + userId, documentId, now);
+        iv.approve(now);
+        identityVerificationRepository.save(iv);
+    }
 
     private Long createUserWithDeposit() {
         Role role = roleRepository.findByName("ROLE_USER")
@@ -78,7 +100,10 @@ class PaymentControllerTest {
         mockMvc.perform(post("/api/v1/payments")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("amount", new BigDecimal("50000")))))
-                .andExpect(status().isNotFound());
+                // MVP-004: a principal id with no user has no VERIFIED identity either - the KYC
+                // gate rejects it before payment creation (still rejected, never spoofable).
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("IDENTITY_VERIFICATION_REQUIRED"));
     }
 
     @Test
@@ -94,6 +119,7 @@ class PaymentControllerTest {
             Long savedId = userRepository.save(user).getId();
             depositService.createDeposit(savedId, BigDecimal.ZERO);
         }
+        ensureVerifiedIdentity(1L);
 
         mockMvc.perform(post("/api/v1/payments")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -115,6 +141,7 @@ class PaymentControllerTest {
             Long savedId = userRepository.save(user).getId();
             depositService.createDeposit(savedId, BigDecimal.ZERO);
         }
+        ensureVerifiedIdentity(2L);  // MVP-004: so the 4xx below is the amount policy, not KYC
 
         mockMvc.perform(post("/api/v1/payments")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -133,6 +160,7 @@ class PaymentControllerTest {
             Long savedId = userRepository.save(user).getId();
             depositService.createDeposit(savedId, BigDecimal.ZERO);
         }
+        ensureVerifiedIdentity(3L);
 
         Map<String, Object> bodyWithForbiddenFields = new LinkedHashMap<>();
         bodyWithForbiddenFields.put("amount", new BigDecimal("1000"));

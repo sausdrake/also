@@ -5,6 +5,7 @@ import com.example.autoauction.auction.web.dto.BidRequest;
 import com.example.autoauction.auction.web.dto.BidResponse;
 import com.example.autoauction.auth.domain.UserPrincipal;
 import com.example.autoauction.auth.infrastructure.security.CurrentUser;
+import com.example.autoauction.identity.application.VerifiedIdentityGate;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,9 +21,11 @@ import org.springframework.web.bind.annotation.*;
 public class BidController {
 
     private final BidService bidService;
+    private final VerifiedIdentityGate verifiedIdentityGate;
 
-    public BidController(BidService bidService) {
+    public BidController(BidService bidService, VerifiedIdentityGate verifiedIdentityGate) {
         this.bidService = bidService;
+        this.verifiedIdentityGate = verifiedIdentityGate;
     }
 
     @PostMapping("/{auctionId}/bids")
@@ -36,6 +39,7 @@ public class BidController {
     ) {
         Long bidderId = currentUser.getUserId();
         log.info("User {} placing bid on auction {}", bidderId, auctionId);
+        verifiedIdentityGate.requireVerified(bidderId);
 
         BidResponse response = bidService.placeBid(auctionId, request.amount(), bidderId);
         return ResponseEntity.ok(response);
@@ -51,6 +55,7 @@ public class BidController {
     ) {
         Long buyerId = currentUser.getUserId();
         log.info("User {} buying auction {} via Buy Now", buyerId, auctionId);
+        verifiedIdentityGate.requireVerified(buyerId);
 
         BidResponse response = bidService.buyNow(auctionId, buyerId);
         return ResponseEntity.ok(response);

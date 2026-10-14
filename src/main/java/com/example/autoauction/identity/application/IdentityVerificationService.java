@@ -25,7 +25,8 @@ import java.util.UUID;
 /**
  * Phase 3/4: self-service identity-verification operations - submission, own-status/history
  * queries, own-document access. Narrow, self-contained: never touches {@code User},
- * {@code BidService}, or {@code DepositService} (Phase 3 §8 - identity gates nothing yet).
+ * {@code BidService}, or {@code DepositService}. Enforcement of the resulting status on protected
+ * operations lives in {@link VerifiedIdentityGate} (MVP-004).
  *
  * <p>Deliberately never logs {@code rawDocumentNumber} or any canonical document number
  * (Phase 3.1 §5) - the raw value exists only as a method parameter here, canonicalized

@@ -5,6 +5,7 @@ import com.example.autoauction.auth.domain.UserPrincipal;
 import com.example.autoauction.diagnostic.application.DiagnosticRequestService;
 import com.example.autoauction.diagnostic.web.dto.CreateDiagnosticRequest;
 import com.example.autoauction.diagnostic.web.dto.DiagnosticRequestResponse;
+import com.example.autoauction.identity.application.VerifiedIdentityGate;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 public class DiagnosticRequestController {
 
     private final DiagnosticRequestService requestService;
+    private final VerifiedIdentityGate verifiedIdentityGate;
 
     /**
      * Создать заявку на диагностику (покупатель)
@@ -38,6 +40,7 @@ public class DiagnosticRequestController {
             @CurrentUser UserPrincipal currentUser
     ) {
         log.info("POST /api/diagnostic-requests - user: {}", currentUser.getUserId());
+        verifiedIdentityGate.requireVerified(currentUser.getUserId());
         DiagnosticRequestResponse response = requestService.createRequest(request, currentUser.getUserId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

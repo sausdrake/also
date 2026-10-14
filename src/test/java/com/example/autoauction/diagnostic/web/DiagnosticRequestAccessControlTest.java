@@ -43,6 +43,10 @@ class DiagnosticRequestAccessControlTest {
     @MockBean
     private DiagnosticRequestService requestService;
 
+    // MVP-004: the controller's KYC gate for request creation (not exercised by these GET tests)
+    @MockBean
+    private com.example.autoauction.identity.application.VerifiedIdentityGate verifiedIdentityGate;
+
     @MockBean
     private JwtService jwtService;
 

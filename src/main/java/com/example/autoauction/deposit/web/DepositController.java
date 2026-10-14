@@ -8,6 +8,7 @@ import com.example.autoauction.deposit.web.dto.DepositRequest;
 import com.example.autoauction.deposit.web.dto.DepositResponse;
 import com.example.autoauction.deposit.web.dto.DepositTransactionResponse;
 import com.example.autoauction.deposit.web.dto.WithdrawRequest;
+import com.example.autoauction.identity.application.VerifiedIdentityGate;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,9 +31,11 @@ import java.util.List;
 public class DepositController {
 
     private final DepositService depositService;
+    private final VerifiedIdentityGate verifiedIdentityGate;
 
-    public DepositController(DepositService depositService) {
+    public DepositController(DepositService depositService, VerifiedIdentityGate verifiedIdentityGate) {
         this.depositService = depositService;
+        this.verifiedIdentityGate = verifiedIdentityGate;
         log.info("DepositController initialized");
     }
     @PostMapping("/deposit")
@@ -44,6 +47,8 @@ public class DepositController {
     ) {
         Long userId = currentUser.getUserId();
         log.info("User {} depositing: {}", userId, request.amount());
+        // MVP-004: no KYC gate here - self-service deposit is disabled for everyone (stable 409);
+        // funding goes through POST /api/v1/payments, which is gated.
 
         DepositResponse response = depositService.deposit(userId, request.amount());
         return ResponseEntity.ok(response);
@@ -58,6 +63,7 @@ public class DepositController {
     ) {
         Long userId = currentUser.getUserId();
         log.info("User {} withdrawing: {}", userId, request.amount());
+        verifiedIdentityGate.requireVerified(userId);
 
         DepositResponse response = depositService.withdraw(userId, request.amount(), request.idempotencyKey());
         return ResponseEntity.ok(response);
