@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Routes, Route, NavLink, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import api from '../api/client';
@@ -931,9 +931,26 @@ function ReportsPage() {
     } catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); setRejectTarget(null); }
   };
 
+  // MVP-003: guards the detail panel against stale responses - an older loadDetail() (another
+  // report's "Детали" click, or the SellerViolationResolutionPanel onDone refetch) resolving
+  // after a newer one, or after the panel was closed. Every loadDetail() and closeDetail()
+  // bumps the generation; only a response whose captured generation is still current may set
+  // detailReport or notify (same pattern as AdminSalePage's requestGeneration).
+  const detailGeneration = useRef(0);
+
   const loadDetail = async (id: number) => {
-    try { const r = await api.get(`/admin/diagnostic/reports/${id}`); setDetailReport(r.data); }
-    catch (e: any) { notify('Ошибка загрузки детали', true); }
+    const generation = ++detailGeneration.current;
+    try {
+      const r = await api.get(`/admin/diagnostic/reports/${id}`);
+      if (generation === detailGeneration.current) setDetailReport(r.data);
+    } catch (e: any) {
+      if (generation === detailGeneration.current) notify('Ошибка загрузки детали', true);
+    }
+  };
+
+  const closeDetail = () => {
+    detailGeneration.current += 1;
+    setDetailReport(null);
   };
 
   const isReviewable = (r: Report) => r.status === 'COMPLETED';
@@ -950,7 +967,7 @@ function ReportsPage() {
       {detailReport && (
         <div className="fixed inset-0 z-50 flex">
           {/* backdrop */}
-          <div className="flex-1 bg-black/50" onClick={() => setDetailReport(null)} />
+          <div className="flex-1 bg-black/50" onClick={closeDetail} />
           {/* side panel */}
           <div className="w-full max-w-2xl bg-white shadow-2xl flex flex-col h-full overflow-hidden">
             {/* Header */}
@@ -963,7 +980,7 @@ function ReportsPage() {
                   Отчёт #{detailReport.id} · VIN: {detailReport.vin}
                 </p>
               </div>
-              <button onClick={() => setDetailReport(null)}
+              <button onClick={closeDetail}
                 className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -979,11 +996,11 @@ function ReportsPage() {
                     d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
                 <span className="text-sm text-amber-800 font-medium flex-1">Ожидает проверки администратора</span>
-                <button onClick={() => { approve(detailReport.id); setDetailReport(null); }}
+                <button onClick={() => { approve(detailReport.id); closeDetail(); }}
                   className="px-4 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 font-semibold">
                   Одобрить
                 </button>
-                <button onClick={() => { setRejectTarget(detailReport.id); setDetailReport(null); }}
+                <button onClick={() => { setRejectTarget(detailReport.id); closeDetail(); }}
                   className="px-4 py-1.5 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 font-semibold">
                   Отклонить
                 </button>
