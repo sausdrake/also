@@ -1,5 +1,7 @@
 package com.example.autoauction.config;
 
+import org.springframework.beans.factory.annotation.Value;
+import java.util.Arrays;
 import com.example.autoauction.auth.infrastructure.security.StompAuthChannelInterceptor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -22,9 +24,14 @@ import java.util.List;
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final StompAuthChannelInterceptor stompAuthChannelInterceptor;
+    /** SEC-03: the same origins as CORS (allowed.origins) - never "*". */
+    private final String[] allowedOrigins;
 
-    public WebSocketConfig(StompAuthChannelInterceptor stompAuthChannelInterceptor) {
+    public WebSocketConfig(StompAuthChannelInterceptor stompAuthChannelInterceptor,
+                           @Value("${allowed.origins}") String allowedOrigins) {
         this.stompAuthChannelInterceptor = stompAuthChannelInterceptor;
+        this.allowedOrigins = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim).filter(o -> !o.isEmpty()).toArray(String[]::new);
     }
 
     @Override
@@ -43,12 +50,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // SockJS endpoint для браузеров (с fallback)
         registry.addEndpoint("/ws-auction")
-                .setAllowedOriginPatterns("*")
+                .setAllowedOrigins(allowedOrigins)
                 .withSockJS();
 
         // Чистый WebSocket endpoint для Postman, wscat и прямых подключений
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*");
+                .setAllowedOrigins(allowedOrigins);
     }
 
     @Override
