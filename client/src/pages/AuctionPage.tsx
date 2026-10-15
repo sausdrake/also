@@ -569,6 +569,46 @@ export const AuctionPage = () => {
                       </div>
                     </div>
 
+                    {/* Scenario 18 step 2: overall score and key defects (items rated 3 or lower) */}
+                    {(() => {
+                      const rated = (report.template?.groups ?? []).flatMap(g => g.items.map(item => ({
+                        group: g.name,
+                        item,
+                        answer: report.existingAnswers.find(a => a.inspectionItemId === item.id),
+                      }))).filter(r => r.answer && !r.answer.skipped && r.answer.rating != null && r.answer.rating > 0);
+                      if (rated.length === 0) return null;
+                      const score = rated.reduce((sum, r) => sum + (r.answer!.rating as number), 0) / rated.length;
+                      const defects = rated.filter(r => (r.answer!.rating as number) <= 3)
+                        .sort((a, b) => (a.answer!.rating as number) - (b.answer!.rating as number));
+                      return (
+                        <div className="space-y-3" data-testid="report-summary">
+                          <div className="flex items-center gap-3 px-4 py-3 bg-white border border-gray-100 rounded-xl">
+                            <span className="text-2xl font-bold text-gray-900">{score.toFixed(1)}</span>
+                            <div>
+                              <p className="text-sm font-semibold text-gray-800">Общая оценка</p>
+                              <p className="text-xs text-gray-400">из 5 · по {rated.length} оценённым пунктам</p>
+                            </div>
+                          </div>
+                          {defects.length === 0 ? (
+                            <p className="text-sm text-green-700 bg-green-50 rounded-xl px-4 py-2">Ключевых недостатков не выявлено</p>
+                          ) : (
+                            <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+                              <p className="text-sm font-semibold text-amber-800 mb-2">Ключевые недостатки ({defects.length})</p>
+                              <ul className="space-y-1.5">
+                                {defects.map(d => (
+                                  <li key={d.item.id} className="text-sm text-amber-900">
+                                    <span className="font-semibold">{d.answer!.rating}/5</span>
+                                    {' · '}{d.group}: {d.item.title}
+                                    {d.answer!.comment && <span className="text-amber-700"> — {d.answer!.comment}</span>}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {/* Stats */}
                     {(() => {
                       const allItems = (report.template?.groups ?? []).flatMap(g => g.items);
