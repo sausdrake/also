@@ -32,6 +32,7 @@ class HealthControllerApiIntegrationTest {
         mockMvc.perform(get("/api/health"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UP"))
+                .andExpect(jsonPath("$.db").value("UP"))   // OBS-02: the database is really checked
                 .andExpect(jsonPath("$.service").value("Auto Auction API"))
                 .andExpect(jsonPath("$.timestamp").exists());
     }
