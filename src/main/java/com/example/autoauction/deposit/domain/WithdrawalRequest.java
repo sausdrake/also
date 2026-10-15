@@ -22,8 +22,9 @@ public class WithdrawalRequest {
 
     /**
      * O2: characters that print nothing - ASCII whitespace, NBSP and the other Unicode spaces,
-     * the zero-width characters. A payout note made only of these is no note. V57's CHECK uses
-     * the very same class, so the database refuses what the domain refuses.
+     * the zero-width characters. A payout note (O2) or a rejection reason (WD-01) made only of these
+     * is no text. The CHECKs of V57 (note) and V60 (reason) use the very same class, so the
+     * database refuses what the domain refuses.
      */
     private static final java.util.regex.Pattern INVISIBLE_CHARS = java.util.regex.Pattern.compile(
             "[\\t\\n\\x0B\\f\\r \\u0085\\u00A0\\u1680\\u2000-\\u200B\\u2028\\u2029\\u202F\\u205F\\u3000\\u2060\\uFEFF]");
@@ -122,7 +123,8 @@ public class WithdrawalRequest {
             throw new IllegalStateException("Заявку на вывод #" + id + " в статусе " + status + " нельзя отклонить");
         }
         String trimmed = reason == null ? "" : reason.trim();
-        if (trimmed.isEmpty()) {
+        if (INVISIBLE_CHARS.matcher(trimmed).replaceAll("").isEmpty()) {
+            // WD-01: the user sees this reason - a reason that prints nothing is no reason
             throw new IllegalArgumentException("Причина отклонения обязательна");
         }
         if (trimmed.length() > MAX_REJECTION_REASON_LENGTH) {

@@ -669,6 +669,31 @@ class WithdrawalRequestIntegrationTest {
     }
 
     @Test
+    @DisplayName("WD-01: a visually empty rejection reason is refused - nothing returned, still PROCESSING; real text is kept")
+    void rejectionReason_visuallyEmptyRefused() throws Exception {
+        Long userId = user("1000", true);
+        Long id = processingRequest(userId, "100");
+        for (String reason : List.of("", "   ", "\\t", "\\n", "\\u00a0\\u00a0", " \\t\\u00a0\\n\\u2007\\u202f\\u3000 ",
+                "\\u200b\\ufeff\\u2060")) {
+            adminJson(id, "reject", "{\"reason\":\"" + reason + "\",\"payoutNotMade\":true,\"expectedStatus\":\"PROCESSING\"}")
+                    .andExpect(status().isBadRequest());
+            assertThat(request(id).getStatus()).as(reason).isEqualTo(WithdrawalRequestStatus.PROCESSING);
+            assertThat(request(id).getRejectionReason()).as(reason).isNull();
+        }
+        assertThatThrownBy(() -> withdrawalRequestService.reject(id, ADMIN_ID, "\u00a0\u2007\u200b", true,
+                WithdrawalRequestStatus.PROCESSING)).isInstanceOf(IllegalArgumentException.class);
+        assertMoney(userId, "900", "0");
+        assertThat(ledger(userId, DepositTransaction.TransactionType.WITHDRAWAL_RETURN)).isEmpty();
+
+        adminJson(id, "reject", "{\"reason\":\"\\u00a0Неверные\\u00a0реквизиты\",\"payoutNotMade\":true,\"expectedStatus\":\"PROCESSING\"}")
+                .andExpect(status().isOk());
+        assertThat(request(id).getStatus()).isEqualTo(WithdrawalRequestStatus.REJECTED);
+        assertThat(request(id).getRejectionReason()).isEqualTo("\u00a0Неверные\u00a0реквизиты");
+        assertMoney(userId, "1000", "0");
+        assertThat(ledger(userId, DepositTransaction.TransactionType.WITHDRAWAL_RETURN)).hasSize(1);
+    }
+
+    @Test
     @DisplayName("F6.1: malformed reject bodies are refused without any effect")
     void malformedRejectBody_refused() throws Exception {
         Long userId = user("1000", true);

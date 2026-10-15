@@ -346,8 +346,13 @@ class WithdrawalRequestConcurrencyPgIntegrationTest extends AbstractPostgresInte
                 p.getCreatedAt(), p.getProcessingStartedAt(), p.getProcessingStartedBy(), now, adminId, null,
                 " \t\n\r\u000b\f\u0085\u00a0\u1680\u2007\u200b\u2028\u2029\u202f\u205f\u3000\u2060\ufeff", p.getVersion());
 
+        // WD-01 (V60): a rejection reason that prints nothing is refused like an empty payout note
+        WithdrawalRequest rejectedInvisibleReason = new WithdrawalRequest(id, userId, p.getAmount(), WithdrawalRequestStatus.REJECTED, p.getIdempotencyKey(),
+                p.getCreatedAt(), p.getProcessingStartedAt(), p.getProcessingStartedBy(), now, adminId,
+                " \t\n\r\u000b\f\u0085\u00a0\u1680\u2007\u200b\u2028\u2029\u202f\u205f\u3000\u2060\ufeff", null, p.getVersion());
+
         for (WithdrawalRequest broken : List.of(paidNoNote, paidBlankNote, paidNbspNote, paidInvisibleNote,
-                rejectedHalfAudit, rejectedWithNote, processingWithNote)) {
+                rejectedHalfAudit, rejectedWithNote, processingWithNote, rejectedInvisibleReason)) {
             assertThat(save.apply(broken)).as("%s / note=%s", broken.getStatus(), broken.getPayoutNote())
                     .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
         }
