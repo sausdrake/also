@@ -20,12 +20,9 @@ interface WatchedAuction {
 
 // ─────────────────── Deposit Tab ───────────────────
 
-const MAX_DEPOSIT = 10_000_000;
-
 function DepositTab() {
   const { balance, blockedAmount, availableBalance, isLoading, fetchDeposit } = useDepositStore();
   const [transactions, setTransactions] = useState<any[]>([]);
-  const [topUpAmount, setTopUpAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [msg, setMsg] = useState<{ text: string; ok: boolean }>({ text: '', ok: true });
   // Stable idempotency key for the withdrawal currently being attempted: generated once
@@ -55,20 +52,6 @@ function DepositTab() {
     if (val <= 0) return 'Сумма должна быть больше 0';
     if (val > max) return `Максимум: ${max.toLocaleString('ru')} сом`;
     return null;
-  };
-
-  const handleTopUp = async () => {
-    const err = validateAmount(topUpAmount, MAX_DEPOSIT);
-    if (err) { showMsg(err, false); return; }
-    try {
-      await api.post('/deposits/deposit', { amount: parseFloat(topUpAmount) });
-      showMsg('Депозит пополнен');
-      setTopUpAmount('');
-      fetchDeposit();
-      reloadTransactions();
-    } catch (e: any) {
-      showMsg(e.response?.data?.message || 'Ошибка', false);
-    }
   };
 
   const handleWithdraw = async () => {
@@ -116,23 +99,15 @@ function DepositTab() {
 
       {/* Операции */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white border rounded-xl p-4 shadow-sm">
+        {/* Self-service top-up is disabled on the server (POST /deposits/deposit always 409) and
+            no payment provider is connected yet, so there is nothing to submit here - only how
+            funding works today. */}
+        <div className="bg-white border rounded-xl p-4 shadow-sm" data-testid="top-up-info">
           <h3 className="font-semibold mb-3">Пополнить</h3>
-          <div className="flex gap-2 mb-2">
-            {[500, 1000, 5000, 10000].map(v => (
-              <button key={v} onClick={() => setTopUpAmount(String(v))}
-                className="px-3 py-1 text-sm border rounded-lg hover:bg-blue-50">
-                {v.toLocaleString('ru')}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <input type="number" value={topUpAmount} onChange={e => setTopUpAmount(e.target.value)}
-              placeholder="Сумма" className="flex-1 border rounded-lg px-3 py-2" />
-            <button onClick={handleTopUp} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-              Пополнить
-            </button>
-          </div>
+          <p className="text-sm text-gray-600">
+            Самостоятельное пополнение депозита пока недоступно. Зачисление средств выполняется
+            администратором после проверки платежа.
+          </p>
         </div>
 
         <div className="bg-white border rounded-xl p-4 shadow-sm">
