@@ -20,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -88,8 +89,11 @@ public class UserController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    // SEC-02: creates accounts outside /api/auth/register (no rate limit, no registration rules),
+    // so it is an administrative action only.
     @PostMapping
-    @Operation(summary = "Создать нового пользователя")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Создать нового пользователя (только администратор)")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Пользователь успешно создан"),
             @ApiResponse(responseCode = "400", description = "Некорректные данные"),
