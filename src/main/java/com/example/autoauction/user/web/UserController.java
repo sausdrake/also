@@ -144,32 +144,9 @@ public class UserController {
             throw new SecurityException("Только администраторы могут назначать роли");
         }
 
-        User user = userService.getUser(id)
-                .orElseThrow(() -> new IllegalArgumentException("User not found: " + id));
-
-        Role role = roleRepository.findByName(request.roleName())
-                .orElseThrow(() -> new IllegalArgumentException("Role not found: " + request.roleName()));
-
-        // Создаем нового пользователя с обновленными ролями
-        Set<Role> newRoles = new java.util.HashSet<>(user.getRoles());
-        newRoles.add(role);
-
-        // Slice 1A: must preserve the existing trust decision - role assignment is an unrelated
-        // action and must never silently reset trusted/verifiedByAdminId/verifiedAt.
-        User updatedUser = new User(
-                user.getId(),
-                user.getUsername(),
-                user.getEmail(),
-                user.getPasswordHash(),
-                user.isActive(),
-                newRoles,
-                user.isTrusted(),
-                user.getVerifiedByAdminId(),
-                user.getVerifiedAt()
-        );
-
-        User saved = userService.createUser(updatedUser);
-        log.info("Role {} assigned to user {} by admin {}", role.getName(), id, SecurityUtils.getCurrentUsername());
+        // SEC-06: the role change is done - and journaled with the acting admin - by UserService
+        User saved = userService.addUserRole(id, request.roleName(), SecurityUtils.getCurrentUserId());
+        log.info("Role {} assigned to user {} by admin {}", request.roleName(), id, SecurityUtils.getCurrentUsername());
 
         return ResponseEntity.ok(UserResponse.fromDomain(saved));
     }

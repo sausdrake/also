@@ -1,5 +1,9 @@
 package com.example.autoauction.user.application;
 
+import com.example.autoauction.user.domain.AdminUserAction;
+import com.example.autoauction.user.domain.AdminUserActionType;
+import com.example.autoauction.user.domain.port.AdminUserActionRepository;
+import java.util.stream.Collectors;
 import com.example.autoauction.user.domain.Role;
 import com.example.autoauction.user.domain.User;
 import com.example.autoauction.user.domain.port.RoleRepository;
@@ -22,11 +26,31 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final AdminUserActionRepository adminUserActionRepository;
 
-    public UserService(UserRepository userRepository, RoleRepository roleRepository) {
+    public UserService(UserRepository userRepository, RoleRepository roleRepository,
+                       AdminUserActionRepository adminUserActionRepository) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
+        this.adminUserActionRepository = adminUserActionRepository;
         log.info("UserService initialized.");
+    }
+
+    /**
+     * SEC-06: journals an administrative action in the caller's transaction - if the action rolls
+     * back, so does its journal row, and an action is never stored without its actor.
+     */
+    private void journal(Long targetUserId, Long actingAdminId, AdminUserActionType action, String details) {
+        adminUserActionRepository.append(AdminUserAction.of(targetUserId, actingAdminId, action, details, OffsetDateTime.now()));
+    }
+
+    private static String roleNames(Set<Role> roles) {
+        return roles.stream().map(Role::getName).sorted().collect(Collectors.joining(",", "[", "]"));
+    }
+
+    /** SEC-06: the journal of administrative actions on one user, newest first. */
+    public List<AdminUserAction> listAdminActions(Long userId) {
+        return adminUserActionRepository.findByTargetUserIdNewestFirst(userId);
     }
 
     public Optional<User> findByUsername(String username) { return userRepository.findByUsername(username); }
@@ -49,7 +73,8 @@ public class UserService {
     }
 
     @Transactional
-    public User blockUser(Long userId) {
+    public User blockUser(Long userId, Long actingAdminId) {
+        Objects.requireNonNull(actingAdminId, "actingAdminId не может быть null");
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден: " + userId));
         // Slice 1A: must preserve the existing trust decision - block/unblock is an unrelated
@@ -58,12 +83,14 @@ public class UserService {
                 user.getPasswordHash(), false, user.getRoles(),
                 user.isTrusted(), user.getVerifiedByAdminId(), user.getVerifiedAt());
         User saved = userRepository.save(blocked);
-        log.info("User {} blocked", userId);
+        journal(userId, actingAdminId, AdminUserActionType.BLOCK, null);
+        log.info("User {} blocked by admin {}", userId, actingAdminId);
         return saved;
     }
 
     @Transactional
-    public User unblockUser(Long userId) {
+    public User unblockUser(Long userId, Long actingAdminId) {
+        Objects.requireNonNull(actingAdminId, "actingAdminId не может быть null");
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден: " + userId));
         // Slice 1A: same preservation as blockUser above.
@@ -71,7 +98,8 @@ public class UserService {
                 user.getPasswordHash(), true, user.getRoles(),
                 user.isTrusted(), user.getVerifiedByAdminId(), user.getVerifiedAt());
         User saved = userRepository.save(unblocked);
-        log.info("User {} unblocked", userId);
+        journal(userId, actingAdminId, AdminUserActionType.UNBLOCK, null);
+        log.info("User {} unblocked by admin {}", userId, actingAdminId);
         return saved;
     }
 
@@ -84,10 +112,10 @@ public class UserService {
      * <p>verifiedByAdminId/verifiedAt always record who made the most recent trust-status
      * decision (grant or revoke) and when - never cleared on revoke, so an untrusted-after-review
      * user remains distinguishable from a never-reviewed user (both show trusted=false, but only
-     * the former carries a non-null verifiedByAdminId/verifiedAt). There is no historical ledger
-     * beyond this single current decision, by design - repeated TRUST calls (by the same or a
-     * different admin) simply refresh this current-state metadata, safely and without creating
-     * any contradictory state.
+     * the former carries a non-null verifiedByAdminId/verifiedAt). The user row keeps only this
+     * single current decision, by design - repeated TRUST calls (by the same or a different admin)
+     * simply refresh this current-state metadata. SEC-06: every grant and revoke is additionally
+     * journaled in admin_user_actions, which is history, not state.
      */
     @Transactional
     public User trustUser(Long userId, Long actingAdminId) {
@@ -97,6 +125,7 @@ public class UserService {
         User trusted = new User(user.getId(), user.getUsername(), user.getEmail(), user.getPasswordHash(),
                 user.isActive(), user.getRoles(), true, actingAdminId, OffsetDateTime.now());
         User saved = userRepository.save(trusted);
+        journal(userId, actingAdminId, AdminUserActionType.TRUST, null);
         log.info("User {} trusted by admin {}", userId, actingAdminId);
         return saved;
     }
@@ -109,12 +138,14 @@ public class UserService {
         User untrusted = new User(user.getId(), user.getUsername(), user.getEmail(), user.getPasswordHash(),
                 user.isActive(), user.getRoles(), false, actingAdminId, OffsetDateTime.now());
         User saved = userRepository.save(untrusted);
+        journal(userId, actingAdminId, AdminUserActionType.UNTRUST, null);
         log.info("User {} untrusted by admin {}", userId, actingAdminId);
         return saved;
     }
 
     @Transactional
-    public User setUserRole(Long userId, String roleName) {
+    public User setUserRole(Long userId, String roleName, Long actingAdminId) {
+        Objects.requireNonNull(actingAdminId, "actingAdminId не может быть null");
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден: " + userId));
         Role role = roleRepository.findByName(roleName)
@@ -127,7 +158,29 @@ public class UserService {
                 user.getPasswordHash(), user.isActive(), roles,
                 user.isTrusted(), user.getVerifiedByAdminId(), user.getVerifiedAt());
         User saved = userRepository.save(updated);
-        log.info("User {} role set to {}", userId, roleName);
+        journal(userId, actingAdminId, AdminUserActionType.ROLE_SET, roleNames(user.getRoles()) + " -> " + roleNames(roles));
+        log.info("User {} role set to {} by admin {}", userId, roleName, actingAdminId);
+        return saved;
+    }
+
+    /**
+     * SEC-06: adds a role to the user's existing roles (formerly done inline in
+     * UserController.assignRole without any journal). Preserves the trust decision.
+     */
+    @Transactional
+    public User addUserRole(Long userId, String roleName, Long actingAdminId) {
+        Objects.requireNonNull(actingAdminId, "actingAdminId не может быть null");
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+        Role role = roleRepository.findByName(roleName)
+                .orElseThrow(() -> new IllegalArgumentException("Role not found: " + roleName));
+        Set<Role> roles = new HashSet<>(user.getRoles());
+        roles.add(role);
+        User updated = new User(user.getId(), user.getUsername(), user.getEmail(), user.getPasswordHash(),
+                user.isActive(), roles, user.isTrusted(), user.getVerifiedByAdminId(), user.getVerifiedAt());
+        User saved = userRepository.save(updated);
+        journal(userId, actingAdminId, AdminUserActionType.ROLE_ADD, roleNames(user.getRoles()) + " -> " + roleNames(roles));
+        log.info("Role {} added to user {} by admin {}", roleName, userId, actingAdminId);
         return saved;
     }
 

@@ -121,7 +121,7 @@ class AdminUserControllerTest {
         void blockUser_ReturnsBlocked() throws Exception {
             Role role = new Role(1L, "ROLE_USER", "User role");
             User blocked = new User(1L, "john", "john@test.com", "hash", false, Set.of(role));
-            when(userService.blockUser(1L)).thenReturn(blocked);
+            when(userService.blockUser(1L, 1L)).thenReturn(blocked);   // SEC-06: actor = the authenticated admin (id 1)
 
             mockMvc.perform(patch("/api/v1/admin/users/1/block"))
                     .andExpect(status().isOk())
@@ -214,7 +214,7 @@ class AdminUserControllerTest {
         void setRole_ReturnsUpdatedUser() throws Exception {
             Role newRole = new Role(2L, "ROLE_DIAGNOSTIC", "Diagnostic");
             User updated = new User(1L, "john", "john@test.com", "hash", true, Set.of(newRole));
-            when(userService.setUserRole(eq(1L), eq("ROLE_DIAGNOSTIC"))).thenReturn(updated);
+            when(userService.setUserRole(eq(1L), eq("ROLE_DIAGNOSTIC"), eq(1L))).thenReturn(updated);
 
             mockMvc.perform(patch("/api/v1/admin/users/1/role")
                             .contentType(MediaType.APPLICATION_JSON)

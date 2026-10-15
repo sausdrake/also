@@ -29,6 +29,9 @@ class UserServiceTest {
     @Mock
     private RoleRepository roleRepository;
 
+    @Mock
+    private com.example.autoauction.user.domain.port.AdminUserActionRepository adminUserActionRepository;
+
     @InjectMocks
     private UserService userService;
 
@@ -207,7 +210,7 @@ class UserServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(trustedActive));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        User blocked = userService.blockUser(1L);
+        User blocked = userService.blockUser(1L, 42L);
 
         assertFalse(blocked.isActive());
         assertTrue(blocked.isTrusted());
@@ -223,7 +226,7 @@ class UserServiceTest {
         when(roleRepository.findByName("ROLE_DIAGNOSTIC")).thenReturn(Optional.of(newRole));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        User updated = userService.setUserRole(1L, "ROLE_DIAGNOSTIC");
+        User updated = userService.setUserRole(1L, "ROLE_DIAGNOSTIC", 42L);
 
         assertTrue(updated.isTrusted());
         assertEquals(7L, updated.getVerifiedByAdminId());

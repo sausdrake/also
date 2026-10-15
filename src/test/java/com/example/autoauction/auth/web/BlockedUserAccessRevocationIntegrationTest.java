@@ -38,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("SEC-01: a blocked user loses REST access immediately")
 class BlockedUserAccessRevocationIntegrationTest {
 
+    private static final Long ADMIN_ID = 9601L;
     private static final String PASSWORD = "Sec01-" + UUID.randomUUID();
 
     @Autowired private MockMvc mockMvc;
@@ -81,7 +82,7 @@ class BlockedUserAccessRevocationIntegrationTest {
         String[] tokens = login(user.getUsername(), "10.61.0.1");
         assertThat(getMyDeposit(tokens[0])).isEqualTo(200);
 
-        userService.blockUser(user.getId());
+        userService.blockUser(user.getId(), ADMIN_ID);
 
         assertThat(getMyDeposit(tokens[0])).as("read endpoint").isEqualTo(401);
         int withdrawal = mockMvc.perform(post("/api/v1/withdrawals").header("Authorization", "Bearer " + tokens[0])
@@ -102,7 +103,7 @@ class BlockedUserAccessRevocationIntegrationTest {
         User user = newUser();
         String[] tokens = login(user.getUsername(), "10.61.0.2");
 
-        userService.blockUser(user.getId());
+        userService.blockUser(user.getId(), ADMIN_ID);
 
         int refresh = mockMvc.perform(post("/api/auth/refresh").contentType("application/json")
                         .content("{\"refreshToken\":\"" + tokens[1] + "\"}"))
@@ -122,11 +123,11 @@ class BlockedUserAccessRevocationIntegrationTest {
         String[] blockedTokens = login(blocked.getUsername(), "10.61.0.4");
         String[] otherTokens = login(other.getUsername(), "10.61.0.5");
 
-        userService.blockUser(blocked.getId());
+        userService.blockUser(blocked.getId(), ADMIN_ID);
         assertThat(getMyDeposit(blockedTokens[0])).isEqualTo(401);
         assertThat(getMyDeposit(otherTokens[0])).isEqualTo(200);
 
-        userService.unblockUser(blocked.getId());
+        userService.unblockUser(blocked.getId(), ADMIN_ID);
         assertThat(getMyDeposit(blockedTokens[0])).isEqualTo(200);
     }
 }

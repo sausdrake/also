@@ -68,14 +68,16 @@ public class AdminUserController {
 
     @PatchMapping("/{id}/block")
     @Operation(summary = "Заблокировать пользователя")
-    public ResponseEntity<UserDto> blockUser(@PathVariable Long id) {
-        return ResponseEntity.ok(UserDto.from(userService.blockUser(id)));
+    public ResponseEntity<UserDto> blockUser(@PathVariable Long id,
+                                             @Parameter(hidden = true) @CurrentUser UserPrincipal currentUser) {
+        return ResponseEntity.ok(UserDto.from(userService.blockUser(id, currentUser.getUserId())));
     }
 
     @PatchMapping("/{id}/unblock")
     @Operation(summary = "Разблокировать пользователя")
-    public ResponseEntity<UserDto> unblockUser(@PathVariable Long id) {
-        return ResponseEntity.ok(UserDto.from(userService.unblockUser(id)));
+    public ResponseEntity<UserDto> unblockUser(@PathVariable Long id,
+                                               @Parameter(hidden = true) @CurrentUser UserPrincipal currentUser) {
+        return ResponseEntity.ok(UserDto.from(userService.unblockUser(id, currentUser.getUserId())));
     }
 
     /**
@@ -106,13 +108,28 @@ public class AdminUserController {
     @Operation(summary = "Сменить роль пользователя")
     public ResponseEntity<UserDto> setRole(
             @PathVariable Long id,
-            @RequestBody Map<String, String> body
+            @RequestBody Map<String, String> body,
+            @Parameter(hidden = true) @CurrentUser UserPrincipal currentUser
     ) {
         String roleName = body.get("role");
         if (roleName == null || roleName.isBlank()) {
             throw new IllegalArgumentException("Поле role обязательно");
         }
-        return ResponseEntity.ok(UserDto.from(userService.setUserRole(id, roleName)));
+        return ResponseEntity.ok(UserDto.from(userService.setUserRole(id, roleName, currentUser.getUserId())));
+    }
+
+    /** SEC-06: who blocked, unblocked, trusted or changed the roles of this user, and when (newest first). */
+    @GetMapping("/{id}/actions")
+    @Operation(summary = "Журнал административных действий над пользователем")
+    public List<AdminUserActionDto> adminActions(@PathVariable Long id) {
+        return userService.listAdminActions(id).stream().map(AdminUserActionDto::from).toList();
+    }
+
+    public record AdminUserActionDto(Long id, Long targetUserId, Long adminId, String action, String details,
+                                     java.time.OffsetDateTime createdAt) {
+        static AdminUserActionDto from(com.example.autoauction.user.domain.AdminUserAction a) {
+            return new AdminUserActionDto(a.id(), a.targetUserId(), a.adminId(), a.action().name(), a.details(), a.createdAt());
+        }
     }
 
     // Slice 2 · Step 2A: the duplicate admin-adjust route previously hosted here has been removed.
