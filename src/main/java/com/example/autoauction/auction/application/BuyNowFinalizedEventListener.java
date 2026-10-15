@@ -4,12 +4,16 @@ package com.example.autoauction.auction.application;
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.web.AuctionWebSocketController;
 import com.example.autoauction.notification.application.NotificationService;
+import com.example.autoauction.subscription.application.LotSubscriptionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Fires only after {@link AuctionFinalizer#finalizeWithBuyNow}'s transaction has physically
@@ -33,10 +37,13 @@ public class BuyNowFinalizedEventListener {
 
     private final AuctionWebSocketController webSocketController;
     private final NotificationService notificationService;
+    private final LotSubscriptionService lotSubscriptionService;
 
     public BuyNowFinalizedEventListener(AuctionWebSocketController webSocketController,
+                                        LotSubscriptionService lotSubscriptionService,
                                         NotificationService notificationService) {
         this.webSocketController = webSocketController;
+        this.lotSubscriptionService = lotSubscriptionService;
         this.notificationService = notificationService;
     }
 
@@ -57,11 +64,60 @@ public class BuyNowFinalizedEventListener {
             log.warn("Failed to send Buy Now win notification to user {}: {}", winnerId, e.getMessage());
         }
 
+        notifyCreatorAndFollowers(auction, winnerId, buyNowAmount);
+
         try {
             webSocketController.sendBuyNowNotification(auctionId, winnerId, buyNowAmount);
             webSocketController.sendAuctionUpdate(auction, "BUY_NOW");
         } catch (Exception e) {
             log.warn("Failed to send Buy Now WebSocket notification for auction {}: {}", auctionId, e.getMessage());
+        }
+    }
+
+    /**
+     * Scenario 9.3: everybody involved learns that the lot is gone. As for a normally completed
+     * auction, the auction's creator gets AUCTION_COMPLETED; Buy Now happens before the start, so
+     * nobody has bid yet - the people following the lot (its subscribers) get AUCTION_ENDED.
+     * Each recipient is notified once; one failed notification never stops the others.
+     */
+    private void notifyCreatorAndFollowers(Auction auction, Long winnerId, BigDecimal buyNowAmount) {
+        Long auctionId = auction.getId();
+        Set<Long> notified = new HashSet<>();
+        notified.add(winnerId);
+
+        Long creatorId = auction.getCreatedBy();
+        if (creatorId != null && notified.add(creatorId)) {
+            try {
+                notificationService.send(creatorId, "AUCTION_COMPLETED",
+                        "Аукцион завершён",
+                        String.format("Аукцион \"%s\" завершён покупкой по цене Buy Now (%s сом).",
+                                auction.getVehicleInfo(), buyNowAmount.toPlainString()),
+                        auctionId, "AUCTION");
+            } catch (Exception e) {
+                log.warn("Failed to send Buy Now AUCTION_COMPLETED to user {}: {}", creatorId, e.getMessage());
+            }
+        }
+
+        List<Long> followers;
+        try {
+            followers = lotSubscriptionService.getSubscriberIds(auctionId);
+        } catch (Exception e) {
+            log.warn("Failed to load followers of auction {}: {}", auctionId, e.getMessage());
+            return;
+        }
+        for (Long followerId : followers) {
+            if (followerId == null || !notified.add(followerId)) {
+                continue;
+            }
+            try {
+                notificationService.send(followerId, "AUCTION_ENDED",
+                        "Аукцион завершён",
+                        String.format("Автомобиль \"%s\" куплен по цене Buy Now. Торги по этому лоту не состоятся.",
+                                auction.getVehicleInfo()),
+                        auctionId, "AUCTION");
+            } catch (Exception e) {
+                log.warn("Failed to send Buy Now AUCTION_ENDED to user {}: {}", followerId, e.getMessage());
+            }
         }
     }
 }

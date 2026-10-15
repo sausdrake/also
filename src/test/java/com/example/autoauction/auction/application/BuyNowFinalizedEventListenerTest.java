@@ -43,6 +43,9 @@ class BuyNowFinalizedEventListenerTest {
     @Mock
     private NotificationService notificationService;
 
+    @Mock
+    private com.example.autoauction.subscription.application.LotSubscriptionService lotSubscriptionService;
+
     @InjectMocks
     private BuyNowFinalizedEventListener listener;
 
@@ -128,6 +131,67 @@ class BuyNowFinalizedEventListenerTest {
             assertThatCode(() -> listener.onBuyNowFinalized(event)).doesNotThrowAnyException();
 
             verify(webSocketController, times(1)).sendBuyNowNotification(auctionId, winnerId, buyNowAmount);
+        }
+    }
+
+    @Nested
+    @DisplayName("Сценарий 9.3: о покупке Buy Now узнают создатель аукциона и все, кто следит за лотом")
+    class CreatorAndFollowers {
+
+        private void sentTo(Long userId, String type, int times) {
+            verify(notificationService, times(times)).send(eq(userId), eq(type), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
+        }
+
+        @Test
+        @DisplayName("создатель получает AUCTION_COMPLETED, подписчики (кроме победителя) - AUCTION_ENDED, каждый один раз")
+        void creatorAndFollowersAreNotifiedOnce() {
+            org.mockito.Mockito.when(lotSubscriptionService.getSubscriberIds(auctionId))
+                    .thenReturn(java.util.Arrays.asList(200L, 300L, winnerId, 200L, null));
+
+            listener.onBuyNowFinalized(new BuyNowFinalizedEvent(auction, winnerId, buyNowAmount));
+
+            sentTo(sellerId, "AUCTION_COMPLETED", 1);
+            sentTo(200L, "AUCTION_ENDED", 1);
+            sentTo(300L, "AUCTION_ENDED", 1);
+            sentTo(winnerId, "AUCTION_ENDED", 0);
+            sentTo(winnerId, "AUCTION_WON", 1);
+        }
+
+        @Test
+        @DisplayName("создатель, который сам следит за лотом, получает только AUCTION_COMPLETED")
+        void creatorWhoFollowsGetsOneNotification() {
+            org.mockito.Mockito.when(lotSubscriptionService.getSubscriberIds(auctionId)).thenReturn(java.util.List.of(sellerId));
+
+            listener.onBuyNowFinalized(new BuyNowFinalizedEvent(auction, winnerId, buyNowAmount));
+
+            sentTo(sellerId, "AUCTION_COMPLETED", 1);
+            sentTo(sellerId, "AUCTION_ENDED", 0);
+        }
+
+        @Test
+        @DisplayName("сбой загрузки подписчиков не всплывает и не мешает остальным побочным эффектам")
+        void followerLookupFailure_DoesNotPropagate() {
+            doThrow(new RuntimeException("db down")).when(lotSubscriptionService).getSubscriberIds(auctionId);
+
+            assertThatCode(() -> listener.onBuyNowFinalized(new BuyNowFinalizedEvent(auction, winnerId, buyNowAmount)))
+                    .doesNotThrowAnyException();
+
+            sentTo(winnerId, "AUCTION_WON", 1);
+            sentTo(sellerId, "AUCTION_COMPLETED", 1);
+            verify(webSocketController, times(1)).sendAuctionUpdate(auction, "BUY_NOW");
+        }
+
+        @Test
+        @DisplayName("сбой уведомления одного подписчика не мешает остальным")
+        void oneFollowerFailure_DoesNotStopTheOthers() {
+            org.mockito.Mockito.when(lotSubscriptionService.getSubscriberIds(auctionId)).thenReturn(java.util.List.of(200L, 300L));
+            doThrow(new RuntimeException("boom")).when(notificationService)
+                    .send(eq(200L), eq("AUCTION_ENDED"), anyString(), anyString(), any(), anyString());
+
+            assertThatCode(() -> listener.onBuyNowFinalized(new BuyNowFinalizedEvent(auction, winnerId, buyNowAmount)))
+                    .doesNotThrowAnyException();
+
+            sentTo(300L, "AUCTION_ENDED", 1);
         }
     }
 }
