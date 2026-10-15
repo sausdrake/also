@@ -334,6 +334,10 @@ public class DiagnosticRequestService {
                 throw new IllegalArgumentException(
                         "Пункт анкеты " + answerDto.getItemId() + " не принадлежит шаблону, привязанному к заявке");
             }
+            // Scenario 3: a rating is 1-5 stars.
+            if (answerDto.getRating() != null && (answerDto.getRating() < 1 || answerDto.getRating() > 5)) {
+                throw new IllegalArgumentException("Оценка пункта анкеты должна быть от 1 до 5");
+            }
         }
 
         // Удаляем старые ответы
@@ -358,7 +362,10 @@ public class DiagnosticRequestService {
 
         // Если это финальная отправка, меняем статус
         if (dto.isSubmit()) {
-            validateMandatoryVideos(request);
+            InspectionTemplate template = templateRepository.findFullTemplateById(request.getTemplateId())
+                    .orElseThrow(() -> new IllegalStateException("Шаблон анкеты не найден: " + request.getTemplateId()));
+            validateRequiredAnswers(template, dto.getAnswers());
+            validateMandatoryVideos(request, template);
             requestRepository.markAsCompleted(requestId, diagnosticId);
             log.info("Request {} marked as completed", requestId);
 
@@ -388,10 +395,7 @@ public class DiagnosticRequestService {
      * transaction, before markAsCompleted - a failure here throws and rolls back the
      * answers already persisted earlier in this same method.
      */
-    private void validateMandatoryVideos(DiagnosticRequest request) {
-        InspectionTemplate template = templateRepository.findFullTemplateById(request.getTemplateId())
-                .orElseThrow(() -> new IllegalStateException("Шаблон анкеты не найден: " + request.getTemplateId()));
-
+    private void validateMandatoryVideos(DiagnosticRequest request, InspectionTemplate template) {
         for (InspectionGroup group : template.getGroups()) {
             for (InspectionItem item : group.getItems()) {
                 if (item.isHasVideo() && !mediaRepository.existsQualifyingVideo(request.getId(), item.getId())) {
@@ -406,6 +410,45 @@ public class DiagnosticRequestService {
     /**
      * Получить заявки диагноста (в работе и завершённые)
      */
+    /**
+     * Scenario 3 step 7: a report can only be submitted when every required item is filled -
+     * enforced here, not only in the client, so a direct API call cannot submit an incomplete
+     * report. "Filled" follows the item's field type exactly as the diagnostician UI decides it:
+     * NUMBER needs a rating, PHOTO at least one photo, CHECKBOX an explicit true/false, every
+     * other type a non-blank comment. Runs inside the caller's transaction, so a failure rolls
+     * back the answers persisted earlier in the same call.
+     */
+    private void validateRequiredAnswers(InspectionTemplate template, List<InspectionAnswerDto> answers) {
+        Map<Long, InspectionAnswerDto> byItem = new HashMap<>();
+        for (InspectionAnswerDto answer : answers) {
+            byItem.put(answer.getItemId(), answer);
+        }
+        List<String> missing = new ArrayList<>();
+        for (InspectionGroup group : template.getGroups()) {
+            for (InspectionItem item : group.getItems()) {
+                if (item.isRequired() && !isFilled(item, byItem.get(item.getId()))) {
+                    missing.add(item.getTitle());
+                }
+            }
+        }
+        if (!missing.isEmpty()) {
+            throw new IllegalStateException("Не заполнены обязательные пункты анкеты: " + String.join(", ", missing));
+        }
+    }
+
+    private static boolean isFilled(InspectionItem item, InspectionAnswerDto answer) {
+        if (answer == null) {
+            return false;
+        }
+        String fieldType = item.getFieldType() == null ? "TEXT" : item.getFieldType();
+        return switch (fieldType) {
+            case "NUMBER" -> answer.getRating() != null && answer.getRating() > 0;
+            case "PHOTO" -> answer.getPhotoUrls() != null && !answer.getPhotoUrls().isEmpty();
+            case "CHECKBOX" -> "true".equals(answer.getComment()) || "false".equals(answer.getComment());
+            default -> answer.getComment() != null && !answer.getComment().isBlank();
+        };
+    }
+
     @Transactional(readOnly = true)
     public Page<DiagnosticRequestResponse> getDiagnosticRequests(Long diagnosticId, Pageable pageable) {
         return requestRepository.findByAssignedTo(diagnosticId, pageable)
