@@ -15,7 +15,23 @@ public class UserPrincipal extends User {
             Collection<? extends GrantedAuthority> authorities,
             Long userId
     ) {
-        super(username, password, authorities);
+        this(username, password, true, authorities, userId);
+    }
+
+    /**
+     * SEC-01: {@code enabled} must carry the user's own active flag. Every check that relies on
+     * {@link #isEnabled()} - the REST JWT filter, the STOMP CONNECT interceptor and login
+     * authentication - is only as good as this value; the 4-argument constructor (always enabled)
+     * is kept for callers that build a principal for an already-verified active user.
+     */
+    public UserPrincipal(
+            String username,
+            String password,
+            boolean enabled,
+            Collection<? extends GrantedAuthority> authorities,
+            Long userId
+    ) {
+        super(username, password, enabled, true, true, true, authorities);
         this.userId = userId;
     }
 

@@ -26,6 +26,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         return new UserPrincipal(
                 user.getUsername(),
                 user.getPasswordHash(),
+                user.isActive(),   // SEC-01: a blocked user is a disabled principal
                 user.getRoles().stream()
                         .map(role -> new SimpleGrantedAuthority(role.getName()))
                         .toList(),

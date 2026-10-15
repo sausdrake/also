@@ -13,6 +13,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -180,7 +181,8 @@ public class AuthService {
             // 4. Проверка активности пользователя
             if (!user.isActive()) {
                 log.warn("Authentication failed - user is inactive: {}", request.username());
-                throw new RuntimeException("User account is inactive");
+                // SEC-01: an authentication failure (401), not a server error
+                throw new DisabledException("User account is inactive");
             }
 
             // 5. Генерация токенов (roles и userId включены в payload)
@@ -234,7 +236,8 @@ public class AuthService {
             // 4. Проверка активности пользователя
             if (!user.isActive()) {
                 log.warn("Refresh token rejected - user is inactive: {}", user.getUsername());
-                throw new RuntimeException("User account is inactive");
+                // SEC-01: an authentication failure (401), not a server error
+                throw new DisabledException("User account is inactive");
             }
 
             // 5. Генерация новых токенов (roles и userId включены в payload)

@@ -64,7 +64,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
 
-            if (jwtService.isTokenValid(jwt, userDetails)) {
+            // SEC-01: the user is re-read on every request, so a block takes effect at once - an
+            // access token issued before the block (valid up to its 24 h expiry) authenticates
+            // nobody. The request continues unauthenticated and protected routes answer 401.
+            if (userDetails.isEnabled() && jwtService.isTokenValid(jwt, userDetails)) {
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                         userDetails,
                         null,
