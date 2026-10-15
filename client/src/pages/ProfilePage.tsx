@@ -21,6 +21,23 @@ interface WatchedAuction {
 
 // ─────────────────── Deposit Tab ───────────────────
 
+interface WithdrawalRequest {
+  id: number;
+  amount: number;
+  status: 'PENDING' | 'PROCESSING' | 'PAID' | 'REJECTED';
+  createdAt: string;
+  processedAt: string | null;
+  rejectionReason: string | null;
+}
+
+// F6: a withdrawal is a manual payout request; PAID means AlSo paid by hand, not a bank transfer.
+const WITHDRAWAL_STATUS: Record<string, { label: string; style: string }> = {
+  PENDING: { label: 'Ожидает обработки', style: 'bg-yellow-100 text-yellow-700' },
+  PROCESSING: { label: 'В обработке', style: 'bg-blue-100 text-blue-700' },
+  PAID: { label: 'Выплачено', style: 'bg-green-100 text-green-700' },
+  REJECTED: { label: 'Отклонено, сумма возвращена', style: 'bg-red-100 text-red-700' },
+};
+
 function DepositTab() {
   const { balance, blockedAmount, availableBalance, isLoading, fetchDeposit } = useDepositStore();
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -38,11 +55,16 @@ function DepositTab() {
     return withdrawKeyRef.current.key;
   };
 
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
+
   const reloadTransactions = () => api.get('/deposits/my/transactions').then(r => setTransactions(r.data)).catch(() => {});
+  const reloadWithdrawals = () =>
+    api.get<WithdrawalRequest[]>('/withdrawals/my').then(r => setWithdrawals(Array.isArray(r.data) ? r.data : [])).catch(() => {});
 
   useEffect(() => {
     fetchDeposit();
     reloadTransactions();
+    reloadWithdrawals();
   }, []);
 
   const showMsg = (text: string, ok = true) => setMsg({ text, ok });
@@ -60,13 +82,14 @@ function DepositTab() {
     const err = validateAmount(withdrawAmount, avail);
     if (err) { showMsg(err, false); return; }
     try {
-      await api.post('/deposits/withdraw',
+      await api.post('/withdrawals',
         { amount: parseFloat(withdrawAmount), idempotencyKey: getWithdrawKey(withdrawAmount) });
-      showMsg('Средства выведены');
+      showMsg('Заявка на вывод создана. Выплату выполнит администратор вручную.');
       setWithdrawAmount('');
       withdrawKeyRef.current = null;
       fetchDeposit();
       reloadTransactions();
+      reloadWithdrawals();
     } catch (e: any) {
       showMsg(e.response?.data?.message || 'Ошибка', false);
     }
@@ -121,8 +144,32 @@ function DepositTab() {
             </button>
           </div>
           <p className="text-xs text-gray-400 mt-1">Доступно: {availableBalance?.toLocaleString('ru') ?? '—'} сом</p>
+          <p className="text-xs text-gray-500 mt-1">
+            Вывод оформляется заявкой: сумма сразу списывается с доступного баланса, выплату выполняет
+            администратор вручную. Если заявку отклонят, сумма вернётся на депозит.
+          </p>
         </div>
       </div>
+
+      {withdrawals.length > 0 && (
+        <div className="bg-white border rounded-xl shadow-sm overflow-hidden" data-testid="my-withdrawals">
+          <div className="px-4 py-3 border-b bg-gray-50">
+            <h3 className="font-semibold">Заявки на вывод</h3>
+          </div>
+          <ul className="divide-y">
+            {withdrawals.map(w => (
+              <li key={w.id} className="px-4 py-2 text-sm flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="text-gray-500 whitespace-nowrap">{formatDateTime(w.createdAt)}</span>
+                <span className="font-medium">{Number(w.amount).toLocaleString('ru')} сом</span>
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${WITHDRAWAL_STATUS[w.status]?.style ?? 'bg-gray-100 text-gray-600'}`}>
+                  {WITHDRAWAL_STATUS[w.status]?.label ?? w.status}
+                </span>
+                {w.rejectionReason && <span className="text-red-600 basis-full">Причина: {w.rejectionReason}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* История транзакций */}
       <div className="bg-white border rounded-xl shadow-sm overflow-hidden">

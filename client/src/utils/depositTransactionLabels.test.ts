@@ -3,7 +3,7 @@ import { depositTxTypeLabel } from './depositTransactionLabels';
 
 describe('depositTxTypeLabel', () => {
   it('labels every server-side DepositTransaction.TransactionType', () => {
-    const serverTypes = ['DEPOSIT', 'WITHDRAWAL', 'BLOCK', 'UNBLOCK', 'CHARGE', 'ADMIN_ADJUSTMENT', 'PAYMENT_CREDIT'];
+    const serverTypes = ['DEPOSIT', 'WITHDRAWAL', 'BLOCK', 'UNBLOCK', 'CHARGE', 'ADMIN_ADJUSTMENT', 'PAYMENT_CREDIT', 'WITHDRAWAL_RETURN'];
     for (const t of serverTypes) expect(depositTxTypeLabel(t)).not.toBe(t);
     expect(depositTxTypeLabel('ADMIN_ADJUSTMENT')).toBe('Корректировка администратором');
     expect(depositTxTypeLabel('PAYMENT_CREDIT')).toBe('Зачисление платежа');

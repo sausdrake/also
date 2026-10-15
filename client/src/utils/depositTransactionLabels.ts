@@ -10,6 +10,7 @@ export const DEPOSIT_TX_TYPE_LABELS: Record<string, string> = {
   CHARGE: 'Удержание',
   ADMIN_ADJUSTMENT: 'Корректировка администратором',
   PAYMENT_CREDIT: 'Зачисление платежа',
+  WITHDRAWAL_RETURN: 'Возврат по отклонённой заявке на вывод',
 };
 
 export function depositTxTypeLabel(type: string): string {

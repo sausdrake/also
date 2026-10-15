@@ -7,6 +7,7 @@ import { useAuthStore } from '../store/authStore';
 import { PhotoLightbox } from '../components/PhotoLightbox';
 import { PolicyPage } from './admin/PolicyPage';
 import { LateSuccessPaymentsPage } from './admin/LateSuccessPaymentsPage';
+import { AdminWithdrawalsPage } from './admin/AdminWithdrawalsPage';
 import { AdminSalePage } from './admin/AdminSalePage';
 import { AdminIdentityPage } from './admin/AdminIdentityPage';
 import { AdminReconciliationPage } from './admin/AdminReconciliationPage';
@@ -316,6 +317,16 @@ function AdminSidebar() {
             }`}>
           {NAV_ITEMS[3].icon}
           Депозиты
+        </NavLink>
+
+        {/* Заявки на вывод (F6, ручная выплата) */}
+        <NavLink to="/admin/withdrawals"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+              isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            }`}>
+          {NAV_ITEMS[3].icon}
+          Заявки на вывод
         </NavLink>
 
         {/* Поздние успешные платежи */}
@@ -2908,6 +2919,7 @@ export function AdminDashboard() {
             <Route path="policy" element={<PolicyPage />} />
             <Route path="deposits" element={<DepositsPage />} />
             <Route path="payments/late-successes" element={<LateSuccessPaymentsPage />} />
+            <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Routes>
