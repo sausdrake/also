@@ -38,13 +38,16 @@ public class BuyNowFinalizedEventListener {
     private final AuctionWebSocketController webSocketController;
     private final NotificationService notificationService;
     private final LotSubscriptionService lotSubscriptionService;
+    private final AuctionSellerResolver auctionSellerResolver;
 
     public BuyNowFinalizedEventListener(AuctionWebSocketController webSocketController,
                                         LotSubscriptionService lotSubscriptionService,
-                                        NotificationService notificationService) {
+                                        NotificationService notificationService,
+                                        AuctionSellerResolver auctionSellerResolver) {
         this.webSocketController = webSocketController;
         this.lotSubscriptionService = lotSubscriptionService;
         this.notificationService = notificationService;
+        this.auctionSellerResolver = auctionSellerResolver;
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -76,7 +79,7 @@ public class BuyNowFinalizedEventListener {
 
     /**
      * Scenario 9.3: everybody involved learns that the lot is gone. As for a normally completed
-     * auction, the auction's creator gets AUCTION_COMPLETED; Buy Now happens before the start, so
+     * auction, the seller (NOTIF-01) and the auction's creator get AUCTION_COMPLETED; Buy Now happens before the start, so
      * nobody has bid yet - the people following the lot (its subscribers) get AUCTION_ENDED.
      * Each recipient is notified once; one failed notification never stops the others.
      */
@@ -85,8 +88,15 @@ public class BuyNowFinalizedEventListener {
         Set<Long> notified = new HashSet<>();
         notified.add(winnerId);
 
-        Long creatorId = auction.getCreatedBy();
-        if (creatorId != null && notified.add(creatorId)) {
+        Set<Long> completedRecipients = new java.util.LinkedHashSet<>();
+        auctionSellerResolver.resolveSellerId(auction).ifPresent(completedRecipients::add);
+        if (auction.getCreatedBy() != null) {
+            completedRecipients.add(auction.getCreatedBy());
+        }
+        for (Long creatorId : completedRecipients) {
+            if (!notified.add(creatorId)) {
+                continue;
+            }
             try {
                 notificationService.send(creatorId, "AUCTION_COMPLETED",
                         "Аукцион завершён",

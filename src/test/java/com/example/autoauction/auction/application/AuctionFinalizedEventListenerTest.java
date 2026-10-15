@@ -46,6 +46,9 @@ class AuctionFinalizedEventListenerTest {
     @Mock
     private NotificationService notificationService;
 
+    @Mock
+    private AuctionSellerResolver auctionSellerResolver;   // NOTIF-01: seller unknown unless a test says otherwise
+
     @InjectMocks
     private AuctionFinalizedEventListener listener;
 
@@ -208,5 +211,27 @@ class AuctionFinalizedEventListenerTest {
 
             verify(webSocketController, times(1)).sendAuctionEnded(auctionId, winnerId, winningBid);
         }
+    }
+
+    @org.junit.jupiter.api.Test
+    @DisplayName("NOTIF-01: the vehicle owner gets AUCTION_COMPLETED, the creating admin still gets it, once each")
+    void completed_goesToSellerAndCreator() {
+        Long owner = 20L;
+        org.mockito.Mockito.when(auctionSellerResolver.resolveSellerId(auction)).thenReturn(java.util.Optional.of(owner));
+
+        listener.onAuctionFinalized(new AuctionFinalizedEvent(auction, winnerId, winningBid, List.of(winnerId, loserId)));
+
+        verify(notificationService, times(1)).send(eq(owner), eq("AUCTION_COMPLETED"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
+        verify(notificationService, times(1)).send(eq(sellerId), eq("AUCTION_COMPLETED"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
+    }
+
+    @org.junit.jupiter.api.Test
+    @DisplayName("NOTIF-01: owner and creator are the same person -> one AUCTION_COMPLETED")
+    void completed_sameOwnerAndCreator_once() {
+        org.mockito.Mockito.when(auctionSellerResolver.resolveSellerId(auction)).thenReturn(java.util.Optional.of(sellerId));
+
+        listener.onAuctionFinalized(new AuctionFinalizedEvent(auction, winnerId, winningBid, List.of(winnerId)));
+
+        verify(notificationService, times(1)).send(eq(sellerId), eq("AUCTION_COMPLETED"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
     }
 }

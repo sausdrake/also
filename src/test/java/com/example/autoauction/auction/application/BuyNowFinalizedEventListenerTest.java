@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+import static org.mockito.Mockito.never;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -45,6 +46,9 @@ class BuyNowFinalizedEventListenerTest {
 
     @Mock
     private com.example.autoauction.subscription.application.LotSubscriptionService lotSubscriptionService;
+
+    @Mock
+    private AuctionSellerResolver auctionSellerResolver;   // NOTIF-01: seller unknown unless a test says otherwise
 
     @InjectMocks
     private BuyNowFinalizedEventListener listener;
@@ -193,5 +197,20 @@ class BuyNowFinalizedEventListenerTest {
 
             sentTo(300L, "AUCTION_ENDED", 1);
         }
+    }
+
+    @org.junit.jupiter.api.Test
+    @DisplayName("NOTIF-01: Buy Now - the vehicle owner and the creating admin each get AUCTION_COMPLETED once, not AUCTION_ENDED")
+    void buyNowCompleted_goesToOwnerAndCreator() {
+        Long owner = 20L;
+        org.mockito.Mockito.when(auctionSellerResolver.resolveSellerId(auction)).thenReturn(java.util.Optional.of(owner));
+        org.mockito.Mockito.when(lotSubscriptionService.getSubscriberIds(auctionId)).thenReturn(java.util.List.of(owner, 300L));
+
+        listener.onBuyNowFinalized(new BuyNowFinalizedEvent(auction, winnerId, buyNowAmount));
+
+        verify(notificationService, times(1)).send(eq(owner), eq("AUCTION_COMPLETED"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
+        verify(notificationService, times(1)).send(eq(sellerId), eq("AUCTION_COMPLETED"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
+        verify(notificationService, never()).send(eq(owner), eq("AUCTION_ENDED"), anyString(), anyString(), any(), anyString());
+        verify(notificationService, times(1)).send(eq(300L), eq("AUCTION_ENDED"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
     }
 }

@@ -45,6 +45,9 @@ class BidPlacedEventListenerTest {
     @Mock
     private NotificationService notificationService;
 
+    @Mock
+    private AuctionSellerResolver auctionSellerResolver;   // NOTIF-01: seller unknown unless a test says otherwise
+
     @InjectMocks
     private BidPlacedEventListener listener;
 
@@ -189,5 +192,17 @@ class BidPlacedEventListenerTest {
             verify(notificationService, times(1)).send(eq(bidderId), eq("AUCTION_LEADER"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
         }
+    }
+
+    @org.junit.jupiter.api.Test
+    @DisplayName("NOTIF-01: NEW_BID_ON_VEHICLE goes to the vehicle owner, not to the admin who created the auction")
+    void newBid_goesToOwnerNotCreator() {
+        Long owner = 20L;
+        org.mockito.Mockito.when(auctionSellerResolver.resolveSellerId(auction)).thenReturn(java.util.Optional.of(owner));
+
+        listener.onBidPlaced(new BidPlacedEvent(auction, bidderId, bidAmount, prevLeaderId, false));
+
+        verify(notificationService, times(1)).send(eq(owner), eq("NEW_BID_ON_VEHICLE"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
+        verify(notificationService, never()).send(eq(sellerId), eq("NEW_BID_ON_VEHICLE"), anyString(), anyString(), any(), anyString());
     }
 }

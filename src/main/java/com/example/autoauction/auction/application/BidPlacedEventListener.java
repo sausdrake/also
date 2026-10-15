@@ -27,11 +27,14 @@ public class BidPlacedEventListener {
 
     private final AuctionWebSocketController webSocketController;
     private final NotificationService notificationService;
+    private final AuctionSellerResolver auctionSellerResolver;
 
     public BidPlacedEventListener(AuctionWebSocketController webSocketController,
-                                  NotificationService notificationService) {
+                                  NotificationService notificationService,
+                                  AuctionSellerResolver auctionSellerResolver) {
         this.webSocketController = webSocketController;
         this.notificationService = notificationService;
+        this.auctionSellerResolver = auctionSellerResolver;
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -67,7 +70,9 @@ public class BidPlacedEventListener {
             }
         }
 
-        Long sellerId = auction.getCreatedBy();
+        // NOTIF-01: "a new bid on your vehicle" goes to the vehicle owner, not to the administrator
+        // who created the auction (unknown seller of a historical auction: the creator, as before).
+        Long sellerId = auctionSellerResolver.resolveSellerId(auction).orElse(auction.getCreatedBy());
         if (sellerId != null && !sellerId.equals(bidderId)) {
             try {
                 notificationService.send(sellerId, "NEW_BID_ON_VEHICLE",

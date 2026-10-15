@@ -10,7 +10,9 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Fires only after {@link AuctionFinalizer#finalizeAuction}'s transaction has physically
@@ -40,11 +42,14 @@ public class AuctionFinalizedEventListener {
 
     private final AuctionWebSocketController webSocketController;
     private final NotificationService notificationService;
+    private final AuctionSellerResolver auctionSellerResolver;
 
     public AuctionFinalizedEventListener(AuctionWebSocketController webSocketController,
-                                         NotificationService notificationService) {
+                                         NotificationService notificationService,
+                                         AuctionSellerResolver auctionSellerResolver) {
         this.webSocketController = webSocketController;
         this.notificationService = notificationService;
+        this.auctionSellerResolver = auctionSellerResolver;
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -85,15 +90,22 @@ public class AuctionFinalizedEventListener {
                 }
             }
 
-            Long sellerId = auction.getCreatedBy();
-            if (sellerId != null) {
+            // NOTIF-01: the seller (vehicle owner) learns the result; the administrator who created
+            // the auction still gets it too, to run the sale. Unknown seller (historical auction
+            // without a commitment): the creator only, as before.
+            Set<Long> completedRecipients = new LinkedHashSet<>();
+            auctionSellerResolver.resolveSellerId(auction).ifPresent(completedRecipients::add);
+            if (auction.getCreatedBy() != null) {
+                completedRecipients.add(auction.getCreatedBy());
+            }
+            for (Long recipientId : completedRecipients) {
                 try {
-                    notificationService.send(sellerId, "AUCTION_COMPLETED",
+                    notificationService.send(recipientId, "AUCTION_COMPLETED",
                             "Аукцион завершён",
                             String.format("Аукцион \"%s\" завершён. Победитель определён.", auction.getVehicleInfo()),
                             auctionId, "AUCTION");
                 } catch (Exception e) {
-                    log.warn("Failed to send AUCTION_COMPLETED to seller {}: {}", sellerId, e.getMessage());
+                    log.warn("Failed to send AUCTION_COMPLETED to user {}: {}", recipientId, e.getMessage());
                 }
             }
 
