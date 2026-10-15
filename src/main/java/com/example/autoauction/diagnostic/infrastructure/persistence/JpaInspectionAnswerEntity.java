@@ -38,6 +38,9 @@ public class JpaInspectionAnswerEntity {
     @Column(name = "video_urls", columnDefinition = "text")
     private String videoUrlsJson;
 
+    @Column(name = "skipped", nullable = false)
+    private boolean skipped;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 

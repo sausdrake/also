@@ -48,7 +48,7 @@ interface VehicleDetail {
 
 interface DiagItem   { id: number; title: string; fieldType: string; description?: string; }
 interface DiagGroup  { id: number; name: string; items: DiagItem[]; }
-interface DiagAnswer { inspectionItemId: number; rating: number | null; comment: string; photoUrls: string[]; }
+interface DiagAnswer { inspectionItemId: number; rating: number | null; comment: string; photoUrls: string[]; skipped?: boolean; }
 interface DiagReport {
   vin: string;
   template: { name: string; groups: DiagGroup[] };
@@ -99,6 +99,7 @@ function DiagSection({ group, answers }: { group: DiagGroup; answers: DiagAnswer
   const ansMap = Object.fromEntries(answers.map(a => [a.inspectionItemId, a]));
 
   const renderVal = (item: DiagItem, ans?: DiagAnswer) => {
+    if (ans?.skipped) return <span className="text-gray-400 text-sm italic">Пропущен диагностом</span>;
     if (!ans) return <span className="text-gray-300 text-sm">Не заполнено</span>;
 
     switch (item.fieldType) {

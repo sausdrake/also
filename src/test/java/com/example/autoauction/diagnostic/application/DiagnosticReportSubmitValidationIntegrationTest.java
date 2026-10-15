@@ -3,7 +3,9 @@ package com.example.autoauction.diagnostic.application;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest.DiagnosticRequestStatus;
 import com.example.autoauction.diagnostic.domain.InspectionTemplate;
+import com.example.autoauction.diagnostic.domain.InspectionAnswer;
 import com.example.autoauction.diagnostic.domain.port.DiagnosticRequestRepository;
+import com.example.autoauction.diagnostic.domain.port.InspectionAnswerRepository;
 import com.example.autoauction.diagnostic.web.dto.InspectionAnswerDto;
 import com.example.autoauction.diagnostic.web.dto.InspectionGroupDto;
 import com.example.autoauction.diagnostic.web.dto.InspectionItemDto;
@@ -45,6 +47,7 @@ class DiagnosticReportSubmitValidationIntegrationTest {
     @Autowired private DiagnosticRequestService diagnosticRequestService;
     @Autowired private InspectionTemplateService templateService;
     @Autowired private DiagnosticRequestRepository requestRepository;
+    @Autowired private InspectionAnswerRepository answerRepository;
 
     private final Map<String, Long> items = new HashMap<>();
     private Long requestId;
@@ -175,5 +178,56 @@ class DiagnosticReportSubmitValidationIntegrationTest {
     void ratingBoundaries_areAccepted(int rating) {
         submit(completeWith("Оценка ЛКП", answer("Оценка ЛКП", rating, null, null)), true);
         assertThat(status()).isEqualTo(DiagnosticRequestStatus.COMPLETED);
+    }
+
+    // ---------------------------------------------------------------- scenario 3 step 4: skip
+
+    private InspectionAnswerDto skipped(String title, Integer rating, String comment) {
+        InspectionAnswerDto a = answer(title, rating, comment, List.of("https://cdn/ignored.jpg"));
+        a.setSkipped(true);
+        return a;
+    }
+
+    @Test
+    @DisplayName("a non-required item can be skipped; it is stored as skipped with no content")
+    void optionalItem_canBeSkipped() {
+        List<InspectionAnswerDto> answers = new ArrayList<>(complete());
+        answers.add(skipped("Доп. замечания", 3, "should be dropped"));
+
+        submit(answers, true);
+
+        assertThat(status()).isEqualTo(DiagnosticRequestStatus.COMPLETED);
+        InspectionAnswer stored = answerRepository.findByDiagnosticRequestId(requestId).stream()
+                .filter(a -> a.getInspectionItemId().equals(items.get("Доп. замечания"))).findFirst().orElseThrow();
+        assertThat(stored.isSkipped()).isTrue();
+        assertThat(stored.getRating()).isNull();
+        assertThat(stored.getComment()).isNull();
+        assertThat(stored.getPhotoUrls()).isEmpty();
+    }
+
+    @ParameterizedTest(name = "required item [{0}] cannot be skipped, not even in a draft")
+    @ValueSource(strings = {"Оценка ЛКП", "Комментарий по кузову"})
+    void requiredItem_cannotBeSkipped(String title) {
+        assertThatThrownBy(() -> submit(List.of(skipped(title, null, null)), false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(title);
+        assertThat(status()).isEqualTo(DiagnosticRequestStatus.IN_PROGRESS);
+    }
+
+    @Test
+    @DisplayName("unskipping: a later save with content replaces the skipped marker")
+    void skippedItem_canBeFilledLater() {
+        List<InspectionAnswerDto> first = new ArrayList<>(complete());
+        first.add(skipped("Доп. замечания", null, null));
+        submit(first, false);
+
+        List<InspectionAnswerDto> second = new ArrayList<>(complete());
+        second.add(answer("Доп. замечания", null, "Всё в порядке", null));
+        submit(second, false);
+
+        InspectionAnswer stored = answerRepository.findByDiagnosticRequestId(requestId).stream()
+                .filter(a -> a.getInspectionItemId().equals(items.get("Доп. замечания"))).findFirst().orElseThrow();
+        assertThat(stored.isSkipped()).isFalse();
+        assertThat(stored.getComment()).isEqualTo("Всё в порядке");
     }
 }

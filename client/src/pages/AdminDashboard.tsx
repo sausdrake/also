@@ -35,7 +35,7 @@ interface Auction {
 
 interface DiagItem  { id: number; title: string; fieldType: string; }
 interface DiagGroup { id: number; name: string; items: DiagItem[]; }
-interface DiagAnswer { inspectionItemId: number; rating: number | null; comment: string; photoUrls: string[]; }
+interface DiagAnswer { inspectionItemId: number; rating: number | null; comment: string; photoUrls: string[]; skipped?: boolean; }
 
 interface Report {
   id: number; brand: string; model: string; year: number; vin: string;
@@ -770,6 +770,7 @@ function AdminDiagAccordion({ template, answers }: {
   };
 
   const renderVal = (item: DiagItem, ans?: DiagAnswer) => {
+    if (ans?.skipped) return <span className="text-sm text-gray-400 italic">Пропущен диагностом</span>;
     if (!ans || !isFilled(item, ans)) {
       return <span className="text-sm text-gray-300 italic">Не заполнено</span>;
     }

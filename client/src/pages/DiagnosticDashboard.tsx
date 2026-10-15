@@ -248,7 +248,7 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
           comment: a.comment || '',
           photoUrls: a.photoUrls || [],
           videoUrls: a.videoUrls || [],
-          isSkipped: false,
+          isSkipped: !!a.skipped,
         };
       });
       setAnswers(initial);
@@ -314,7 +314,9 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
     setMissingFields([]);
     setSubmitting(true);
     try {
-      await api.post(`/diagnostic/work/${requestId}/answers`, { answers: Object.values(answers), submit: isSubmit });
+      // The server field is `skipped` (scenario 3 step 4); it clears a skipped item's content.
+      const payload = Object.values(answers).map(({ isSkipped, ...a }) => ({ ...a, skipped: isSkipped }));
+      await api.post(`/diagnostic/work/${requestId}/answers`, { answers: payload, submit: isSubmit });
       setMsg(isSubmit ? 'Отчёт отправлен на проверку!' : 'Черновик сохранён');
       if (isSubmit) setTimeout(onDone, 1500);
     } catch (e: any) {
@@ -486,10 +488,27 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
                         )}
                       </div>
                     )}
-                    {editable ? (
-                      <FieldInput item={item} ans={ans}
-                        onChange={(field, value) => setAnswer(item.id, field, value)}
-                        hasError={hasError} />
+                    {editable && ans.isSkipped ? (
+                      <div className="flex items-center justify-between text-sm text-gray-500 bg-gray-50 rounded-lg px-3 py-2 border border-dashed">
+                        <span className="italic">Пункт пропущен</span>
+                        <button type="button" onClick={() => setAnswer(item.id, 'isSkipped', false)}
+                          aria-label={`Вернуть пункт ${item.title}`}
+                          className="text-xs text-blue-600 hover:underline">Вернуть</button>
+                      </div>
+                    ) : editable ? (
+                      <>
+                        <FieldInput item={item} ans={ans}
+                          onChange={(field, value) => setAnswer(item.id, field, value)}
+                          hasError={hasError} />
+                        {/* Scenario 3 step 4: only a non-required item may be skipped. */}
+                        {!item.isRequired && (
+                          <button type="button" onClick={() => setAnswer(item.id, 'isSkipped', true)}
+                            aria-label={`Пропустить пункт ${item.title}`}
+                            className="text-xs text-gray-500 hover:text-gray-700 underline">Пропустить</button>
+                        )}
+                      </>
+                    ) : ans.isSkipped ? (
+                      <div className="text-sm text-gray-500 italic bg-gray-50 rounded-lg px-3 py-2 border">Пропущен</div>
                     ) : (
                       <div className="text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2 border">
                         {item.fieldType === 'NUMBER' && ans.rating ? `Оценка: ${ans.rating}/5` : null}

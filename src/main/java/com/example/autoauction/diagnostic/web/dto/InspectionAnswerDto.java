@@ -12,4 +12,6 @@ public class InspectionAnswerDto {
     private String comment;
     private List<String> photoUrls;
     private List<String> videoUrls;
+    /** Scenario 3: "Пропустить" - allowed only for a non-required item. */
+    private boolean skipped;
 }

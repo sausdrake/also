@@ -22,6 +22,7 @@ public class InspectionAnswerMapper {
         entity.setComment(domain.getComment());
         entity.setPhotoUrls(domain.getPhotoUrls() != null ? domain.getPhotoUrls() : new ArrayList<>());
         entity.setVideoUrls(domain.getVideoUrls() != null ? domain.getVideoUrls() : new ArrayList<>());
+        entity.setSkipped(domain.isSkipped());
         entity.setCreatedAt(domain.getCreatedAt());
         entity.setUpdatedAt(domain.getUpdatedAt());
         return entity;
@@ -38,6 +39,7 @@ public class InspectionAnswerMapper {
         domain.setComment(entity.getComment());
         domain.setPhotoUrls(entity.getPhotoUrls() != null ? entity.getPhotoUrls() : new ArrayList<>());
         domain.setVideoUrls(entity.getVideoUrls() != null ? entity.getVideoUrls() : new ArrayList<>());
+        domain.setSkipped(entity.isSkipped());
         domain.setCreatedAt(entity.getCreatedAt());
         domain.setUpdatedAt(entity.getUpdatedAt());
         return domain;

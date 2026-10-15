@@ -334,6 +334,10 @@ public class DiagnosticRequestService {
                 throw new IllegalArgumentException(
                         "Пункт анкеты " + answerDto.getItemId() + " не принадлежит шаблону, привязанному к заявке");
             }
+            // Scenario 3 step 4: only a non-required item may be skipped.
+            if (answerDto.isSkipped() && item.isRequired()) {
+                throw new IllegalArgumentException("Обязательный пункт анкеты нельзя пропустить: " + item.getTitle());
+            }
             // Scenario 3: a rating is 1-5 stars.
             if (answerDto.getRating() != null && (answerDto.getRating() < 1 || answerDto.getRating() > 5)) {
                 throw new IllegalArgumentException("Оценка пункта анкеты должна быть от 1 до 5");
@@ -349,10 +353,17 @@ public class DiagnosticRequestService {
             InspectionAnswer answer = new InspectionAnswer();
             answer.setDiagnosticRequestId(requestId);
             answer.setInspectionItemId(answerDto.getItemId());
-            answer.setRating(answerDto.getRating());
-            answer.setComment(answerDto.getComment());
-            answer.setPhotoUrls(answerDto.getPhotoUrls());
-            answer.setVideoUrls(answerDto.getVideoUrls());
+            if (answerDto.isSkipped()) {
+                // A skipped item carries no content, so the report never mixes "skipped" with data.
+                answer.setSkipped(true);
+                answer.setPhotoUrls(List.of());
+                answer.setVideoUrls(List.of());
+            } else {
+                answer.setRating(answerDto.getRating());
+                answer.setComment(answerDto.getComment());
+                answer.setPhotoUrls(answerDto.getPhotoUrls());
+                answer.setVideoUrls(answerDto.getVideoUrls());
+            }
             answer.setCreatedAt(OffsetDateTime.now());
             answer.setUpdatedAt(OffsetDateTime.now());
             answers.add(answer);
@@ -437,7 +448,7 @@ public class DiagnosticRequestService {
     }
 
     private static boolean isFilled(InspectionItem item, InspectionAnswerDto answer) {
-        if (answer == null) {
+        if (answer == null || answer.isSkipped()) {
             return false;
         }
         String fieldType = item.getFieldType() == null ? "TEXT" : item.getFieldType();
