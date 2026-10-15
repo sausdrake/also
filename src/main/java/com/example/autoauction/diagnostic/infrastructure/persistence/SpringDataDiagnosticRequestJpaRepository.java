@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,6 +17,8 @@ import java.util.Optional;
 public interface SpringDataDiagnosticRequestJpaRepository extends JpaRepository<JpaDiagnosticRequestEntity, Long> {
 
     Page<JpaDiagnosticRequestEntity> findByUserId(Long userId, Pageable pageable);
+
+    boolean existsByUserIdAndStatusIn(Long userId, Collection<DiagnosticRequest.DiagnosticRequestStatus> statuses);
 
     Page<JpaDiagnosticRequestEntity> findByStatus(DiagnosticRequest.DiagnosticRequestStatus status, Pageable pageable);
 

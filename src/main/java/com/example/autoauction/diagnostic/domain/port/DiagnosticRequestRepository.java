@@ -3,6 +3,7 @@ package com.example.autoauction.diagnostic.domain.port;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,4 +41,7 @@ public interface DiagnosticRequestRepository {
     boolean resetForRework(Long requestId, Long diagnosticId);
 
     Optional<DiagnosticRequest> findApprovedByVin(String vin);
+
+    /** True if the user has any request in one of the given statuses (order-independent). */
+    boolean existsByUserIdAndStatusIn(Long userId, Collection<DiagnosticRequest.DiagnosticRequestStatus> statuses);
 }

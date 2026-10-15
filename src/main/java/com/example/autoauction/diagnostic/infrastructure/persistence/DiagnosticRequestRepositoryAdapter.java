@@ -143,4 +143,11 @@ public class DiagnosticRequestRepositoryAdapter implements DiagnosticRequestRepo
                 vin, DiagnosticRequest.DiagnosticRequestStatus.APPROVED)
                 .map(mapper::toDomain);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsByUserIdAndStatusIn(Long userId,
+                                             java.util.Collection<DiagnosticRequest.DiagnosticRequestStatus> statuses) {
+        return jpaRepository.existsByUserIdAndStatusIn(userId, statuses);
+    }
 }

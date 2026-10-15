@@ -131,8 +131,7 @@ class DiagnosticRequestServiceTest {
         @DisplayName("Успешное создание заявки")
         void createRequest_Success() {
             // Мокаем что нет активных заявок
-            Page<DiagnosticRequest> emptyPage = Page.empty();
-            when(requestRepository.findByUserId(eq(userId), any(Pageable.class))).thenReturn(emptyPage);
+            when(requestRepository.existsByUserIdAndStatusIn(eq(userId), any())).thenReturn(false);
 
             when(requestRepository.save(any(DiagnosticRequest.class))).thenReturn(savedRequest);
             when(systemSettingsService.getBigDecimal(eq("diagnostic_deposit_amount"), any(BigDecimal.class)))
@@ -171,8 +170,7 @@ class DiagnosticRequestServiceTest {
         @DisplayName("Настройка diagnostic_fee_amount не сконфигурирована - создание падает ДО " +
                 "сохранения заявки и ДО заморозки commitment")
         void createRequest_FeeSettingNotConfigured_FailsClosedBeforeAnyMutation() {
-            Page<DiagnosticRequest> emptyPage = Page.empty();
-            when(requestRepository.findByUserId(eq(userId), any(Pageable.class))).thenReturn(emptyPage);
+            when(requestRepository.existsByUserIdAndStatusIn(eq(userId), any())).thenReturn(false);
             when(systemSettingsService.getBigDecimal(eq("diagnostic_deposit_amount"), any(BigDecimal.class)))
                     .thenReturn(new BigDecimal("10000"));
             when(systemSettingsService.getRequiredBigDecimal(eq("diagnostic_fee_amount")))

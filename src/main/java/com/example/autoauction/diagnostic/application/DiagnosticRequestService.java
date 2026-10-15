@@ -70,11 +70,13 @@ public class DiagnosticRequestService {
     @Transactional
     public DiagnosticRequestResponse createRequest(CreateDiagnosticRequest dto, Long userId) {
         log.info("Creating diagnostic request for user: {}, vin: {}", userId, dto.getVin());
-        // Проверка на существующую активную заявку
-        Page<DiagnosticRequest> activeRequests = requestRepository.findByUserId(userId, PageRequest.of(0, 1));
-        boolean hasPending = activeRequests.getContent().stream()
-                .anyMatch(r -> r.getStatus() == DiagnosticRequest.DiagnosticRequestStatus.PENDING ||
-                        r.getStatus() == DiagnosticRequest.DiagnosticRequestStatus.IN_PROGRESS);
+        // Проверка на существующую активную заявку. An existence query over ALL of the user's
+        // requests - inspecting only an unordered first page could see an old APPROVED/REJECTED
+        // row and miss the active one, letting a second active request (and a second deposit
+        // freeze) through.
+        boolean hasPending = requestRepository.existsByUserIdAndStatusIn(userId, java.util.EnumSet.of(
+                DiagnosticRequest.DiagnosticRequestStatus.PENDING,
+                DiagnosticRequest.DiagnosticRequestStatus.IN_PROGRESS));
 
         if (hasPending) {
             throw new IllegalStateException("У вас уже есть активная заявка на диагностику. Дождитесь её завершения.");
