@@ -7,6 +7,7 @@ import { AuctionPage } from './pages/AuctionPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { DiagnosticDashboard } from './pages/DiagnosticDashboard';
 import { ProfilePage } from './pages/ProfilePage';
+import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ForbiddenPage } from './pages/ForbiddenPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -33,6 +34,12 @@ function AppContent() {
           <Route path="/auction/:id" element={<AuctionPage />} />
 
           {/* Защищённые маршруты */}
+          <Route path="/change-password" element={
+            <ProtectedRoute>
+              <ChangePasswordPage />
+            </ProtectedRoute>
+          } />
+
           <Route path="/profile/*" element={
             <ProtectedRoute>
               <ProfilePage />

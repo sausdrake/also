@@ -48,6 +48,9 @@ class AdminUserControllerTest {
     @MockBean
     private JwtService jwtService;
 
+    @MockBean
+    private com.example.autoauction.auth.application.PasswordService passwordService;   // AUTH-01
+
     private User testUser;
 
     @BeforeEach

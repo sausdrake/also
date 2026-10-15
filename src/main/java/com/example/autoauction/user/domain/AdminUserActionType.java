@@ -9,5 +9,7 @@ public enum AdminUserActionType {
     /** the user's roles were replaced by exactly one role */
     ROLE_SET,
     /** a role was added to the user's roles */
-    ROLE_ADD
+    ROLE_ADD,
+    /** AUTH-01: the password was replaced by a one-time temporary password */
+    PASSWORD_RESET
 }

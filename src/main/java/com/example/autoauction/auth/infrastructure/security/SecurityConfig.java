@@ -1,5 +1,6 @@
 package com.example.autoauction.auth.infrastructure.security;
 
+import com.example.autoauction.auth.domain.port.PasswordChangeRequirementRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -32,6 +33,7 @@ public class SecurityConfig {
     private final UserDetailsService userDetailsService;
     private final JwtAuthenticationEntryPoint authenticationEntryPoint;
     private final JwtAccessDeniedHandler accessDeniedHandler;
+    private final PasswordChangeRequirementRepository passwordChangeRequirementRepository;
 
     @org.springframework.beans.factory.annotation.Value("${allowed.origins:http://localhost:5173}")
     private String allowedOrigins;
@@ -40,11 +42,13 @@ public class SecurityConfig {
             JwtAuthenticationFilter jwtAuthFilter,
             UserDetailsService userDetailsService,
             JwtAuthenticationEntryPoint authenticationEntryPoint,
-            JwtAccessDeniedHandler accessDeniedHandler) {
+            JwtAccessDeniedHandler accessDeniedHandler,
+            PasswordChangeRequirementRepository passwordChangeRequirementRepository) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.userDetailsService = userDetailsService;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
+        this.passwordChangeRequirementRepository = passwordChangeRequirementRepository;
     }
 
     @Bean
@@ -104,7 +108,10 @@ public class SecurityConfig {
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                // AUTH-01: a temporary password set by an administrator must be replaced first
+                .addFilterAfter(new PasswordChangeRequiredFilter(passwordChangeRequirementRepository),
+                        JwtAuthenticationFilter.class);
 
         return http.build();
     }

@@ -522,6 +522,9 @@ function UsersPage() {
   const [roleTarget, setRoleTarget] = useState<UserItem | null>(null);
   const [newRole, setNewRole]       = useState('');
   const [viewTarget, setViewTarget] = useState<UserItem | null>(null);
+  // AUTH-01: password reset - confirmation first, then the temporary password shown once
+  const [resetTarget, setResetTarget] = useState<UserItem | null>(null);
+  const [temporaryPassword, setTemporaryPassword] = useState<{ username: string; password: string } | null>(null);
 
   const notify = (text: string, err = false) => { setMsg(text); setMsgErr(err); setTimeout(() => setMsg(''), 4000); };
 
@@ -561,6 +564,16 @@ function UsersPage() {
     } catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); }
   };
 
+  const resetPassword = async () => {
+    if (!resetTarget) return;
+    const target = resetTarget;
+    setResetTarget(null);
+    try {
+      const { data } = await api.post(`/admin/users/${target.id}/password-reset`);
+      setTemporaryPassword({ username: target.username, password: data.temporaryPassword });
+    } catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); }
+  };
+
   const applyRole = async () => {
     if (!roleTarget || !newRole.trim()) return;
     try {
@@ -594,6 +607,42 @@ function UsersPage() {
               <button onClick={() => setRoleTarget(null)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">Отмена</button>
               <button onClick={applyRole} disabled={!newRole}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm disabled:opacity-50 hover:bg-blue-700">Применить</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {resetTarget && (
+        <Modal onClose={() => setResetTarget(null)}>
+          <div className="p-6 space-y-4">
+            <h3 className="font-semibold">Сбросить пароль: <span className="text-blue-600">{resetTarget.username}</span></h3>
+            <p className="text-sm text-gray-600">
+              Сначала сверьте личность обратившегося с его подтверждённым документом (KYC) — по регламенту
+              docs/ops/password-reset.md. Старый пароль и все сеансы перестанут работать; пользователь сможет
+              только сменить временный пароль на свой.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setResetTarget(null)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">Отмена</button>
+              <button onClick={resetPassword}
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm hover:bg-amber-700">Личность сверена, сбросить</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {temporaryPassword && (
+        <Modal onClose={() => setTemporaryPassword(null)}>
+          <div className="p-6 space-y-4">
+            <h3 className="font-semibold">Временный пароль для {temporaryPassword.username}</h3>
+            <p className="font-mono text-lg tracking-wider bg-gray-50 border rounded-lg p-3 select-all" data-testid="temporary-password">
+              {temporaryPassword.password}
+            </p>
+            <p className="text-sm text-gray-600">
+              Пароль показывается один раз и нигде не хранится. Передайте его пользователю лично или по
+              подтверждённому каналу; при входе система потребует задать новый пароль.
+            </p>
+            <div className="flex justify-end">
+              <button onClick={() => setTemporaryPassword(null)} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Готово</button>
             </div>
           </div>
         </Modal>
@@ -654,6 +703,10 @@ function UsersPage() {
               <button onClick={() => { setViewTarget(null); setRoleTarget(viewTarget); setNewRole(viewTarget.roles[0] || ''); }}
                 className="px-3 py-2 rounded-lg text-sm bg-blue-50 text-blue-700 hover:bg-blue-100">
                 Изменить роль
+              </button>
+              <button onClick={() => { setResetTarget(viewTarget); setViewTarget(null); }}
+                className="px-3 py-2 rounded-lg text-sm bg-amber-50 text-amber-700 hover:bg-amber-100">
+                Сбросить пароль
               </button>
             </div>
           </div>

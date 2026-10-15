@@ -746,8 +746,12 @@ function ProfileTab() {
           </div>
         </div>
       </div>
+      <button onClick={() => navigate('/change-password')}
+        className="mt-6 w-full bg-gray-50 text-gray-700 border border-gray-200 py-2 rounded-lg hover:bg-gray-100">
+        Сменить пароль
+      </button>
       <button onClick={handleLogout}
-        className="mt-6 w-full bg-red-50 text-red-600 border border-red-200 py-2 rounded-lg hover:bg-red-100">
+        className="mt-3 w-full bg-red-50 text-red-600 border border-red-200 py-2 rounded-lg hover:bg-red-100">
         Выйти
       </button>
     </div>

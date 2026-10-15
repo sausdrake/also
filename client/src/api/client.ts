@@ -29,10 +29,27 @@ function forceLogout() {
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
+// AUTH-01: signed in with a temporary password set by support - the API answers
+// 403 PASSWORD_CHANGE_REQUIRED to everything except the password change.
+export function isPasswordChangeRequired(error: any): boolean {
+  return error?.response?.status === 403 && error?.response?.data?.error === 'PASSWORD_CHANGE_REQUIRED';
+}
+
+function redirectToPasswordChange() {
+  if (window.location.pathname === '/change-password') return;
+  window.history.replaceState(null, '', '/change-password?required=1');
+  window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config;
+
+    if (isPasswordChangeRequired(error)) {
+      redirectToPasswordChange();
+      return Promise.reject(error);
+    }
 
     if (error.response?.status === 401 && !original._retry) {
       const { isAuthenticated } = useAuthStore.getState();

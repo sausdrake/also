@@ -1,5 +1,6 @@
 package com.example.autoauction.admin.web;
 
+import com.example.autoauction.auth.application.PasswordService;
 import com.example.autoauction.auth.domain.UserPrincipal;
 import com.example.autoauction.auth.infrastructure.security.CurrentUser;
 import com.example.autoauction.deposit.application.DepositService;
@@ -11,6 +12,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +30,7 @@ public class AdminUserController {
 
     private final UserService userService;
     private final DepositService depositService;
+    private final PasswordService passwordService;
 
     @GetMapping
     @Operation(summary = "Список пользователей (фильтры: role, active, withBalance)")
@@ -119,6 +122,21 @@ public class AdminUserController {
     }
 
     /** SEC-06: who blocked, unblocked, trusted or changed the roles of this user, and when (newest first). */
+    /**
+     * AUTH-01: resets a forgotten password to a one-time temporary password, returned here once.
+     * Only after the caller's identity has been checked against the user's verified KYC document
+     * (docs/ops/password-reset.md); the reset is journaled.
+     */
+    @PostMapping("/{id}/password-reset")
+    @Operation(summary = "Сбросить пароль пользователя на временный (только после сверки личности с KYC)")
+    public ResponseEntity<TemporaryPasswordDto> resetPassword(@PathVariable Long id,
+                                                              @Parameter(hidden = true) @CurrentUser UserPrincipal currentUser) {
+        String temporaryPassword = passwordService.resetByAdmin(id, currentUser.getUserId());
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new TemporaryPasswordDto(temporaryPassword));
+    }
+
+    public record TemporaryPasswordDto(String temporaryPassword) {}
+
     @GetMapping("/{id}/actions")
     @Operation(summary = "Журнал административных действий над пользователем")
     public List<AdminUserActionDto> adminActions(@PathVariable Long id) {

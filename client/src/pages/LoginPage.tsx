@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 
@@ -20,6 +20,7 @@ export const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const { login } = useAuthStore();
   const navigate = useNavigate();
+  const notice: string | undefined = (useLocation().state as { notice?: string } | null)?.notice;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,6 +69,8 @@ export const LoginPage = () => {
           <h1 className="text-center text-3xl font-extrabold text-gray-900">AutoAuction</h1>
           <h2 className="mt-2 text-center text-xl text-gray-600">Вход в систему</h2>
         </div>
+
+        {notice && <div role="status" className="text-green-700 text-sm text-center bg-green-50 border border-green-200 rounded-lg p-3">{notice}</div>}
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-xl shadow-sm space-y-3">
