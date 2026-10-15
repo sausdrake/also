@@ -92,7 +92,9 @@ public class GlobalExceptionHandler {
 
         // Извлекаем более понятное сообщение
         String message = "Database constraint violation";
-        if (e.getMessage() != null && e.getMessage().toLowerCase().contains("idempotency_key")) {
+        if (e.getMessage() != null && e.getMessage().toLowerCase().contains("uk_deposit_tx_reconciliation_reference")) {
+            message = "Эта внешняя операция уже зачислена (повтор по той же ссылке RECONCILIATION)";
+        } else if (e.getMessage() != null && e.getMessage().toLowerCase().contains("idempotency_key")) {
             message = "Эта корректировка уже была обработана ранее (повтор с тем же ключом идемпотентности)";
         } else if (e.getMessage().contains("UK_")) {
             if (e.getMessage().contains("username")) {

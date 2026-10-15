@@ -126,6 +126,14 @@ public class JpaDepositRepositoryAdapter implements DepositRepository {
         return transactionJpaRepository.findByIdempotencyKey(idempotencyKey).map(mapper::toDomain);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<DepositTransaction> findReconciliationAdjustmentByReference(String reference) {
+        return transactionJpaRepository.findReconciliationAdjustmentsByReference(
+                        reference, DepositTransaction.TransactionType.ADMIN_ADJUSTMENT).stream()
+                .findFirst().map(mapper::toDomain);
+    }
+
     // НОВЫЕ МЕТОДЫ
     @Override
     public void freezeForAuction(Long depositId, Long auctionId, java.math.BigDecimal amount, FreezeReason reason) {

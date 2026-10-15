@@ -52,6 +52,12 @@ public interface DepositRepository {
     List<DepositTransaction> findTransactionsByAuctionId(Long auctionId);
     Optional<DepositTransaction> findTransactionByIdempotencyKey(String idempotencyKey);
 
+    /**
+     * F7: the RECONCILIATION admin adjustment already booked for this external operation
+     * reference, if any (at most one - V56 partial unique index).
+     */
+    Optional<DepositTransaction> findReconciliationAdjustmentByReference(String reference);
+
     // НОВЫЕ МЕТОДЫ для работы с frozen deposits
     void freezeForAuction(Long depositId, Long auctionId, java.math.BigDecimal amount, FreezeReason reason);
     void unfreezeForAuction(Long depositId, Long auctionId);

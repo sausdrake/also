@@ -853,6 +853,9 @@ public class DepositService {
         }
     }
 
+    /** deposit_transactions.reference is VARCHAR(100). */
+    static final int MAX_REFERENCE_LENGTH = 100;
+
     /** Slice 2 · Step 2A hardening: replaces the previous, un-hardened {@code 99_999_999} cap. */
     static final BigDecimal MAX_ADJUST_AMOUNT = new BigDecimal("500000");
 
@@ -877,6 +880,11 @@ public class DepositService {
         }
         if (reference == null || reference.isBlank()) {
             throw new IllegalArgumentException("Ссылка (reference) обязательна для корректировки депозита");
+        }
+        reference = reference.trim();
+        if (reference.length() > MAX_REFERENCE_LENGTH) {
+            throw new IllegalArgumentException(
+                    "Ссылка (reference) не может быть длиннее " + MAX_REFERENCE_LENGTH + " символов");
         }
         if (amount == null) {
             throw new IllegalArgumentException("Сумма корректировки не может быть null");
@@ -935,6 +943,26 @@ public class DepositService {
             log.info("Idempotent replay of admin adjustment for key '{}', target user {}. No new mutation applied.",
                     idempotencyKey, targetUserId);
             return getDepositByUserId(targetUserId);
+        }
+
+        // F7: for RECONCILIATION the reference is the external unique identifier of the money
+        // operation being booked - one external operation, at most one credit. A repeat for the
+        // same user and amount (even under a new idempotency key) is a no-op; anything else is a
+        // conflict, never a second credit. V56's partial unique index enforces the same rule for
+        // two attempts racing past this check.
+        if (reason == AdminAdjustmentReason.RECONCILIATION) {
+            Optional<DepositTransaction> booked = depositRepository.findReconciliationAdjustmentByReference(reference);
+            if (booked.isPresent()) {
+                DepositTransaction prev = booked.get();
+                if (!prev.getUserId().equals(targetUserId) || prev.getAmount().compareTo(amount) != 0) {
+                    throw new IllegalStateException(
+                            "Корректировка отклонена: внешняя операция '" + reference + "' уже зачислена "
+                            + "(другой пользователь или другая сумма)");
+                }
+                log.info("RECONCILIATION reference '{}' already booked for user {} - no second credit",
+                        reference, targetUserId);
+                return getDepositByUserId(targetUserId);
+            }
         }
 
         Deposit deposit = depositRepository.findByUserId(targetUserId)

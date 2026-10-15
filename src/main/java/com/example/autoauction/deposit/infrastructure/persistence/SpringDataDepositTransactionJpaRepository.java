@@ -16,6 +16,12 @@ public interface SpringDataDepositTransactionJpaRepository extends JpaRepository
     List<JpaDepositTransactionEntity> findByAuctionId(Long auctionId);
     java.util.Optional<JpaDepositTransactionEntity> findByIdempotencyKey(String idempotencyKey);
 
+    /** F7: the RECONCILIATION credit already booked for an external operation reference, if any. */
+    @Query("SELECT t FROM JpaDepositTransactionEntity t WHERE t.reference = :reference "
+            + "AND t.type = :type AND t.description = 'RECONCILIATION'")
+    List<JpaDepositTransactionEntity> findReconciliationAdjustmentsByReference(
+            @Param("reference") String reference, @Param("type") DepositTransaction.TransactionType type);
+
     @Query("SELECT t FROM JpaDepositTransactionEntity t WHERE t.userId = :userId " +
            "AND (:type IS NULL OR t.type = :type) " +
            "AND (:from IS NULL OR t.createdAt >= :from) " +
