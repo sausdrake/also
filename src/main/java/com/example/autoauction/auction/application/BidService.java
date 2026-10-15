@@ -35,6 +35,7 @@ public class BidService {
     private final ApplicationEventPublisher eventPublisher;
     private final PolicyVersionService policyVersionService;
     private final UserService userService;
+    private final AuctionSellerResolver auctionSellerResolver;
 
     public BidService(AuctionRepository auctionRepository,
                       DepositService depositService,
@@ -43,7 +44,8 @@ public class BidService {
                       RateLimitService rateLimitService,
                       ApplicationEventPublisher eventPublisher,
                       PolicyVersionService policyVersionService,
-                      UserService userService) {
+                      UserService userService,
+                      AuctionSellerResolver auctionSellerResolver) {
         this.auctionRepository = auctionRepository;
         this.depositService = depositService;
         this.participantRepository = participantRepository;
@@ -52,6 +54,7 @@ public class BidService {
         this.eventPublisher = eventPublisher;
         this.policyVersionService = policyVersionService;
         this.userService = userService;
+        this.auctionSellerResolver = auctionSellerResolver;
         log.info("BidService initialized with WebSocket and Notification support");
     }
 
@@ -127,7 +130,9 @@ public class BidService {
             throw new IllegalStateException("Buy Now не установлен для этого аукциона");
         }
 
-        if (buyerId.equals(auction.getCreatedBy())) {
+        // SEC-09: createdBy is the administrator who created the auction; the seller (vehicle
+        // owner) is resolved separately - neither may buy the lot.
+        if (buyerId.equals(auction.getCreatedBy()) || auctionSellerResolver.isSeller(auction, buyerId)) {
             log.warn("Пользователь {} попытался купить свой автомобиль", buyerId);
             throw new IllegalArgumentException("Нельзя купить собственный автомобиль");
         }
@@ -208,7 +213,9 @@ public class BidService {
             throw new IllegalStateException("Время аукциона истекло");
         }
 
-        if (bidderId.equals(auction.getCreatedBy())) {
+        // SEC-09: the seller (vehicle owner) must not bid up their own lot; createdBy (the admin who
+        // created the auction) stays excluded as before.
+        if (bidderId.equals(auction.getCreatedBy()) || auctionSellerResolver.isSeller(auction, bidderId)) {
             log.warn("Попытка сделать ставку на свой аукцион от пользователя {}", bidderId);
             throw new IllegalArgumentException("Нельзя делать ставки на собственный аукцион");
         }

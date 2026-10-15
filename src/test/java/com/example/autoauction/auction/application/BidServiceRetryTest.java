@@ -46,6 +46,9 @@ class BidServiceRetryTest {
     @Mock
     private AuctionFinalizer auctionFinalizer;
 
+    @Mock
+    private AuctionSellerResolver auctionSellerResolver;   // SEC-09: seller unknown by default
+
     @InjectMocks
     private BidService bidService;
 

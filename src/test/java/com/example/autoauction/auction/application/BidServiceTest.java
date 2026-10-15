@@ -58,6 +58,9 @@ class BidServiceTest {
     @Mock
     private UserService userService;
 
+    @Mock
+    private AuctionSellerResolver auctionSellerResolver;   // SEC-09: seller unknown by default
+
     @InjectMocks
     private BidService bidService;
 
