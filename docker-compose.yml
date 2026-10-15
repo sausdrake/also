@@ -44,6 +44,11 @@ services:
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
     ports:
       - "8081:8081"
+    # MEDIA-05: uploaded media and log files live outside the container - without these volumes
+    # every deploy (container re-creation) deleted all uploaded photos and videos
+    volumes:
+      - media_uploads:/app/uploads
+      - app_logs:/app/logs
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081/api/health"]
       interval: 10s
@@ -55,6 +60,8 @@ services:
 
 volumes:
   postgres_data:
+  media_uploads:
+  app_logs:
 
 networks:
   autoauction-network:

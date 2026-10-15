@@ -23,6 +23,10 @@ RUN apk add --no-cache ffmpeg
 
 # Создаём пользователя для запуска (не root)
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+# MEDIA-05: /app belongs to root, so appuser could not create the media upload directory (startup
+# failed since MEDIA-04) or the log directory. Both are created here, owned by appuser; docker-compose
+# mounts named volumes on them, which inherit this ownership and survive container re-creation.
+RUN mkdir -p /app/uploads /app/logs && chown appuser:appgroup /app/uploads /app/logs
 USER appuser
 
 # Открываем порт
