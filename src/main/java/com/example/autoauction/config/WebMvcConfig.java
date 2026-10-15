@@ -7,6 +7,10 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
@@ -23,8 +27,16 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        String absolutePath = Paths.get(uploadDir).toAbsolutePath().toUri().toString();
+        // MEDIA-04: Path.toUri() ends with "/" only for an existing directory. On a fresh server the
+        // upload directory did not exist yet, the location was registered as a file and every
+        // uploaded file answered 404 until a restart - so the directory is created first.
+        Path dir = Paths.get(uploadDir).toAbsolutePath();
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Cannot create the media upload directory " + dir, e);
+        }
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations(absolutePath);
+                .addResourceLocations(dir.toUri().toString());
     }
 }
