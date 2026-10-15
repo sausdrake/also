@@ -2542,6 +2542,15 @@ function AuctionsPage() {
 
 // ─── Deposits ─────────────────────────────────────────────────────────────────
 
+// The closed set of AdminAdjustmentReason values the adjust endpoint accepts.
+const ADJUST_REASONS: { value: string; label: string }[] = [
+  { value: 'RECONCILIATION', label: 'Сверка платежа (зачисление подтверждённого платежа)' },
+  { value: 'MANUAL_REFUND', label: 'Ручной возврат' },
+  { value: 'CHARGEBACK', label: 'Чарджбэк' },
+  { value: 'SUPPORT_CORRECTION', label: 'Исправление по обращению' },
+  { value: 'OTHER', label: 'Другое' },
+];
+
 function DepositsPage() {
   const [deposits, setDeposits]   = useState<DepositItem[]>([]);
   const [users, setUsers]         = useState<UserItem[]>([]);
@@ -2551,7 +2560,8 @@ function DepositsPage() {
   const [search, setSearch]       = useState('');
   const [adjustTarget, setAdjustTarget] = useState<DepositItem | null>(null);
   const [adjustAmount, setAdjustAmount] = useState('');
-  const [adjustComment, setAdjustComment] = useState('');
+  const [adjustReason, setAdjustReason] = useState('');
+  const [adjustReference, setAdjustReference] = useState('');
   // Generated once when the modal opens for a given target, reused across retries of the
   // same submit attempt (e.g. after a network error) so the backend's idempotency check
   // actually protects against double-submission. A fresh key is only generated when a new
@@ -2595,14 +2605,14 @@ function DepositsPage() {
   }, [deposits, search]);
 
   const adjustDeposit = async () => {
-    if (!adjustTarget || !adjustAmount || !adjustComment.trim()) return;
+    if (!adjustTarget || !adjustAmount || !adjustReason || !adjustReference.trim()) return;
     const amount = parseFloat(adjustAmount);
     if (isNaN(amount)) { notify('Некорректная сумма', true); return; }
     try {
       await api.post(`/admin/deposits/${adjustTarget.userId}/adjust`,
-        { amount, comment: adjustComment.trim(), idempotencyKey: adjustKey });
+        { amount, reason: adjustReason, reference: adjustReference.trim(), idempotencyKey: adjustKey });
       notify(`Депозит скорректирован на ${amount > 0 ? '+' : ''}${amount} сом`);
-      setAdjustTarget(null); setAdjustAmount(''); setAdjustComment(''); load();
+      setAdjustTarget(null); setAdjustAmount(''); setAdjustReason(''); setAdjustReference(''); load();
     } catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); }
   };
 
@@ -2642,15 +2652,24 @@ function DepositsPage() {
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Комментарий *</label>
-                <input type="text" placeholder="Причина корректировки"
-                  value={adjustComment} onChange={e => setAdjustComment(e.target.value)}
+                <label htmlFor="adjust-reason" className="text-xs text-gray-500 block mb-1">Причина *</label>
+                <select id="adjust-reason" value={adjustReason} onChange={e => setAdjustReason(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                  <option value="">Выберите причину</option>
+                  {ADJUST_REASONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="adjust-reference" className="text-xs text-gray-500 block mb-1">Основание (ссылка) *</label>
+                <input id="adjust-reference" type="text" maxLength={100}
+                  placeholder="Номер платежа, обращения или документа"
+                  value={adjustReference} onChange={e => setAdjustReference(e.target.value)}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
               </div>
             </div>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setAdjustTarget(null)} className="px-4 py-2 border border-gray-200 rounded-xl text-sm hover:bg-gray-50">Отмена</button>
-              <button onClick={adjustDeposit} disabled={!adjustAmount || !adjustComment.trim()}
+              <button onClick={adjustDeposit} disabled={!adjustAmount || !adjustReason || !adjustReference.trim()}
                 className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm disabled:opacity-50 hover:bg-blue-700">Применить</button>
             </div>
           </div>
@@ -2758,7 +2777,7 @@ function DepositsPage() {
                           className="text-xs px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">
                           История
                         </button>
-                        <button onClick={() => { setAdjustTarget(d); setAdjustAmount(''); setAdjustComment(''); setAdjustKey(crypto.randomUUID()); }}
+                        <button onClick={() => { setAdjustTarget(d); setAdjustAmount(''); setAdjustReason(''); setAdjustReference(''); setAdjustKey(crypto.randomUUID()); }}
                           className="text-xs px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium">
                           Корректировать
                         </button>
