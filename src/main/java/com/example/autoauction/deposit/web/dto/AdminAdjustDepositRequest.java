@@ -2,6 +2,7 @@ package com.example.autoauction.deposit.web.dto;
 
 import com.example.autoauction.deposit.domain.AdminAdjustmentReason;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -17,6 +18,7 @@ public record AdminAdjustDepositRequest(
 
         @Schema(description = "Сумма корректировки (положительная — пополнение, отрицательная — списание)", example = "5000")
         @NotNull(message = "Сумма обязательна")
+        @Digits(integer = 17, fraction = 2, message = "Не больше двух знаков после запятой")
         BigDecimal amount,
 
         @Schema(description = "Структурированная причина корректировки")

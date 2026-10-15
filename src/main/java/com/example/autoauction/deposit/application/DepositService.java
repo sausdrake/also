@@ -102,6 +102,7 @@ public class DepositService {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             throw new IllegalArgumentException("Ключ идемпотентности обязателен для вывода средств");
         }
+        requireTyiynPrecision(amount);
 
         Optional<DepositTransaction> existing = depositRepository.findTransactionByIdempotencyKey(idempotencyKey);
         if (existing.isPresent()) {
@@ -791,6 +792,18 @@ public class DepositService {
                         "Убедитесь, что аукцион завершён и пользователь является победителем."));
     }
 
+    /**
+     * S11: every money column is NUMERIC(19,2). A client-supplied amount with more fractional
+     * digits would be rounded silently by the database, so the stored ledger amount would no
+     * longer equal the balance delta and an idempotent replay would compare against the rounded
+     * value. Trailing zeros (100.100) are fine - only the value's real precision counts.
+     */
+    private static void requireTyiynPrecision(BigDecimal amount) {
+        if (amount != null && amount.stripTrailingZeros().scale() > 2) {
+            throw new IllegalArgumentException("Сумма не может содержать больше двух знаков после запятой");
+        }
+    }
+
     /** Slice 2 · Step 2A hardening: replaces the previous, un-hardened {@code 99_999_999} cap. */
     static final BigDecimal MAX_ADJUST_AMOUNT = new BigDecimal("500000");
 
@@ -826,6 +839,7 @@ public class DepositService {
             throw new IllegalArgumentException(
                     "Сумма корректировки не может превышать " + MAX_ADJUST_AMOUNT);
         }
+        requireTyiynPrecision(amount);
         // R-1.4: ключ идемпотентности обязателен для всех финансовых admin-корректировок.
         // Клиент обязан сгенерировать его ОДИН раз для данной попытки корректировки и
         // переиспользовать его при повторной отправке того же запроса (например, после

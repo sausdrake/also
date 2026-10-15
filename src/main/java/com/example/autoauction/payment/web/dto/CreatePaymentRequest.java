@@ -2,6 +2,7 @@ package com.example.autoauction.payment.web.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
@@ -19,6 +20,7 @@ public record CreatePaymentRequest(
         @Schema(description = "Запрашиваемая сумма пополнения, KGS", example = "50000", required = true)
         @NotNull(message = "Сумма обязательна")
         @DecimalMin(value = "0.01", message = "Сумма должна быть больше 0")
+        @Digits(integer = 17, fraction = 2, message = "Не больше двух знаков после запятой")
         BigDecimal amount,
 
         @Schema(description = "Необязательный ключ идемпотентности: клиент может сгенерировать его "

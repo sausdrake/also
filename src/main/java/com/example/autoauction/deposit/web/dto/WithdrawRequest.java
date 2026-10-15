@@ -2,6 +2,7 @@ package com.example.autoauction.deposit.web.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -13,6 +14,7 @@ public record WithdrawRequest(
         @Schema(description = "Сумма", example = "10000", required = true)
         @NotNull(message = "Сумма обязательна")
         @DecimalMin(value = "0.01", message = "Сумма должна быть больше 0")
+        @Digits(integer = 17, fraction = 2, message = "Не больше двух знаков после запятой")
         BigDecimal amount,
 
         @Schema(description = "Ключ идемпотентности: клиент генерирует его один раз на попытку " +

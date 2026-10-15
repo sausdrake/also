@@ -30,8 +30,8 @@ public final class PaymentAmountPolicy {
     }
 
     /**
-     * @throws IllegalArgumentException if {@code amount} is null, below {@link #MIN_TOP_UP}, or
-     *         above {@link #MAX_TOP_UP}
+     * @throws IllegalArgumentException if {@code amount} is null, below {@link #MIN_TOP_UP},
+     *         above {@link #MAX_TOP_UP}, or has more than two decimal places
      */
     public static void validateAmount(BigDecimal amount) {
         Objects.requireNonNull(amount, "Сумма пополнения обязательна");
@@ -42,6 +42,10 @@ public final class PaymentAmountPolicy {
         if (amount.compareTo(MAX_TOP_UP) > 0) {
             throw new IllegalArgumentException(
                     "Максимальная сумма одного пополнения — " + MAX_TOP_UP.toPlainString() + " KGS");
+        }
+        // S11: amount_requested is NUMERIC(19,2) - more precision would be rounded silently.
+        if (amount.stripTrailingZeros().scale() > 2) {
+            throw new IllegalArgumentException("Сумма пополнения не может содержать больше двух знаков после запятой");
         }
     }
 
