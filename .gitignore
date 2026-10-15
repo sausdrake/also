@@ -74,4 +74,6 @@ claude/
 .mvn/
 *.md
 !CLAUDE.md
+# operations runbooks are part of the repository
+!docs/ops/*.md
 *.txt
