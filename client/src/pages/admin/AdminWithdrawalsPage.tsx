@@ -17,6 +17,7 @@ export interface AdminWithdrawalRequest {
   processedAt: string | null;
   processedBy: number | null;
   rejectionReason: string | null;
+  payoutNote: string | null;
 }
 
 const STATUS_LABEL: Record<WithdrawalStatus, string> = {
@@ -35,18 +36,22 @@ const FILTERS: { value: WithdrawalStatus | ''; label: string }[] = [
 ];
 
 /**
- * F6: manual payout requests. Until a bank is connected AlSo pays withdrawals by hand:
+ * F6/F6.1: manual payout requests. Until a bank is connected AlSo pays withdrawals by hand:
  * "В работу" (PENDING -> PROCESSING, nothing paid yet), "Выплачено" (PROCESSING -> PAID - the
- * admin confirms the manual payout was made; final), "Отклонить" (PENDING only, mandatory reason,
- * the amount goes back to the user's deposit). The server refuses every other transition.
+ * admin confirms the manual payout with a mandatory note; final), "Отклонить" (PENDING or
+ * PROCESSING - mandatory reason and an explicit confirmation that no payout was made; the amount
+ * goes back to the user's deposit). The reject request carries the status shown on screen, so the
+ * server refuses it if the request changed meanwhile. The server refuses every other transition.
  */
 export function AdminWithdrawalsPage() {
   const [filter, setFilter] = useState<WithdrawalStatus | ''>('PENDING');
   const [items, setItems] = useState<AdminWithdrawalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<number | null>(null);
-  const [rejecting, setRejecting] = useState<number | null>(null);
+  const [form, setForm] = useState<{ id: number; kind: 'reject' | 'paid' } | null>(null);
   const [reason, setReason] = useState('');
+  const [noPayoutConfirmed, setNoPayoutConfirmed] = useState(false);
+  const [payoutNote, setPayoutNote] = useState('');
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   const load = (status: WithdrawalStatus | '' = filter) => {
@@ -65,8 +70,7 @@ export function AdminWithdrawalsPage() {
     try {
       await api.post(`/admin/withdrawals/${id}/${action}`, body);
       setMsg({ text: okText, ok: true });
-      setRejecting(null);
-      setReason('');
+      closeForm();
       load();
     } catch (e: any) {
       setMsg({ text: e.response?.data?.message || 'Не удалось выполнить действие', ok: false });
@@ -76,9 +80,17 @@ export function AdminWithdrawalsPage() {
     }
   };
 
-  const markPaid = (w: AdminWithdrawalRequest) => {
-    if (!window.confirm(`Подтвердить, что ${Number(w.amount).toLocaleString('ru')} сом выплачены пользователю вручную? Отменить это действие нельзя.`)) return;
-    act(w.id, 'paid', `Заявка #${w.id} отмечена выплаченной`);
+  const closeForm = () => {
+    setForm(null);
+    setReason('');
+    setNoPayoutConfirmed(false);
+    setPayoutNote('');
+  };
+
+  const openForm = (id: number, kind: 'reject' | 'paid') => {
+    const same = form?.id === id && form.kind === kind;
+    closeForm();
+    if (!same) setForm({ id, kind });
   };
 
   return (
@@ -127,29 +139,50 @@ export function AdminWithdrawalsPage() {
                 </p>
                 {w.rejectionReason && <p className="text-xs text-red-600">Причина отклонения: {w.rejectionReason}</p>}
 
+                {w.payoutNote && <p className="text-xs text-green-700">Заметка о выплате: {w.payoutNote}</p>}
+
                 <div className="flex flex-wrap gap-2">
                   {w.status === 'PENDING' && (
-                    <>
-                      <button disabled={busy === w.id} onClick={() => act(w.id, 'processing', `Заявка #${w.id} взята в работу`)}
-                        className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white disabled:opacity-50">В работу</button>
-                      <button disabled={busy === w.id} onClick={() => { setRejecting(rejecting === w.id ? null : w.id); setReason(''); }}
-                        className="text-xs px-3 py-1.5 rounded-lg border text-red-600 disabled:opacity-50">Отклонить</button>
-                    </>
+                    <button disabled={busy === w.id} onClick={() => act(w.id, 'processing', `Заявка #${w.id} взята в работу`)}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white disabled:opacity-50">В работу</button>
                   )}
                   {w.status === 'PROCESSING' && (
-                    <button disabled={busy === w.id} onClick={() => markPaid(w)}
+                    <button disabled={busy === w.id} onClick={() => openForm(w.id, 'paid')}
                       className="text-xs px-3 py-1.5 rounded-lg bg-green-600 text-white disabled:opacity-50">Выплачено</button>
+                  )}
+                  {(w.status === 'PENDING' || w.status === 'PROCESSING') && (
+                    <button disabled={busy === w.id} onClick={() => openForm(w.id, 'reject')}
+                      className="text-xs px-3 py-1.5 rounded-lg border text-red-600 disabled:opacity-50">Отклонить</button>
                   )}
                 </div>
 
-                {rejecting === w.id && w.status === 'PENDING' && (
-                  <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 space-y-2">
+                {form?.id === w.id && form.kind === 'reject' && (w.status === 'PENDING' || w.status === 'PROCESSING') && (
+                  <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 space-y-2" data-testid={`reject-form-${w.id}`}>
                     <textarea value={reason} onChange={e => setReason(e.target.value)} maxLength={1000} rows={2}
-                      aria-label="Причина отклонения" placeholder="Причина отклонения (увидит пользователь)"
+                      aria-label="Причина отклонения" placeholder="Причина отклонения (увидит пользователь; без номеров карт и счетов)"
                       className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm" />
-                    <button disabled={!reason.trim() || busy === w.id}
-                      onClick={() => act(w.id, 'reject', `Заявка #${w.id} отклонена, сумма возвращена на депозит`, { reason: reason.trim() })}
+                    <label className="flex items-start gap-2 text-xs text-gray-700">
+                      <input type="checkbox" checked={noPayoutConfirmed} onChange={e => setNoPayoutConfirmed(e.target.checked)} className="mt-0.5" />
+                      <span>Подтверждаю, что выплата пользователю по этой заявке фактически не производилась. Сумма вернётся на депозит пользователя.</span>
+                    </label>
+                    <button disabled={!reason.trim() || !noPayoutConfirmed || busy === w.id}
+                      onClick={() => act(w.id, 'reject', `Заявка #${w.id} отклонена, сумма возвращена на депозит`,
+                        { reason: reason.trim(), payoutNotMade: true, expectedStatus: w.status })}
                       className="text-xs px-3 py-1.5 rounded-lg bg-red-600 text-white disabled:opacity-50">Отклонить и вернуть сумму</button>
+                  </div>
+                )}
+
+                {form?.id === w.id && form.kind === 'paid' && w.status === 'PROCESSING' && (
+                  <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 space-y-2" data-testid={`paid-form-${w.id}`}>
+                    <textarea value={payoutNote} onChange={e => setPayoutNote(e.target.value)} maxLength={1000} rows={2}
+                      aria-label="Заметка о выплате" placeholder="Как и когда выплачено: способ, дата, номер обращения или чека"
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm" />
+                    <p className="text-xs text-amber-700">Не указывайте полный номер карты, счёта или другие банковские реквизиты.</p>
+                    <button disabled={!payoutNote.trim() || busy === w.id}
+                      onClick={() => act(w.id, 'paid', `Заявка #${w.id} отмечена выплаченной`, { payoutNote: payoutNote.trim() })}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-green-600 text-white disabled:opacity-50">
+                      Подтвердить выплату {Number(w.amount).toLocaleString('ru')} сом
+                    </button>
                   </div>
                 )}
               </div>
