@@ -197,10 +197,8 @@ class PaymentControllerTest {
         mockMvc.perform(post("/api/v1/payments")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(bodyWithForbiddenFields)))
-                .andExpect(status().is5xxServerError());
-        // Known, pre-existing limitation (not introduced by P1.5): GlobalExceptionHandler has no
-        // specific handler for HttpMessageNotReadableException, so this surfaces as 500 rather
-        // than the more conventional 400 - reported as a non-blocking limitation, not fixed here
-        // (GlobalExceptionHandler is shared, unrelated infrastructure, out of this slice's scope).
+                .andExpect(status().isBadRequest());
+        // ERR-01: the unreadable body is a client error - 400 (it was a 500 before
+        // GlobalExceptionHandler handled HttpMessageNotReadableException).
     }
 }

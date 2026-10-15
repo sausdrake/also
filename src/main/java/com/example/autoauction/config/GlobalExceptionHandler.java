@@ -7,6 +7,9 @@ import com.example.autoauction.deposit.domain.InsufficientFundsException;
 import com.example.autoauction.identity.application.IdentityVerificationRequiredException;
 import com.example.autoauction.policy.application.PolicyConflictException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -291,6 +294,41 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(error);
+    }
+
+    // ERR-01: an unreadable body (malformed JSON, empty body, unknown field, unknown enum value,
+    // wrong JSON type) is the client's mistake - 400, not a 500 "internal error". The parser's
+    // message names classes, fields and input fragments, so it is logged, never returned.
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleMessageNotReadable(HttpMessageNotReadableException e) {
+        log.warn("Некорректное тело запроса: {}", e.getMostSpecificCause().getMessage());
+        return clientError(HttpStatus.BAD_REQUEST, "Некорректное тело запроса",
+                "Тело запроса не удалось прочитать: проверьте формат JSON, имена и значения полей");
+    }
+
+    // ERR-01: wrong Content-Type - 415, not 500.
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException e) {
+        log.warn("Неподдерживаемый Content-Type: {}", e.getContentType());
+        return clientError(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Неподдерживаемый тип содержимого",
+                "Неподдерживаемый тип содержимого запроса");
+    }
+
+    // ERR-01: wrong HTTP method - 405, not 500.
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
+        log.warn("Неподдерживаемый HTTP-метод: {}", e.getMethod());
+        return clientError(HttpStatus.METHOD_NOT_ALLOWED, "Метод не поддерживается",
+                "HTTP-метод " + e.getMethod() + " не поддерживается для этого адреса");
+    }
+
+    private static ResponseEntity<Map<String, Object>> clientError(HttpStatus status, String error, String message) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", java.time.LocalDateTime.now().toString());
+        body.put("status", status.value());
+        body.put("error", error);
+        body.put("message", message);
+        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).body(body);
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
