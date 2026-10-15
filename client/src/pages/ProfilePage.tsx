@@ -357,6 +357,8 @@ function RequestsTab() {
   const [form, setForm] = useState({ brand: '', model: '', year: '', vin: '' });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState('');
+  // Scenario 1 step 4: "Просмотр" opens the request's details (incl. why it was rejected).
+  const [viewedId, setViewedId] = useState<number | null>(null);
 
   const loadRequests = () => {
     api.get('/diagnostic/requests/my?page=0&size=20')
@@ -484,6 +486,11 @@ function RequestsTab() {
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}>
                       {statusInfo.label}
                     </span>
+                    <button onClick={() => setViewedId(viewedId === req.id ? null : req.id)}
+                      aria-expanded={viewedId === req.id}
+                      className="text-gray-600 hover:text-gray-800 text-sm border border-gray-200 px-3 py-1 rounded-lg">
+                      {viewedId === req.id ? 'Скрыть' : 'Просмотр'}
+                    </button>
                     {req.status === 'PENDING' && (
                       <button onClick={() => handleCancel(req.id)}
                         className="text-red-500 hover:text-red-700 text-sm border border-red-200 px-3 py-1 rounded-lg">
@@ -492,6 +499,20 @@ function RequestsTab() {
                     )}
                   </div>
                 </div>
+                {viewedId === req.id && (
+                  <dl className="mt-3 pt-3 border-t grid grid-cols-2 gap-x-4 gap-y-1 text-sm" data-testid={`request-details-${req.id}`}>
+                    <dt className="text-gray-400">Подана</dt><dd>{req.createdAt ? formatDateTime(req.createdAt) : '—'}</dd>
+                    <dt className="text-gray-400">Обновлена</dt><dd>{req.updatedAt ? formatDateTime(req.updatedAt) : '—'}</dd>
+                    <dt className="text-gray-400">Диагност</dt><dd>{req.diagnosticName || 'ещё не назначен'}</dd>
+                    <dt className="text-gray-400">Залог</dt><dd>{req.depositFrozen != null ? `${Number(req.depositFrozen).toLocaleString('ru')} сом` : '—'}</dd>
+                    {req.rejectedReason && (
+                      <>
+                        <dt className="text-gray-400">Причина отклонения</dt>
+                        <dd className="text-red-600">{req.rejectedReason}</dd>
+                      </>
+                    )}
+                  </dl>
+                )}
                 {req.status === 'APPROVED' && (
                   <RequestVehicleStatus vehicleId={req.vehicleId ?? null} />
                 )}
