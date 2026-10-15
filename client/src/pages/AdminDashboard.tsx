@@ -1639,6 +1639,45 @@ function TemplatesPage() {
     finally { setSavingItem(false); }
   };
 
+  // Scenario 13: groups and items are reordered by drag & drop (or the ↑/↓ buttons) and the order
+  // is persisted in sort_order. The moved list is renumbered 1..n so older rows that all share
+  // the same sort_order still end up in a well-defined order.
+  const [dragGroup, setDragGroup] = useState<number | null>(null);
+  const [dragItem, setDragItem] = useState<{ groupId: number; index: number } | null>(null);
+
+  const moved = <T,>(list: T[], from: number, to: number): T[] => {
+    const next = [...list];
+    const [entry] = next.splice(from, 1);
+    next.splice(to, 0, entry);
+    return next;
+  };
+
+  const reorderGroups = async (from: number, to: number) => {
+    if (!selected?.groups || from === to || to < 0 || to >= selected.groups.length) return;
+    const groups = moved(selected.groups, from, to);
+    setSelected({ ...selected, groups });
+    try {
+      await Promise.all(groups.map((g, i) => g.sortOrder === i + 1 ? null
+        : api.put(`/admin/diagnostic/groups/${g.id}`, { name: g.name, sortOrder: i + 1 })));
+    } catch (e: any) { notify(e.response?.data?.message || 'Не удалось сохранить порядок', true); }
+    loadTemplate(selected.id);
+  };
+
+  const reorderItems = async (groupId: number, from: number, to: number) => {
+    const group = selected?.groups?.find(g => g.id === groupId);
+    if (!selected || !group || from === to || to < 0 || to >= group.items.length) return;
+    const items = moved(group.items, from, to);
+    setSelected({ ...selected, groups: selected.groups!.map(g => g.id === groupId ? { ...g, items } : g) });
+    try {
+      await Promise.all(items.map((it, i) => it.sortOrder === i + 1 ? null
+        : api.put(`/admin/diagnostic/items/${it.id}`, {
+          title: it.title, description: it.description ?? null, fieldType: it.fieldType, isRequired: it.isRequired,
+          hasPhoto: !!it.hasPhoto, hasVideo: !!it.hasVideo, hasRating: !!it.hasRating, sortOrder: i + 1,
+        })));
+    } catch (e: any) { notify(e.response?.data?.message || 'Не удалось сохранить порядок', true); }
+    loadTemplate(selected.id);
+  };
+
   const addField = async (groupId: number) => {
     if (!itemTitle.trim()) return;
     try {
@@ -1650,7 +1689,8 @@ function TemplatesPage() {
         hasPhoto: itemFieldType === 'PHOTO',
         hasRating: itemFieldType === 'NUMBER',
         hasVideo: itemHasVideo,
-        sortOrder: 1,
+        // new items go to the end of their group
+        sortOrder: (selected?.groups?.find(g => g.id === groupId)?.items?.length ?? 0) + 1,
       });
       setItemTitle(''); setItemDesc(''); setItemRequired(true); setItemHasVideo(false);
       setItemFieldType('TEXT'); setActiveSection(null);
@@ -1858,7 +1898,11 @@ function TemplatesPage() {
                   <p className="text-center text-gray-400 py-8 text-sm">Нет разделов. Добавьте первый раздел.</p>
                 )}
                 {(selected.groups || []).map((section, sIdx) => (
-                  <div key={section.id} className="p-4">
+                  <div key={section.id} className={`p-4 ${dragGroup === sIdx ? 'opacity-50' : ''}`}
+                    data-testid={`group-${section.id}`}
+                    draggable onDragStart={() => setDragGroup(sIdx)} onDragEnd={() => setDragGroup(null)}
+                    onDragOver={e => { if (dragGroup != null) e.preventDefault(); }}
+                    onDrop={() => { if (dragGroup != null) { reorderGroups(dragGroup, sIdx); setDragGroup(null); } }}>
                     <div className="flex justify-between items-center mb-3">
                       <div className="flex items-center gap-2">
                         <span className="w-5 h-5 bg-blue-100 text-blue-600 rounded-lg text-xs flex items-center justify-center font-bold">{sIdx + 1}</span>
@@ -1866,6 +1910,12 @@ function TemplatesPage() {
                         <span className="text-xs text-gray-400">{section.items?.length || 0} полей</span>
                       </div>
                       <div className="flex gap-2">
+                        <button onClick={() => reorderGroups(sIdx, sIdx - 1)} disabled={sIdx === 0}
+                          aria-label={`Группа ${section.name} выше`}
+                          className="text-xs text-gray-400 hover:text-gray-700 px-1 disabled:opacity-30">↑</button>
+                        <button onClick={() => reorderGroups(sIdx, sIdx + 1)} disabled={sIdx === (selected.groups || []).length - 1}
+                          aria-label={`Группа ${section.name} ниже`}
+                          className="text-xs text-gray-400 hover:text-gray-700 px-1 disabled:opacity-30">↓</button>
                         <button onClick={() => setActiveSection(activeSection === section.id ? null : section.id)}
                           className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg hover:bg-blue-100">+ Поле</button>
                         <button onClick={() => setConfirmDeleteSection(section.id)}
@@ -1930,7 +1980,17 @@ function TemplatesPage() {
                       {(section.items || []).map((field, fIdx) => {
                         const ft = ftMeta(field.fieldType || 'TEXT');
                         return (
-                          <div key={field.id}
+                          <div key={field.id} data-testid={`item-${field.id}`}
+                            draggable
+                            onDragStart={e => { e.stopPropagation(); setDragItem({ groupId: section.id, index: fIdx }); }}
+                            onDragEnd={() => setDragItem(null)}
+                            onDragOver={e => { if (dragItem?.groupId === section.id) { e.preventDefault(); e.stopPropagation(); } }}
+                            onDrop={e => {
+                              if (dragItem?.groupId !== section.id) return;
+                              e.stopPropagation();
+                              reorderItems(section.id, dragItem.index, fIdx);
+                              setDragItem(null);
+                            }}
                             className="flex justify-between items-center bg-gray-50 rounded-xl px-3 py-2 text-sm border border-gray-100">
                             <div className="flex items-center gap-2 min-w-0">
                               <span className="text-gray-400 text-xs w-5 text-right shrink-0">{fIdx + 1}.</span>
@@ -1944,6 +2004,12 @@ function TemplatesPage() {
                             </div>
                             <div className="flex items-center gap-2 ml-3 shrink-0">
                               <span className="text-xs text-gray-400 hidden sm:block">{ft.label}</span>
+                              <button onClick={() => reorderItems(section.id, fIdx, fIdx - 1)} disabled={fIdx === 0}
+                                aria-label={`Пункт ${field.title} выше`}
+                                className="text-gray-400 hover:text-gray-700 text-xs px-1 disabled:opacity-30">↑</button>
+                              <button onClick={() => reorderItems(section.id, fIdx, fIdx + 1)} disabled={fIdx === (section.items || []).length - 1}
+                                aria-label={`Пункт ${field.title} ниже`}
+                                className="text-gray-400 hover:text-gray-700 text-xs px-1 disabled:opacity-30">↓</button>
                               <button onClick={() => setEditItem({ ...field })}
                                 title="Редактировать" aria-label={`Редактировать пункт ${field.title}`}
                                 className="text-gray-400 hover:text-blue-600 text-xs px-1">✏️</button>
