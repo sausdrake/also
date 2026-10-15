@@ -82,7 +82,7 @@ class AdminAuctionControllerTest {
                 new BigDecimal("10000"),
                 startTime,
                 endTime,
-                null, null
+                "https://cdn.test/main.jpg", null
         );
 
         auctionResponse = new AuctionResponse(
@@ -158,6 +158,25 @@ class AdminAuctionControllerTest {
             mockMvc.perform(post("/api/v1/admin/auctions")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(invalidRequest)))
+                    .andExpect(status().isBadRequest());
+
+            verify(adminAuctionService, never()).createAuction(any(), any());
+        }
+
+        @org.junit.jupiter.params.ParameterizedTest
+        @org.junit.jupiter.params.provider.NullAndEmptySource
+        @org.junit.jupiter.params.provider.ValueSource(strings = {"   "})
+        @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
+        @DisplayName("Сценарии 5/17: аукцион без главного фото - 400, сервис не вызывается")
+        void createAuction_WithoutMainPhoto_ShouldReturnBadRequest(String mainPhotoUrl) throws Exception {
+            AuctionCreateRequest noPhoto = new AuctionCreateRequest(
+                    validCreateRequest.vehicleId(), validCreateRequest.startingPrice(), validCreateRequest.reservePrice(),
+                    validCreateRequest.buyNowPrice(), validCreateRequest.minBidStep(), validCreateRequest.startTime(),
+                    validCreateRequest.endTime(), mainPhotoUrl, null);
+
+            mockMvc.perform(post("/api/v1/admin/auctions")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(noPhoto)))
                     .andExpect(status().isBadRequest());
 
             verify(adminAuctionService, never()).createAuction(any(), any());

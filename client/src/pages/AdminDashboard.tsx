@@ -2164,6 +2164,8 @@ function AuctionsPage() {
   const validateForm = () => {
     const errs: Record<string, string> = {};
     if (!form.vehicleId) errs.vehicleId = 'Выберите автомобиль';
+    // Scenarios 5.3 / 17.2: the main photo (the first one) is mandatory.
+    if (auctionPhotos.length === 0) errs.photos = 'Загрузите главное фото (обязательно)';
     const sp = parseFloat(form.startingPrice);
     if (!form.startingPrice || isNaN(sp) || sp <= 0) errs.startingPrice = 'Введите стартовую цену';
     if (sp > 999_999_999) errs.startingPrice = 'Слишком большая сумма';
@@ -2311,8 +2313,9 @@ function AuctionsPage() {
 
               <div>
                 <label className="text-xs text-gray-500 mb-1 block font-medium">
-                  Фотографии {auctionPhotos.length > 0 && `— загружено: ${auctionPhotos.length}`}
+                  Фотографии * (первая — главная) {auctionPhotos.length > 0 && `— загружено: ${auctionPhotos.length}`}
                 </label>
+                {formErrors.photos && <p className="text-red-500 text-xs mb-1">{formErrors.photos}</p>}
                 {auctionPhotos.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-2">
                     {auctionPhotos.map((url, i) => (

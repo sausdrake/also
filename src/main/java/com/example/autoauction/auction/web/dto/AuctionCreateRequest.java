@@ -3,6 +3,7 @@ package com.example.autoauction.auction.web.dto;
 import com.example.autoauction.auction.web.validation.ValidAuctionPrices;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
 
@@ -44,7 +45,8 @@ public record AuctionCreateRequest(
         @NotNull(message = "Время окончания обязательно")
         OffsetDateTime endTime,
 
-        @Schema(description = "URL главного фото", example = "https://...")
+        @Schema(description = "URL главного фото (обязательно, сценарии 5 и 17)", example = "https://...")
+        @NotBlank(message = "Главное фото обязательно")
         String mainPhotoUrl,
 
         @Schema(description = "JSON-строка дополнительных фото", example = "[\"url1\",\"url2\"]")

@@ -36,7 +36,7 @@ class AuctionPricesValidatorTest {
                                                 BigDecimal buyNowPrice) {
         OffsetDateTime start = OffsetDateTime.parse("2030-01-01T10:00:00+00:00");
         return new AuctionCreateRequest(1L, startingPrice, reservePrice, buyNowPrice,
-                new BigDecimal("10"), start, start.plusDays(7), null, null);
+                new BigDecimal("10"), start, start.plusDays(7), "https://cdn.test/main.jpg", null);
     }
 
     private static Set<String> properties(Set<ConstraintViolation<AuctionCreateRequest>> violations) {
