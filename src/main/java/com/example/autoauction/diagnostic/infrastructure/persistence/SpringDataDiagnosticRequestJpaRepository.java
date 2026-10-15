@@ -22,6 +22,12 @@ public interface SpringDataDiagnosticRequestJpaRepository extends JpaRepository<
 
     boolean existsByVinAndStatusIn(String vin, Collection<DiagnosticRequest.DiagnosticRequestStatus> statuses);
 
+    boolean existsByPreviousDiagnosticRequestId(Long previousDiagnosticRequestId);
+
+    Optional<JpaDiagnosticRequestEntity> findFirstByVehicleIdOrderByCreatedAtDescIdDesc(Long vehicleId);
+
+    List<JpaDiagnosticRequestEntity> findByVinOrderByCreatedAtAscIdAsc(String vin);
+
     Page<JpaDiagnosticRequestEntity> findByStatus(DiagnosticRequest.DiagnosticRequestStatus status, Pageable pageable);
 
     Page<JpaDiagnosticRequestEntity> findByAssignedTo(Long assignedTo, Pageable pageable);

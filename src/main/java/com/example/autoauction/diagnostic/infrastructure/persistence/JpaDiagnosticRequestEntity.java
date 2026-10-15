@@ -57,6 +57,25 @@ public class JpaDiagnosticRequestEntity {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
+    @Column(name = "previous_diagnostic_request_id")
+    private Long previousDiagnosticRequestId;
+
+    @Column(name = "vehicle_id")
+    private Long vehicleId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "rediagnostic_reason", length = 32)
+    private com.example.autoauction.diagnostic.domain.RediagnosticReason rediagnosticReason;
+
+    @Column(name = "rediagnostic_comment", length = 2000)
+    private String rediagnosticComment;
+
+    @Column(name = "rediagnostic_ordered_by")
+    private Long rediagnosticOrderedBy;
+
+    @Column(name = "rediagnostic_ordered_at")
+    private OffsetDateTime rediagnosticOrderedAt;
+
     @PrePersist
     protected void onCreate() {
         createdAt = OffsetDateTime.now();

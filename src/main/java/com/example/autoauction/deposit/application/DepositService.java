@@ -471,6 +471,36 @@ public class DepositService {
      * collateral, exactly mirroring how confiscateToPlatform only ever reduces the buyer's own
      * balance.
      */
+    /**
+     * MVP-005: the seller pays for a re-diagnostic caused by his own violation. Charged once,
+     * when the re-diagnostic is ordered, straight from the available balance under the deposit's
+     * row lock - so it is owed regardless of how the new diagnostic cycle ends (the new
+     * request's commitment carries a zero fee, so it can never be charged a second time).
+     * Fails with "Недостаточно доступных средств" when the balance cannot cover it.
+     */
+    @Transactional
+    public void chargeRediagnosticFee(Long userId, Long requestId, BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        Deposit deposit = depositRepository.findByUserIdForUpdate(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Депозит не найден"));
+        BigDecimal balanceBefore = deposit.getBalance();
+        deposit.withdraw(amount);
+        depositRepository.save(deposit);
+
+        DepositTransaction charge = new DepositTransaction(
+                deposit.getId(), userId,
+                DepositTransaction.TransactionType.CHARGE,
+                amount, balanceBefore, deposit.getBalance(),
+                "REDIAGNOSTIC_" + requestId,
+                "Оплата повторной диагностики по вине продавца, заявка #" + requestId
+        );
+        charge.setAuctionId(requestId);
+        depositRepository.saveTransaction(charge);
+        log.info("Re-diagnostic fee {} charged to user {} for request {}", amount, userId, requestId);
+    }
+
     @Transactional
     public void chargeSellerViolationPenalty(Long depositId, Long diagnosticRequestId, Long auctionId,
                                               BigDecimal totalFrozen, BigDecimal chargeAmount) {

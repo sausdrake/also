@@ -157,4 +157,22 @@ public class DiagnosticRequestRepositoryAdapter implements DiagnosticRequestRepo
                                           java.util.Collection<DiagnosticRequest.DiagnosticRequestStatus> statuses) {
         return jpaRepository.existsByVinAndStatusIn(vin, statuses);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsByPreviousDiagnosticRequestId(Long previousDiagnosticRequestId) {
+        return jpaRepository.existsByPreviousDiagnosticRequestId(previousDiagnosticRequestId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<DiagnosticRequest> findLatestRediagnosticOfVehicle(Long vehicleId) {
+        return jpaRepository.findFirstByVehicleIdOrderByCreatedAtDescIdDesc(vehicleId).map(mapper::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DiagnosticRequest> findByVinOrderByCreatedAtAsc(String vin) {
+        return jpaRepository.findByVinOrderByCreatedAtAscIdAsc(vin).stream().map(mapper::toDomain).toList();
+    }
 }

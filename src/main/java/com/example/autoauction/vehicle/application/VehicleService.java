@@ -384,6 +384,16 @@ public class VehicleService {
         log.info("Vehicle {} marked NEEDS_REDIAGNOSTIC", vehicleId);
     }
 
+    /** MVP-005: see Vehicle.completeRediagnostic. */
+    @Transactional
+    public void completeRediagnostic(Long vehicleId, Long newDiagnosticRequestId) {
+        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> new IllegalArgumentException("Автомобиль не найден: " + vehicleId));
+        vehicle.completeRediagnostic(newDiagnosticRequestId);
+        vehicleRepository.save(vehicle);
+        log.info("Vehicle {} re-diagnosed by request {} - APPROVED again", vehicleId, newDiagnosticRequestId);
+    }
+
     /**
      * Создать Vehicle автоматически при одобрении диагностического отчёта.
      * Данные берутся из диагностической заявки.

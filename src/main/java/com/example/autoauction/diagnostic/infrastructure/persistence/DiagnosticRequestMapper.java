@@ -24,6 +24,12 @@ public class DiagnosticRequestMapper {
         entity.setRejectionCategory(domain.getRejectionCategory());
         entity.setCreatedAt(domain.getCreatedAt());
         entity.setUpdatedAt(domain.getUpdatedAt());
+        entity.setPreviousDiagnosticRequestId(domain.getPreviousDiagnosticRequestId());
+        entity.setVehicleId(domain.getVehicleId());
+        entity.setRediagnosticReason(domain.getRediagnosticReason());
+        entity.setRediagnosticComment(domain.getRediagnosticComment());
+        entity.setRediagnosticOrderedBy(domain.getRediagnosticOrderedBy());
+        entity.setRediagnosticOrderedAt(domain.getRediagnosticOrderedAt());
         return entity;
     }
 
@@ -45,6 +51,12 @@ public class DiagnosticRequestMapper {
         domain.setRejectionCategory(entity.getRejectionCategory());
         domain.setCreatedAt(entity.getCreatedAt());
         domain.setUpdatedAt(entity.getUpdatedAt());
+        domain.setPreviousDiagnosticRequestId(entity.getPreviousDiagnosticRequestId());
+        domain.setVehicleId(entity.getVehicleId());
+        domain.setRediagnosticReason(entity.getRediagnosticReason());
+        domain.setRediagnosticComment(entity.getRediagnosticComment());
+        domain.setRediagnosticOrderedBy(entity.getRediagnosticOrderedBy());
+        domain.setRediagnosticOrderedAt(entity.getRediagnosticOrderedAt());
         return domain;
     }
 }

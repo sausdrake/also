@@ -41,6 +41,10 @@ class AdminVehicleControllerTest {
     @MockBean
     private VehicleService vehicleService;
 
+    // MVP-005: the controller's re-diagnostic collaborator (covered by AdminRediagnostic*Test)
+    @MockBean
+    private com.example.autoauction.admin.application.AdminRediagnosticService adminRediagnosticService;
+
     @MockBean
     private JwtService jwtService;
 

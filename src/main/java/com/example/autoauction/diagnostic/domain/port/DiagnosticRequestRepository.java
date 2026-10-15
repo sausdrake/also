@@ -47,4 +47,13 @@ public interface DiagnosticRequestRepository {
 
     /** True if any request for this VIN is in one of the given statuses. */
     boolean existsByVinAndStatusIn(String vin, Collection<DiagnosticRequest.DiagnosticRequestStatus> statuses);
+
+    /** MVP-005: whether a re-diagnostic request already supersedes this request. */
+    boolean existsByPreviousDiagnosticRequestId(Long previousDiagnosticRequestId);
+
+    /** MVP-005: the most recent re-diagnostic request of a vehicle, if any. */
+    Optional<DiagnosticRequest> findLatestRediagnosticOfVehicle(Long vehicleId);
+
+    /** MVP-005: every diagnostic request ever made for a VIN, oldest first (diagnostic history). */
+    List<DiagnosticRequest> findByVinOrderByCreatedAtAsc(String vin);
 }

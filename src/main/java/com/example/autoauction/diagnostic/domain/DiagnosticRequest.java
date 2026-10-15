@@ -21,6 +21,19 @@ public class DiagnosticRequest {
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 
+    // MVP-005: re-diagnostic link and audit trail (all null for an ordinary first request)
+    private Long previousDiagnosticRequestId;
+    private Long vehicleId;
+    private RediagnosticReason rediagnosticReason;
+    private String rediagnosticComment;
+    private Long rediagnosticOrderedBy;
+    private OffsetDateTime rediagnosticOrderedAt;
+
+    /** MVP-005: true for a request created by an admin-ordered re-diagnostic. */
+    public boolean isRediagnostic() {
+        return previousDiagnosticRequestId != null;
+    }
+
     public enum DiagnosticRequestStatus {
         PENDING,        // Ожидает диагноста
         IN_PROGRESS,    // В работе у диагноста

@@ -480,6 +480,11 @@ public class DiagnosticRequestService {
         if (request.getStatus() != DiagnosticRequest.DiagnosticRequestStatus.PENDING) {
             throw new IllegalStateException("Можно отозвать только заявку в статусе PENDING. Текущий статус: " + request.getStatus());
         }
+        // MVP-005: a re-diagnostic is ordered by an admin (and possibly already paid for) - the
+        // seller cannot withdraw it.
+        if (request.isRediagnostic()) {
+            throw new IllegalStateException("Повторную диагностику, назначенную администратором, нельзя отозвать");
+        }
 
         sellerDiagnosticCommitmentService.releaseCommitment(userId, requestId);
 
@@ -521,6 +526,10 @@ public class DiagnosticRequestService {
         }
         if (request.getStatus() != DiagnosticRequest.DiagnosticRequestStatus.REJECTED) {
             throw new IllegalStateException("Исправить можно только отклонённый отчёт. Текущий статус: " + request.getStatus());
+        }
+        // MVP-005: once a re-diagnostic supersedes this request it is history - never reopened.
+        if (requestRepository.existsByPreviousDiagnosticRequestId(requestId)) {
+            throw new IllegalStateException("Заявка заменена повторной диагностикой и не может быть исправлена");
         }
 
         boolean ok = requestRepository.resetForRework(requestId, diagnosticId);
@@ -581,6 +590,15 @@ public class DiagnosticRequestService {
         sellerDiagnosticCommitmentService.markAwaitingFinalization(requestId);
 
         // Автоматически создать Vehicle из данных заявки
+        // MVP-005: an approved re-diagnostic returns the EXISTING vehicle to APPROVED and points it at
+        // this request - strictly (a failure rolls the approval back), never via the
+        // best-effort vehicle auto-creation below, which would silently reuse the vehicle by VIN.
+        if (request.isRediagnostic()) {
+            vehicleService.completeRediagnostic(request.getVehicleId(), requestId);
+            log.info("Re-diagnostic report {} approved by admin {}", requestId, adminId);
+            return DiagnosticRequestResponse.fromDomain(saved);
+        }
+
         String diagnosticUsername = userRepository.findById(request.getAssignedTo() != null ? request.getAssignedTo() : request.getUserId())
                 .map(u -> u.getUsername()).orElse("unknown");
         String adminUsername = userRepository.findById(adminId).map(u -> u.getUsername()).orElse("admin");

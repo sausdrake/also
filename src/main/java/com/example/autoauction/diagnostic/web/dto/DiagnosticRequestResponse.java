@@ -54,6 +54,15 @@ public class DiagnosticRequestResponse {
     private List<InspectionAnswer> existingAnswers;
     private List<InspectionAnswer> answers;
 
+    // MVP-005: re-diagnostic link and audit trail
+    private Long previousDiagnosticRequestId;
+    /** the vehicle this re-diagnostic request re-examines */
+    private Long rediagnosedVehicleId;
+    private String rediagnosticReason;
+    private String rediagnosticComment;
+    private Long rediagnosticOrderedBy;
+    private OffsetDateTime rediagnosticOrderedAt;
+
     public static DiagnosticRequestResponse fromDomain(DiagnosticRequest request) {
         DiagnosticRequestResponse response = new DiagnosticRequestResponse();
         response.setId(request.getId());
@@ -69,6 +78,12 @@ public class DiagnosticRequestResponse {
         response.setRejectionCategory(request.getRejectionCategory() != null ? request.getRejectionCategory().name() : null);
         response.setCreatedAt(request.getCreatedAt());
         response.setUpdatedAt(request.getUpdatedAt());
+        response.setPreviousDiagnosticRequestId(request.getPreviousDiagnosticRequestId());
+        response.setRediagnosedVehicleId(request.getVehicleId());
+        response.setRediagnosticReason(request.getRediagnosticReason() != null ? request.getRediagnosticReason().name() : null);
+        response.setRediagnosticComment(request.getRediagnosticComment());
+        response.setRediagnosticOrderedBy(request.getRediagnosticOrderedBy());
+        response.setRediagnosticOrderedAt(request.getRediagnosticOrderedAt());
         return response;
     }
 }

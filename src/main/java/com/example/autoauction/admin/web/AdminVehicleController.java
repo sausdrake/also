@@ -1,6 +1,9 @@
 package com.example.autoauction.admin.web;
 
+import com.example.autoauction.admin.application.AdminRediagnosticService;
+import com.example.autoauction.admin.web.dto.RediagnosticOrderRequest;
 import com.example.autoauction.auth.domain.UserPrincipal;
+import com.example.autoauction.diagnostic.web.dto.DiagnosticRequestResponse;
 import com.example.autoauction.auth.infrastructure.security.CurrentUser;
 import com.example.autoauction.vehicle.application.VehicleService;
 import com.example.autoauction.vehicle.domain.VehicleStatus;
@@ -25,9 +28,11 @@ import java.util.List;
 public class AdminVehicleController {
 
     private final VehicleService vehicleService;
+    private final AdminRediagnosticService adminRediagnosticService;
 
-    public AdminVehicleController(VehicleService vehicleService) {
+    public AdminVehicleController(VehicleService vehicleService, AdminRediagnosticService adminRediagnosticService) {
         this.vehicleService = vehicleService;
+        this.adminRediagnosticService = adminRediagnosticService;
     }
 
     @GetMapping("/pending")
@@ -96,5 +101,24 @@ public class AdminVehicleController {
     @Operation(summary = "Получить автомобили, требующие повторной диагностики")
     public List<VehicleResponse> getNeedsRediagnosticVehicles() {
         return vehicleService.getVehiclesByStatus(VehicleStatus.NEEDS_REDIAGNOSTIC);
+    }
+
+    @PostMapping("/{id}/rediagnostic")
+    @Operation(summary = "Назначить повторную диагностику (MVP-005)")
+    public ResponseEntity<DiagnosticRequestResponse> orderRediagnostic(
+            @PathVariable Long id,
+            @Valid @RequestBody RediagnosticOrderRequest request,
+            @Parameter(hidden = true) @CurrentUser UserPrincipal currentUser) {
+        var created = adminRediagnosticService.orderRediagnostic(id, request.reason(), request.comment(),
+                currentUser.getUserId());
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
+                .body(DiagnosticRequestResponse.fromDomain(created));
+    }
+
+    @GetMapping("/{id}/diagnostic-history")
+    @Operation(summary = "История диагностик автомобиля: первичная, повторные, причины (MVP-005)")
+    public List<DiagnosticRequestResponse> getDiagnosticHistory(@PathVariable Long id) {
+        return adminRediagnosticService.diagnosticHistory(id).stream()
+                .map(DiagnosticRequestResponse::fromDomain).toList();
     }
 }

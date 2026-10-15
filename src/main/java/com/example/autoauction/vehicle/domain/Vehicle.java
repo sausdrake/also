@@ -181,6 +181,21 @@ public class Vehicle {
         this.status = VehicleStatus.NEEDS_REDIAGNOSTIC;
         this.updatedAt = OffsetDateTime.now();
     }
+
+    /**
+     * MVP-005: the re-diagnostic report was approved - the SAME vehicle becomes auctionable again
+     * and its current diagnostic pointer moves to the new request (the latest approved report),
+     * so a new auction binds the new request's commitment. Earlier requests stay reachable
+     * through the re-diagnostic chain.
+     */
+    public void completeRediagnostic(Long newDiagnosticRequestId) {
+        if (this.status != VehicleStatus.NEEDS_REDIAGNOSTIC) {
+            throw new IllegalStateException("Only NEEDS_REDIAGNOSTIC can complete a re-diagnostic");
+        }
+        this.diagnosticRequestId = java.util.Objects.requireNonNull(newDiagnosticRequestId, "newDiagnosticRequestId");
+        this.status = VehicleStatus.APPROVED;
+        this.updatedAt = OffsetDateTime.now();
+    }
     // Добавь в класс Vehicle следующие методы:
 
     public void setStatus(VehicleStatus status) {
