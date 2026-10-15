@@ -13,6 +13,11 @@ import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import java.math.BigDecimal;
 import java.util.Set;
@@ -38,6 +43,7 @@ class ReconciliationReferenceConcurrencyPgIntegrationTest extends AbstractPostgr
     @Autowired private DepositRepository depositRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private RoleRepository roleRepository;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     private Long user() {
         Role role = roleRepository.findByName("ROLE_USER")
@@ -120,5 +126,133 @@ class ReconciliationReferenceConcurrencyPgIntegrationTest extends AbstractPostgr
         duplicate.setIdempotencyKey("k-raw-" + System.nanoTime());
         assertThatThrownBy(() -> depositRepository.saveTransaction(duplicate))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    // ------------------------------------------------------------------ V56 normalisation (btrim)
+
+    private DepositTransaction rawRow(Long userId, String reference, String description) {
+        Long depositId = depositRepository.findByUserId(userId).orElseThrow().getId();
+        DepositTransaction row = new DepositTransaction(depositId, userId, DepositTransaction.TransactionType.ADMIN_ADJUSTMENT,
+                new BigDecimal("1"), BigDecimal.ZERO, new BigDecimal("1"), reference, description);
+        row.setIdempotencyKey("k-raw-" + System.nanoTime());
+        return row;
+    }
+
+    @Test
+    @DisplayName("V56: \" ABC \" and \"ABC\" are one external operation; distinct references, NULLs and other reasons are not constrained")
+    void indexUsesTrimmedReference() {
+        Long a = user();
+        Long b = user();
+        String abc = "EXT-NORM-" + System.nanoTime();
+
+        depositRepository.saveTransaction(rawRow(a, abc, "RECONCILIATION"));
+        assertThatThrownBy(() -> depositRepository.saveTransaction(rawRow(b, "  " + abc + " ", "RECONCILIATION")))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        depositRepository.saveTransaction(rawRow(b, abc + "-2", "RECONCILIATION"));          // a different reference
+        depositRepository.saveTransaction(rawRow(a, null, "RECONCILIATION"));               // NULLs are never duplicates
+        depositRepository.saveTransaction(rawRow(b, null, "RECONCILIATION"));
+        depositRepository.saveTransaction(rawRow(a, abc, "SUPPORT_CORRECTION"));            // other reasons: not unique
+        depositRepository.saveTransaction(rawRow(b, abc, "SUPPORT_CORRECTION"));
+    }
+
+    @RepeatedTest(5)
+    @DisplayName("V56: \"X\" and \" X \" credited at once -> exactly one credit")
+    void trimmedVariantsRace_exactlyOneCredit() throws InterruptedException {
+        Long a = user();
+        Long b = user();
+        String reference = "EXT-PG-TRIM-" + System.nanoTime();
+
+        race(credit(a, reference), credit(b, "  " + reference + " "));
+
+        assertThat(reconciliationCredits(a) + reconciliationCredits(b)).isEqualTo(1);
+        assertThat(balance(a).add(balance(b))).isEqualByComparingTo("5000");
+    }
+
+    @Test
+    @DisplayName("V56: a legacy untrimmed row is found by the trimmed lookup - a repeat is a no-op, not a second credit")
+    void legacyUntrimmedRow_isFoundByTrimmedLookup() {
+        Long userId = user();
+        String reference = "EXT-LEGACY-" + System.nanoTime();
+        Long depositId = depositRepository.findByUserId(userId).orElseThrow().getId();
+        DepositTransaction legacy = new DepositTransaction(depositId, userId, DepositTransaction.TransactionType.ADMIN_ADJUSTMENT,
+                new BigDecimal("5000"), BigDecimal.ZERO, new BigDecimal("5000"), " " + reference + " ", "RECONCILIATION");
+        legacy.setIdempotencyKey("k-legacy-" + System.nanoTime());
+        depositRepository.saveTransaction(legacy);
+
+        depositService.adminAdjust(userId, new BigDecimal("5000"), AdminAdjustmentReason.RECONCILIATION, reference,
+                "k-" + System.nanoTime(), ADMIN_ID);
+
+        assertThat(reconciliationCredits(userId)).isEqualTo(1);
+        assertThat(balance(userId)).as("the replay did not touch the balance").isEqualByComparingTo("0");
+    }
+
+    @Test
+    @DisplayName("D-F7-1: TAB/LF/CR legacy rows - the same text again is no second credit; REF<TAB> and REF stay distinct")
+    void controlCharactersFollowBtrim() {
+        String[][] same = {{"R\t", "R\t"}, {"R\n", "R\n"}, {"R\r", "R\r"}, {"R\t", " R\t "}, {"R", " R "}};
+        for (String[] c : same) {
+            Long userId = user();
+            String s = "-" + System.nanoTime();
+            DepositTransaction legacy = rawRow(userId, c[0].replace("R", "R" + s), "RECONCILIATION");
+            depositRepository.saveTransaction(legacy);
+            depositService.adminAdjust(userId, new BigDecimal("1"), AdminAdjustmentReason.RECONCILIATION,
+                    c[1].replace("R", "R" + s), "k-" + System.nanoTime(), ADMIN_ID);
+            assertThat(reconciliationCredits(userId)).as("[%s] vs [%s]", c[0], c[1]).isEqualTo(1);
+            assertThat(balance(userId)).as("[%s] vs [%s]: balance untouched", c[0], c[1]).isEqualByComparingTo("0");
+        }
+        // under btrim "R<TAB>" and "R" are different external identifiers - both may be credited
+        Long userId = user();
+        String r = "R-" + System.nanoTime();
+        depositRepository.saveTransaction(rawRow(userId, r + "\t", "RECONCILIATION"));
+        depositService.adminAdjust(userId, new BigDecimal("1"), AdminAdjustmentReason.RECONCILIATION, r,
+                "k-" + System.nanoTime(), ADMIN_ID);
+        assertThat(reconciliationCredits(userId)).isEqualTo(2);
+        // and the index agrees: " R<TAB> " collides with "R<TAB>"
+        Long other = user();
+        assertThatThrownBy(() -> depositRepository.saveTransaction(rawRow(other, " " + r + "\t ", "RECONCILIATION")))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @RepeatedTest(5)
+    @DisplayName("D-F7-1: \"R<TAB>\" and \" R<TAB> \" credited at once -> exactly one credit")
+    void controlCharacterVariantsRace_exactlyOneCredit() throws InterruptedException {
+        Long a = user();
+        Long b = user();
+        String reference = "EXT-PG-TAB-" + System.nanoTime() + "\t";
+
+        race(credit(a, reference), credit(b, " " + reference + " "));
+
+        assertThat(reconciliationCredits(a) + reconciliationCredits(b)).isEqualTo(1);
+        assertThat(balance(a).add(balance(b))).isEqualByComparingTo("5000");
+    }
+
+    @Test
+    @DisplayName("V56 pre-check uses the index's semantics: NULLs pass, trimmed duplicates are refused")
+    void preCheckMatchesIndexSemantics() throws Exception {
+        String migration = Files.readString(Path.of("src/main/resources/db/migration/V56__reconciliation_reference_unique.sql"),
+                StandardCharsets.UTF_8);
+        String doBlock = migration.substring(migration.indexOf("DO $$"), migration.indexOf("END $$;") + "END $$;".length());
+        String table = "v56_precheck_" + System.nanoTime();
+        jdbcTemplate.execute("CREATE TABLE " + table + " (LIKE deposit_transactions INCLUDING DEFAULTS)");
+        try {
+            String check = doBlock.replace("deposit_transactions", table);
+            String insert = "INSERT INTO " + table + " (deposit_id, user_id, type, amount, balance_before, balance_after, reference, description, created_at) "
+                    + "VALUES (1, 1, 'ADMIN_ADJUSTMENT', 1, 0, 1, ?, ?, now())";
+
+            jdbcTemplate.update(insert, null, "RECONCILIATION");
+            jdbcTemplate.update(insert, null, "RECONCILIATION");
+            jdbcTemplate.update(insert, "ABC", "SUPPORT_CORRECTION");
+            jdbcTemplate.update(insert, "ABC", "SUPPORT_CORRECTION");
+            jdbcTemplate.update(insert, "ABC", "RECONCILIATION");
+            jdbcTemplate.update(insert, "ABD", "RECONCILIATION");
+            jdbcTemplate.execute(check);   // passes: NULLs, other reasons and distinct references are fine
+
+            jdbcTemplate.update(insert, " ABC ", "RECONCILIATION");
+            assertThatThrownBy(() -> jdbcTemplate.execute(check))
+                    .hasMessageContaining("more than one RECONCILIATION credit");
+        } finally {
+            jdbcTemplate.execute("DROP TABLE " + table);
+        }
     }
 }

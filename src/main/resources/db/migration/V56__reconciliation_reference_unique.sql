@@ -8,13 +8,19 @@
 -- Scope: only RECONCILIATION adjustments (adminAdjust stores the reason name in description).
 -- References of other transaction types are not unique by design (e.g. every row of one auction
 -- or withdrawal request shares its reference), so the uniqueness is deliberately partial.
+--
+-- Normalisation: one external operation is identified by btrim(reference) - " ABC " and "ABC"
+-- are the same operation. The application trims before storing and looks up by the trimmed
+-- value; the index below is on the same expression, and the pre-check groups by it too. NULL
+-- references are no external operation at all: never duplicates of each other (excluded from
+-- the check and the index alike).
 DO $$
 BEGIN
     IF EXISTS (
-        SELECT reference
+        SELECT btrim(reference)
         FROM deposit_transactions
-        WHERE type = 'ADMIN_ADJUSTMENT' AND description = 'RECONCILIATION'
-        GROUP BY reference
+        WHERE type = 'ADMIN_ADJUSTMENT' AND description = 'RECONCILIATION' AND reference IS NOT NULL
+        GROUP BY btrim(reference)
         HAVING COUNT(*) > 1
     ) THEN
         RAISE EXCEPTION 'V56: deposit_transactions already holds more than one RECONCILIATION credit for the same reference - '
@@ -23,5 +29,5 @@ BEGIN
 END $$;
 
 CREATE UNIQUE INDEX uk_deposit_tx_reconciliation_reference
-    ON deposit_transactions(reference)
-    WHERE type = 'ADMIN_ADJUSTMENT' AND description = 'RECONCILIATION';
+    ON deposit_transactions (btrim(reference))
+    WHERE type = 'ADMIN_ADJUSTMENT' AND description = 'RECONCILIATION' AND reference IS NOT NULL;

@@ -856,6 +856,25 @@ public class DepositService {
     /** deposit_transactions.reference is VARCHAR(100). */
     static final int MAX_REFERENCE_LENGTH = 100;
 
+    /**
+     * D-F7-1: removes leading and trailing U+0020 spaces only - exactly PostgreSQL's
+     * {@code btrim(text)}, which V56's unique index and the RECONCILIATION lookup use. Not
+     * {@link String#trim()}: that also strips TAB/LF/CR, so an incoming "REF&lt;TAB&gt;" became "REF"
+     * and no longer matched a stored "REF&lt;TAB&gt;", letting one external operation be credited twice.
+     * Case and inner characters are never changed.
+     */
+    static String stripSpaces(String value) {
+        int start = 0;
+        int end = value.length();
+        while (start < end && value.charAt(start) == ' ') {
+            start++;
+        }
+        while (end > start && value.charAt(end - 1) == ' ') {
+            end--;
+        }
+        return value.substring(start, end);
+    }
+
     /** Slice 2 · Step 2A hardening: replaces the previous, un-hardened {@code 99_999_999} cap. */
     static final BigDecimal MAX_ADJUST_AMOUNT = new BigDecimal("500000");
 
@@ -881,7 +900,7 @@ public class DepositService {
         if (reference == null || reference.isBlank()) {
             throw new IllegalArgumentException("Ссылка (reference) обязательна для корректировки депозита");
         }
-        reference = reference.trim();
+        reference = stripSpaces(reference);
         if (reference.length() > MAX_REFERENCE_LENGTH) {
             throw new IllegalArgumentException(
                     "Ссылка (reference) не может быть длиннее " + MAX_REFERENCE_LENGTH + " символов");

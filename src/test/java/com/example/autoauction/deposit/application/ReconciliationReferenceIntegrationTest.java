@@ -174,6 +174,82 @@ class ReconciliationReferenceIntegrationTest {
     }
 
     @Test
+    @DisplayName("V56 normalisation: a legacy row stored with surrounding spaces is the same operation as the trimmed reference")
+    void legacyUntrimmedReference_isTheSameOperation() {
+        // H2 has no V56 index, so this isolates the application lookup: it must compare trimmed values
+        Long userId = user("0");
+        String reference = ref();
+        Long depositId = depositRepository.findByUserId(userId).orElseThrow().getId();
+        DepositTransaction legacy = new DepositTransaction(depositId, userId, DepositTransaction.TransactionType.ADMIN_ADJUSTMENT,
+                new BigDecimal("5000"), BigDecimal.ZERO, new BigDecimal("5000"), "  " + reference + " ", "RECONCILIATION");
+        legacy.setIdempotencyKey("k-legacy-" + System.nanoTime());
+        depositRepository.saveTransaction(legacy);
+
+        depositService.adminAdjust(userId, new BigDecimal("5000"), AdminAdjustmentReason.RECONCILIATION, reference,
+                "k-" + System.nanoTime(), ADMIN_ID);
+        assertThatThrownBy(() -> depositService.adminAdjust(userId, new BigDecimal("4000"), AdminAdjustmentReason.RECONCILIATION,
+                " " + reference, "k-" + System.nanoTime(), ADMIN_ID))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(balance(userId)).as("no credit beyond the legacy row's").isEqualByComparingTo("0");
+        assertThat(adjustments(userId)).hasSize(1);
+    }
+
+    /** D-F7-1: {existing raw reference, incoming reference, same external operation under btrim?} */
+    private static final Object[][] BTRIM_CASES = {
+            {"REF\t", "REF\t", true},      // 1 TAB is kept on both sides
+            {"REF\n", "REF\n", true},      // 2 LF
+            {"REF\r", "REF\r", true},      // 3 CR
+            {"REF\t", " REF\t ", true},    // 4 only the outer spaces go
+            {"REF", " REF ", true},         // 5 spaces
+            {"REF\t", "REF", false},        // 6 TAB is part of the identifier
+            {"REF", "REF\t", false},        // 6 (reverse)
+            {"REF-A", "REF-B", false},      // 8 distinct references
+    };
+
+    @Test
+    @DisplayName("D-F7-1: the application normalises exactly like btrim - TAB/LF/CR are kept, only U+0020 is stripped")
+    void lookupMatchesBtrimSemantics() {
+        for (Object[] c : BTRIM_CASES) {
+            String suffix = "-" + System.nanoTime();
+            String existing = ((String) c[0]).replace("REF", "REF" + suffix);
+            String incoming = ((String) c[1]).replace("REF", "REF" + suffix);
+            boolean same = (Boolean) c[2];
+            String label = "[" + c[0] + "] vs [" + c[1] + "]";
+
+            Long userId = user("0");
+            Long depositId = depositRepository.findByUserId(userId).orElseThrow().getId();
+            DepositTransaction legacy = new DepositTransaction(depositId, userId, DepositTransaction.TransactionType.ADMIN_ADJUSTMENT,
+                    new BigDecimal("5000"), BigDecimal.ZERO, new BigDecimal("5000"), existing, "RECONCILIATION");
+            legacy.setIdempotencyKey("k-legacy-" + System.nanoTime());
+            depositRepository.saveTransaction(legacy);
+
+            depositService.adminAdjust(userId, new BigDecimal("5000"), AdminAdjustmentReason.RECONCILIATION, incoming,
+                    "k-" + System.nanoTime(), ADMIN_ID);
+
+            if (same) {
+                assertThat(balance(userId)).as(label + ": no second credit").isEqualByComparingTo("0");
+                assertThat(adjustments(userId)).as(label).hasSize(1);
+            } else {
+                assertThat(balance(userId)).as(label + ": a different external operation is credited").isEqualByComparingTo("5000");
+                assertThat(adjustments(userId)).as(label).hasSize(2);
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("D-F7-1: a stored reference keeps TAB/LF/CR and loses only its outer spaces")
+    void storedReferenceIsBtrimmed() {
+        Long userId = user("0");
+        String reference = ref();
+        depositService.adminAdjust(userId, new BigDecimal("100"), AdminAdjustmentReason.RECONCILIATION, "  " + reference + "\t ",
+                "k-" + System.nanoTime(), ADMIN_ID);
+        assertThat(adjustments(userId).get(0).getReference()).isEqualTo(reference + "\t");
+        assertThat(DepositService.stripSpaces(" \t a b \n ")).isEqualTo("\t a b \n");
+        assertThat(DepositService.stripSpaces("Ab")).isEqualTo("Ab");
+    }
+
+    @Test
     @DisplayName("a RECONCILIATION reference does not collide with the same text used by another reason")
     @WithMockCustomUser(userId = 42L, username = "admin", roles = {"ADMIN"})
     void reconciliationVsOtherReason_independent() throws Exception {
