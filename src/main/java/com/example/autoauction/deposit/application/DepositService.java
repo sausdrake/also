@@ -89,14 +89,33 @@ public class DepositService {
                 "Зачисление средств выполняется администратором после проверки платежа.");
     }
 
+    /** F6: ledger idempotency-key prefix of a rejected withdrawal request's return. */
+    public static final String WITHDRAWAL_RETURN_KEY_PREFIX = "WITHDRAWAL_RETURN:";
+
+    /** F6: ledger reference shared by every row of one withdrawal request. */
+    public static String withdrawalReference(Long withdrawalRequestId) {
+        return "WITHDRAWAL_REQUEST_" + withdrawalRequestId;
+    }
+
     /**
      * R-1.3: idempotencyKey обязателен. Клиент генерирует его один раз на попытку вывода
      * и переиспользует при повторной отправке того же запроса (например, после сетевой
      * ошибки/потери ответа) — повтор с тем же ключом возвращает уже применённый результат,
      * не выполняя повторное списание.
+     *
+     * <p>F6: this is the debit primitive of a withdrawal request - the only production caller is
+     * {@code WithdrawalRequestService.create}, which records the request in the same transaction.
+     * It is never exposed on its own: there is no automatic payout.
      */
     @Transactional
     public DepositResponse withdraw(Long userId, BigDecimal amount, String idempotencyKey) {
+        return withdraw(userId, amount, idempotencyKey, "WITHDRAWAL", "Вывод средств с депозита");
+    }
+
+    /** F6: {@link #withdraw(Long, BigDecimal, String)} with the request's own ledger reference. */
+    @Transactional
+    public DepositResponse withdraw(Long userId, BigDecimal amount, String idempotencyKey,
+                                    String reference, String description) {
         log.info("Withdraw for user: {}, amount: {}", userId, amount);
 
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
@@ -133,8 +152,8 @@ public class DepositService {
                 amount,
                 balanceBefore,
                 deposit.getBalance(),
-                "WITHDRAWAL",
-                "Вывод средств с депозита"
+                reference,
+                description
         );
         transaction.setIdempotencyKey(idempotencyKey);
         // Уникальность idempotency_key обеспечена на уровне БД (тот же частичный уникальный
@@ -790,6 +809,36 @@ public class DepositService {
                 .orElseThrow(() -> new IllegalStateException(
                         "Заморозка победителя для аукциона " + auctionId + " не найдена. " +
                         "Убедитесь, что аукцион завершён и пользователь является победителем."));
+    }
+
+    /**
+     * F6: credits a rejected withdrawal request's amount back to the deposit. The ledger key
+     * {@code WITHDRAWAL_RETURN:<requestId>} is unique in the database, so a second return for the
+     * same request is impossible even if a caller's own status guard were bypassed. Runs inside
+     * the caller's transaction: if the return fails, the rejection rolls back with it.
+     */
+    @Transactional
+    public void returnWithdrawal(Long userId, Long withdrawalRequestId, BigDecimal amount) {
+        Deposit deposit = depositRepository.findByUserIdForUpdate(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Депозит не найден для пользователя: " + userId));
+        String key = WITHDRAWAL_RETURN_KEY_PREFIX + withdrawalRequestId;
+        if (depositRepository.findTransactionByIdempotencyKey(key).isPresent()) {
+            throw new IllegalStateException("Сумма по заявке на вывод #" + withdrawalRequestId + " уже возвращена");
+        }
+        BigDecimal balanceBefore = deposit.getBalance();
+        deposit.deposit(amount);
+
+        DepositTransaction tx = new DepositTransaction(
+                deposit.getId(), userId,
+                DepositTransaction.TransactionType.WITHDRAWAL_RETURN,
+                amount, balanceBefore, deposit.getBalance(),
+                withdrawalReference(withdrawalRequestId),
+                "Возврат: заявка на вывод #" + withdrawalRequestId + " отклонена"
+        );
+        tx.setIdempotencyKey(key);
+        depositRepository.saveTransaction(tx);
+        depositRepository.save(deposit);
+        log.info("Withdrawal request {} amount {} returned to user {}", withdrawalRequestId, amount, userId);
     }
 
     /**

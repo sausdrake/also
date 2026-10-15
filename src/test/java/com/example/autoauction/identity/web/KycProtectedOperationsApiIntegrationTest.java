@@ -117,7 +117,7 @@ class KycProtectedOperationsApiIntegrationTest {
     }
 
     private static MockHttpServletRequestBuilder withdraw(String idempotencyKey) {
-        return json(post("/api/v1/deposits/withdraw"), "{\"amount\":100,\"idempotencyKey\":\"" + idempotencyKey + "\"}");
+        return json(post("/api/v1/withdrawals"), "{\"amount\":100,\"idempotencyKey\":\"" + idempotencyKey + "\"}");
     }
 
     private static MockHttpServletRequestBuilder payment(String idempotencyKey) {

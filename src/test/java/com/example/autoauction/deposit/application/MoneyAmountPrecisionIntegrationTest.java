@@ -101,7 +101,7 @@ class MoneyAmountPrecisionIntegrationTest {
     @DisplayName("HTTP: withdraw, payment creation and admin adjust answer 400 for a sub-tyiyn amount")
     @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
     void http_rejectsMoreThanTwoDecimals() throws Exception {
-        mockMvc.perform(post("/api/v1/deposits/withdraw").contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/api/v1/withdrawals").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"amount\":100.005,\"idempotencyKey\":\"k-scale-1\"}"))
                 .andExpect(status().isBadRequest());
         mockMvc.perform(post("/api/v1/payments").contentType(MediaType.APPLICATION_JSON)
@@ -116,7 +116,7 @@ class MoneyAmountPrecisionIntegrationTest {
     @DisplayName("HTTP: a withdraw idempotency key longer than its column (100) answers 400")
     @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
     void http_rejectsOverlongWithdrawKey() throws Exception {
-        mockMvc.perform(post("/api/v1/deposits/withdraw").contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/api/v1/withdrawals").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"amount\":100,\"idempotencyKey\":\"" + "k".repeat(101) + "\"}"))
                 .andExpect(status().isBadRequest());
     }

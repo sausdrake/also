@@ -7,8 +7,6 @@ import com.example.autoauction.deposit.domain.DepositTransaction;
 import com.example.autoauction.deposit.web.dto.DepositRequest;
 import com.example.autoauction.deposit.web.dto.DepositResponse;
 import com.example.autoauction.deposit.web.dto.DepositTransactionResponse;
-import com.example.autoauction.deposit.web.dto.WithdrawRequest;
-import com.example.autoauction.identity.application.VerifiedIdentityGate;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,11 +29,9 @@ import java.util.List;
 public class DepositController {
 
     private final DepositService depositService;
-    private final VerifiedIdentityGate verifiedIdentityGate;
 
-    public DepositController(DepositService depositService, VerifiedIdentityGate verifiedIdentityGate) {
+    public DepositController(DepositService depositService) {
         this.depositService = depositService;
-        this.verifiedIdentityGate = verifiedIdentityGate;
         log.info("DepositController initialized");
     }
     @PostMapping("/deposit")
@@ -54,20 +50,8 @@ public class DepositController {
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/withdraw")
-    @Operation(summary = "Вывести средства с депозита")
-    public ResponseEntity<DepositResponse> withdraw(
-            @Valid @RequestBody WithdrawRequest request,
-            @Parameter(hidden = true)
-            @CurrentUser UserPrincipal currentUser
-    ) {
-        Long userId = currentUser.getUserId();
-        log.info("User {} withdrawing: {}", userId, request.amount());
-        verifiedIdentityGate.requireVerified(userId);
-
-        DepositResponse response = depositService.withdraw(userId, request.amount(), request.idempotencyKey());
-        return ResponseEntity.ok(response);
-    }
+    // F6: the immediate POST /withdraw route is gone - a withdrawal is now a manual payout request,
+    // POST /api/v1/withdrawals (WithdrawalController).
 
     @GetMapping("/my")
     @Operation(summary = "Получить мой депозит")

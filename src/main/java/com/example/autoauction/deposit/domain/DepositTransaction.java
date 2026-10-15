@@ -76,6 +76,9 @@ public class DepositTransaction {
         ADMIN_ADJUSTMENT,   // Ручная корректировка администратором
         /** Slice 2 · Step 2A: automatic deposit credit driven by a confirmed payment (Step 2D).
          *  Never has a human admin actor - {@code performedByAdminId} stays null. */
-        PAYMENT_CREDIT
+        PAYMENT_CREDIT,
+        /** F6: a rejected withdrawal request's amount credited back - at most one per request
+         *  (idempotency key {@code WITHDRAWAL_RETURN:<requestId>}). */
+        WITHDRAWAL_RETURN
     }
 }
