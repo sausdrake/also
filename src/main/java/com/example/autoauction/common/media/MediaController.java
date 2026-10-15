@@ -59,6 +59,10 @@ public class MediaController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("error", "Файл превышает максимальный размер 10 МБ"));
         }
+        if (!contentMatchesType(file, contentType)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "Содержимое файла не соответствует заявленному типу"));
+        }
 
         try {
             Path dir = Paths.get(uploadDir);
@@ -130,6 +134,30 @@ public class MediaController {
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
+    }
+
+    /**
+     * SEC-04: the declared Content-Type comes from the client; the stored file is accepted only when
+     * its first bytes carry that type's signature (JPEG FF D8 FF, PNG 89 'PNG' 0D 0A 1A 0A, MP4 an
+     * ISO-BMFF 'ftyp' box at offset 4). Anything else - HTML, scripts, another image type - is refused
+     * before a byte reaches the upload directory.
+     */
+    static boolean contentMatchesType(MultipartFile file, String contentType) {
+        byte[] head;
+        try (var in = file.getInputStream()) {
+            head = in.readNBytes(12);
+        } catch (IOException e) {
+            return false;
+        }
+        return switch (contentType) {
+            case "image/jpeg" -> head.length >= 3
+                    && (head[0] & 0xFF) == 0xFF && (head[1] & 0xFF) == 0xD8 && (head[2] & 0xFF) == 0xFF;
+            case "image/png" -> head.length >= 8
+                    && (head[0] & 0xFF) == 0x89 && head[1] == 'P' && head[2] == 'N' && head[3] == 'G'
+                    && head[4] == 0x0D && head[5] == 0x0A && head[6] == 0x1A && head[7] == 0x0A;
+            case "video/mp4" -> head.length >= 8 && head[4] == 'f' && head[5] == 't' && head[6] == 'y' && head[7] == 'p';
+            default -> false;
+        };
     }
 
     /**

@@ -38,6 +38,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("Тесты контроллера медиа — расширение (C-3) и авторизация удаления (H-7)")
 class MediaControllerTest {
 
+    /** SEC-04: uploads must carry the signature of their declared type; the payload after it is irrelevant here. */
+    static byte[] bodyFor(String contentType) {
+        byte[] head = switch (contentType) {
+            case "image/jpeg" -> new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0};
+            case "image/png" -> new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+            case "video/mp4" -> new byte[]{0, 0, 0, 0x18, 'f', 't', 'y', 'p'};
+            default -> new byte[0];
+        };
+        byte[] body = java.util.Arrays.copyOf(head, head.length + 8);
+        System.arraycopy("payload!".getBytes(), 0, body, head.length, 8);
+        return body;
+    }
+
     private static final String BASE_URL = "http://localhost:8080/uploads";
 
     @Autowired
@@ -56,7 +69,7 @@ class MediaControllerTest {
     @DisplayName("JPEG с filename=payload.html -> сохранённое расширение .jpg, не .html")
     void jpegWithHtmlFilename_extensionComesFromContentType() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
-                "file", "payload.html", "image/jpeg", "fake-jpeg-bytes".getBytes());
+                "file", "payload.html", "image/jpeg", bodyFor("image/jpeg"));
 
         mockMvc.perform(multipart("/api/media/upload").file(file))
                 .andExpect(status().isOk())
@@ -69,7 +82,7 @@ class MediaControllerTest {
     @DisplayName("PNG с filename=payload.html -> сохранённое расширение .png, не .html")
     void pngWithHtmlFilename_extensionComesFromContentType() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
-                "file", "payload.html", "image/png", "fake-png-bytes".getBytes());
+                "file", "payload.html", "image/png", bodyFor("image/png"));
 
         mockMvc.perform(multipart("/api/media/upload").file(file))
                 .andExpect(status().isOk())
@@ -82,7 +95,7 @@ class MediaControllerTest {
     @DisplayName("PNG с filename=payload.svg -> сохранённое расширение .png, не .svg")
     void pngWithSvgFilename_extensionComesFromContentType() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
-                "file", "payload.svg", "image/png", "fake-svg-bytes".getBytes());
+                "file", "payload.svg", "image/png", bodyFor("image/png"));
 
         mockMvc.perform(multipart("/api/media/upload").file(file))
                 .andExpect(status().isOk())
@@ -95,7 +108,7 @@ class MediaControllerTest {
     @DisplayName("MP4 с filename=payload.html -> сохранённое расширение .mp4, не .html")
     void mp4WithHtmlFilename_extensionComesFromContentType() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
-                "file", "payload.html", "video/mp4", "fake-mp4-bytes".getBytes());
+                "file", "payload.html", "video/mp4", bodyFor("video/mp4"));
 
         mockMvc.perform(multipart("/api/media/upload").file(file))
                 .andExpect(status().isOk())
@@ -113,7 +126,7 @@ class MediaControllerTest {
     @WithMockCustomUser
     @DisplayName("Обычные валидные имена файлов -> расширение всё равно берётся из Content-Type")
     void validFilenames_extensionStillComesFromContentType(String filename, String contentType, String expectedExt) throws Exception {
-        MockMultipartFile file = new MockMultipartFile("file", filename, contentType, "bytes".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", filename, contentType, bodyFor(contentType));
 
         mockMvc.perform(multipart("/api/media/upload").file(file))
                 .andExpect(status().isOk())
@@ -136,7 +149,7 @@ class MediaControllerTest {
     @WithMockCustomUser
     @DisplayName("Имя файла без расширения -> расширение всё равно берётся из Content-Type")
     void filenameWithoutExtension_extensionComesFromContentType() throws Exception {
-        MockMultipartFile file = new MockMultipartFile("file", "photo", "image/png", "bytes".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "photo", "image/png", bodyFor("image/png"));
 
         mockMvc.perform(multipart("/api/media/upload").file(file))
                 .andExpect(status().isOk())
@@ -147,7 +160,7 @@ class MediaControllerTest {
     @WithMockCustomUser
     @DisplayName("Множественные расширения photo.png.html -> сохранённое расширение .png")
     void multipleExtensionsInFilename_onlyContentTypeDecides() throws Exception {
-        MockMultipartFile file = new MockMultipartFile("file", "photo.png.html", "image/png", "bytes".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "photo.png.html", "image/png", bodyFor("image/png"));
 
         mockMvc.perform(multipart("/api/media/upload").file(file))
                 .andExpect(status().isOk())
@@ -159,7 +172,7 @@ class MediaControllerTest {
     @WithMockCustomUser
     @DisplayName("Регистр в имени файла (payload.HTML) не влияет на расширение")
     void filenameCaseVariation_doesNotAffectExtension() throws Exception {
-        MockMultipartFile file = new MockMultipartFile("file", "payload.HTML", "image/png", "bytes".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "payload.HTML", "image/png", bodyFor("image/png"));
 
         mockMvc.perform(multipart("/api/media/upload").file(file))
                 .andExpect(status().isOk())
@@ -172,7 +185,7 @@ class MediaControllerTest {
     @WithMockCustomUser
     @DisplayName("originalFilename = null -> загрузка не зависит от имени файла")
     void nullOriginalFilename_uploadStillSucceeds() throws Exception {
-        MockMultipartFile file = new MockMultipartFile("file", null, "image/png", "bytes".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", null, "image/png", bodyFor("image/png"));
 
         mockMvc.perform(multipart("/api/media/upload").file(file))
                 .andExpect(status().isOk())
@@ -185,7 +198,7 @@ class MediaControllerTest {
     @WithMockCustomUser(userId = 7L, roles = {"USER"})
     @DisplayName("H-7: загрузка фиксирует MediaAsset с ID текущего пользователя")
     void upload_recordsMediaAssetWithCurrentUserId() throws Exception {
-        MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", "bytes".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", bodyFor("image/png"));
 
         mockMvc.perform(multipart("/api/media/upload").file(file))
                 .andExpect(status().isOk());
@@ -200,7 +213,7 @@ class MediaControllerTest {
         doThrow(new RuntimeException("db connection refused: password=SuperSecret123"))
                 .when(mediaAssetService).recordUpload(anyString(), eq(7L));
 
-        MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", "bytes".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", bodyFor("image/png"));
 
         mockMvc.perform(multipart("/api/media/upload").file(file))
                 .andExpect(status().is5xxServerError());
@@ -213,7 +226,7 @@ class MediaControllerTest {
         doThrow(new RuntimeException("db connection refused: password=SuperSecret123"))
                 .when(mediaAssetService).recordUpload(anyString(), eq(7L));
 
-        MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", "bytes".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", bodyFor("image/png"));
 
         mockMvc.perform(multipart("/api/media/upload").file(file))
                 .andExpect(content().string(not(containsString("SuperSecret123"))))
@@ -224,7 +237,7 @@ class MediaControllerTest {
     @WithMockCustomUser(userId = 7L, roles = {"USER"})
     @DisplayName("H-7: клиентский параметр uploaderId игнорируется — используется только принципал")
     void upload_clientSuppliedUploaderIdIgnored() throws Exception {
-        MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", "bytes".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", bodyFor("image/png"));
 
         mockMvc.perform(multipart("/api/media/upload")
                         .file(file)
@@ -294,7 +307,7 @@ class MediaControllerTest {
     @Test
     @DisplayName("H-7: неаутентифицированная загрузка отклоняется")
     void upload_unauthenticated_rejected() throws Exception {
-        MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", "bytes".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", bodyFor("image/png"));
 
         mockMvc.perform(multipart("/api/media/upload").file(file))
                 .andExpect(status().isUnauthorized());
