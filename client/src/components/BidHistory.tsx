@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
 import { parseDate } from '../utils/formatDate';
 
 interface Bid {
@@ -22,7 +21,6 @@ export const BidHistory = ({ auctionId }: BidHistoryProps) => {
   }, [auctionId]);
 
   const fetchBids = async () => {
-    const token = localStorage.getItem('accessToken');
     try {
       // TODO: добавить эндпоинт для истории ставок на бэкенде
       // Пока заглушка

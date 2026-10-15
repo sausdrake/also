@@ -499,7 +499,7 @@ export const AuctionPage = () => {
                     vehicle?.fuelType     && { label: 'Топливо',      value: fuelLabel[vehicle.fuelType] || vehicle.fuelType },
                     vehicle?.transmission && { label: 'КПП',          value: transLabel[vehicle.transmission] || vehicle.transmission },
                     vehicle?.color        && { label: 'Цвет',         value: vehicle.color },
-                  ].filter(Boolean).map(({ label, value }) => (
+                  ].filter((spec): spec is { label: string; value: string } => Boolean(spec)).map(({ label, value }) => (
                     <div key={label} className="bg-gray-50 rounded-xl p-3">
                       <p className="text-xs text-gray-400 mb-0.5">{label}</p>
                       <p className="font-semibold text-gray-900 text-sm">{value}</p>

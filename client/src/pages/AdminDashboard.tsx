@@ -35,7 +35,7 @@ interface Auction {
   winnerId?: number; winningBid?: number;
 }
 
-interface DiagItem  { id: number; title: string; fieldType: string; }
+interface DiagItem  { id: number; title: string; fieldType: string; isRequired?: boolean; }
 interface DiagGroup { id: number; name: string; items: DiagItem[]; }
 interface DiagAnswer { inspectionItemId: number; rating: number | null; comment: string; photoUrls: string[]; skipped?: boolean; }
 
@@ -137,7 +137,8 @@ function Alert({ msg, err }: { msg: string; err?: boolean }) {
   );
 }
 
-function Modal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+// onClose is part of the callers' contract; the modal itself closes only through its own buttons.
+function Modal({ children, onClose: _onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto">
@@ -2565,7 +2566,7 @@ const ADJUST_REASONS: { value: string; label: string }[] = [
 
 function DepositsPage() {
   const [deposits, setDeposits]   = useState<DepositItem[]>([]);
-  const [users, setUsers]         = useState<UserItem[]>([]);
+  const [, setUsers]              = useState<UserItem[]>([]);
   const [loading, setLoading]     = useState(true);
   const [msg, setMsg]             = useState('');
   const [msgErr, setMsgErr]       = useState(false);
