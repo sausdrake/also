@@ -426,6 +426,12 @@ public class VehicleService {
         return VehicleResponse.fromDomain(saved);
     }
 
+    /** Scenario 1: whether a vehicle with this VIN is already registered (vehicles.vin is unique). */
+    @Transactional(readOnly = true)
+    public boolean isVinRegistered(String vin) {
+        return vin != null && vehicleRepository.existsByVin(vin);
+    }
+
     public long countByStatus(VehicleStatus status) {
         return vehicleRepository.findByStatus(status).size();
     }

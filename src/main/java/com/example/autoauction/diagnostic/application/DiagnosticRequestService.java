@@ -81,6 +81,21 @@ public class DiagnosticRequestService {
         if (hasPending) {
             throw new IllegalStateException("У вас уже есть активная заявка на диагностику. Дождитесь её завершения.");
         }
+
+        // Scenario 1 step 2: VIN uniqueness. vehicles.vin is unique and approving a report for an
+        // already registered VIN reuses that vehicle (createFromDiagnosticRequest), so such a
+        // request could never lead to a new listing - yet it would freeze a deposit and charge
+        // the diagnostic fee. A VIN that is already being diagnosed by any user is refused too.
+        // A REJECTED request does not block: it may be reworked, but it may also be final.
+        if (vehicleService.isVinRegistered(dto.getVin())) {
+            throw new IllegalStateException("Автомобиль с таким VIN уже зарегистрирован на платформе");
+        }
+        if (requestRepository.existsByVinAndStatusIn(dto.getVin(), java.util.EnumSet.of(
+                DiagnosticRequest.DiagnosticRequestStatus.PENDING,
+                DiagnosticRequest.DiagnosticRequestStatus.IN_PROGRESS,
+                DiagnosticRequest.DiagnosticRequestStatus.COMPLETED))) {
+            throw new IllegalStateException("По этому VIN уже идёт диагностика");
+        }
         // PHASE 2: both amounts are snapshotted at creation time from SystemSettingsService -
         // never re-read later in the lifecycle (see SellerDiagnosticCommitment Javadoc).
         // diagnosticFeeAmount has no authorized default (see Phase 2 resolution) - it must be

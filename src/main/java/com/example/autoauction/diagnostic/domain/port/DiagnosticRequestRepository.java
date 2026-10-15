@@ -44,4 +44,7 @@ public interface DiagnosticRequestRepository {
 
     /** True if the user has any request in one of the given statuses (order-independent). */
     boolean existsByUserIdAndStatusIn(Long userId, Collection<DiagnosticRequest.DiagnosticRequestStatus> statuses);
+
+    /** True if any request for this VIN is in one of the given statuses. */
+    boolean existsByVinAndStatusIn(String vin, Collection<DiagnosticRequest.DiagnosticRequestStatus> statuses);
 }

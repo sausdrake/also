@@ -150,4 +150,11 @@ public class DiagnosticRequestRepositoryAdapter implements DiagnosticRequestRepo
                                              java.util.Collection<DiagnosticRequest.DiagnosticRequestStatus> statuses) {
         return jpaRepository.existsByUserIdAndStatusIn(userId, statuses);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsByVinAndStatusIn(String vin,
+                                          java.util.Collection<DiagnosticRequest.DiagnosticRequestStatus> statuses) {
+        return jpaRepository.existsByVinAndStatusIn(vin, statuses);
+    }
 }
