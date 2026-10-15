@@ -10,12 +10,23 @@ import java.util.Objects;
  * exclusively through {@link DepositTransaction} rows (see {@code WithdrawalRequestService}).
  *
  * <p>Transitions: {@link #startProcessing} PENDING -> PROCESSING, {@link #markPaid}
- * PROCESSING -> PAID, {@link #reject} PENDING -> REJECTED. Every other transition, including a
- * repeat of the same one, is refused with {@link IllegalStateException}.
+ * PROCESSING -> PAID (with a mandatory payout note), {@link #reject} PENDING or PROCESSING ->
+ * REJECTED (with a mandatory reason and the admin's explicit confirmation that no payout was
+ * made). PAID and REJECTED are final: every other transition, including a repeat of the same
+ * one, is refused with {@link IllegalStateException}.
  */
 public class WithdrawalRequest {
 
     public static final int MAX_REJECTION_REASON_LENGTH = 1000;
+    public static final int MAX_PAYOUT_NOTE_LENGTH = 1000;
+
+    /**
+     * O2: characters that print nothing - ASCII whitespace, NBSP and the other Unicode spaces,
+     * the zero-width characters. A payout note made only of these is no note. V57's CHECK uses
+     * the very same class, so the database refuses what the domain refuses.
+     */
+    private static final java.util.regex.Pattern INVISIBLE_CHARS = java.util.regex.Pattern.compile(
+            "[\\t\\n\\x0B\\f\\r \\u0085\\u00A0\\u1680\\u2000-\\u200B\\u2028\\u2029\\u202F\\u205F\\u3000\\u2060\\uFEFF]");
 
     private Long id;
     private final Long userId;
@@ -28,6 +39,8 @@ public class WithdrawalRequest {
     private OffsetDateTime processedAt;
     private Long processedBy;
     private String rejectionReason;
+    /** F6.1: the admin's note on how the manual payout was made - set only on PAID. */
+    private String payoutNote;
     private Long version;
 
     /** A new request in {@link WithdrawalRequestStatus#PENDING}. */
@@ -53,7 +66,8 @@ public class WithdrawalRequest {
     public WithdrawalRequest(Long id, Long userId, BigDecimal amount, WithdrawalRequestStatus status,
                              String idempotencyKey, OffsetDateTime createdAt,
                              OffsetDateTime processingStartedAt, Long processingStartedBy,
-                             OffsetDateTime processedAt, Long processedBy, String rejectionReason, Long version) {
+                             OffsetDateTime processedAt, Long processedBy, String rejectionReason,
+                             String payoutNote, Long version) {
         this.id = id;
         this.userId = userId;
         this.amount = amount;
@@ -65,6 +79,7 @@ public class WithdrawalRequest {
         this.processedAt = processedAt;
         this.processedBy = processedBy;
         this.rejectionReason = rejectionReason;
+        this.payoutNote = payoutNote;
         this.version = version;
     }
 
@@ -76,19 +91,36 @@ public class WithdrawalRequest {
         this.status = WithdrawalRequestStatus.PROCESSING;
     }
 
-    /** PROCESSING -> PAID: an admin confirms the manual payout was made. No money moves. */
-    public void markPaid(Long adminId, OffsetDateTime at) {
+    /**
+     * PROCESSING -> PAID: an admin confirms the manual payout was made and records how in a
+     * mandatory note (part of the audit trail). No money moves.
+     */
+    public void markPaid(Long adminId, String payoutNote, OffsetDateTime at) {
         requireStatus(WithdrawalRequestStatus.PROCESSING, "отметить выплаченной");
+        String note = payoutNote == null ? "" : payoutNote.trim();
+        if (INVISIBLE_CHARS.matcher(note).replaceAll("").isEmpty()) {
+            throw new IllegalArgumentException("Заметка о произведённой выплате обязательна");
+        }
+        if (note.length() > MAX_PAYOUT_NOTE_LENGTH) {
+            throw new IllegalArgumentException(
+                    "Заметка о выплате не может быть длиннее " + MAX_PAYOUT_NOTE_LENGTH + " символов");
+        }
         this.processedBy = Objects.requireNonNull(adminId, "adminId не может быть null");
         this.processedAt = Objects.requireNonNull(at, "at не может быть null");
+        this.payoutNote = note;
         this.status = WithdrawalRequestStatus.PAID;
     }
 
     /**
-     * PENDING -> REJECTED with a mandatory reason. The caller must return the amount to the
-     * deposit in the same transaction.
+     * PENDING or PROCESSING -> REJECTED with a mandatory reason and the admin's explicit
+     * confirmation that no payout was made - nothing else proves that, PROCESSING least of all.
+     * A request rejected from PROCESSING keeps its processing_started_* audit fields. The caller
+     * must return the amount to the deposit in the same transaction.
      */
-    public void reject(Long adminId, String reason, OffsetDateTime at) {
+    public void reject(Long adminId, String reason, boolean payoutNotMadeConfirmed, OffsetDateTime at) {
+        if (status != WithdrawalRequestStatus.PENDING && status != WithdrawalRequestStatus.PROCESSING) {
+            throw new IllegalStateException("Заявку на вывод #" + id + " в статусе " + status + " нельзя отклонить");
+        }
         String trimmed = reason == null ? "" : reason.trim();
         if (trimmed.isEmpty()) {
             throw new IllegalArgumentException("Причина отклонения обязательна");
@@ -97,7 +129,10 @@ public class WithdrawalRequest {
             throw new IllegalArgumentException(
                     "Причина отклонения не может быть длиннее " + MAX_REJECTION_REASON_LENGTH + " символов");
         }
-        requireStatus(WithdrawalRequestStatus.PENDING, "отклонить");
+        if (!payoutNotMadeConfirmed) {
+            throw new IllegalArgumentException(
+                    "Отклонение требует подтверждения, что выплата пользователю не производилась");
+        }
         this.processedBy = Objects.requireNonNull(adminId, "adminId не может быть null");
         this.processedAt = Objects.requireNonNull(at, "at не может быть null");
         this.rejectionReason = trimmed;
@@ -122,5 +157,6 @@ public class WithdrawalRequest {
     public OffsetDateTime getProcessedAt() { return processedAt; }
     public Long getProcessedBy() { return processedBy; }
     public String getRejectionReason() { return rejectionReason; }
+    public String getPayoutNote() { return payoutNote; }
     public Long getVersion() { return version; }
 }

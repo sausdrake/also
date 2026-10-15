@@ -26,10 +26,12 @@ import java.util.List;
  *   <li>{@link #reject} returns it with {@link DepositService#returnWithdrawal}, whose ledger key
  *       {@code WITHDRAWAL_RETURN:<id>} is unique in the database - at most one return, ever.</li>
  *   <li>{@link #startProcessing} and {@link #markPaid} move no money; PAID only records that AlSo
- *       paid the user by hand. It is never a bank confirmation.</li>
+ *       paid the user by hand (with a mandatory note on how). It is never a bank confirmation.</li>
  * </ul>
  * Every admin transition locks the request row first; the domain refuses any transition out of
- * the wrong status, so a repeated or late action is a 409, never a second effect.
+ * the wrong status, so a repeated or late action is a 409, never a second effect. PAID and
+ * REJECTED are both final, so for one PROCESSING request they are mutually exclusive: whichever
+ * transaction takes the row lock second sees the other's terminal status and is refused.
  */
 @Slf4j
 @Service
@@ -120,21 +122,34 @@ public class WithdrawalRequestService {
         return saved;
     }
 
-    /** PROCESSING -> PAID: the admin confirms the manual payout. No money moves. */
+    /** PROCESSING -> PAID: the admin confirms the manual payout and notes how. No money moves. */
     @Transactional
-    public WithdrawalRequest markPaid(Long requestId, Long adminId) {
+    public WithdrawalRequest markPaid(Long requestId, Long adminId, String payoutNote) {
         WithdrawalRequest request = lock(requestId);
-        request.markPaid(adminId, now());
+        request.markPaid(adminId, payoutNote, now());
         WithdrawalRequest saved = withdrawalRequestRepository.save(request);
         log.info("Withdrawal request {} marked PAID (manual payout) by admin {}", requestId, adminId);
         return saved;
     }
 
-    /** PENDING -> REJECTED and the amount back to the deposit, in one transaction. */
+    /**
+     * PENDING or PROCESSING -> REJECTED and the amount back to the deposit, in one transaction.
+     * {@code expectedStatus} is the status the admin saw when deciding: it is compared under the
+     * row lock, so a request that was taken into work (and perhaps paid out) after the admin's
+     * screen was rendered is refused instead of being rejected on a stale view.
+     */
     @Transactional
-    public WithdrawalRequest reject(Long requestId, Long adminId, String reason) {
+    public WithdrawalRequest reject(Long requestId, Long adminId, String reason, boolean payoutNotMadeConfirmed,
+                                    WithdrawalRequestStatus expectedStatus) {
+        if (expectedStatus == null) {
+            throw new IllegalArgumentException("Ожидаемый статус заявки обязателен");
+        }
         WithdrawalRequest request = lock(requestId);
-        request.reject(adminId, reason, now());
+        if (request.getStatus() != expectedStatus) {
+            throw new IllegalStateException("Статус заявки на вывод #" + requestId + " изменился: ожидался "
+                    + expectedStatus + ", сейчас " + request.getStatus() + ". Обновите страницу.");
+        }
+        request.reject(adminId, reason, payoutNotMadeConfirmed, now());
         WithdrawalRequest saved = withdrawalRequestRepository.save(request);
         depositService.returnWithdrawal(saved.getUserId(), saved.getId(), saved.getAmount());
         log.info("Withdrawal request {} rejected by admin {}, amount {} returned", requestId, adminId, saved.getAmount());

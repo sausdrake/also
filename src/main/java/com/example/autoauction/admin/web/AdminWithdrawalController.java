@@ -5,6 +5,7 @@ import com.example.autoauction.auth.infrastructure.security.CurrentUser;
 import com.example.autoauction.deposit.application.WithdrawalRequestService;
 import com.example.autoauction.deposit.domain.WithdrawalRequest;
 import com.example.autoauction.deposit.domain.WithdrawalRequestStatus;
+import com.example.autoauction.deposit.web.dto.MarkWithdrawalPaidRequest;
 import com.example.autoauction.deposit.web.dto.RejectWithdrawalRequest;
 import com.example.autoauction.deposit.web.dto.WithdrawalRequestResponse;
 import com.example.autoauction.user.domain.User;
@@ -57,17 +58,18 @@ public class AdminWithdrawalController {
     }
 
     @PostMapping("/{id}/paid")
-    @Operation(summary = "Подтвердить, что ручная выплата пользователю выполнена")
-    public WithdrawalRequestResponse markPaid(@PathVariable Long id,
+    @Operation(summary = "Подтвердить, что ручная выплата пользователю выполнена (с обязательной заметкой)")
+    public WithdrawalRequestResponse markPaid(@PathVariable Long id, @Valid @RequestBody MarkWithdrawalPaidRequest body,
                                               @Parameter(hidden = true) @CurrentUser UserPrincipal currentUser) {
-        return toResponse(withdrawalRequestService.markPaid(id, currentUser.getUserId()));
+        return toResponse(withdrawalRequestService.markPaid(id, currentUser.getUserId(), body.payoutNote()));
     }
 
     @PostMapping("/{id}/reject")
-    @Operation(summary = "Отклонить заявку и вернуть сумму на депозит")
+    @Operation(summary = "Отклонить заявку (из PENDING или PROCESSING, выплата не производилась) и вернуть сумму на депозит")
     public WithdrawalRequestResponse reject(@PathVariable Long id, @Valid @RequestBody RejectWithdrawalRequest body,
                                             @Parameter(hidden = true) @CurrentUser UserPrincipal currentUser) {
-        return toResponse(withdrawalRequestService.reject(id, currentUser.getUserId(), body.reason()));
+        return toResponse(withdrawalRequestService.reject(id, currentUser.getUserId(), body.reason(),
+                Boolean.TRUE.equals(body.payoutNotMade()), body.expectedStatus()));
     }
 
     private WithdrawalRequestResponse toResponse(WithdrawalRequest r) {

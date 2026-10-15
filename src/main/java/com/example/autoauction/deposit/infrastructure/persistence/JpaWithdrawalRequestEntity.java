@@ -54,6 +54,9 @@ public class JpaWithdrawalRequestEntity {
     @Column(name = "rejection_reason", length = 1000)
     private String rejectionReason;
 
+    @Column(name = "payout_note", length = 1000)
+    private String payoutNote;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
@@ -65,7 +68,7 @@ public class JpaWithdrawalRequestEntity {
                                       String idempotencyKey, OffsetDateTime createdAt,
                                       OffsetDateTime processingStartedAt, Long processingStartedBy,
                                       OffsetDateTime processedAt, Long processedBy, String rejectionReason,
-                                      Long version) {
+                                      String payoutNote, Long version) {
         this.id = id;
         this.userId = userId;
         this.amount = amount;
@@ -77,6 +80,7 @@ public class JpaWithdrawalRequestEntity {
         this.processedAt = processedAt;
         this.processedBy = processedBy;
         this.rejectionReason = rejectionReason;
+        this.payoutNote = payoutNote;
         this.version = version;
     }
 
@@ -91,5 +95,6 @@ public class JpaWithdrawalRequestEntity {
     public OffsetDateTime getProcessedAt() { return processedAt; }
     public Long getProcessedBy() { return processedBy; }
     public String getRejectionReason() { return rejectionReason; }
+    public String getPayoutNote() { return payoutNote; }
     public Long getVersion() { return version; }
 }

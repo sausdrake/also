@@ -175,8 +175,8 @@ class WithdrawalRequestConcurrencyPgIntegrationTest extends AbstractPostgresInte
         AtomicReference<Throwable> e1 = new AtomicReference<>();
         AtomicReference<Throwable> e2 = new AtomicReference<>();
 
-        race(capture(() -> withdrawalRequestService.reject(id, adminId, "first"), e1),
-             capture(() -> withdrawalRequestService.reject(id, adminId, "second"), e2));
+        race(capture(() -> withdrawalRequestService.reject(id, adminId, "first", true, WithdrawalRequestStatus.PENDING), e1),
+             capture(() -> withdrawalRequestService.reject(id, adminId, "second", true, WithdrawalRequestStatus.PENDING), e2));
 
         assertThat(e1.get() == null ^ e2.get() == null).as("exactly one: %s / %s", e1.get(), e2.get()).isTrue();
         assertThat(deposit(userId).getBalance()).isEqualByComparingTo("1000");
@@ -193,7 +193,7 @@ class WithdrawalRequestConcurrencyPgIntegrationTest extends AbstractPostgresInte
         AtomicReference<Throwable> rejectErr = new AtomicReference<>();
         AtomicReference<Throwable> processErr = new AtomicReference<>();
 
-        race(capture(() -> withdrawalRequestService.reject(id, adminId, "no"), rejectErr),
+        race(capture(() -> withdrawalRequestService.reject(id, adminId, "no", true, WithdrawalRequestStatus.PENDING), rejectErr),
              capture(() -> withdrawalRequestService.startProcessing(id, adminId), processErr));
 
         assertThat(rejectErr.get() == null ^ processErr.get() == null).as("exactly one: %s / %s", rejectErr.get(), processErr.get()).isTrue();
@@ -215,10 +215,156 @@ class WithdrawalRequestConcurrencyPgIntegrationTest extends AbstractPostgresInte
         Long userId = user("1000");
         WithdrawalRequest saved = withdrawalRequestService.create(userId, new BigDecimal("10"), "pg-ck-" + System.nanoTime());
         WithdrawalRequest broken = new WithdrawalRequest(saved.getId(), userId, saved.getAmount(), WithdrawalRequestStatus.REJECTED,
-                saved.getIdempotencyKey(), saved.getCreatedAt(), null, null, OffsetDateTime.now(), 1L, null, saved.getVersion());
+                saved.getIdempotencyKey(), saved.getCreatedAt(), null, null, OffsetDateTime.now(), 1L, null, null, saved.getVersion());
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> withdrawalRequestRepository.save(broken))
                 .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
         List<WithdrawalRequest> mine = withdrawalRequestService.listMine(userId);
         assertThat(mine.get(0).getStatus()).isEqualTo(WithdrawalRequestStatus.PENDING);
+    }
+
+    // ------------------------------------------------------------------ F6.1
+
+    private Long processingRequest(Long userId, Long adminId, String key) {
+        Long id = withdrawalRequestService.create(userId, new BigDecimal("300"), key + System.nanoTime()).getId();
+        withdrawalRequestService.startProcessing(id, adminId);
+        return id;
+    }
+
+    @RepeatedTest(5)
+    @DisplayName("F6.1: PROCESSING -> REJECTED vs PROCESSING -> PAID at once: exactly one terminal state, never PAID + refund")
+    void rejectFromProcessingVsPaid() throws InterruptedException {
+        Long userId = user("1000");
+        Long adminId = admin();
+        Long id = processingRequest(userId, adminId, "pg-f61-rp-");
+        AtomicReference<Throwable> rejectErr = new AtomicReference<>();
+        AtomicReference<Throwable> paidErr = new AtomicReference<>();
+
+        race(capture(() -> withdrawalRequestService.reject(id, adminId, "не выплачено", true, WithdrawalRequestStatus.PROCESSING), rejectErr),
+             capture(() -> withdrawalRequestService.markPaid(id, adminId, "выплачено наличными"), paidErr));
+
+        assertThat(rejectErr.get() == null ^ paidErr.get() == null).as("exactly one: %s / %s", rejectErr.get(), paidErr.get()).isTrue();
+        WithdrawalRequest r = withdrawalRequestRepository.findById(id).orElseThrow();
+        long returns = ledgerCount(userId, DepositTransaction.TransactionType.WITHDRAWAL_RETURN);
+        if (rejectErr.get() == null) {
+            assertThat(r.getStatus()).isEqualTo(WithdrawalRequestStatus.REJECTED);
+            assertThat(r.getPayoutNote()).as("no payout confirmation on a rejected request").isNull();
+            assertThat(r.getProcessingStartedBy()).isEqualTo(adminId);
+            assertThat(returns).isEqualTo(1);
+            assertThat(deposit(userId).getBalance()).isEqualByComparingTo("1000");
+        } else {
+            assertThat(r.getStatus()).isEqualTo(WithdrawalRequestStatus.PAID);
+            assertThat(r.getRejectionReason()).isNull();
+            assertThat(returns).as("no refund on a paid request").isZero();
+            assertThat(deposit(userId).getBalance()).isEqualByComparingTo("700");
+        }
+    }
+
+    @RepeatedTest(5)
+    @DisplayName("F6.1: two rejections of one PROCESSING request at once: one rejection, one return")
+    void doubleRejectFromProcessing() throws InterruptedException {
+        Long userId = user("1000");
+        Long adminId = admin();
+        Long id = processingRequest(userId, adminId, "pg-f61-rr-");
+        AtomicReference<Throwable> e1 = new AtomicReference<>();
+        AtomicReference<Throwable> e2 = new AtomicReference<>();
+
+        race(capture(() -> withdrawalRequestService.reject(id, adminId, "a", true, WithdrawalRequestStatus.PROCESSING), e1),
+             capture(() -> withdrawalRequestService.reject(id, adminId, "b", true, WithdrawalRequestStatus.PROCESSING), e2));
+
+        assertThat(e1.get() == null ^ e2.get() == null).as("exactly one: %s / %s", e1.get(), e2.get()).isTrue();
+        assertThat(ledgerCount(userId, DepositTransaction.TransactionType.WITHDRAWAL_RETURN)).isEqualTo(1);
+        assertThat(deposit(userId).getBalance()).isEqualByComparingTo("1000");
+    }
+
+    @RepeatedTest(5)
+    @DisplayName("F6.1: take-into-work vs PAID on a PENDING request: only the two legal outcomes, no money moves")
+    void startVsPaidOnPending() throws InterruptedException {
+        Long userId = user("1000");
+        Long adminId = admin();
+        Long id = withdrawalRequestService.create(userId, new BigDecimal("300"), "pg-f61-sp-" + System.nanoTime()).getId();
+        AtomicReference<Throwable> startErr = new AtomicReference<>();
+        AtomicReference<Throwable> paidErr = new AtomicReference<>();
+
+        race(capture(() -> withdrawalRequestService.startProcessing(id, adminId), startErr),
+             capture(() -> withdrawalRequestService.markPaid(id, adminId, "выплачено"), paidErr));
+
+        assertThat(startErr.get()).as("taking into work always succeeds here").isNull();
+        WithdrawalRequestStatus status = withdrawalRequestRepository.findById(id).orElseThrow().getStatus();
+        assertThat(status).isEqualTo(paidErr.get() == null ? WithdrawalRequestStatus.PAID : WithdrawalRequestStatus.PROCESSING);
+        assertThat(deposit(userId).getBalance()).isEqualByComparingTo("700");
+        assertThat(ledgerCount(userId, DepositTransaction.TransactionType.WITHDRAWAL_RETURN)).isZero();
+    }
+
+    @RepeatedTest(5)
+    @DisplayName("F6.1: a stale PENDING rejection racing take-into-work never rejects a PROCESSING request")
+    void staleRejectVsProcessing() throws InterruptedException {
+        Long userId = user("1000");
+        Long adminId = admin();
+        Long id = withdrawalRequestService.create(userId, new BigDecimal("300"), "pg-f61-st-" + System.nanoTime()).getId();
+        AtomicReference<Throwable> rejectErr = new AtomicReference<>();
+        AtomicReference<Throwable> processErr = new AtomicReference<>();
+
+        race(capture(() -> withdrawalRequestService.reject(id, adminId, "x", true, WithdrawalRequestStatus.PENDING), rejectErr),
+             capture(() -> withdrawalRequestService.startProcessing(id, adminId), processErr));
+
+        WithdrawalRequest r = withdrawalRequestRepository.findById(id).orElseThrow();
+        assertThat(rejectErr.get() == null ^ processErr.get() == null).isTrue();
+        if (rejectErr.get() == null) {
+            assertThat(r.getProcessingStartedAt()).as("rejected while still PENDING").isNull();
+        } else {
+            assertThat(r.getStatus()).isEqualTo(WithdrawalRequestStatus.PROCESSING);
+            assertThat(ledgerCount(userId, DepositTransaction.TransactionType.WITHDRAWAL_RETURN)).isZero();
+        }
+    }
+
+    @org.junit.jupiter.api.Test
+    @DisplayName("F6.1 V57 CHECK: PAID without note, half-filled processing audit on REJECTED, a note outside PAID are refused")
+    void v57StateAuditCheck() {
+        Long userId = user("1000");
+        Long adminId = admin();
+        Long id = processingRequest(userId, adminId, "pg-f61-ck-");
+        WithdrawalRequest p = withdrawalRequestRepository.findById(id).orElseThrow();
+        OffsetDateTime now = OffsetDateTime.now();
+
+        java.util.function.Function<WithdrawalRequest, Throwable> save = w -> {
+            try { withdrawalRequestRepository.save(w); return null; } catch (Throwable t) { return t; }
+        };
+        WithdrawalRequest paidNoNote = new WithdrawalRequest(id, userId, p.getAmount(), WithdrawalRequestStatus.PAID, p.getIdempotencyKey(),
+                p.getCreatedAt(), p.getProcessingStartedAt(), p.getProcessingStartedBy(), now, adminId, null, null, p.getVersion());
+        WithdrawalRequest paidBlankNote = new WithdrawalRequest(id, userId, p.getAmount(), WithdrawalRequestStatus.PAID, p.getIdempotencyKey(),
+                p.getCreatedAt(), p.getProcessingStartedAt(), p.getProcessingStartedBy(), now, adminId, null, "   ", p.getVersion());
+        WithdrawalRequest rejectedHalfAudit = new WithdrawalRequest(id, userId, p.getAmount(), WithdrawalRequestStatus.REJECTED, p.getIdempotencyKey(),
+                p.getCreatedAt(), p.getProcessingStartedAt(), null, now, adminId, "r", null, p.getVersion());
+        WithdrawalRequest rejectedWithNote = new WithdrawalRequest(id, userId, p.getAmount(), WithdrawalRequestStatus.REJECTED, p.getIdempotencyKey(),
+                p.getCreatedAt(), p.getProcessingStartedAt(), p.getProcessingStartedBy(), now, adminId, "r", "paid?", p.getVersion());
+        WithdrawalRequest processingWithNote = new WithdrawalRequest(id, userId, p.getAmount(), WithdrawalRequestStatus.PROCESSING, p.getIdempotencyKey(),
+                p.getCreatedAt(), p.getProcessingStartedAt(), p.getProcessingStartedBy(), null, null, null, "note", p.getVersion());
+
+        WithdrawalRequest paidNbspNote = new WithdrawalRequest(id, userId, p.getAmount(), WithdrawalRequestStatus.PAID, p.getIdempotencyKey(),
+                p.getCreatedAt(), p.getProcessingStartedAt(), p.getProcessingStartedBy(), now, adminId, null, "\u00a0\u00a0", p.getVersion());
+        WithdrawalRequest paidInvisibleNote = new WithdrawalRequest(id, userId, p.getAmount(), WithdrawalRequestStatus.PAID, p.getIdempotencyKey(),
+                p.getCreatedAt(), p.getProcessingStartedAt(), p.getProcessingStartedBy(), now, adminId, null,
+                " \t\n\r\u000b\f\u0085\u00a0\u1680\u2007\u200b\u2028\u2029\u202f\u205f\u3000\u2060\ufeff", p.getVersion());
+
+        for (WithdrawalRequest broken : List.of(paidNoNote, paidBlankNote, paidNbspNote, paidInvisibleNote,
+                rejectedHalfAudit, rejectedWithNote, processingWithNote)) {
+            assertThat(save.apply(broken)).as("%s / note=%s", broken.getStatus(), broken.getPayoutNote())
+                    .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        }
+        assertThat(withdrawalRequestRepository.findById(id).orElseThrow().getStatus()).isEqualTo(WithdrawalRequestStatus.PROCESSING);
+
+        // a note with visible text around invisible characters is a valid note for the database too
+        Long other = processingRequest(userId, adminId, "pg-f61-ck2-");
+        WithdrawalRequest o = withdrawalRequestRepository.findById(other).orElseThrow();
+        withdrawalRequestRepository.save(new WithdrawalRequest(other, userId, o.getAmount(), WithdrawalRequestStatus.PAID, o.getIdempotencyKey(),
+                o.getCreatedAt(), o.getProcessingStartedAt(), o.getProcessingStartedBy(), now, adminId, null, "\u00a0чек 77\u00a0", o.getVersion()));
+        assertThat(withdrawalRequestRepository.findById(other).orElseThrow().getStatus()).isEqualTo(WithdrawalRequestStatus.PAID);
+
+        // the legal REJECTED-from-PROCESSING shape is accepted
+        withdrawalRequestService.reject(id, adminId, "не выплачено", true, WithdrawalRequestStatus.PROCESSING);
+        WithdrawalRequest r = withdrawalRequestRepository.findById(id).orElseThrow();
+        assertThat(r.getStatus()).isEqualTo(WithdrawalRequestStatus.REJECTED);
+        assertThat(r.getProcessingStartedAt()).isNotNull();
+        assertThat(r.getProcessingStartedBy()).isEqualTo(adminId);
     }
 }

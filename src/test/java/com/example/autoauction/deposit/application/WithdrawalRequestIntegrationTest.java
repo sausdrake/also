@@ -110,12 +110,31 @@ class WithdrawalRequestIntegrationTest {
         return ((Number) JsonPath.read(body, "$.id")).longValue();
     }
 
+    private static final String PAYOUT_NOTE = "Перевод по номеру телефона из обращения #12, 15.10";
+
+    /** A valid admin action as the UI sends it: reject on the status currently shown, paid with a note. */
     private ResultActions admin(Long requestId, String action) throws Exception {
-        var request = post("/api/v1/admin/withdrawals/" + requestId + "/" + action).with(as(ADMIN_ID, "ADMIN"));
         if (action.equals("reject")) {
-            request.contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Неверные реквизиты\"}");
+            String seen = withdrawalRequestRepository.findById(requestId)
+                    .map(r -> r.getStatus().name()).orElse("PENDING");
+            return adminJson(requestId, "reject",
+                    "{\"reason\":\"Неверные реквизиты\",\"payoutNotMade\":true,\"expectedStatus\":\"" + seen + "\"}");
         }
-        return mockMvc.perform(request);
+        if (action.equals("paid")) {
+            return adminJson(requestId, "paid", "{\"payoutNote\":\"" + PAYOUT_NOTE + "\"}");
+        }
+        return mockMvc.perform(post("/api/v1/admin/withdrawals/" + requestId + "/" + action).with(as(ADMIN_ID, "ADMIN")));
+    }
+
+    private ResultActions adminJson(Long requestId, String action, String json) throws Exception {
+        return mockMvc.perform(post("/api/v1/admin/withdrawals/" + requestId + "/" + action).with(as(ADMIN_ID, "ADMIN"))
+                .contentType(MediaType.APPLICATION_JSON).content(json));
+    }
+
+    private Long processingRequest(Long userId, String amount) throws Exception {
+        Long id = createOk(userId, amount);
+        admin(id, "processing").andExpect(status().isOk());
+        return id;
     }
 
     private Deposit deposit(Long userId) {
@@ -310,6 +329,7 @@ class WithdrawalRequestIntegrationTest {
                 .andExpect(jsonPath("$.status").value("PAID"))
                 .andExpect(jsonPath("$.processedBy").value(ADMIN_ID))
                 .andExpect(jsonPath("$.processedAt").isNotEmpty())
+                .andExpect(jsonPath("$.payoutNote").value(PAYOUT_NOTE))
                 .andExpect(jsonPath("$.username").isNotEmpty());
 
         admin(id, "paid").andExpect(status().isConflict());          // PAID -> PAID
@@ -328,7 +348,9 @@ class WithdrawalRequestIntegrationTest {
                 .andExpect(jsonPath("$[0].status").value("PAID"))
                 .andExpect(jsonPath("$[0].processedAt").isNotEmpty())
                 .andExpect(jsonPath("$[0].processedBy").doesNotExist())
-                .andExpect(jsonPath("$[0].processingStartedBy").doesNotExist());
+                .andExpect(jsonPath("$[0].processingStartedBy").doesNotExist())
+                .andExpect(jsonPath("$[0].payoutNote").doesNotExist());
+        assertThat(request(id).getPayoutNote()).isEqualTo(PAYOUT_NOTE);
     }
 
     @Test
@@ -359,20 +381,15 @@ class WithdrawalRequestIntegrationTest {
     }
 
     @Test
-    @DisplayName("a request in PROCESSING can no longer be rejected; PENDING cannot be paid directly")
+    @DisplayName("PENDING cannot be paid directly")
     void illegalShortcuts_refused() throws Exception {
         Long userId = user("1000", true);
         Long pending = createOk(userId, "100");
         admin(pending, "paid").andExpect(status().isConflict());
 
-        Long processing = createOk(userId, "100");
-        admin(processing, "processing").andExpect(status().isOk());
-        admin(processing, "reject").andExpect(status().isConflict());
-
         assertThat(request(pending).getStatus()).isEqualTo(WithdrawalRequestStatus.PENDING);
-        assertThat(request(processing).getStatus()).isEqualTo(WithdrawalRequestStatus.PROCESSING);
-        assertMoney(userId, "800", "0");
-        assertThat(ledger(userId, DepositTransaction.TransactionType.WITHDRAWAL_RETURN)).isEmpty();
+        assertThat(request(pending).getPayoutNote()).isNull();
+        assertMoney(userId, "900", "0");
     }
 
     @Test
@@ -380,11 +397,11 @@ class WithdrawalRequestIntegrationTest {
     void rejectValidation() throws Exception {
         Long userId = user("1000", true);
         Long id = createOk(userId, "100");
-        mockMvc.perform(post("/api/v1/admin/withdrawals/" + id + "/reject").with(as(ADMIN_ID, "ADMIN"))
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"  \"}"))
+        adminJson(id, "reject", "{\"reason\":\"  \",\"payoutNotMade\":true,\"expectedStatus\":\"PENDING\"}")
                 .andExpect(status().isBadRequest());
-        mockMvc.perform(post("/api/v1/admin/withdrawals/" + id + "/reject").with(as(ADMIN_ID, "ADMIN"))
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"" + "x".repeat(1001) + "\"}"))
+        adminJson(id, "reject", "{\"payoutNotMade\":true,\"expectedStatus\":\"PENDING\"}")
+                .andExpect(status().isBadRequest());
+        adminJson(id, "reject", "{\"reason\":\"" + "x".repeat(1001) + "\",\"payoutNotMade\":true,\"expectedStatus\":\"PENDING\"}")
                 .andExpect(status().isBadRequest());
         admin(Long.MAX_VALUE, "processing").andExpect(status().isNotFound());
 
@@ -481,12 +498,214 @@ class WithdrawalRequestIntegrationTest {
     @DisplayName("domain: a rejection needs a non-blank reason; transitions need an admin")
     void domainGuards() {
         WithdrawalRequest r = new WithdrawalRequest(1L, new BigDecimal("10"), "k", OffsetDateTime.now());
-        assertThatThrownBy(() -> r.reject(1L, " ", OffsetDateTime.now())).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> r.reject(1L, " ", true, OffsetDateTime.now())).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> r.reject(1L, "причина", false, OffsetDateTime.now())).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> r.markPaid(1L, "note", OffsetDateTime.now())).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> r.startProcessing(null, OffsetDateTime.now())).isInstanceOf(NullPointerException.class);
         assertThat(r.getStatus()).isEqualTo(WithdrawalRequestStatus.PENDING);
         assertThatThrownBy(() -> new WithdrawalRequest(1L, new BigDecimal("10.001"), "k", OffsetDateTime.now()))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new WithdrawalRequest(1L, BigDecimal.ZERO, "k", OffsetDateTime.now()))
                 .isInstanceOf(IllegalArgumentException.class);
+
+        // a terminal request answers "wrong status" before anything else is looked at
+        WithdrawalRequest paid = new WithdrawalRequest(1L, new BigDecimal("10"), "k", OffsetDateTime.now());
+        paid.startProcessing(1L, OffsetDateTime.now());
+        paid.markPaid(1L, "  наличными в офисе  ", OffsetDateTime.now());
+        assertThat(paid.getPayoutNote()).isEqualTo("наличными в офисе");
+        assertThatThrownBy(() -> paid.reject(1L, "", false, OffsetDateTime.now())).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> paid.markPaid(1L, "again", OffsetDateTime.now())).isInstanceOf(IllegalStateException.class);
+    }
+
+    // ------------------------------------------------------------------ F6.1: PROCESSING -> REJECTED, payout note
+
+    @Test
+    @DisplayName("F6.1: PROCESSING -> REJECTED with confirmation returns once via WITHDRAWAL_RETURN:<id>, keeps processing audit")
+    void processingToRejected() throws Exception {
+        Long userId = user("1000", true);
+        Long id = processingRequest(userId, "300");
+        WithdrawalRequest before = request(id);
+
+        adminJson(id, "reject", "{\"reason\":\" Реквизиты недействительны \",\"payoutNotMade\":true,\"expectedStatus\":\"PROCESSING\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REJECTED"))
+                .andExpect(jsonPath("$.rejectionReason").value("Реквизиты недействительны"))
+                .andExpect(jsonPath("$.processingStartedBy").value(ADMIN_ID))
+                .andExpect(jsonPath("$.processedBy").value(ADMIN_ID))
+                .andExpect(jsonPath("$.payoutNote").doesNotExist());
+
+        WithdrawalRequest r = request(id);
+        assertThat(r.getStatus()).isEqualTo(WithdrawalRequestStatus.REJECTED);
+        assertThat(r.getProcessingStartedAt()).isEqualTo(before.getProcessingStartedAt());
+        assertThat(r.getProcessingStartedBy()).isEqualTo(before.getProcessingStartedBy());
+        assertThat(r.getProcessedAt()).isNotNull();
+        assertMoney(userId, "1000", "0");
+        List<DepositTransaction> returns = ledger(userId, DepositTransaction.TransactionType.WITHDRAWAL_RETURN);
+        assertThat(returns).hasSize(1);
+        assertThat(returns.get(0).getIdempotencyKey()).isEqualTo("WITHDRAWAL_RETURN:" + id);
+        assertThat(returns.get(0).getAmount()).isEqualByComparingTo("300");
+
+        // retry of the same rejection: refused, no second return
+        admin(id, "reject").andExpect(status().isConflict());
+        admin(id, "paid").andExpect(status().isConflict());   // REJECTED -> PAID
+        assertMoney(userId, "1000", "0");
+        assertThat(ledger(userId, DepositTransaction.TransactionType.WITHDRAWAL_RETURN)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("F6.1: rejecting without the payout-not-made confirmation is refused, from PENDING and from PROCESSING")
+    void rejectWithoutConfirmation_refused() throws Exception {
+        Long userId = user("1000", true);
+        Long pending = createOk(userId, "100");
+        Long processing = processingRequest(userId, "100");
+
+        for (Long id : List.of(pending, processing)) {
+            String seen = request(id).getStatus().name();
+            adminJson(id, "reject", "{\"reason\":\"x\",\"payoutNotMade\":false,\"expectedStatus\":\"" + seen + "\"}")
+                    .andExpect(status().isBadRequest());
+            adminJson(id, "reject", "{\"reason\":\"x\",\"expectedStatus\":\"" + seen + "\"}")
+                    .andExpect(status().isBadRequest());
+        }
+        // the service refuses it as well, independent of the HTTP layer
+        assertThatThrownBy(() -> withdrawalRequestService.reject(processing, ADMIN_ID, "x", false, WithdrawalRequestStatus.PROCESSING))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(request(pending).getStatus()).isEqualTo(WithdrawalRequestStatus.PENDING);
+        assertThat(request(processing).getStatus()).isEqualTo(WithdrawalRequestStatus.PROCESSING);
+        assertMoney(userId, "800", "0");
+        assertThat(ledger(userId, DepositTransaction.TransactionType.WITHDRAWAL_RETURN)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("F6.1: a stale expectedStatus (or none) is refused - no rejection on an outdated screen")
+    void staleExpectedStatus_refused() throws Exception {
+        Long userId = user("1000", true);
+        Long processing = processingRequest(userId, "100");
+        Long pending = createOk(userId, "100");
+
+        // the admin still sees PENDING, but someone took the request into work meanwhile
+        adminJson(processing, "reject", "{\"reason\":\"x\",\"payoutNotMade\":true,\"expectedStatus\":\"PENDING\"}")
+                .andExpect(status().isConflict());
+        adminJson(pending, "reject", "{\"reason\":\"x\",\"payoutNotMade\":true,\"expectedStatus\":\"PROCESSING\"}")
+                .andExpect(status().isConflict());
+        adminJson(pending, "reject", "{\"reason\":\"x\",\"payoutNotMade\":true}")
+                .andExpect(status().isBadRequest());
+        assertThatThrownBy(() -> withdrawalRequestService.reject(pending, ADMIN_ID, "x", true, null))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(request(processing).getStatus()).isEqualTo(WithdrawalRequestStatus.PROCESSING);
+        assertThat(request(pending).getStatus()).isEqualTo(WithdrawalRequestStatus.PENDING);
+        assertMoney(userId, "800", "0");
+        assertThat(ledger(userId, DepositTransaction.TransactionType.WITHDRAWAL_RETURN)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("F6.1: PAID needs a payout note (non-blank, <= 1000 chars); the note moves no money")
+    void paidNeedsNote_andMovesNoMoney() throws Exception {
+        Long userId = user("1000", true);
+        Long id = processingRequest(userId, "300");
+        int ledgerRowsBefore = depositRepository.findTransactionsByUserId(userId).size();
+
+        adminJson(id, "paid", "{\"payoutNote\":\"   \"}").andExpect(status().isBadRequest());
+        adminJson(id, "paid", "{}").andExpect(status().isBadRequest());
+        adminJson(id, "paid", "{\"payoutNote\":\"" + "n".repeat(1001) + "\"}").andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/v1/admin/withdrawals/" + id + "/paid").with(as(ADMIN_ID, "ADMIN")))
+                .andExpect(r -> assertThat(r.getResponse().getStatus()).isGreaterThanOrEqualTo(400));
+        assertThatThrownBy(() -> withdrawalRequestService.markPaid(id, ADMIN_ID, " "))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(request(id).getStatus()).isEqualTo(WithdrawalRequestStatus.PROCESSING);
+
+        adminJson(id, "paid", "{\"payoutNote\":\"  " + PAYOUT_NOTE + "  \"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PAID"))
+                .andExpect(jsonPath("$.payoutNote").value(PAYOUT_NOTE));
+
+        assertMoney(userId, "700", "0");
+        assertThat(depositRepository.findTransactionsByUserId(userId)).as("PAID writes no ledger row").hasSize(ledgerRowsBefore);
+        assertThat(ledger(userId, DepositTransaction.TransactionType.WITHDRAWAL)).hasSize(1);
+        assertThat(ledger(userId, DepositTransaction.TransactionType.WITHDRAWAL_RETURN)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("O1: only the JSON literal true confirms - \"true\", 1, \"1\", null, false, \"maybe\", {} and [] are 400 without effect")
+    void payoutNotMade_onlyJsonTrue() throws Exception {
+        Long userId = user("1000", true);
+        Long id = processingRequest(userId, "100");
+        for (String value : List.of("\"true\"", "1", "\"1\"", "null", "false", "\"maybe\"", "0", "{}", "[]", "[true]")) {
+            adminJson(id, "reject", "{\"reason\":\"x\",\"payoutNotMade\":" + value + ",\"expectedStatus\":\"PROCESSING\"}")
+                    .andExpect(status().isBadRequest());
+            WithdrawalRequest r = request(id);
+            assertThat(r.getStatus()).as(value).isEqualTo(WithdrawalRequestStatus.PROCESSING);
+            assertThat(r.getRejectionReason()).as(value).isNull();
+        }
+        assertMoney(userId, "900", "0");
+        assertThat(ledger(userId, DepositTransaction.TransactionType.WITHDRAWAL_RETURN)).isEmpty();
+
+        adminJson(id, "reject", "{\"reason\":\"x\",\"payoutNotMade\":true,\"expectedStatus\":\"PROCESSING\"}")
+                .andExpect(status().isOk());
+        assertMoney(userId, "1000", "0");
+        assertThat(ledger(userId, DepositTransaction.TransactionType.WITHDRAWAL_RETURN)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("O2: a visually empty payout note (spaces, TAB, LF, NBSP, Unicode/zero-width spaces) is refused; real text is kept")
+    void payoutNote_visuallyEmptyRefused() throws Exception {
+        Long userId = user("1000", true);
+        Long id = processingRequest(userId, "100");
+        int ledgerRows = depositRepository.findTransactionsByUserId(userId).size();
+        for (String note : List.of("", "   ", "\\t", "\\n", "\\u00a0\\u00a0", " \\t\\u00a0\\n\\u2007\\u202f\\u3000 ",
+                "\\u200b\\ufeff\\u2060")) {
+            adminJson(id, "paid", "{\"payoutNote\":\"" + note + "\"}").andExpect(status().isBadRequest());
+            assertThat(request(id).getStatus()).as(note).isEqualTo(WithdrawalRequestStatus.PROCESSING);
+            assertThat(request(id).getPayoutNote()).as(note).isNull();
+        }
+        assertThatThrownBy(() -> withdrawalRequestService.markPaid(id, ADMIN_ID, "\u00a0\u2007\u200b"))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        adminJson(id, "paid", "{\"payoutNote\":\"\\u00a0Наличными\\u00a0в офисе\"}").andExpect(status().isOk());
+        assertThat(request(id).getStatus()).isEqualTo(WithdrawalRequestStatus.PAID);
+        assertThat(request(id).getPayoutNote()).isEqualTo("\u00a0Наличными\u00a0в офисе");
+        assertMoney(userId, "900", "0");
+        assertThat(depositRepository.findTransactionsByUserId(userId)).hasSize(ledgerRows);
+    }
+
+    @Test
+    @DisplayName("F6.1: malformed reject bodies are refused without any effect")
+    void malformedRejectBody_refused() throws Exception {
+        Long userId = user("1000", true);
+        Long id = processingRequest(userId, "100");
+
+        adminJson(id, "reject", "{\"reason\":\"x\",\"payoutNotMade\":\"maybe\",\"expectedStatus\":\"PROCESSING\"}")
+                .andExpect(r -> assertThat(r.getResponse().getStatus()).isGreaterThanOrEqualTo(400));
+        adminJson(id, "reject", "{\"reason\":\"x\",\"payoutNotMade\":true,\"expectedStatus\":\"BOGUS\"}")
+                .andExpect(r -> assertThat(r.getResponse().getStatus()).isGreaterThanOrEqualTo(400));
+        adminJson(id, "reject", "not json").andExpect(r -> assertThat(r.getResponse().getStatus()).isGreaterThanOrEqualTo(400));
+
+        assertThat(request(id).getStatus()).isEqualTo(WithdrawalRequestStatus.PROCESSING);
+        assertMoney(userId, "900", "0");
+        assertThat(ledger(userId, DepositTransaction.TransactionType.WITHDRAWAL_RETURN)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("F6.1: rollback during a PROCESSING rejection -> still PROCESSING, nothing returned; the retry returns once")
+    void rollback_duringProcessingRejection() throws Exception {
+        Long userId = user("1000", true);
+        Long id = processingRequest(userId, "300");
+        doThrow(new IllegalStateException("simulated return failure"))
+                .when(depositService).returnWithdrawal(eq(userId), eq(id), any());
+
+        admin(id, "reject").andExpect(status().isConflict());
+
+        WithdrawalRequest r = request(id);
+        assertThat(r.getStatus()).isEqualTo(WithdrawalRequestStatus.PROCESSING);
+        assertThat(r.getRejectionReason()).isNull();
+        assertThat(r.getProcessedAt()).isNull();
+        assertMoney(userId, "700", "0");
+        assertThat(ledger(userId, DepositTransaction.TransactionType.WITHDRAWAL_RETURN)).isEmpty();
+
+        org.mockito.Mockito.reset(depositService);
+        admin(id, "reject").andExpect(status().isOk());
+        admin(id, "reject").andExpect(status().isConflict());
+        assertMoney(userId, "1000", "0");
+        assertThat(ledger(userId, DepositTransaction.TransactionType.WITHDRAWAL_RETURN)).hasSize(1);
     }
 }

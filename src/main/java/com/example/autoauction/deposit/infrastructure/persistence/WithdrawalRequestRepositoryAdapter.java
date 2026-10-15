@@ -61,12 +61,12 @@ public class WithdrawalRequestRepositoryAdapter implements WithdrawalRequestRepo
     private static JpaWithdrawalRequestEntity toEntity(WithdrawalRequest d) {
         return new JpaWithdrawalRequestEntity(d.getId(), d.getUserId(), d.getAmount(), d.getStatus(),
                 d.getIdempotencyKey(), d.getCreatedAt(), d.getProcessingStartedAt(), d.getProcessingStartedBy(),
-                d.getProcessedAt(), d.getProcessedBy(), d.getRejectionReason(), d.getVersion());
+                d.getProcessedAt(), d.getProcessedBy(), d.getRejectionReason(), d.getPayoutNote(), d.getVersion());
     }
 
     private static WithdrawalRequest toDomain(JpaWithdrawalRequestEntity e) {
         return new WithdrawalRequest(e.getId(), e.getUserId(), e.getAmount(), e.getStatus(),
                 e.getIdempotencyKey(), e.getCreatedAt(), e.getProcessingStartedAt(), e.getProcessingStartedBy(),
-                e.getProcessedAt(), e.getProcessedBy(), e.getRejectionReason(), e.getVersion());
+                e.getProcessedAt(), e.getProcessedBy(), e.getRejectionReason(), e.getPayoutNote(), e.getVersion());
     }
 }
