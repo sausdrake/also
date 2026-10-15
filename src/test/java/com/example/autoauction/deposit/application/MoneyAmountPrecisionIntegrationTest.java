@@ -111,4 +111,13 @@ class MoneyAmountPrecisionIntegrationTest {
                         .content("{\"amount\":10.001,\"reason\":\"OTHER\",\"reference\":\"T\",\"idempotencyKey\":\"k-scale-2\"}"))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    @DisplayName("HTTP: a withdraw idempotency key longer than its column (100) answers 400")
+    @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
+    void http_rejectsOverlongWithdrawKey() throws Exception {
+        mockMvc.perform(post("/api/v1/deposits/withdraw").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"amount\":100,\"idempotencyKey\":\"" + "k".repeat(101) + "\"}"))
+                .andExpect(status().isBadRequest());
+    }
 }

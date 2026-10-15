@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 
@@ -27,10 +28,12 @@ public record AdminAdjustDepositRequest(
 
         @Schema(description = "Обязательная ссылка/основание для аудита корректировки", example = "PAYMENT:TX-12345")
         @NotBlank(message = "Ссылка (reference) обязательна")
+        @Size(max = 100, message = "Ссылка (reference) не может быть длиннее 100 символов")
         String reference,
 
         @Schema(description = "Ключ идемпотентности", example = "c2f1e6d0-...")
         @NotBlank(message = "Ключ идемпотентности обязателен")
+        @Size(max = 100, message = "Ключ идемпотентности не может быть длиннее 100 символов")
         String idempotencyKey
 ) {
 }

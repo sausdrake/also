@@ -5,6 +5,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 
@@ -21,5 +22,6 @@ public record WithdrawRequest(
                 "вывода и переиспользует при повторной отправке того же запроса (например, после " +
                 "сетевой ошибки), чтобы повтор не привёл к повторному списанию", required = true)
         @NotBlank(message = "Ключ идемпотентности обязателен")
+        @Size(max = 100, message = "Ключ идемпотентности не может быть длиннее 100 символов")
         String idempotencyKey
 ) {}

@@ -80,6 +80,25 @@ class AdminDepositControllerTest {
     }
 
     @Test
+    @DisplayName("S11: reference и ключ идемпотентности длиннее колонки (100) отклоняются с 400, ничего не записывается")
+    @WithMockCustomUser(userId = 42L, username = "admin", roles = {"ADMIN"})
+    void canonicalEndpoint_OverlongReferenceOrKey_Rejected() throws Exception {
+        Long targetUserId = createUserWithDeposit(new BigDecimal("10000"));
+        String longText = "R".repeat(101);
+
+        mockMvc.perform(post("/api/v1/admin/deposits/" + targetUserId + "/adjust")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body(new BigDecimal("1000"), "OTHER", longText, "api-key-long-" + System.nanoTime())))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/v1/admin/deposits/" + targetUserId + "/adjust")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body(new BigDecimal("1000"), "OTHER", "TICKET-LONG", longText)))
+                .andExpect(status().isBadRequest());
+        org.assertj.core.api.Assertions.assertThat(depositService.getDepositByUserId(targetUserId).balance())
+                .isEqualByComparingTo("10000");
+    }
+
+    @Test
     @DisplayName("Неаутентифицированный запрос к каноничному эндпоинту отклоняется (401)")
     void canonicalEndpoint_Unauthenticated_Rejected() throws Exception {
         mockMvc.perform(post("/api/v1/admin/deposits/1/adjust")
