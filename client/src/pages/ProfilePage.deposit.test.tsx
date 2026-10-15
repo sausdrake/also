@@ -20,6 +20,9 @@ const apiPost = api.post as unknown as ReturnType<typeof vi.fn>;
 beforeEach(() => {
   apiGet.mockReset().mockImplementation((url: string) => {
     if (url === '/deposits/my') return Promise.resolve({ data: { balance: 1000, blockedAmount: 0, availableBalance: 1000 } });
+    if (url === '/deposits/my/transactions') return Promise.resolve({ data: [
+      { id: 1, type: 'ADMIN_ADJUSTMENT', amount: 1000, description: 'RECONCILIATION', createdAt: '2026-10-15T10:00:00Z' },
+    ] });
     return Promise.resolve({ data: [] });
   });
   apiPost.mockReset().mockResolvedValue({ data: {} });
@@ -39,5 +42,13 @@ describe('ProfilePage deposit tab - top-up', () => {
     expect(screen.queryByRole('button', { name: 'Пополнить' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Вывести' })).toBeInTheDocument();
     expect(apiPost).not.toHaveBeenCalled();
+  });
+
+  it('shows transaction types by their Russian label', async () => {
+    const router = createMemoryRouter([{ path: '/profile/*', element: <ProfilePage /> }], { initialEntries: ['/profile'] });
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByText('Корректировка администратором')).toBeInTheDocument();
+    expect(screen.queryByText('ADMIN_ADJUSTMENT')).not.toBeInTheDocument();
   });
 });

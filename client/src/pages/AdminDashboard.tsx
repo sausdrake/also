@@ -11,6 +11,7 @@ import { AdminSalePage } from './admin/AdminSalePage';
 import { AdminIdentityPage } from './admin/AdminIdentityPage';
 import { AdminReconciliationPage } from './admin/AdminReconciliationPage';
 import { AdminVehiclesNeedsRediagnosticPage } from './admin/AdminVehiclesNeedsRediagnosticPage';
+import { depositTxTypeLabel } from '../utils/depositTransactionLabels';
 import { RejectReportModal } from '../components/admin/diagnostic/RejectReportModal';
 import { SellerViolationResolutionPanel, type ViolationResolution } from '../components/admin/diagnostic/SellerViolationResolutionPanel';
 
@@ -2625,13 +2626,6 @@ function DepositsPage() {
     finally { setTxLoading(false); }
   };
 
-  const TX_TYPE_LABELS: Record<string, string> = {
-    DEPOSIT: 'Пополнение', WITHDRAWAL: 'Вывод',
-    FREEZE: 'Заморозка', UNFREEZE: 'Разморозка',
-    AUCTION_BID: 'Ставка', AUCTION_WIN: 'Победа',
-    ADMIN_ADJUST: 'Корректировка',
-  };
-
   const totalBalance = deposits.reduce((s, d) => s + (d.balance || 0), 0);
   const totalBlocked = deposits.reduce((s, d) => s + (d.blockedAmount || 0), 0);
 
@@ -2695,7 +2689,7 @@ function DepositsPage() {
                 {transactions.map((tx: any) => (
                   <div key={tx.id} className="flex items-center justify-between px-3 py-2.5 text-sm">
                     <div>
-                      <p className="font-medium text-gray-800">{TX_TYPE_LABELS[tx.type] || tx.type}</p>
+                      <p className="font-medium text-gray-800">{depositTxTypeLabel(tx.type)}</p>
                       {tx.description && <p className="text-xs text-gray-400 mt-0.5">{tx.description}</p>}
                     </div>
                     <div className="text-right">

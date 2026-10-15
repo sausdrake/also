@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import { useDepositStore } from '../store/depositStore';
 import { parseDate } from '../utils/formatDate';
 import { formatDateTime } from '../utils/formatDate';
+import { depositTxTypeLabel } from '../utils/depositTransactionLabels';
 import { RequestVehicleStatus } from '../components/seller/RequestVehicleStatus';
 import { IdentityVerificationTab } from '../components/identity/IdentityVerificationTab';
 
@@ -152,7 +153,7 @@ function DepositTab() {
                         tx.type === 'WITHDRAWAL' ? 'bg-red-100 text-red-700' :
                         tx.type === 'BLOCK' ? 'bg-yellow-100 text-yellow-700' :
                         'bg-gray-100 text-gray-600'
-                      }`}>{tx.type}</span>
+                      }`}>{depositTxTypeLabel(tx.type)}</span>
                     </td>
                     <td className="px-4 py-2 font-medium">
                       {Number(tx.amount).toLocaleString('ru')} сом
