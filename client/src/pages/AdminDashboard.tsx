@@ -2700,6 +2700,9 @@ const SETTINGS_META: Record<string, { label: string; description: string; min: n
   // commission_percent / platform_fee_percent removed: commission is configured only via the
   // PolicyVersion admin surface (/admin/policy). The legacy system_settings row is inert.
   diagnostic_deposit_amount:            { label: 'Залог для диагностики (сом)',        description: 'Фиксированная сумма заморозки при подаче заявки на диагностику',          min: 0, max: 100000, step: 1000 },
+  // Fail-closed on the server: until it is set, diagnostic requests are refused (no default
+  // value has ever been approved, so none is pre-filled here).
+  diagnostic_fee_amount:                { label: 'Стоимость диагностики (сом)',        description: 'Плата за диагностику, удерживаемая с продавца из залога. Пока не задана, заявки на диагностику не принимаются', min: 0, max: 100000, step: 100 },
   auction_confirm_hours:                { label: 'Подтверждение аукциона (ч)',         description: 'Часов на подтверждение аукциона администратором после создания',          min: 1, max: 168, step: 1 },
   completed_auction_visibility_hours:   { label: 'Видимость завершённых аукционов (ч)', description: 'Часов, в течение которых показываются завершённые аукционы',              min: 1, max: 8760, step: 24 },
 };
@@ -2715,11 +2718,15 @@ function SettingsPage() {
     api.get('/admin/settings').then(r => setSettings(r.data)).finally(() => setLoading(false));
   }, []);
 
+  // Only filled-in values are validated and sent: a setting that has never been configured is
+  // shown as an empty field and simply stays unset until the admin enters a value.
+  const filled = (val: string | undefined) => val != null && String(val).trim() !== '';
+
   const validate = () => {
     const errs: Record<string, string> = {};
     for (const [key, val] of Object.entries(settings)) {
       const meta = SETTINGS_META[key];
-      if (!meta) continue;
+      if (!meta || !filled(val)) continue;
       const num = Number(val);
       if (isNaN(num) || num < meta.min) errs[key] = `Минимум: ${meta.min}`;
       if (num > meta.max) errs[key] = `Максимум: ${meta.max}`;
@@ -2731,7 +2738,7 @@ function SettingsPage() {
     const errs = validate();
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
     setErrors({});
-    const safe = Object.fromEntries(Object.entries(settings).filter(([k]) => k in SETTINGS_META));
+    const safe = Object.fromEntries(Object.entries(settings).filter(([k, v]) => k in SETTINGS_META && filled(v)));
     try {
       await api.put('/admin/settings', safe);
       setMsg('Настройки сохранены'); setMsgErr(false); setTimeout(() => setMsg(''), 3000);
@@ -2752,14 +2759,19 @@ function SettingsPage() {
       ) : (
         <div className="max-w-xl space-y-4">
           <div className="bg-white border border-gray-100 rounded-2xl shadow-sm divide-y divide-gray-50">
-            {Object.keys(SETTINGS_META).filter(k => k in settings).map(key => {
+            {Object.keys(SETTINGS_META).map(key => {
               const meta = SETTINGS_META[key];
               return (
                 <div key={key} className="p-5">
-                  <label className="text-sm font-semibold text-gray-800 block mb-0.5">{meta.label}</label>
+                  <label htmlFor={`setting-${key}`} className="text-sm font-semibold text-gray-800 block mb-0.5">
+                    {meta.label}
+                    {!filled(settings[key]) && (
+                      <span className="ml-2 text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">Не задано</span>
+                    )}
+                  </label>
                   <p className="text-xs text-gray-400 mb-3">{meta.description}</p>
                   <div className="flex gap-3 items-center">
-                    <input type="number" value={settings[key] ?? ''} min={meta.min} max={meta.max} step={meta.step}
+                    <input id={`setting-${key}`} type="number" value={settings[key] ?? ''} min={meta.min} max={meta.max} step={meta.step}
                       onChange={e => { setSettings({ ...settings, [key]: e.target.value }); setErrors(prev => ({ ...prev, [key]: '' })); }}
                       className={`w-40 border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none ${errors[key] ? 'border-red-400' : 'border-gray-200'}`} />
                     <span className="text-xs text-gray-400">{meta.min}–{meta.max}</span>
