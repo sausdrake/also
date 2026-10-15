@@ -151,4 +151,43 @@ describe('AdminDashboard TemplatesPage - edit item and delete group (scenario 14
     await waitFor(() => expect(apiDelete).toHaveBeenCalledWith('/admin/diagnostic/groups/11'));
     expect(apiDelete).toHaveBeenCalledTimes(1);
   });
+
+  it('13.8: a new item can require a rating and a video', async () => {
+    apiPost.mockResolvedValue({ data: {} });
+    await openSedanConstructor();
+
+    fireEvent.click(screen.getAllByText('+ Поле')[0]);
+    fireEvent.change(screen.getByPlaceholderText('Название поля *'), { target: { value: 'Работа двигателя (видео)' } });
+    fireEvent.click(screen.getByText('Число'));
+    fireEvent.click(screen.getByLabelText('Требовать видео'));
+    fireEvent.click(screen.getByText('Добавить поле'));
+
+    await waitFor(() => expect(apiPost).toHaveBeenCalledWith('/admin/diagnostic/groups/10/items', expect.objectContaining({
+      title: 'Работа двигателя (видео)', fieldType: 'NUMBER', hasRating: true, hasVideo: true,
+    })));
+  });
+
+  it('13.8: a new item does not require a video unless asked', async () => {
+    apiPost.mockResolvedValue({ data: {} });
+    await openSedanConstructor();
+
+    fireEvent.click(screen.getAllByText('+ Поле')[0]);
+    fireEvent.change(screen.getByPlaceholderText('Название поля *'), { target: { value: 'Царапины' } });
+    fireEvent.click(screen.getByText('Добавить поле'));
+
+    await waitFor(() => expect(apiPost).toHaveBeenCalledWith('/admin/diagnostic/groups/10/items', expect.objectContaining({
+      title: 'Царапины', hasVideo: false,
+    })));
+  });
+
+  it('13.8: the edit modal shows and changes the video requirement', async () => {
+    fireEvent.click(await openSedanConstructor());
+
+    const video = screen.getByLabelText('Требовать видео');
+    expect(video).toBeChecked();
+    fireEvent.click(video);
+    fireEvent.click(screen.getByText('Сохранить'));
+
+    await waitFor(() => expect(apiPut).toHaveBeenCalledWith('/admin/diagnostic/items/100', expect.objectContaining({ hasVideo: false })));
+  });
 });

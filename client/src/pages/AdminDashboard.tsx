@@ -1477,6 +1477,9 @@ function TemplatesPage() {
   const [itemDesc, setItemDesc]     = useState('');
   const [itemRequired, setItemRequired] = useState(true);
   const [itemFieldType, setItemFieldType] = useState('TEXT');
+  // Scenario 13.8: an item may require a video (e.g. "Работа двигателя": rating + video); the
+  // diagnostician must then upload it before the report can be submitted.
+  const [itemHasVideo, setItemHasVideo] = useState(false);
   const [seeding, setSeeding]       = useState(false);
   const [seedProgress, setSeedProgress] = useState('');
   const [confirmSeed, setConfirmSeed] = useState(false);
@@ -1646,10 +1649,10 @@ function TemplatesPage() {
         isRequired: itemRequired,
         hasPhoto: itemFieldType === 'PHOTO',
         hasRating: itemFieldType === 'NUMBER',
-        hasVideo: false,
+        hasVideo: itemHasVideo,
         sortOrder: 1,
       });
-      setItemTitle(''); setItemDesc(''); setItemRequired(true);
+      setItemTitle(''); setItemDesc(''); setItemRequired(true); setItemHasVideo(false);
       setItemFieldType('TEXT'); setActiveSection(null);
       if (selected) loadTemplate(selected.id);
     } catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); }
@@ -1695,6 +1698,11 @@ function TemplatesPage() {
               <input type="checkbox" checked={editItem.isRequired}
                 onChange={e => setEditItem({ ...editItem, isRequired: e.target.checked })} />
               <span className="text-gray-700">Обязательный пункт</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={!!editItem.hasVideo}
+                onChange={e => setEditItem({ ...editItem, hasVideo: e.target.checked })} />
+              <span className="text-gray-700">Требовать видео</span>
             </label>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setEditItem(null)} disabled={savingItem}
@@ -1902,6 +1910,10 @@ function TemplatesPage() {
                           <input type="checkbox" checked={itemRequired} onChange={e => setItemRequired(e.target.checked)} />
                           <span className="text-gray-600">Обязательное поле</span>
                         </label>
+                        <label className="flex items-center gap-2 text-xs cursor-pointer">
+                          <input type="checkbox" checked={itemHasVideo} onChange={e => setItemHasVideo(e.target.checked)} />
+                          <span className="text-gray-600">Требовать видео</span>
+                        </label>
                         <div className="flex gap-2">
                           <button onClick={() => addField(section.id)}
                             className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700">Добавить поле</button>
@@ -1926,6 +1938,7 @@ function TemplatesPage() {
                               <div className="min-w-0">
                                 <span className="text-sm">{field.title}</span>
                                 {field.isRequired && <span className="text-red-500 ml-1">*</span>}
+                                {field.hasVideo && <span className="ml-1 text-xs" title="Требуется видео">🎥</span>}
                                 {field.description && <p className="text-xs text-gray-400 truncate mt-0.5">{field.description}</p>}
                               </div>
                             </div>
