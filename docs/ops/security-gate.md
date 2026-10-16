@@ -1,0 +1,53 @@
+# Security gate before launch (SEC-07)
+
+Status: **checks done, sign-off by the Product Owner pending.** Date of the scan: 2026-10-16.
+Re-run the dependency scans before the go-live: advisories appear every week.
+
+## Scope and method
+
+| Area | How it was checked |
+|---|---|
+| Object-level access (IDOR) on `/api/**` | Every non-admin endpoint with an id in the path, query or body, read in code down to the service check; findings confirmed by a failing test first |
+| Anonymous endpoints | Every `/api/v1/public/**` response compared field by field with what the public page renders |
+| Uploads | SEC-04 (magic bytes, `nosniff`), media finalize/read/delete authorization |
+| WebSocket | SEC-03 (allowed origins), JWT at CONNECT (SEC-01), broadcast payloads |
+| Debug / service endpoints | No actuator; API docs off in `prod`; dev seeding only under `@Profile("dev")`, refused in `prod` (CFG-01) |
+| Frontend dependencies | `npm audit --omit=dev` |
+| Backend dependencies | OSV database, every runtime Maven artifact with its resolved version |
+
+## Found and fixed
+
+| Task | Severity | Finding | Commit |
+|---|---|---|---|
+| SEC-12 | Medium-High | Anonymous report and vehicle endpoints returned the seller's id and username, the frozen deposit, staff ids and usernames (admin username = half a login), seller-violation decisions, licence plate | `9bdc824` |
+| SEC-14 | Low | Any authenticated user could "finalize" someone else's READY diagnostic media and read its metadata (caption) | `0f5f081` |
+| SEC-13 | High (bundle: axios) | Frontend: 1 critical, 2 high, 3 moderate in production dependencies | `ab48b2c` |
+| SEC-15 | Critical | Backend on end-of-life Spring Boot 3.1.5: 26 vulnerable packages (Tomcat 7 critical, Spring Security 2 critical, pgjdbc SQL injection, ...) | `e86d1fa` |
+
+Earlier fixes in the same area: SEC-01 blocked users lose access at once, SEC-02 second registration
+path closed, SEC-03 WebSocket origins, SEC-04 upload content check, SEC-06 admin action journal,
+SEC-09 seller cannot bid on their own car, SEC-11 database port not public, ERR-01 no 500 for client errors.
+
+## Residual risks - need a decision
+
+| # | Risk | Assessment | Proposed decision |
+|---|---|---|---|
+| R1 | `spring-webmvc` 6.2.19: two critical advisories (XsltView path limitation, SSE fragment rendering), fixed only in Spring 7 | Not exploitable: the application uses neither XsltView nor SSE/fragment rendering (checked in code) | Accept until SEC-16 |
+| R2 | Spring Boot 3.x has no open-source support since 2026-06-30 - new advisories will not get 3.x fixes | Today clean except R1; risk grows with time | **Decide: SEC-16 (move to Boot 4.x, large migration) or commercial support for 3.5** |
+| R3 | `react-router` 6.x: open redirect via backslash; SSR hydration | Not exploitable: every navigation target is built by the app from numeric ids; no SSR | Accept until a react-router 7 migration |
+| R4 | Dev-only build tooling (tailwindcss 3 chain) | Not shipped to users | Accept |
+| R5 | Public auction responses and WebSocket messages carry the numeric `winnerId`; the public auction shows the reserve price | No usernames; reserve visibility is BIZ-01 | Decide with BIZ-01 |
+| R6 | `/api/v1/public/vehicles/{id}` answers for a vehicle in any status (now only public car data) | Low: no personal or staff data left | Accept, or restrict to listed statuses |
+| R7 | Login rate limit behind a reverse proxy (SEC-10) | Depends on the real proxy (INF-05) | Implement with INF-05 |
+
+## Not covered here
+
+- HTTPS, HSTS and security headers on the real server (SEC-05, INF-04/05).
+- A test against the running stand (penetration test, E2E-01).
+- SEC-08: the public repository and its secrets - the owner's action.
+
+## Sign-off
+
+| Role | Name | Decision on R1-R7 | Date |
+|---|---|---|---|
+| Product Owner | | | |
