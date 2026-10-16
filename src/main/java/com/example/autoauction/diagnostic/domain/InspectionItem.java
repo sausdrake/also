@@ -16,6 +16,12 @@ public class InspectionItem {
     private boolean hasRating;
     @JsonProperty("isRequired")
     private boolean isRequired;
+
+    // SEC-15: explicit, so the getter and the field stay ONE JSON property (see InspectionTemplate).
+    @JsonProperty("isRequired")
+    public boolean isRequired() {
+        return isRequired;
+    }
     private Integer sortOrder;
     private OffsetDateTime createdAt;
 }

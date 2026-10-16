@@ -16,6 +16,13 @@ public class InspectionTemplate {
     // does for isRequired); Lombok's isActive() getter alone would publish it as "active".
     @JsonProperty("isActive")
     private boolean isActive;
+
+    // SEC-15: explicit, so the getter and the field stay ONE JSON property. Since Jackson 2.18 the
+    // Lombok getter isActive() was published separately as "active" next to "isActive".
+    @JsonProperty("isActive")
+    public boolean isActive() {
+        return isActive;
+    }
     private Long createdBy;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;

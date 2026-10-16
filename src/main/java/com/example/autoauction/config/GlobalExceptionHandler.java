@@ -10,6 +10,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -320,6 +321,14 @@ public class GlobalExceptionHandler {
         log.warn("Неподдерживаемый HTTP-метод: {}", e.getMethod());
         return clientError(HttpStatus.METHOD_NOT_ALLOWED, "Метод не поддерживается",
                 "HTTP-метод " + e.getMethod() + " не поддерживается для этого адреса");
+    }
+
+    // SEC-15: since Spring 6.1 an unknown path raises NoResourceFoundException; without this handler
+    // the generic Exception handler answered 500 for every mistyped or removed route.
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleNoResource(NoResourceFoundException e) {
+        log.warn("Не найдено: {} {}", e.getHttpMethod(), e.getResourcePath());
+        return clientError(HttpStatus.NOT_FOUND, "Не найдено", "Запрошенный адрес не существует");
     }
 
     private static ResponseEntity<Map<String, Object>> clientError(HttpStatus status, String error, String message) {
