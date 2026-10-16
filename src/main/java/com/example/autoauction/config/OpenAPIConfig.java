@@ -8,14 +8,11 @@ import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
-import io.swagger.v3.oas.models.servers.Server;
 import lombok.extern.slf4j.Slf4j;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.method.HandlerMethod;
-
-import java.util.List;
 
 @Slf4j
 @Configuration
@@ -67,11 +64,9 @@ public class OpenAPIConfig {
                         .license(new License()
                                 .name("Apache 2.0")
                                 .url("http://springdoc.org")))
-                .servers(List.of(
-                        new Server()
-                                .url("http://localhost:8080")
-                                .description("Local development server")
-                ))
+                // DEV-01: no fixed server list - springdoc then names the origin each request came from,
+                // so Swagger UI's "Try it out" calls the backend it was opened on. The hard-coded
+                // http://localhost:8080 sent every call to a port nothing listens on (the backend runs on 8081).
                 .addSecurityItem(new SecurityRequirement()
                         .addList(securitySchemeName))
                 .components(new Components()
