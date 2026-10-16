@@ -3,7 +3,10 @@ version: '3.8'
 services:
   # База данных PostgreSQL
   postgres:
-    image: postgres:15-alpine
+    # DB-03: PostgreSQL 16 - the version every migration, boot and E2E test runs against
+    # (PostgresVersionAlignmentTest keeps them equal). An existing volume of another major version
+    # does NOT start on this image: upgrade it with pg_dump/restore (docs/ops/postgresql-version.md).
+    image: postgres:16-alpine
     container_name: autoauction-postgres
     environment:
       POSTGRES_DB: auto_auction

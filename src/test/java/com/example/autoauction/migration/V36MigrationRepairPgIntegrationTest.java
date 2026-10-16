@@ -38,7 +38,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * it is absent. V36's other three statements (the {@code vehicles} UNIQUE, the {@code auctions}
  * column + FK, the {@code auctions} UNIQUE) are unchanged and still run.
  *
- * <p>Runs against real <b>PostgreSQL 15</b> (the version in the repository's
+ * <p>Runs against real <b>PostgreSQL 16</b> (the version in the repository's
  * {@code docker-compose.yml}), driving Flyway directly through its Java API against an empty
  * database - no Spring context, no {@code DataInitializer}, no dev profile, no manually inserted
  * users, no baseline manipulation.
@@ -48,11 +48,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * {@code ~/.docker-java.properties}.
  */
 @Testcontainers
-@DisplayName("Migration repair · V36 · PostgreSQL 15")
+@DisplayName("Migration repair · V36 · PostgreSQL 16")
 class V36MigrationRepairPgIntegrationTest {
 
     @Container
-    static final PostgreSQLContainer<?> PG = new PostgreSQLContainer<>("postgres:15-alpine");
+    static final PostgreSQLContainer<?> PG = new PostgreSQLContainer<>("postgres:16-alpine");
 
     private static final String LOC = "classpath:db/migration";
     private static final String SEDAN = "Стандартный шаблон для седана";
@@ -95,10 +95,10 @@ class V36MigrationRepairPgIntegrationTest {
                 .findFirst().orElseThrow(() -> new AssertionError("migration " + version + " not applied"));
     }
 
-    // ── 1. PRIMARY GATE: clean PostgreSQL 15, full V1 → V42 ────────────────────────────────────
+    // ── 1. PRIMARY GATE: clean PostgreSQL 16, full V1 → V42 ────────────────────────────────────
 
     @Test
-    @DisplayName("clean empty PostgreSQL 15 applies the full V1→V42 chain; V42 current; no pending; every migration SUCCESS")
+    @DisplayName("clean empty PostgreSQL 16 applies the full V1→latest chain; latest current; no pending; every migration SUCCESS")
     void cleanChainReachesV42() throws Exception {
         wipe();
         Flyway fw = flyway(LOC, null); // no target -> full chain

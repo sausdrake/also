@@ -30,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * database failed at V10. The repair changes the seed value to {@code NULL} (the column is nullable
  * per V9).
  *
- * <p>Runs against real <b>PostgreSQL 15</b> (the version in the repository's {@code docker-compose.yml}),
+ * <p>Runs against real <b>PostgreSQL 16</b> (the version in the repository's {@code docker-compose.yml}),
  * driving Flyway directly through its Java API against an empty database - no Spring context, no
  * {@code DataInitializer}, no dev profile, no manually inserted users, no baseline manipulation.
  *
@@ -47,11 +47,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * (api.version=1.44) and/or {@code ~/.docker-java.properties}.
  */
 @Testcontainers
-@DisplayName("Migration repair · V10 · PostgreSQL 15")
+@DisplayName("Migration repair · V10 · PostgreSQL 16")
 class V10MigrationRepairPgIntegrationTest {
 
     @Container
-    static final PostgreSQLContainer<?> PG = new PostgreSQLContainer<>("postgres:15-alpine");
+    static final PostgreSQLContainer<?> PG = new PostgreSQLContainer<>("postgres:16-alpine");
 
     private static final String LOC = "classpath:db/migration";
     private static final String SEDAN = "Стандартный шаблон для седана";
@@ -86,7 +86,7 @@ class V10MigrationRepairPgIntegrationTest {
     // ── 1. The V10 repair: clean chain reaches and applies V10 with created_by = NULL ────────
 
     @Test
-    @DisplayName("repaired V10 applies on empty PostgreSQL 15 (V1→V35); V10 SUCCESS; created_by IS NULL; no user seeded; no duplicate")
+    @DisplayName("repaired V10 applies on empty PostgreSQL 16 (V1→V35); V10 SUCCESS; created_by IS NULL; no user seeded; no duplicate")
     void repairedV10AppliesCleanly() throws Exception {
         wipe();
         Flyway fw = flyway(LOC, TARGET_BEFORE_V36);
@@ -120,7 +120,7 @@ class V10MigrationRepairPgIntegrationTest {
     // ── 2. The clean chain now advances past V10 through the (Step 1G) repaired V36 to V42 ───
 
     @Test
-    @DisplayName("full V1→V42 completes on empty PostgreSQL 15; V10 and V36 both SUCCESS (no V10 regression, V36 defect fixed in Step 1G)")
+    @DisplayName("full V1→latest completes on empty PostgreSQL 16; V10 and V36 both SUCCESS (no V10 regression, V36 defect fixed in Step 1G)")
     void fullChainReachesV42() throws Exception {   // name kept for history: now "reaches the latest"
         wipe();
         Flyway fw = flyway(LOC, null); // no target -> full chain

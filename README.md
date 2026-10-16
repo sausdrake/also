@@ -8,7 +8,7 @@
 - Java 17 + Spring Boot 3.1.5
 - Spring Security (JWT-аутентификация)
 - Spring WebSocket (STOMP) — ставки в реальном времени
-- Spring Data JPA + PostgreSQL 15
+- Spring Data JPA + PostgreSQL 16
 - Flyway — миграции базы данных
 - Bucket4j — rate limiting
 - Springdoc OpenAPI — Swagger-документация
@@ -74,6 +74,9 @@ client/src/
 docker-compose up -d
 ```
 
+> База — PostgreSQL 16. Том `postgres_data`, созданный прежней версией (15), под 16 не запустится:
+> перенос данных — только через `pg_dump`/восстановление, см. `docs/ops/postgresql-version.md`.
+
 - Бэкенд: http://localhost:8080
 - Swagger UI: http://localhost:8080/swagger-ui.html
 - БД: `localhost:5432`
@@ -86,7 +89,7 @@ docker-compose down
 
 ### Локальная разработка
 
-**Требования:** Java 17, Node.js 16+, PostgreSQL 15, Maven 3.9
+**Требования:** Java 17, Node.js 16+, PostgreSQL 16, Maven 3.9
 
 **Backend:**
 
