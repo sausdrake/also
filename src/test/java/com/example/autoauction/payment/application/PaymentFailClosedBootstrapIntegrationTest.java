@@ -57,6 +57,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * untouched.
  */
 @SpringBootTest(properties = {
+        // TEST-02: without the "test" profile nothing supplies the JWT secret, which the application
+        // takes from the JWT_SECRET environment variable only (01d0584) - the context never started
+        "jwt.secret=6661696c2d636c6f7365642d626f6f7473747261702d746573742d6f6e6c792d6e6f742d612d7265616c2d736563726574",
         "r2.account-id=fail-closed-bootstrap-test-unused",
         "r2.bucket=fail-closed-bootstrap-test-unused",
         "r2.access-key-id=fail-closed-bootstrap-test-unused",

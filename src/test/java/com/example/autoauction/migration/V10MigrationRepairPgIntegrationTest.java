@@ -121,7 +121,7 @@ class V10MigrationRepairPgIntegrationTest {
 
     @Test
     @DisplayName("full V1→V42 completes on empty PostgreSQL 15; V10 and V36 both SUCCESS (no V10 regression, V36 defect fixed in Step 1G)")
-    void fullChainReachesV42() throws Exception {
+    void fullChainReachesV42() throws Exception {   // name kept for history: now "reaches the latest"
         wipe();
         Flyway fw = flyway(LOC, null); // no target -> full chain
         fw.migrate();
@@ -140,7 +140,10 @@ class V10MigrationRepairPgIntegrationTest {
                 .findFirst().orElseThrow();
         assertThat(v36.getState()).as("V36 applied successfully (IF NOT EXISTS repair)")
                 .isEqualTo(MigrationState.SUCCESS);
-        assertThat(fw.info().current().getVersion().getVersion()).as("chain reaches V42").isEqualTo("42");
+        // TEST-02: was pinned to "42" and broke with every later migration; the chain must reach the newest one
+        assertThat(fw.info().current().getVersion().getVersion()).as("chain reaches the latest migration")
+                .isEqualTo(latestAvailable(fw));
+        assertThat(Integer.parseInt(latestAvailable(fw))).isGreaterThanOrEqualTo(42);
         assertThat(fw.info().pending()).as("no pending migrations").isEmpty();
     }
 
@@ -225,5 +228,15 @@ class V10MigrationRepairPgIntegrationTest {
                 .isEqualTo((long) repairedFileChecksum);
         assertThat(scalar("SELECT COUNT(*) FROM users")).as("application data (users) untouched by repair").isEqualTo(1);
         assertThat(scalar("SELECT COUNT(*) FROM users WHERE username = 'fixture_pre_existing'")).isEqualTo(1);
+    }
+
+    /** TEST-02: the newest migration on the classpath - the chain must always reach it (never pinned to a number). */
+    private static String latestAvailable(Flyway fw) {
+        return java.util.Arrays.stream(fw.info().all())
+                .map(MigrationInfo::getVersion)
+                .filter(java.util.Objects::nonNull)
+                .max(java.util.Comparator.naturalOrder())
+                .orElseThrow()
+                .getVersion();
     }
 }

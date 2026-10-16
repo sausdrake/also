@@ -108,7 +108,10 @@ class V36MigrationRepairPgIntegrationTest {
         MigrationInfo current = fw.info().current();
         assertThat(current).isNotNull();
         assertThat(current.getVersion()).isNotNull();
-        assertThat(current.getVersion().getVersion()).as("latest applied migration is V42").isEqualTo("42");
+        // TEST-02: was pinned to "42" and broke with every later migration; the chain must reach the newest one
+        assertThat(current.getVersion().getVersion()).as("latest applied migration is the newest available")
+                .isEqualTo(latestAvailable(fw));
+        assertThat(Integer.parseInt(latestAvailable(fw))).isGreaterThanOrEqualTo(42);
         assertThat(fw.info().pending()).as("no pending migrations after full migrate").isEmpty();
         for (MigrationInfo mi : fw.info().applied()) {
             assertThat(mi.getState()).as("migration %s state", mi.getVersion())
@@ -324,5 +327,15 @@ class V36MigrationRepairPgIntegrationTest {
                 .findFirst().orElseThrow().getChecksum();
         assertThat(newChecksum).as("stored checksum equals the repaired V36 file's Flyway checksum")
                 .isEqualTo((long) repairedFileChecksum);
+    }
+
+    /** TEST-02: the newest migration on the classpath - the chain must always reach it (never pinned to a number). */
+    private static String latestAvailable(Flyway fw) {
+        return java.util.Arrays.stream(fw.info().all())
+                .map(MigrationInfo::getVersion)
+                .filter(java.util.Objects::nonNull)
+                .max(java.util.Comparator.naturalOrder())
+                .orElseThrow()
+                .getVersion();
     }
 }
