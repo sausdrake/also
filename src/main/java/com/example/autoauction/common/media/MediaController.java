@@ -36,7 +36,8 @@ public class MediaController {
     @Value("${media.upload.dir:uploads}")
     private String uploadDir;
 
-    @Value("${media.base-url:http://localhost:8080/uploads}")
+    // DEV-02: required, like everywhere else it is read - no fallback to a localhost URL
+    @Value("${media.base-url}")
     private String baseUrl;
 
     /**
