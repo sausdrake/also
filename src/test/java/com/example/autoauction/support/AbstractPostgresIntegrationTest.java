@@ -4,8 +4,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Slice 2 (Bank / Payment Infrastructure): base class for financial money-path integration tests
@@ -13,7 +11,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * blocking, transaction isolation, {@code NUMERIC(19,2)} precision and true concurrent-webhook
  * races cannot be faithfully exercised on H2.
  *
- * <p>The container is {@code static} so Testcontainers starts it once per JVM fork and reuses it
+ * <p>TEST-01: the container is a JVM-wide singleton - started once in the static initializer and
+ * stopped by Testcontainers' reaper when the JVM exits. Managed by the JUnit extension
+ * ({@code @Container}) it was stopped after every test class while Spring kept the cached context
+ * pointing at it, so the next class sharing that context failed to connect: the PG classes could
+ * only be run one at a time. All subclasses share one database; each test creates its own data.
+ * {@code disabledWithoutDocker} on a subclass is evaluated before the class is initialized, so
+ * without Docker the class is still skipped, not failed. As before, the container is reused
  * across every subclass; {@link ServiceConnection} (Spring Boot 3.1+) wires the application
  * datasource to it automatically - no {@code @DynamicPropertySource} plumbing.
  *
@@ -26,11 +30,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  */
 @SpringBootTest
 @ActiveProfiles({"test", "pg"})
-@Testcontainers
 public abstract class AbstractPostgresIntegrationTest {
 
-    @Container
     @ServiceConnection
     protected static final PostgreSQLContainer<?> POSTGRES =
             new PostgreSQLContainer<>("postgres:16-alpine");
+
+    static {
+        POSTGRES.start();
+    }
 }

@@ -3,13 +3,11 @@ package com.example.autoauction.auth.infrastructure.scheduler;
 import com.example.autoauction.admin.application.SchedulerHealthSignal;
 import com.example.autoauction.auth.domain.port.RefreshTokenRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@EnableScheduling
 public class TokenCleanupScheduler {
 
     private final RefreshTokenRepository refreshTokenRepository;

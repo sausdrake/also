@@ -161,6 +161,11 @@ class PaymentCreditVsWithdrawConcurrencyPgIntegrationTest extends AbstractPostgr
 
         CountDownLatch creditLockAcquired = new CountDownLatch(1);
         CountDownLatch creditCommitted = new CountDownLatch(1);
+        // TEST-01: the other side must have READ the deposit before credit commits - otherwise a
+        // fast credit (a warm JVM) commits first, the read is fresh, no stale write, and the test
+        // failed whenever another class had warmed up the same code. Credit's write waits for it;
+        // the read is a plain SELECT, never blocked by credit's FOR UPDATE lock, so no deadlock.
+        CountDownLatch withdrawRead = new CountDownLatch(1);
 
         doAnswer(inv -> {
             Object result = inv.callRealMethod();
@@ -170,7 +175,9 @@ class PaymentCreditVsWithdrawConcurrencyPgIntegrationTest extends AbstractPostgr
 
         doAnswer(inv -> {
             if (Thread.currentThread().getName().equals("withdraw-thread")) {
-                return awaitThenCallReal(inv, creditLockAcquired);
+                Object read = awaitThenCallReal(inv, creditLockAcquired);
+                withdrawRead.countDown();
+                return read;
             }
             return inv.callRealMethod();
         }).when(depositRepositorySpy).findByUserId(userId);
@@ -178,6 +185,9 @@ class PaymentCreditVsWithdrawConcurrencyPgIntegrationTest extends AbstractPostgr
         doAnswer(inv -> {
             if (Thread.currentThread().getName().equals("withdraw-thread")) {
                 return awaitThenCallReal(inv, creditCommitted);
+            }
+            if (Thread.currentThread().getName().equals("credit-thread")) {
+                return awaitThenCallReal(inv, withdrawRead);
             }
             return inv.callRealMethod();
         }).when(depositRepositorySpy).save(any(Deposit.class));

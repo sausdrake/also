@@ -215,14 +215,30 @@ class PaymentCreditVsUnblockForSaleFailureConcurrencyPgIntegrationTest extends A
         String ref = newSucceedingPayment(f.winnerId(), CREDIT_AMOUNT);
 
         CountDownLatch creditCommitted = new CountDownLatch(1);
+        // TEST-01: the other side must have READ the deposit before credit commits - otherwise a
+        // fast credit (a warm JVM) commits first, the read is fresh, no stale write, and the test
+        // failed whenever another class had warmed up the same code. Credit's write waits for it;
+        // the read is a plain SELECT, never blocked by credit's FOR UPDATE lock, so no deadlock.
+        CountDownLatch unblockRead = new CountDownLatch(1);
 
         // Only unblock-thread's save is gated on credit's full commit signal; unblock's own
         // unlocked findByUserId read is deliberately left un-gated - under PostgreSQL READ
         // COMMITTED it is never blocked by credit's uncommitted FOR UPDATE lock, so gating it
         // would misrepresent real Postgres semantics (same reasoning already validated in D5-D/E/F).
         doAnswer(inv -> {
+            Object read = inv.callRealMethod();
+            if (Thread.currentThread().getName().equals("unblock-thread")) {
+                unblockRead.countDown();
+            }
+            return read;
+        }).when(depositRepositorySpy).findByUserId(f.winnerId());
+
+        doAnswer(inv -> {
             if (Thread.currentThread().getName().equals("unblock-thread")) {
                 return awaitThenCallReal(inv, creditCommitted);
+            }
+            if (Thread.currentThread().getName().equals("credit-thread")) {
+                return awaitThenCallReal(inv, unblockRead);
             }
             return inv.callRealMethod();
         }).when(depositRepositorySpy).save(any(Deposit.class));

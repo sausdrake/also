@@ -9,7 +9,6 @@ import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.notification.application.NotificationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -20,7 +19,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
-@EnableScheduling
 public class AuctionCompletionScheduler {
 
     private final AuctionRepository auctionRepository;
