@@ -70,6 +70,8 @@ client/src/
 
 ### Docker Compose (рекомендуется)
 
+Сначала создайте `.env` по образцу `.env.example` (см. «Переменные окружения»).
+
 ```bash
 docker-compose up -d
 ```
@@ -77,8 +79,8 @@ docker-compose up -d
 > База — PostgreSQL 16. Том `postgres_data`, созданный прежней версией (15), под 16 не запустится:
 > перенос данных — только через `pg_dump`/восстановление, см. `docs/ops/postgresql-version.md`.
 
-- Бэкенд: http://localhost:8080
-- Swagger UI: http://localhost:8080/swagger-ui.html
+- Бэкенд: http://localhost:8081
+- Swagger UI в Docker Compose выключен: сервис работает в профиле `prod`
 - БД: `localhost:5432`
 
 Остановить:
@@ -106,17 +108,24 @@ npm install
 npm run dev
 ```
 
-Фронтенд доступен на http://localhost:5173, бэкенд на http://localhost:8080.
+Фронтенд доступен на http://localhost:5173, бэкенд на http://localhost:8081.
 
 ## Переменные окружения
 
-Файл `.env` в корне проекта:
+Файл `.env` в корне проекта — скопируйте `.env.example` и задайте свои значения:
 
 ```env
-JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
-SPRING_DATASOURCE_USERNAME=auto_auction_user
-SPRING_DATASOURCE_PASSWORD=auto_auction_password
+DB_PASSWORD=
+JWT_SECRET=
+ALLOWED_ORIGINS=
+MEDIA_BASE_URL=
+R2_ACCOUNT_ID=
+R2_BUCKET=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
 ```
+
+`JWT_SECRET` — случайная строка не короче 32 байт; общеизвестные значения профиль `prod` отвергает при старте.
 
 В `application.properties` настраивается:
 
@@ -127,7 +136,7 @@ jwt.refresh-expiration=604800000 # 7 дней
 
 # Автоматическое продление аукциона
 auction.extension.enabled=true
-auction.extension.threshold-seconds=30
+auction.extension.threshold-seconds=300
 auction.extension.extension-minutes=5
 ```
 
@@ -147,14 +156,14 @@ auction.extension.extension-minutes=5
 | POST | `/api/admin/auctions` | Создать аукцион (ADMIN) |
 | POST | `/api/admin/vehicles/{id}/approve` | Одобрить автомобиль (ADMIN) |
 
-Полная интерактивная документация: http://localhost:8080/swagger-ui.html
+Полная интерактивная документация (при локальном запуске; в профиле `prod` выключена): http://localhost:8081/swagger-ui.html
 
 ## WebSocket
 
 Подписка на обновления аукциона в реальном времени:
 
 ```
-ws://localhost:8080/ws/auctions
+SockJS: http://localhost:8081/ws-auction
 STOMP topic: /topic/auction/{auctionId}
 ```
 
@@ -204,17 +213,17 @@ docker build -t autoauction .
 
 ```bash
 # Регистрация
-curl -X POST http://localhost:8080/api/auth/register \
+curl -X POST http://localhost:8081/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{"username":"user1","email":"user1@example.com","password":"password123"}'
 
 # Вход
-curl -X POST http://localhost:8080/api/auth/login \
+curl -X POST http://localhost:8081/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"user1","password":"password123"}'
 
 # Список аукционов
-curl http://localhost:8080/api/public/auctions \
+curl http://localhost:8081/api/public/auctions \
   -H "Authorization: Bearer <accessToken>"
 ```
 
