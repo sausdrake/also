@@ -6,12 +6,12 @@ import com.example.autoauction.deposit.domain.Deposit;
 import com.example.autoauction.deposit.domain.FreezeReason;
 import com.example.autoauction.deposit.domain.FrozenDeposit;
 import com.example.autoauction.deposit.domain.port.DepositRepository;
+import com.example.autoauction.notification.application.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -39,7 +39,11 @@ class DepositServiceWithFrozenStorageTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
-    @InjectMocks
+    @Mock
+    private NotificationService notificationService;
+
+    // Built in setUp: unfreezing goes through the real DepositUnfreezeTransactionService over the same
+    // mocked repository, so these tests still see the repository calls the unfreeze makes.
     private DepositService depositService;
 
     private Deposit deposit;
@@ -53,6 +57,8 @@ class DepositServiceWithFrozenStorageTest {
     void setUp() {
         deposit = new Deposit(userId, depositBalance);
         deposit.setId(depositId);
+        depositService = new DepositService(depositRepository, failedOperationService, notificationService,
+                new DepositUnfreezeTransactionService(depositRepository), eventPublisher);
     }
 
     @Test
@@ -97,7 +103,7 @@ class DepositServiceWithFrozenStorageTest {
         when(depositRepository.getFrozenDepositsByDepositId(depositId))
                 .thenReturn(List.of(frozenDeposit));
         doNothing().when(depositRepository).unfreezeForAuction(depositId, auctionId);
-        when(depositRepository.save(any(Deposit.class))).thenReturn(deposit);
+        when(depositRepository.saveAndFlush(any(Deposit.class))).thenReturn(deposit);
         when(depositRepository.saveTransaction(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // when
@@ -105,6 +111,8 @@ class DepositServiceWithFrozenStorageTest {
 
         // then
         verify(depositRepository, times(1)).unfreezeForAuction(depositId, auctionId);
+        assertThat(deposit.getBlockedAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        verify(failedOperationService, never()).saveFailedOperation(anyString(), anyLong(), anyLong(), any());
     }
 
     @Test
@@ -136,6 +144,12 @@ class DepositServiceWithFrozenStorageTest {
 
         // when - метод должен обработать ситуацию без исключения
         assertDoesNotThrow(() -> depositService.unfreezeForAuction(userId, auctionId));
+
+        // then - inconsistent state: nothing is unfrozen, no ledger row, nothing saved; the failure is recorded
+        verify(depositRepository, never()).unfreezeForAuction(anyLong(), anyLong());
+        verify(depositRepository, never()).saveTransaction(any());
+        verify(depositRepository, never()).saveAndFlush(any());
+        verify(failedOperationService).saveFailedOperation(eq("UNFREEZE_AUCTION"), eq(userId), eq(auctionId), any());
     }
 
     @Test

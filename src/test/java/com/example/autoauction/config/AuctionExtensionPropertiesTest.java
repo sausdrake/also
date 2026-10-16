@@ -21,7 +21,7 @@ class AuctionExtensionPropertiesTest {
     @DisplayName("Конфигурация загружается с правильными значениями по умолчанию")
     void propertiesShouldHaveDefaultValues() {
         assertThat(properties.isEnabled()).isTrue();
-        assertThat(properties.getThresholdSeconds()).isEqualTo(30);
+        assertThat(properties.getThresholdSeconds()).isEqualTo(300); // application.properties, da70a77
         assertThat(properties.getExtensionMinutes()).isEqualTo(5);
         assertThat(properties.getMaxExtensions()).isEqualTo(0);
     }

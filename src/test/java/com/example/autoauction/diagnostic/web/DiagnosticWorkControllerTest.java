@@ -4,6 +4,7 @@ import com.example.autoauction.auth.infrastructure.security.JwtService;
 import com.example.autoauction.auth.infrastructure.security.WithMockCustomUser;
 import com.example.autoauction.config.TestSecurityConfig;
 import com.example.autoauction.diagnostic.application.DiagnosticRequestService;
+import com.example.autoauction.diagnostic.application.InspectionTemplateService;
 import com.example.autoauction.diagnostic.web.dto.DiagnosticRequestResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +34,9 @@ class DiagnosticWorkControllerTest {
 
     @MockBean
     private DiagnosticRequestService requestService;
+
+    @MockBean
+    private InspectionTemplateService templateService;
 
     @MockBean
     private JwtService jwtService;
