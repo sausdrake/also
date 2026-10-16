@@ -5,6 +5,7 @@ import com.example.autoauction.diagnostic.media.application.DiagnosticMediaServi
 import com.example.autoauction.diagnostic.media.domain.DiagnosticMedia;
 import com.example.autoauction.diagnostic.media.web.dto.MediaReadUrlResponse;
 import com.example.autoauction.diagnostic.web.dto.DiagnosticRequestResponse;
+import com.example.autoauction.diagnostic.web.dto.PublicDiagnosticReportResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -25,19 +26,19 @@ public class PublicReportController {
 
     @GetMapping("/{requestId}")
     @Operation(summary = "Просмотр одобренного диагностического отчёта")
-    public ResponseEntity<DiagnosticRequestResponse> getReport(@PathVariable Long requestId) {
+    public ResponseEntity<PublicDiagnosticReportResponse> getReport(@PathVariable Long requestId) {
         DiagnosticRequestResponse report = requestService.getRequestDetails(requestId);
         if (report.getStatus() == null || !report.getStatus().equals("APPROVED")) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(report);
+        return ResponseEntity.ok(PublicDiagnosticReportResponse.from(report));   // SEC-12: public allowlist
     }
 
     @GetMapping("/by-vehicle/{vehicleId}")
     @Operation(summary = "Получить одобренный отчёт по ID автомобиля")
-    public ResponseEntity<DiagnosticRequestResponse> getReportByVehicle(@PathVariable Long vehicleId) {
+    public ResponseEntity<PublicDiagnosticReportResponse> getReportByVehicle(@PathVariable Long vehicleId) {
         try {
-            return ResponseEntity.ok(requestService.getApprovedReportForVehicle(vehicleId));
+            return ResponseEntity.ok(PublicDiagnosticReportResponse.from(requestService.getApprovedReportForVehicle(vehicleId)));
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }
