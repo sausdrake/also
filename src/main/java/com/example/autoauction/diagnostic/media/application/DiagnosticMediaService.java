@@ -131,6 +131,19 @@ public class DiagnosticMediaService {
         DiagnosticMedia media = mediaRepository.findById(mediaId)
                 .orElseThrow(() -> new IllegalArgumentException("Медиафайл не найден: " + mediaId));
 
+        // SEC-14: who is asking is checked BEFORE the idempotent answer below - it used to come
+        // after it, so any authenticated user could "finalize" someone else's READY media and read
+        // its metadata. Only identity here (the request's assigned diagnostician who uploaded the
+        // file), so the uploader's late retry keeps its idempotent answer whatever the request status.
+        DiagnosticRequest owning = requestRepository.findById(media.getDiagnosticRequestId())
+                .orElseThrow(() -> new IllegalArgumentException("Заявка не найдена: " + media.getDiagnosticRequestId()));
+        if (owning.getAssignedTo() == null || !owning.getAssignedTo().equals(diagnosticId)) {
+            throw new SecurityException("Вы не назначены на эту заявку");
+        }
+        if (!media.getUploaderId().equals(diagnosticId)) {
+            throw new SecurityException("Вы не загружали этот файл");
+        }
+
         // Idempotent: a media item already READY (or terminally FAILED/EXPIRED/DELETED) is not
         // re-validated - repeated finalize calls must never duplicate work or mutate a settled row.
         if (media.getUploadStatus() != UploadStatus.PENDING_UPLOAD) {
@@ -143,9 +156,6 @@ public class DiagnosticMediaService {
         // Full, live re-authorization - never trust the authorization performed at intent time.
         DiagnosticRequest request = loadRequestAssignedTo(media.getDiagnosticRequestId(), diagnosticId);
         loadItemBoundToRequestTemplate(request, media.getInspectionItemId());
-        if (!media.getUploaderId().equals(diagnosticId)) {
-            throw new SecurityException("Вы не загружали этот файл");
-        }
 
         // R2 I/O happens here, deliberately outside any DB transaction (each repository call
         // above/below is its own short, independently-committing operation).

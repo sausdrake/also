@@ -238,6 +238,78 @@ class DiagnosticMediaSecurityTest {
                 .andExpect(status().isNotFound());
     }
 
+    // ==================== SEC-14: finalize of a READY media item ====================
+
+    private Long readyMediaWithCaption(Ctx ctx, String caption) {
+        DiagnosticMedia media = new DiagnosticMedia();
+        media.setDiagnosticRequestId(ctx.requestId());
+        media.setInspectionItemId(ctx.itemId());
+        media.setUploaderId(ctx.diagnosticId());
+        media.setStorageKey("diagnostic-media/" + ctx.requestId() + "/sec14-" + System.nanoTime() + ".jpg");
+        media.setMediaType(MediaType.PHOTO);
+        media.setMimeType("image/jpeg");
+        media.setSizeBytes(4L);
+        media.setSortOrder(0);
+        media.setCaption(caption);
+        media.setUploadStatus(UploadStatus.READY);
+        media.setProcessingStatus(ProcessingStatus.NOT_REQUIRED);
+        return mediaRepository.save(media).getId();
+    }
+
+    @Test
+    @DisplayName("SEC-14: finalize of someone else's READY media -> 403 for a buyer and for a non-assigned diagnostician, nothing disclosed")
+    void finalize_readyMedia_foreignCaller_403() throws Exception {
+        Ctx ctx = setUp();
+        String caption = "SEC14-PRIVATE-" + System.nanoTime();
+        Long mediaId = readyMediaWithCaption(ctx, caption);
+
+        for (var caller : java.util.List.of(user(createUser("buyer"), "USER"), user(createUser("otherdiag"), "DIAGNOSTIC"))) {
+            String body = mockMvc.perform(post("/api/v1/diagnostic/media/{mediaId}/finalize", mediaId).with(caller))
+                    .andExpect(status().isForbidden())
+                    .andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+            org.assertj.core.api.Assertions.assertThat(body).doesNotContain(caption);
+        }
+    }
+
+    @Test
+    @DisplayName("SEC-14: the uploader's repeated finalize of a READY media item stays idempotent (200)")
+    void finalize_readyMedia_uploader_idempotent200() throws Exception {
+        Ctx ctx = setUp();
+        Long mediaId = readyMediaWithCaption(ctx, "own");
+        mockMvc.perform(post("/api/v1/diagnostic/media/{mediaId}/finalize", mediaId).with(user(ctx.diagnosticId(), "DIAGNOSTIC")))
+                .andExpect(status().isOk());
+        org.assertj.core.api.Assertions.assertThat(mediaRepository.findById(mediaId).orElseThrow().getUploadStatus())
+                .isEqualTo(UploadStatus.READY);
+    }
+
+    @Test
+    @DisplayName("SEC-14: after reassignment neither the new diagnostician (not the uploader) nor the uploader (no longer assigned) can finalize")
+    void finalize_readyMedia_afterReassignment_403Both() throws Exception {
+        Ctx ctx = setUp();
+        Long mediaId = readyMediaWithCaption(ctx, "reassigned");
+        Long newDiagnostician = createUser("newdiag");
+        DiagnosticRequest request = requestRepository.findById(ctx.requestId()).orElseThrow();
+        request.setAssignedTo(newDiagnostician);
+        requestRepository.save(request);
+
+        mockMvc.perform(post("/api/v1/diagnostic/media/{mediaId}/finalize", mediaId).with(user(newDiagnostician, "DIAGNOSTIC")))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/diagnostic/media/{mediaId}/finalize", mediaId).with(user(ctx.diagnosticId(), "DIAGNOSTIC")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("SEC-14: the uploader's late retry after the report was submitted still gets the idempotent 200")
+    void finalize_readyMedia_uploaderAfterSubmission_200() throws Exception {
+        Ctx ctx = setUp();
+        Long mediaId = readyMediaWithCaption(ctx, "own-late");
+        DiagnosticRequest request = requestRepository.findById(ctx.requestId()).orElseThrow();
+        request.setStatus(DiagnosticRequest.DiagnosticRequestStatus.COMPLETED);
+        requestRepository.save(request);
+        mockMvc.perform(post("/api/v1/diagnostic/media/{mediaId}/finalize", mediaId).with(user(ctx.diagnosticId(), "DIAGNOSTIC")))
+                .andExpect(status().isOk());
+    }
+
     private static org.springframework.test.web.servlet.request.RequestPostProcessor user(Long userId, String role) {
         return org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors
                 .user(com.example.autoauction.auth.domain.TestUserPrincipal.createWithRoles(userId, "u" + userId, role));
