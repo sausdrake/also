@@ -26,6 +26,7 @@ import com.example.autoauction.sale.domain.port.SaleResolutionRepository;
 import com.example.autoauction.vehicle.domain.Vehicle;
 import com.example.autoauction.vehicle.domain.port.VehicleRepository;
 import com.example.autoauction.policy.application.PolicyVersionService;
+import com.example.autoauction.support.TestUserIds;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -154,7 +155,7 @@ class SaleCommitmentResolutionIntegrationTest {
      * real SellerDiagnosticCommitment (AWAITING_FINALIZATION).
      */
     private Setup approveAndGetVehicleWithCommitment(BigDecimal committedAmount, BigDecimal feeAmount) {
-        Long sellerId = 900_000L + (System.nanoTime() % 100_000L);
+        Long sellerId = TestUserIds.next();
         txTemplate().execute(status -> {
             depositService.createDeposit(sellerId, new BigDecimal("50000"));
             return null;
@@ -256,7 +257,7 @@ class SaleCommitmentResolutionIntegrationTest {
     }
 
     private long uniqueWinnerId() {
-        return 800_000L + (System.nanoTime() % 100_000L);
+        return TestUserIds.next();
     }
 
     // ==================== Outcome A ====================
@@ -531,7 +532,7 @@ class SaleCommitmentResolutionIntegrationTest {
         // deliberately constructing a state X3-C's own creation-time eligibility check would
         // never itself allow, specifically to prove SaleCommitmentResolutionOrchestrator's own
         // independent AWAITING_FINALIZATION-only defense, not a realistic linkage.
-        long sellerId = 900_000L + (System.nanoTime() % 100_000L);
+        long sellerId = TestUserIds.next();
         txTemplate().execute(status -> {
             depositService.createDeposit(sellerId, new BigDecimal("50000"));
             return null;

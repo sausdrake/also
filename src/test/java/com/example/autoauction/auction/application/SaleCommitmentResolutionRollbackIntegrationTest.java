@@ -23,6 +23,7 @@ import com.example.autoauction.vehicle.domain.Vehicle;
 import com.example.autoauction.vehicle.domain.VehicleStatus;
 import com.example.autoauction.vehicle.domain.port.VehicleRepository;
 import com.example.autoauction.policy.application.PolicyVersionService;
+import com.example.autoauction.support.TestUserIds;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -129,7 +130,7 @@ class SaleCommitmentResolutionRollbackIntegrationTest {
      *  diagnostic-approval flow, same conventions, deliberately not shared code across test
      *  files to keep this class's @SpyBean blast radius fully self-contained. */
     private Setup approveAndGetVehicleWithCommitment(BigDecimal committedAmount, BigDecimal feeAmount) {
-        Long sellerId = 700_000L + (System.nanoTime() % 100_000L);
+        Long sellerId = TestUserIds.next();
         txTemplate().execute(status -> {
             depositService.createDeposit(sellerId, new BigDecimal("50000"));
             return null;
@@ -215,7 +216,7 @@ class SaleCommitmentResolutionRollbackIntegrationTest {
     }
 
     private long uniqueWinnerId() {
-        return 600_000L + (System.nanoTime() % 100_000L);
+        return TestUserIds.next();
     }
 
     private record PolicyWithViolation(Long policyVersionId, Long violationDefinitionId) {}
