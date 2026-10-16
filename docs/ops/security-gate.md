@@ -34,7 +34,7 @@ SEC-09 seller cannot bid on their own car, SEC-11 database port not public, ERR-
 |---|---|---|---|
 | R1 | `spring-webmvc` 6.2.19: two critical advisories (XsltView path limitation, SSE fragment rendering), fixed only in Spring 7 | Not exploitable: the application uses neither XsltView nor SSE/fragment rendering (checked in code) | Accept until SEC-16 |
 | R2 | Spring Boot 3.x has no open-source support since 2026-06-30 - new advisories will not get 3.x fixes | Today clean except R1; risk grows with time | **Decide: SEC-16 (move to Boot 4.x, large migration) or commercial support for 3.5** |
-| R3 | `react-router` 6.x: open redirect via backslash; SSR hydration | Not exploitable: every navigation target is built by the app from numeric ids; no SSR | Accept until a react-router 7 migration |
+| R3 | `react-router` 6.x: open redirect via backslash; SSR hydration | Not exploitable: every navigation target is built by the app from numeric ids; no SSR | Resolved by FE-03: `react-router-dom` 7.18.4 (both advisories fixed in 7.18.0); `npm audit --omit=dev` finds 0 vulnerabilities |
 | R4 | Dev-only build tooling (tailwindcss 3 chain) | Not shipped to users | Accept |
 | R5 | Public auction responses and WebSocket messages carry the numeric `winnerId`; the public auction shows the reserve price | No usernames; reserve visibility is BIZ-01 | Decide with BIZ-01 |
 | R6 | `/api/v1/public/vehicles/{id}` answers for a vehicle in any status (now only public car data) | Low: no personal or staff data left | Accept, or restrict to listed statuses |
