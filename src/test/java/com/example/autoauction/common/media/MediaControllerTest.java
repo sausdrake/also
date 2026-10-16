@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
@@ -51,7 +52,11 @@ class MediaControllerTest {
         return body;
     }
 
-    private static final String BASE_URL = "http://localhost:8080/uploads";
+    // TEST-03: the base URL the controller itself is configured with - never a separate literal.
+    // A literal 8080 here never matched the 8081 this slice reads from application.properties,
+    // so every delete request was refused at the prefix check before reaching what each test checks.
+    @Value("${media.base-url}")
+    private String baseUrl;
 
     @Autowired
     private MockMvc mockMvc;
@@ -254,7 +259,7 @@ class MediaControllerTest {
     @WithMockCustomUser(userId = 7L, roles = {"USER"})
     @DisplayName("H-7: загрузивший может удалить собственный файл")
     void delete_ownFile_allowed() throws Exception {
-        mockMvc.perform(delete("/api/media").param("url", BASE_URL + "/abc.png"))
+        mockMvc.perform(delete("/api/media").param("url", baseUrl + "/abc.png"))
                 .andExpect(status().isNoContent());
 
         verify(mediaAssetService).authorizeDelete(eq("abc.png"), eq(7L), eq(false));
@@ -268,7 +273,7 @@ class MediaControllerTest {
         doThrow(new SecurityException("not owner"))
                 .when(mediaAssetService).authorizeDelete(anyString(), eq(999L), eq(false));
 
-        mockMvc.perform(delete("/api/media").param("url", BASE_URL + "/abc.png"))
+        mockMvc.perform(delete("/api/media").param("url", baseUrl + "/abc.png"))
                 .andExpect(status().isForbidden());
 
         verify(mediaAssetService, never()).deleteRecord(anyString());
@@ -281,7 +286,7 @@ class MediaControllerTest {
         doThrow(new SecurityException("not owner"))
                 .when(mediaAssetService).authorizeDelete(anyString(), eq(55L), eq(false));
 
-        mockMvc.perform(delete("/api/media").param("url", BASE_URL + "/abc.png"))
+        mockMvc.perform(delete("/api/media").param("url", baseUrl + "/abc.png"))
                 .andExpect(status().isForbidden());
     }
 
@@ -289,7 +294,7 @@ class MediaControllerTest {
     @WithMockCustomUser(userId = 1L, roles = {"ADMIN"})
     @DisplayName("H-7: администратор может удалить чужой файл")
     void delete_byAdmin_allowed() throws Exception {
-        mockMvc.perform(delete("/api/media").param("url", BASE_URL + "/abc.png"))
+        mockMvc.perform(delete("/api/media").param("url", baseUrl + "/abc.png"))
                 .andExpect(status().isNoContent());
 
         verify(mediaAssetService).authorizeDelete(eq("abc.png"), eq(1L), eq(true));
@@ -298,7 +303,7 @@ class MediaControllerTest {
     @Test
     @DisplayName("H-7: неаутентифицированное удаление отклоняется")
     void delete_unauthenticated_rejected() throws Exception {
-        mockMvc.perform(delete("/api/media").param("url", BASE_URL + "/abc.png"))
+        mockMvc.perform(delete("/api/media").param("url", baseUrl + "/abc.png"))
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(mediaAssetService);
@@ -322,7 +327,7 @@ class MediaControllerTest {
         doThrow(new SecurityException("unregistered"))
                 .when(mediaAssetService).authorizeDelete(anyString(), eq(7L), eq(false));
 
-        mockMvc.perform(delete("/api/media").param("url", BASE_URL + "/historical.png"))
+        mockMvc.perform(delete("/api/media").param("url", baseUrl + "/historical.png"))
                 .andExpect(status().isForbidden());
     }
 
@@ -330,7 +335,7 @@ class MediaControllerTest {
     @WithMockCustomUser(userId = 1L, roles = {"ADMIN"})
     @DisplayName("H-7: администратор может удалить неучтённый (исторический) файл")
     void delete_unregisteredFile_byAdmin_allowed() throws Exception {
-        mockMvc.perform(delete("/api/media").param("url", BASE_URL + "/historical.png"))
+        mockMvc.perform(delete("/api/media").param("url", baseUrl + "/historical.png"))
                 .andExpect(status().isNoContent());
     }
 
@@ -338,7 +343,7 @@ class MediaControllerTest {
     @WithMockCustomUser(userId = 1L, roles = {"ADMIN"})
     @DisplayName("H-7: удаление отсутствующего на диске файла по-прежнему возвращает 204")
     void delete_fileNotOnDisk_stillReturns204() throws Exception {
-        mockMvc.perform(delete("/api/media").param("url", BASE_URL + "/does-not-exist-on-disk.png"))
+        mockMvc.perform(delete("/api/media").param("url", baseUrl + "/does-not-exist-on-disk.png"))
                 .andExpect(status().isNoContent());
     }
 
@@ -346,7 +351,7 @@ class MediaControllerTest {
     @WithMockCustomUser(userId = 7L, roles = {"USER"})
     @DisplayName("H-7: попытка path traversal отклоняется до вызова авторизации")
     void delete_pathTraversalAttempt_rejectedBeforeAuthorization() throws Exception {
-        mockMvc.perform(delete("/api/media").param("url", BASE_URL + "/../../etc/passwd"))
+        mockMvc.perform(delete("/api/media").param("url", baseUrl + "/../../etc/passwd"))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(mediaAssetService);
@@ -358,7 +363,7 @@ class MediaControllerTest {
     @WithMockCustomUser(userId = 1L, roles = {"ADMIN"})
     @DisplayName("H-7: url в точности равен baseUrl (пустой storageKey) -> 400 до авторизации")
     void delete_urlExactlyEqualsBaseUrl_rejectedBeforeAuthorization() throws Exception {
-        mockMvc.perform(delete("/api/media").param("url", BASE_URL))
+        mockMvc.perform(delete("/api/media").param("url", baseUrl))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(mediaAssetService);
@@ -368,7 +373,7 @@ class MediaControllerTest {
     @WithMockCustomUser(userId = 1L, roles = {"ADMIN"})
     @DisplayName("H-7: url = baseUrl + \"/\" (пустой storageKey после нормализации) -> 400 до авторизации")
     void delete_urlIsBaseUrlWithTrailingSlash_rejectedBeforeAuthorization() throws Exception {
-        mockMvc.perform(delete("/api/media").param("url", BASE_URL + "/"))
+        mockMvc.perform(delete("/api/media").param("url", baseUrl + "/"))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(mediaAssetService);
@@ -378,7 +383,7 @@ class MediaControllerTest {
     @WithMockCustomUser(userId = 1L, roles = {"ADMIN"})
     @DisplayName("H-7: storageKey из одних пробелов -> 400 до авторизации")
     void delete_whitespaceOnlyStorageKey_rejectedBeforeAuthorization() throws Exception {
-        mockMvc.perform(delete("/api/media").param("url", BASE_URL + "/   "))
+        mockMvc.perform(delete("/api/media").param("url", baseUrl + "/   "))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(mediaAssetService);
