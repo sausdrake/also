@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -197,5 +198,207 @@ class AuctionExtensionTest {
         assertThrows(IllegalArgumentException.class, () -> {
             auction.addBid(tooLowBid, 2L, fixedTime.plusMinutes(5));
         });
+    }
+
+    private AuctionExtensionProperties props(int thresholdSeconds, int extensionMinutes, int maxExtensions) {
+        AuctionExtensionProperties p = new AuctionExtensionProperties();
+        p.setEnabled(true);
+        p.setThresholdSeconds(thresholdSeconds);
+        p.setExtensionMinutes(extensionMinutes);
+        p.setMaxExtensions(maxExtensions);
+        return p;
+    }
+
+    private Auction auctionWithoutInjectedProperties(OffsetDateTime endTime) {
+        Auction a = new Auction(
+                1L,
+                STARTING_PRICE,
+                new BigDecimal("1200000"),
+                new BigDecimal("1500000"),
+                MIN_BID_STEP,
+                fixedTime.minusHours(1),
+                endTime,
+                1L,
+                fixedClock
+        );
+        a.setId(1L);
+        a.setStatus(AuctionStatus.ACTIVE);
+        return a;
+    }
+
+    private BigDecimal firstBidAmount() {
+        return STARTING_PRICE.add(MIN_BID_STEP);
+    }
+
+    private void assertExtendedOnce(Auction a, OffsetDateTime oldEnd, long minutes) {
+        assertThat(a.getEndTime()).isEqualTo(oldEnd.plusMinutes(minutes));
+        assertThat(a.getExtensionCount()).isEqualTo(1);
+    }
+
+    private void assertNotExtended(Auction a, OffsetDateTime oldEnd) {
+        assertThat(a.getEndTime()).isEqualTo(oldEnd);
+        assertThat(a.getExtensionCount()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("Граница: ставка ровно за thresholdSeconds до конца продлевает (<= включительно)")
+    void extends_whenExactlyThresholdSecondsLeft() {
+        extensionProperties = props(60, 5, 0);
+        OffsetDateTime endTime = fixedTime.plusMinutes(10);
+        auction = createTestAuction(endTime);
+
+        auction.addBid(firstBidAmount(), 2L, endTime.minusSeconds(60));
+
+        assertExtendedOnce(auction, endTime, 5);
+    }
+
+    @Test
+    @DisplayName("Граница: ставка за thresholdSeconds + 1 до конца не продлевает")
+    void doesNotExtend_whenThresholdPlusOneSecondLeft() {
+        extensionProperties = props(60, 5, 0);
+        OffsetDateTime endTime = fixedTime.plusMinutes(10);
+        auction = createTestAuction(endTime);
+
+        auction.addBid(firstBidAmount(), 2L, endTime.minusSeconds(61));
+
+        assertNotExtended(auction, endTime);
+    }
+
+    @Test
+    @DisplayName("Ставка ровно в endTime принимается, но с 0 секунд до конца не продлевает")
+    void doesNotExtend_whenBidAtEndTime_zeroSecondsLeft() {
+        extensionProperties = props(60, 5, 0);
+        OffsetDateTime endTime = fixedTime.plusMinutes(10);
+        auction = createTestAuction(endTime);
+
+        auction.addBid(firstBidAmount(), 2L, endTime);
+
+        assertNotExtended(auction, endTime);
+        assertThat(auction.getTotalBids()).isEqualTo(1);
+        assertThat(auction.getCurrentPrice()).isEqualByComparingTo(firstBidAmount());
+    }
+
+    @Test
+    @DisplayName("Усечение до целых секунд: threshold + 0.999с -> threshold секунд -> продлевает")
+    void extends_whenThresholdPlus999MillisLeft() {
+        extensionProperties = props(60, 5, 0);
+        OffsetDateTime endTime = fixedTime.plusMinutes(10);
+        auction = createTestAuction(endTime);
+
+        auction.addBid(firstBidAmount(), 2L, endTime.minus(Duration.ofMillis(60_999)));
+
+        assertExtendedOnce(auction, endTime, 5);
+    }
+
+    @Test
+    @DisplayName("Усечение до целых секунд: threshold + 1.000с не продлевает")
+    void doesNotExtend_whenThresholdPlus1000MillisLeft() {
+        extensionProperties = props(60, 5, 0);
+        OffsetDateTime endTime = fixedTime.plusMinutes(10);
+        auction = createTestAuction(endTime);
+
+        auction.addBid(firstBidAmount(), 2L, endTime.minus(Duration.ofMillis(61_000)));
+
+        assertNotExtended(auction, endTime);
+    }
+
+    @Test
+    @DisplayName("Усечение до целых секунд: осталось 0.5с -> 0 секунд -> не продлевает")
+    void doesNotExtend_whenHalfSecondLeft() {
+        extensionProperties = props(60, 5, 0);
+        OffsetDateTime endTime = fixedTime.plusMinutes(10);
+        auction = createTestAuction(endTime);
+
+        auction.addBid(firstBidAmount(), 2L, endTime.minus(Duration.ofMillis(500)));
+
+        assertNotExtended(auction, endTime);
+        assertThat(auction.getTotalBids()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Осталась ровно 1 секунда -> продлевает")
+    void extends_whenOneSecondLeft() {
+        extensionProperties = props(60, 5, 0);
+        OffsetDateTime endTime = fixedTime.plusMinutes(10);
+        auction = createTestAuction(endTime);
+
+        auction.addBid(firstBidAmount(), 2L, endTime.minusSeconds(1));
+
+        assertExtendedOnce(auction, endTime, 5);
+    }
+
+    @Test
+    @DisplayName("Каждое продление сдвигает endTime ровно на extensionMinutes от старого endTime")
+    void extension_movesEndByExactlyExtensionMinutes_fromOldEndTime() {
+        extensionProperties = props(60, 7, 0);
+        OffsetDateTime endTime = fixedTime.plusMinutes(10);
+        auction = createTestAuction(endTime);
+
+        OffsetDateTime firstBidTime = endTime.minusSeconds(20);
+        auction.addBid(firstBidAmount(), 2L, firstBidTime);
+
+        OffsetDateTime afterFirst = auction.getEndTime();
+        assertThat(afterFirst).isEqualTo(endTime.plusMinutes(7));
+        assertThat(afterFirst).isNotEqualTo(firstBidTime.plusMinutes(7));
+        assertThat(auction.getExtensionCount()).isEqualTo(1);
+
+        auction.addBid(firstBidAmount().add(MIN_BID_STEP), 3L, afterFirst.minusSeconds(60));
+
+        assertThat(auction.getEndTime()).isEqualTo(afterFirst.plusMinutes(7));
+        assertThat(auction.getExtensionCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("maxExtensions = 1: вторая поздняя ставка принимается, но не продлевает")
+    void maxExtensions1_secondLateBidAccepted_butNotExtended() {
+        extensionProperties = props(60, 5, 1);
+        OffsetDateTime endTime = fixedTime.plusMinutes(10);
+        auction = createTestAuction(endTime);
+
+        auction.addBid(firstBidAmount(), 2L, endTime.minusSeconds(10));
+        OffsetDateTime afterFirst = auction.getEndTime();
+        assertThat(afterFirst).isEqualTo(endTime.plusMinutes(5));
+        assertThat(auction.getExtensionCount()).isEqualTo(1);
+
+        BigDecimal secondBid = firstBidAmount().add(MIN_BID_STEP);
+        auction.addBid(secondBid, 3L, afterFirst.minusSeconds(10));
+
+        assertThat(auction.getEndTime()).isEqualTo(afterFirst);
+        assertThat(auction.getExtensionCount()).isEqualTo(1);
+        assertThat(auction.getCurrentPrice()).isEqualByComparingTo(secondBid);
+        assertThat(auction.getTotalBids()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Без внедрённых свойств: fallback 30с / 5 мин (не 300 как в production) - ровно 30с продлевает")
+    void fallback_extendsAt30SecondsByFiveMinutes() {
+        OffsetDateTime endTime = fixedTime.plusMinutes(10);
+        auction = auctionWithoutInjectedProperties(endTime);
+
+        auction.addBid(firstBidAmount(), 2L, endTime.minusSeconds(30));
+
+        assertExtendedOnce(auction, endTime, 5);
+    }
+
+    @Test
+    @DisplayName("Без внедрённых свойств: за 31с до конца не продлевает")
+    void fallback_doesNotExtendAt31Seconds() {
+        OffsetDateTime endTime = fixedTime.plusMinutes(10);
+        auction = auctionWithoutInjectedProperties(endTime);
+
+        auction.addBid(firstBidAmount(), 2L, endTime.minusSeconds(31));
+
+        assertNotExtended(auction, endTime);
+    }
+
+    @Test
+    @DisplayName("Без внедрённых свойств: за 30.999с до конца продлевает (усечение)")
+    void fallback_extendsAt30Point999Seconds() {
+        OffsetDateTime endTime = fixedTime.plusMinutes(10);
+        auction = auctionWithoutInjectedProperties(endTime);
+
+        auction.addBid(firstBidAmount(), 2L, endTime.minus(Duration.ofMillis(30_999)));
+
+        assertExtendedOnce(auction, endTime, 5);
     }
 }
