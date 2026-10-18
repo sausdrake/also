@@ -16,6 +16,10 @@ import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.not;
@@ -34,7 +38,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * H-7: удаление медиа разрешено только загрузившему файл пользователю
  * или администратору (Model A — uploader ownership + ADMIN override).
  */
-@WebMvcTest(controllers = MediaController.class)
+@WebMvcTest(controllers = MediaController.class,
+        properties = "media.upload.dir=target/media-controller-test-uploads")
 @Import(TestSecurityConfig.class)
 @DisplayName("Тесты контроллера медиа — расширение (C-3) и авторизация удаления (H-7)")
 class MediaControllerTest {
@@ -58,6 +63,9 @@ class MediaControllerTest {
     @Value("${media.base-url}")
     private String baseUrl;
 
+    @Value("${media.upload.dir}")
+    private String uploadDir;
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -66,6 +74,19 @@ class MediaControllerTest {
 
     @MockBean
     private MediaAssetService mediaAssetService;
+
+    // ==================== TEST ISOLATION: uploads never reach the repository-root uploads/ ====================
+
+    @Test
+    @DisplayName("media.upload.dir этого теста находится внутри target/, а не в корневом uploads/")
+    void uploadDir_isolatedUnderTarget() {
+        Path dir = Paths.get(uploadDir).normalize();
+
+        assertThat(dir.isAbsolute()).isFalse();
+        assertThat(dir.getName(0).toString()).isEqualTo("target");
+        assertThat(dir.getNameCount()).isGreaterThan(1);
+        assertThat(uploadDir).isEqualTo("target/media-controller-test-uploads");
+    }
 
     // ==================== C-3: EXTENSION DERIVATION (unchanged) ====================
 
