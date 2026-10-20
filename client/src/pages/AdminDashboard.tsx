@@ -4,6 +4,7 @@ import axios from 'axios';
 import api from '../api/client';
 import { apiErrorMessage } from '../api/errors';
 import { SidebarLayout } from '../components/layout/SidebarLayout';
+import { ReportItemMedia } from '../components/admin/diagnostic/ReportItemMedia';
 import { formatDateTime, formatDate } from '../utils/formatDate';
 import { useAuthStore } from '../store/authStore';
 import { PhotoLightbox } from '../components/PhotoLightbox';
@@ -37,7 +38,7 @@ interface Auction {
   winnerId?: number; winningBid?: number;
 }
 
-interface DiagItem  { id: number; title: string; fieldType: string; isRequired?: boolean; }
+interface DiagItem  { id: number; title: string; fieldType: string; isRequired?: boolean; hasVideo?: boolean; }
 interface DiagGroup { id: number; name: string; items: DiagItem[]; }
 interface DiagAnswer { inspectionItemId: number; rating: number | null; comment: string; photoUrls: string[]; skipped?: boolean; }
 
@@ -816,7 +817,8 @@ function UsersPage() {
 
 // ─── Reports ──────────────────────────────────────────────────────────────────
 
-function AdminDiagAccordion({ template, answers }: {
+function AdminDiagAccordion({ requestId, template, answers }: {
+  requestId: number;
   template: { name: string; groups: DiagGroup[] };
   answers: DiagAnswer[];
 }) {
@@ -926,6 +928,10 @@ function AdminDiagAccordion({ template, answers }: {
                         </p>
                       </div>
                       <div className="ml-3.5">{renderVal(item, ans)}</div>
+                      {/* FE-CONTRACT-01: video items keep their media in the media API, not in the answer */}
+                      {item.hasVideo && (
+                        <div className="ml-3.5 mt-2"><ReportItemMedia requestId={requestId} itemId={item.id} /></div>
+                      )}
                     </div>
                   );
                 })}
@@ -1115,6 +1121,7 @@ function ReportsPage() {
 
               {detailReport.template && detailReport.existingAnswers ? (
                 <AdminDiagAccordion
+                  requestId={detailReport.id}
                   template={detailReport.template}
                   answers={detailReport.existingAnswers}
                 />

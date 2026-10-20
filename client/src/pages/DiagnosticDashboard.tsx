@@ -10,6 +10,7 @@ import { TemplateBinding, type TemplateOption } from '../components/diagnostic/T
 import { SidebarLayout } from '../components/layout/SidebarLayout';
 import { apiErrorMessage, parseApiError } from '../api/errors';
 import { labelOf } from '../domain/parse';
+import type { DiagnosticRequestStatus } from '../domain/diagnosticRequest';
 import {
   DIAGNOSTIC_STATUS_LABELS, diagnosticianCanEdit, needsTemplate, parseDiagnosticRequestStatus,
 } from '../domain/diagnosticRequest';
@@ -27,7 +28,8 @@ interface DiagRequest {
   status: string;
   createdAt: string;
   ownerName?: string;
-  rejectionComment?: string;
+  /** BE DiagnosticRequestResponse.rejectedReason (FE-CONTRACT-01: was read as `rejectionComment`, never sent). */
+  rejectedReason?: string;
 }
 
 interface Item {
@@ -64,13 +66,14 @@ interface Answer {
   isSkipped: boolean;
 }
 
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  PENDING:     { label: 'Новая',           color: 'bg-yellow-100 text-yellow-700' },
-  DRAFT:       { label: 'Черновик',        color: 'bg-gray-100 text-gray-600' },
-  IN_PROGRESS: { label: 'В работе',        color: 'bg-blue-100 text-blue-700' },
-  COMPLETED:   { label: 'На проверке',     color: 'bg-purple-100 text-purple-700' },
-  APPROVED:    { label: 'Одобрен',         color: 'bg-green-100 text-green-700' },
-  REJECTED:    { label: 'Отклонён',        color: 'bg-red-100 text-red-700' },
+// FE-CONTRACT-01: labels come from the domain model; there is no DRAFT status in the backend
+// (DiagnosticRequestStatus), so the "Черновик" label, filter and count are gone. Only colours here.
+const STATUS_COLOR: Record<DiagnosticRequestStatus, string> = {
+  PENDING:     'bg-yellow-100 text-yellow-700',
+  IN_PROGRESS: 'bg-blue-100 text-blue-700',
+  COMPLETED:   'bg-purple-100 text-purple-700',
+  APPROVED:    'bg-green-100 text-green-700',
+  REJECTED:    'bg-red-100 text-red-700',
 };
 
 /** FE-DIAG-01: the report is opened only for an accepted request (IN_PROGRESS); REJECTED goes through "rework" first. */
@@ -597,7 +600,7 @@ function DashboardPage() {
       const reports: any[] = myRes.data?.content || [];
       setStats({
         pending: (pendingRes.data || []).length,
-        inProgress: reports.filter(r => r.status === 'IN_PROGRESS' || r.status === 'DRAFT').length,
+        inProgress: reports.filter(r => r.status === 'IN_PROGRESS').length,
         submitted: reports.filter(r => r.status === 'COMPLETED').length,
         approved: reports.filter(r => r.status === 'APPROVED').length,
       });
@@ -850,7 +853,6 @@ function MyReportsPage() {
 
   const filterOptions = [
     { value: 'ALL',         label: 'Все' },
-    { value: 'DRAFT',       label: 'Черновик' },
     { value: 'IN_PROGRESS', label: 'В работе' },
     { value: 'SUBMITTED',   label: 'На проверке' },
     { value: 'APPROVED',    label: 'Одобрены' },
@@ -934,7 +936,9 @@ function MyReportsPage() {
             </thead>
             <tbody className="divide-y">
               {filtered.map(r => {
-                const s = STATUS_LABELS[r.status] ?? { label: r.status, color: 'bg-gray-100 text-gray-600' };
+                const parsed = parseDiagnosticRequestStatus(r.status);
+                const s = { label: labelOf(DIAGNOSTIC_STATUS_LABELS.diagnostician, parsed),
+                  color: parsed.known ? STATUS_COLOR[parsed.value] : 'bg-gray-100 text-gray-600' };
                 const canOpen = canOpenReport(r.status);
                 return (
                   <React.Fragment key={r.id}>
@@ -971,7 +975,7 @@ function MyReportsPage() {
                         ) : null}
                       </td>
                     </tr>
-                    {r.status === 'REJECTED' && r.rejectionComment && (
+                    {r.status === 'REJECTED' && r.rejectedReason && (
                       <tr className="bg-red-50">
                         <td colSpan={5} className="px-4 py-2 border-b border-red-100">
                           <div className="flex items-start gap-2 text-sm text-red-700">
@@ -979,7 +983,7 @@ function MyReportsPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                             </svg>
-                            <span><strong>Причина отклонения:</strong> {r.rejectionComment}</span>
+                            <span><strong>Причина отклонения:</strong> {r.rejectedReason}</span>
                           </div>
                         </td>
                       </tr>
