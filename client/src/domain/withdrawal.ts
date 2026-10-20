@@ -32,3 +32,41 @@ export const withdrawalAdminActions = (s: Parsed<WithdrawalStatus>): readonly Wi
   s.known ? ADMIN_ACTIONS[s.value] : [];
 
 export const withdrawalIsFinal = (s: Parsed<WithdrawalStatus>) => s.known && (s.value === 'PAID' || s.value === 'REJECTED');
+
+/**
+ * FE-WD-01: the same statuses as the owner reads them (profile, own requests): a rejection returns
+ * the amount to the deposit (WithdrawalRequestService.reject), and PENDING waits for an admin.
+ */
+export const WITHDRAWAL_OWNER_LABELS: Record<WithdrawalStatus, string> = {
+  PENDING: 'Ожидает обработки',
+  PROCESSING: 'В обработке',
+  PAID: 'Выплачено',
+  REJECTED: 'Отклонено, сумма возвращена',
+};
+
+const AMOUNT = /^\d+(?:[.,]\d+)?$/;
+
+/** The amount as the backend will receive it, or null when the input is not a plain decimal number. */
+export function toWithdrawalAmount(raw: string): number | null {
+  const t = raw.trim();
+  if (!AMOUNT.test(t)) return null;
+  const n = Number(t.replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * FE-WD-01: client-side check mirroring the backend WithdrawRequest (@NotNull, @DecimalMin 0.01,
+ * @Digits fraction 2) plus the available balance the form shows. The backend stays authoritative;
+ * this only avoids sending a request it will certainly refuse. `available` null = not loaded yet.
+ */
+export function validateWithdrawalAmount(raw: string, available: number | null): string | null {
+  const t = raw.trim();
+  if (!t) return 'Введите сумму';
+  if (!AMOUNT.test(t)) return 'Введите сумму числом, например 1500 или 1500.50';
+  if (/[.,]\d{3,}$/.test(t)) return 'Не больше двух знаков после запятой';
+  const value = toWithdrawalAmount(t);
+  if (value === null || value < 0.01) return 'Сумма должна быть больше 0';
+  if (available === null) return 'Доступный баланс ещё не загружен';
+  if (value > available) return `Максимум: ${available.toLocaleString('ru')} сом`;
+  return null;
+}

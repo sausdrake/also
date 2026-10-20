@@ -6,7 +6,10 @@ import type { WatchedAuction } from '../api/subscriptions';
 import { apiErrorMessage, parseApiError } from '../api/errors';
 import { KycRequiredNotice } from '../components/identity/KycRequiredNotice';
 import { AUCTION_STATUS_LABELS } from '../domain/auction';
-import { labelOf } from '../domain/parse';
+import { labelOf, type Parsed } from '../domain/parse';
+import {
+  WITHDRAWAL_OWNER_LABELS, parseWithdrawalStatus, toWithdrawalAmount, validateWithdrawalAmount, type WithdrawalStatus,
+} from '../domain/withdrawal';
 import { useAuthStore } from '../store/authStore';
 import { useDepositStore } from '../store/depositStore';
 import { parseDate } from '../utils/formatDate';
@@ -20,19 +23,36 @@ import { IdentityVerificationTab } from '../components/identity/IdentityVerifica
 interface WithdrawalRequest {
   id: number;
   amount: number;
-  status: 'PENDING' | 'PROCESSING' | 'PAID' | 'REJECTED';
+  status: Parsed<WithdrawalStatus>;
   createdAt: string;
   processedAt: string | null;
   rejectionReason: string | null;
 }
 
 // F6: a withdrawal is a manual payout request; PAID means AlSo paid by hand, not a bank transfer.
-const WITHDRAWAL_STATUS: Record<string, { label: string; style: string }> = {
-  PENDING: { label: 'Ожидает обработки', style: 'bg-yellow-100 text-yellow-700' },
-  PROCESSING: { label: 'В обработке', style: 'bg-blue-100 text-blue-700' },
-  PAID: { label: 'Выплачено', style: 'bg-green-100 text-green-700' },
-  REJECTED: { label: 'Отклонено, сумма возвращена', style: 'bg-red-100 text-red-700' },
+// FE-WD-01: labels come from the domain model (owner wording); only the colours live here.
+const WITHDRAWAL_STYLE: Record<WithdrawalStatus, string> = {
+  PENDING: 'bg-yellow-100 text-yellow-700',
+  PROCESSING: 'bg-blue-100 text-blue-700',
+  PAID: 'bg-green-100 text-green-700',
+  REJECTED: 'bg-red-100 text-red-700',
 };
+
+/** A row of GET /withdrawals/my, or null when it cannot be shown truthfully (no id / amount). */
+function parseOwnWithdrawal(raw: unknown): WithdrawalRequest | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const amount = typeof r.amount === 'number' ? r.amount : typeof r.amount === 'string' ? Number(r.amount) : NaN;
+  if (typeof r.id !== 'number' || !Number.isFinite(amount)) return null;
+  return {
+    id: r.id,
+    amount,
+    status: parseWithdrawalStatus(r.status),
+    createdAt: typeof r.createdAt === 'string' ? r.createdAt : '',
+    processedAt: typeof r.processedAt === 'string' ? r.processedAt : null,
+    rejectionReason: typeof r.rejectionReason === 'string' ? r.rejectionReason : null,
+  };
+}
 
 function DepositTab() {
   const { balance, blockedAmount, availableBalance, isLoading, fetchDeposit } = useDepositStore();
@@ -54,10 +74,21 @@ function DepositTab() {
   };
 
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
+  // FE-WD-01: a failed or malformed list is an error with a retry - never "no requests".
+  const [withdrawalsError, setWithdrawalsError] = useState('');
+  // One POST /withdrawals at a time (the idempotency key already protects the money; this protects the UX).
+  const [withdrawing, setWithdrawing] = useState(false);
+  const withdrawInFlight = useRef(false);
 
   const reloadTransactions = () => api.get('/deposits/my/transactions').then(r => setTransactions(r.data)).catch(() => {});
   const reloadWithdrawals = () =>
-    api.get<WithdrawalRequest[]>('/withdrawals/my').then(r => setWithdrawals(Array.isArray(r.data) ? r.data : [])).catch(() => {});
+    api.get('/withdrawals/my')
+      .then(r => {
+        if (!Array.isArray(r.data)) throw new Error('Malformed withdrawals response');
+        setWithdrawals(r.data.map(parseOwnWithdrawal).filter((w): w is WithdrawalRequest => w !== null));
+        setWithdrawalsError('');
+      })
+      .catch(e => setWithdrawalsError(apiErrorMessage(e, 'Не удалось загрузить заявки на вывод')));
 
   useEffect(() => {
     fetchDeposit();
@@ -67,22 +98,16 @@ function DepositTab() {
 
   const showMsg = (text: string, ok = true) => setMsg({ text, ok });
 
-  const validateAmount = (raw: string, max: number): string | null => {
-    const val = parseFloat(raw);
-    if (!raw.trim() || isNaN(val)) return 'Введите сумму';
-    if (val <= 0) return 'Сумма должна быть больше 0';
-    if (val > max) return `Максимум: ${max.toLocaleString('ru')} сом`;
-    return null;
-  };
-
   const handleWithdraw = async () => {
-    const avail = availableBalance ?? 0;
-    const err = validateAmount(withdrawAmount, avail);
+    if (withdrawInFlight.current) return;
+    const err = validateWithdrawalAmount(withdrawAmount, availableBalance ?? null);
     if (err) { showMsg(err, false); return; }
     setWithdrawKyc(null);
+    withdrawInFlight.current = true;
+    setWithdrawing(true);
     try {
       await api.post('/withdrawals',
-        { amount: parseFloat(withdrawAmount), idempotencyKey: getWithdrawKey(withdrawAmount) });
+        { amount: toWithdrawalAmount(withdrawAmount), idempotencyKey: getWithdrawKey(withdrawAmount) });
       showMsg('Заявка на вывод создана. Выплату выполнит администратор вручную.');
       setWithdrawAmount('');
       withdrawKeyRef.current = null;
@@ -97,8 +122,13 @@ function DepositTab() {
       } else {
         showMsg(error.message, false);
       }
+    } finally {
+      withdrawInFlight.current = false;
+      setWithdrawing(false);
     }
   };
+
+  const nothingToWithdraw = availableBalance != null && availableBalance <= 0;
 
   if (isLoading) return <div className="p-4">Загрузка...</div>;
 
@@ -145,11 +175,13 @@ function DepositTab() {
           <div className="flex gap-2">
             <input type="number" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)}
               placeholder="Сумма" className="flex-1 border rounded-lg px-3 py-2" />
-            <button onClick={handleWithdraw} className="bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-800">
-              Вывести
+            <button onClick={handleWithdraw} disabled={withdrawing || nothingToWithdraw}
+              className="bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed">
+              {withdrawing ? 'Отправка…' : 'Вывести'}
             </button>
           </div>
           <p className="text-xs text-gray-400 mt-1">Доступно: {availableBalance?.toLocaleString('ru') ?? '—'} сом</p>
+          {nothingToWithdraw && <p className="text-xs text-gray-500 mt-1">Нет доступных средств для вывода.</p>}
           <p className="text-xs text-gray-500 mt-1">
             Вывод оформляется заявкой: сумма сразу списывается с доступного баланса, выплату выполняет
             администратор вручную. Если заявку отклонят, сумма вернётся на депозит.
@@ -157,7 +189,15 @@ function DepositTab() {
         </div>
       </div>
 
-      {withdrawals.length > 0 && (
+      {withdrawalsError && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 space-y-2">
+          <p>{withdrawalsError}</p>
+          <button onClick={reloadWithdrawals} className="px-3 py-1.5 bg-white border border-red-300 rounded-lg text-xs font-medium">
+            Повторить
+          </button>
+        </div>
+      )}
+      {!withdrawalsError && withdrawals.length > 0 && (
         <div className="bg-white border rounded-xl shadow-sm overflow-hidden" data-testid="my-withdrawals">
           <div className="px-4 py-3 border-b bg-gray-50">
             <h3 className="font-semibold">Заявки на вывод</h3>
@@ -167,8 +207,8 @@ function DepositTab() {
               <li key={w.id} className="px-4 py-2 text-sm flex flex-wrap items-center gap-x-3 gap-y-1">
                 <span className="text-gray-500 whitespace-nowrap">{formatDateTime(w.createdAt)}</span>
                 <span className="font-medium">{Number(w.amount).toLocaleString('ru')} сом</span>
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${WITHDRAWAL_STATUS[w.status]?.style ?? 'bg-gray-100 text-gray-600'}`}>
-                  {WITHDRAWAL_STATUS[w.status]?.label ?? w.status}
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${w.status.known ? WITHDRAWAL_STYLE[w.status.value] : 'bg-gray-100 text-gray-600'}`}>
+                  {labelOf(WITHDRAWAL_OWNER_LABELS, w.status)}
                 </span>
                 {w.rejectionReason && <span className="text-red-600 basis-full">Причина: {w.rejectionReason}</span>}
               </li>

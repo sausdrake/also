@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import api from '../../api/client';
+import { apiErrorMessage } from '../../api/errors';
+import { labelOf } from '../../domain/parse';
+import {
+  WITHDRAWAL_STATUS_LABELS, parseWithdrawalStatus, withdrawalAdminActions, type WithdrawalStatus,
+} from '../../domain/withdrawal';
 import { formatDateTime } from '../../utils/formatDate';
-
-type WithdrawalStatus = 'PENDING' | 'PROCESSING' | 'PAID' | 'REJECTED';
 
 export interface AdminWithdrawalRequest {
   id: number;
@@ -10,7 +13,7 @@ export interface AdminWithdrawalRequest {
   username: string | null;
   email: string | null;
   amount: number;
-  status: WithdrawalStatus;
+  status: string;
   createdAt: string;
   processingStartedAt: string | null;
   processingStartedBy: number | null;
@@ -19,13 +22,6 @@ export interface AdminWithdrawalRequest {
   rejectionReason: string | null;
   payoutNote: string | null;
 }
-
-const STATUS_LABEL: Record<WithdrawalStatus, string> = {
-  PENDING: 'Ожидает',
-  PROCESSING: 'В обработке',
-  PAID: 'Выплачено',
-  REJECTED: 'Отклонено',
-};
 
 const FILTERS: { value: WithdrawalStatus | ''; label: string }[] = [
   { value: 'PENDING', label: 'Ожидают' },
@@ -53,18 +49,32 @@ export function AdminWithdrawalsPage() {
   const [noPayoutConfirmed, setNoPayoutConfirmed] = useState(false);
   const [payoutNote, setPayoutNote] = useState('');
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  // FE-WD-01: a failed or malformed queue is an error with a retry - never "Заявок нет." (an admin
+  // must not conclude there is nothing to pay out because the list did not load).
+  const [loadError, setLoadError] = useState('');
+  const inFlight = useRef(false);
 
   const load = (status: WithdrawalStatus | '' = filter) => {
     setLoading(true);
-    api.get<AdminWithdrawalRequest[]>('/admin/withdrawals', { params: status ? { status } : {} })
-      .then(r => setItems(Array.isArray(r.data) ? r.data : []))
-      .catch(() => setItems([]))
+    api.get('/admin/withdrawals', { params: status ? { status } : {} })
+      .then(r => {
+        if (!Array.isArray(r.data)) throw new Error('Malformed withdrawals response');
+        setItems(r.data as AdminWithdrawalRequest[]);
+        setLoadError('');
+      })
+      .catch(e => {
+        setItems([]);
+        setLoadError(apiErrorMessage(e, 'Не удалось загрузить заявки на вывод'));
+      })
       .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(filter); }, [filter]);
 
   const act = async (id: number, action: 'processing' | 'paid' | 'reject', okText: string, body?: object) => {
+    // one state change at a time: the server refuses repeats, but a second click must not even send one
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(id);
     setMsg(null);
     try {
@@ -72,10 +82,11 @@ export function AdminWithdrawalsPage() {
       setMsg({ text: okText, ok: true });
       closeForm();
       load();
-    } catch (e: any) {
-      setMsg({ text: e.response?.data?.message || 'Не удалось выполнить действие', ok: false });
+    } catch (e) {
+      setMsg({ text: apiErrorMessage(e, 'Не удалось выполнить действие'), ok: false });
       load();
     } finally {
+      inFlight.current = false;
       setBusy(null);
     }
   };
@@ -119,18 +130,29 @@ export function AdminWithdrawalsPage() {
       <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
         {loading ? (
           <p className="text-sm text-gray-400 p-4">Загрузка...</p>
+        ) : loadError ? (
+          <div role="alert" className="p-4 text-sm text-red-700 bg-red-50 space-y-2">
+            <p>{loadError}</p>
+            <button onClick={() => load()} className="px-3 py-1.5 bg-white border border-red-300 rounded-lg text-xs font-medium">
+              Повторить
+            </button>
+          </div>
         ) : items.length === 0 ? (
           <p className="text-sm text-gray-400 p-4">Заявок нет.</p>
         ) : (
           <div className="divide-y divide-gray-100">
-            {items.map(w => (
+            {items.map(w => {
+              const status = parseWithdrawalStatus(w.status);
+              const actions = withdrawalAdminActions(status);
+              const seen = status.known ? status.value : null;
+              return (
               <div key={w.id} className="px-4 py-3 text-sm space-y-2" data-testid={`withdrawal-${w.id}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="font-medium text-gray-800">
-                    #{w.id} · {Number(w.amount).toLocaleString('ru')} сом · {w.username || `ID ${w.userId}`}
-                    {w.email && <span className="text-gray-500 font-normal"> ({w.email})</span>}
+                    #{w.id} · {Number(w.amount).toLocaleString('ru')} сом · <span className="break-all">{w.username || `ID ${w.userId}`}</span>
+                    {w.email && <span className="text-gray-500 font-normal break-all"> ({w.email})</span>}
                   </p>
-                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{STATUS_LABEL[w.status]}</span>
+                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{labelOf(WITHDRAWAL_STATUS_LABELS, status)}</span>
                 </div>
                 <p className="text-xs text-gray-500">
                   Создана: {formatDateTime(w.createdAt)}
@@ -142,21 +164,21 @@ export function AdminWithdrawalsPage() {
                 {w.payoutNote && <p className="text-xs text-green-700">Заметка о выплате: {w.payoutNote}</p>}
 
                 <div className="flex flex-wrap gap-2">
-                  {w.status === 'PENDING' && (
+                  {actions.includes('processing') && (
                     <button disabled={busy === w.id} onClick={() => act(w.id, 'processing', `Заявка #${w.id} взята в работу`)}
                       className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white disabled:opacity-50">В работу</button>
                   )}
-                  {w.status === 'PROCESSING' && (
+                  {actions.includes('paid') && (
                     <button disabled={busy === w.id} onClick={() => openForm(w.id, 'paid')}
                       className="text-xs px-3 py-1.5 rounded-lg bg-green-600 text-white disabled:opacity-50">Выплачено</button>
                   )}
-                  {(w.status === 'PENDING' || w.status === 'PROCESSING') && (
+                  {actions.includes('reject') && (
                     <button disabled={busy === w.id} onClick={() => openForm(w.id, 'reject')}
                       className="text-xs px-3 py-1.5 rounded-lg border text-red-600 disabled:opacity-50">Отклонить</button>
                   )}
                 </div>
 
-                {form?.id === w.id && form.kind === 'reject' && (w.status === 'PENDING' || w.status === 'PROCESSING') && (
+                {form?.id === w.id && form.kind === 'reject' && actions.includes('reject') && (
                   <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 space-y-2" data-testid={`reject-form-${w.id}`}>
                     <textarea value={reason} onChange={e => setReason(e.target.value)} maxLength={1000} rows={2}
                       aria-label="Причина отклонения" placeholder="Причина отклонения (увидит пользователь; без номеров карт и счетов)"
@@ -167,12 +189,12 @@ export function AdminWithdrawalsPage() {
                     </label>
                     <button disabled={!reason.trim() || !noPayoutConfirmed || busy === w.id}
                       onClick={() => act(w.id, 'reject', `Заявка #${w.id} отклонена, сумма возвращена на депозит`,
-                        { reason: reason.trim(), payoutNotMade: true, expectedStatus: w.status })}
+                        { reason: reason.trim(), payoutNotMade: true, expectedStatus: seen })}
                       className="text-xs px-3 py-1.5 rounded-lg bg-red-600 text-white disabled:opacity-50">Отклонить и вернуть сумму</button>
                   </div>
                 )}
 
-                {form?.id === w.id && form.kind === 'paid' && w.status === 'PROCESSING' && (
+                {form?.id === w.id && form.kind === 'paid' && actions.includes('paid') && (
                   <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 space-y-2" data-testid={`paid-form-${w.id}`}>
                     <textarea value={payoutNote} onChange={e => setPayoutNote(e.target.value)} maxLength={1000} rows={2}
                       aria-label="Заметка о выплате" placeholder="Как и когда выплачено: способ, дата, номер обращения или чека"
@@ -186,7 +208,8 @@ export function AdminWithdrawalsPage() {
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
