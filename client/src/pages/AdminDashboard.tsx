@@ -233,7 +233,7 @@ function AdminSidebar({ onNavigate }: { onNavigate: () => void }) {
             </svg>
           </div>
           <div>
-            <p className="text-sm font-bold text-gray-900">AutoAuction</p>
+            <p className="text-sm font-bold text-gray-900">AlSo</p>
             <p className="text-xs text-gray-400">Администратор</p>
           </div>
         </div>

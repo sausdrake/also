@@ -36,7 +36,7 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-4">
         {/* Логотип */}
         <Link to="/" className="text-xl font-bold text-blue-600 shrink-0">
-          AutoAuction
+          AlSo
         </Link>
 
         {/* Spacer */}
