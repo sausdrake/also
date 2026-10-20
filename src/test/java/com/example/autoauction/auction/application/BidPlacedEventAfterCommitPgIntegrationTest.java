@@ -203,7 +203,7 @@ class BidPlacedEventAfterCommitPgIntegrationTest extends AbstractPostgresIntegra
 
         // --- THE MVP-001 PROOF: exactly one of each side effect, never two, despite two full attempts ---
         verify(webSocketControllerSpy, times(1)).sendAuctionUpdate(any(Auction.class), eq("BID_PLACED"));
-        verify(notificationServiceSpy, times(1)).send(eq(bidderId), eq("AUCTION_LEADER"),
+        verify(notificationServiceSpy, times(1)).sendAfterCommit(eq(bidderId), eq("AUCTION_LEADER"),
                 anyString(), anyString(), eq(auctionId), eq("AUCTION"));
 
         assertThat(auctionRepository.findById(auctionId).orElseThrow().getWinnerId())
@@ -247,7 +247,7 @@ class BidPlacedEventAfterCommitPgIntegrationTest extends AbstractPostgresIntegra
         Long auctionId = newActiveAuctionForBid(REQUIRED_DEPOSIT);
 
         doThrow(new RuntimeException("simulated notification failure"))
-                .when(notificationServiceSpy).send(eq(bidderId), eq("AUCTION_LEADER"),
+                .when(notificationServiceSpy).sendAfterCommit(eq(bidderId), eq("AUCTION_LEADER"),
                         anyString(), anyString(), eq(auctionId), eq("AUCTION"));
 
         AtomicReference<BidResponse> response = new AtomicReference<>();

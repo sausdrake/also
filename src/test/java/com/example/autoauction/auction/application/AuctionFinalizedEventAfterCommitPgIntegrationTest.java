@@ -139,11 +139,11 @@ class AuctionFinalizedEventAfterCommitPgIntegrationTest extends AbstractPostgres
         assertThat(persisted.getWinnerId()).isEqualTo(winnerId);
 
         verify(webSocketControllerSpy, times(1)).sendPersonalUpdate(eq(winnerId), any(Auction.class), eq("YOU_WON"));
-        verify(notificationServiceSpy, times(1)).send(eq(winnerId), eq("AUCTION_WON"),
+        verify(notificationServiceSpy, times(1)).sendAfterCommit(eq(winnerId), eq("AUCTION_WON"),
                 anyString(), anyString(), eq(auctionId), eq("AUCTION"));
-        verify(notificationServiceSpy, times(1)).send(eq(loserId), eq("AUCTION_LOST"),
+        verify(notificationServiceSpy, times(1)).sendAfterCommit(eq(loserId), eq("AUCTION_LOST"),
                 anyString(), anyString(), eq(auctionId), eq("AUCTION"));
-        verify(notificationServiceSpy, times(1)).send(eq(sellerId), eq("AUCTION_COMPLETED"),
+        verify(notificationServiceSpy, times(1)).sendAfterCommit(eq(sellerId), eq("AUCTION_COMPLETED"),
                 anyString(), anyString(), eq(auctionId), eq("AUCTION"));
         verify(webSocketControllerSpy, times(1)).sendAuctionEnded(eq(auctionId), eq(winnerId), any(BigDecimal.class));
         verify(webSocketControllerSpy, times(1)).sendAuctionUpdate(any(Auction.class), eq("AUCTION_FINALIZED"));
@@ -193,9 +193,9 @@ class AuctionFinalizedEventAfterCommitPgIntegrationTest extends AbstractPostgres
         // (DEPOSIT_UNFROZEN etc.) legitimately fire and commit independently, before the conflict
         // is discovered. ---
         verifyNoInteractions(webSocketControllerSpy);
-        verify(notificationServiceSpy, never()).send(any(), eq("AUCTION_WON"), anyString(), anyString(), any(), anyString());
-        verify(notificationServiceSpy, never()).send(any(), eq("AUCTION_LOST"), anyString(), anyString(), any(), anyString());
-        verify(notificationServiceSpy, never()).send(any(), eq("AUCTION_COMPLETED"), anyString(), anyString(), any(), anyString());
+        verify(notificationServiceSpy, never()).sendAfterCommit(any(), eq("AUCTION_WON"), anyString(), anyString(), any(), anyString());
+        verify(notificationServiceSpy, never()).sendAfterCommit(any(), eq("AUCTION_LOST"), anyString(), anyString(), any(), anyString());
+        verify(notificationServiceSpy, never()).sendAfterCommit(any(), eq("AUCTION_COMPLETED"), anyString(), anyString(), any(), anyString());
 
         // --- legitimate retry, exactly as the next scheduler tick would (fresh read) ---
         clearInvocations(webSocketControllerSpy, notificationServiceSpy);
@@ -207,9 +207,9 @@ class AuctionFinalizedEventAfterCommitPgIntegrationTest extends AbstractPostgres
         assertThat(afterRetry.getStatus()).isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
 
         verify(webSocketControllerSpy, times(1)).sendPersonalUpdate(eq(winnerId), any(Auction.class), eq("YOU_WON"));
-        verify(notificationServiceSpy, times(1)).send(eq(winnerId), eq("AUCTION_WON"),
+        verify(notificationServiceSpy, times(1)).sendAfterCommit(eq(winnerId), eq("AUCTION_WON"),
                 anyString(), anyString(), eq(auctionId), eq("AUCTION"));
-        verify(notificationServiceSpy, times(1)).send(eq(loserId), eq("AUCTION_LOST"),
+        verify(notificationServiceSpy, times(1)).sendAfterCommit(eq(loserId), eq("AUCTION_LOST"),
                 anyString(), anyString(), eq(auctionId), eq("AUCTION"));
         verify(webSocketControllerSpy, times(1)).sendAuctionUpdate(any(Auction.class), eq("AUCTION_FINALIZED"));
     }
@@ -241,7 +241,7 @@ class AuctionFinalizedEventAfterCommitPgIntegrationTest extends AbstractPostgres
         assertThat(persisted.getStatus()).as("the finalization remains committed despite the WS failure")
                 .isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
         // independent side effects must still have been attempted
-        verify(notificationServiceSpy, times(1)).send(eq(winnerId), eq("AUCTION_WON"),
+        verify(notificationServiceSpy, times(1)).sendAfterCommit(eq(winnerId), eq("AUCTION_WON"),
                 anyString(), anyString(), eq(auctionId), eq("AUCTION"));
         verify(webSocketControllerSpy, times(1)).sendAuctionUpdate(any(Auction.class), eq("AUCTION_FINALIZED"));
     }
@@ -255,7 +255,7 @@ class AuctionFinalizedEventAfterCommitPgIntegrationTest extends AbstractPostgres
         Long auctionId = createExpiredAuctionWithWinnerAndLoser(winnerId, loserId, new BigDecimal("5000.00"));
 
         doThrow(new RuntimeException("simulated notification failure"))
-                .when(notificationServiceSpy).send(eq(winnerId), eq("AUCTION_WON"),
+                .when(notificationServiceSpy).sendAfterCommit(eq(winnerId), eq("AUCTION_WON"),
                         anyString(), anyString(), eq(auctionId), eq("AUCTION"));
 
         java.util.concurrent.atomic.AtomicReference<Boolean> result = new java.util.concurrent.atomic.AtomicReference<>();
@@ -269,7 +269,7 @@ class AuctionFinalizedEventAfterCommitPgIntegrationTest extends AbstractPostgres
         assertThat(persisted.getStatus()).as("the finalization remains committed despite the notification failure")
                 .isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
         // independent side effects must still have been attempted
-        verify(notificationServiceSpy, times(1)).send(eq(loserId), eq("AUCTION_LOST"),
+        verify(notificationServiceSpy, times(1)).sendAfterCommit(eq(loserId), eq("AUCTION_LOST"),
                 anyString(), anyString(), eq(auctionId), eq("AUCTION"));
         verify(webSocketControllerSpy, times(1)).sendAuctionUpdate(any(Auction.class), eq("AUCTION_FINALIZED"));
     }

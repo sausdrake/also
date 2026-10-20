@@ -66,7 +66,7 @@ public class AuctionFinalizedEventListener {
                 log.warn("Failed to send personal WebSocket notification to user {}: {}", winnerId, e.getMessage());
             }
             try {
-                notificationService.send(winnerId, "AUCTION_WON",
+                notificationService.sendAfterCommit(winnerId, "AUCTION_WON",
                         "Вы выиграли аукцион!",
                         String.format("Поздравляем! Вы выиграли аукцион \"%s\" с ценой %s сом.",
                                 auction.getVehicleInfo(), winningBid.toPlainString()),
@@ -79,7 +79,7 @@ public class AuctionFinalizedEventListener {
             for (Long participantId : participantIds) {
                 if (!participantId.equals(winnerId)) {
                     try {
-                        notificationService.send(participantId, "AUCTION_LOST",
+                        notificationService.sendAfterCommit(participantId, "AUCTION_LOST",
                                 "Вы не выиграли аукцион",
                                 String.format("Аукцион \"%s\" завершён. Победителем стал другой участник. Ваши средства разблокированы.",
                                         auction.getVehicleInfo()),
@@ -100,7 +100,7 @@ public class AuctionFinalizedEventListener {
             }
             for (Long recipientId : completedRecipients) {
                 try {
-                    notificationService.send(recipientId, "AUCTION_COMPLETED",
+                    notificationService.sendAfterCommit(recipientId, "AUCTION_COMPLETED",
                             "Аукцион завершён",
                             String.format("Аукцион \"%s\" завершён. Победитель определён.", auction.getVehicleInfo()),
                             auctionId, "AUCTION");

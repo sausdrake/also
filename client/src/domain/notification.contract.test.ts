@@ -8,11 +8,11 @@ import { NOTIFICATION_TYPES } from './notification';
  */
 const javaSources = import.meta.glob('../../../src/main/java/**/*.java', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 
-/** Types passed as the 2nd argument of `notificationService.send(` (comments stripped first). */
+/** Types passed as the 2nd argument of `notificationService.send(` / `.sendAfterCommit(` (comments stripped first). */
 export function sentNotificationTypes(source: string): string[] {
   const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
   const out: string[] = [];
-  for (const m of code.matchAll(/notificationService\s*\.\s*send\s*\(\s*[^,()]+(?:\([^()]*\))?\s*,\s*"([A-Z0-9_]+)"/g)) out.push(m[1]);
+  for (const m of code.matchAll(/notificationService\s*\.\s*send(?:AfterCommit)?\s*\(\s*[^,()]+(?:\([^()]*\))?\s*,\s*"([A-Z0-9_]+)"/g)) out.push(m[1]);
   return out;
 }
 
@@ -23,8 +23,10 @@ describe('FE-NOTIF-01: notification types match the backend senders', () => {
       /* notificationService.send(x, "BLOCK_COMMENT", ...) */
       notificationService.send(request.getUserId(), "DIAG_X",
           "t", "m", id, "DIAGNOSTIC");
-      notificationService.send(winnerId, "AUCTION_Y", "t", "m");`;
-    expect(sentNotificationTypes(sample)).toEqual(['DIAG_X', 'AUCTION_Y']);
+      notificationService.send(winnerId, "AUCTION_Y", "t", "m");
+      notificationService.sendAfterCommit(event.userId(), "DEPOSIT_Z", "t", "m");
+      notificationService.sendSomethingElse(x, "NOT_A_TYPE");`;
+    expect(sentNotificationTypes(sample)).toEqual(['DIAG_X', 'AUCTION_Y', 'DEPOSIT_Z']);
   });
 
   it('frontend NOTIFICATION_TYPES == the set of types the backend sends', () => {

@@ -206,7 +206,7 @@ class DepositFrozenEventAfterCommitPgIntegrationTest extends AbstractPostgresInt
         assertThat(persisted.getBlockedAmount()).isEqualByComparingTo(REQUIRED_DEPOSIT);
         assertThat(depositRepository.isFrozenForAuction(persisted.getId(), auctionId)).isTrue();
 
-        verify(notificationServiceSpy, times(1)).send(eq(userId), eq("DEPOSIT_FROZEN"), anyString(), anyString());
+        verify(notificationServiceSpy, times(1)).sendAfterCommit(eq(userId), eq("DEPOSIT_FROZEN"), anyString(), anyString());
     }
 
     // ======================================================================
@@ -288,7 +288,7 @@ class DepositFrozenEventAfterCommitPgIntegrationTest extends AbstractPostgresInt
                 .freezeForAuction(any(Long.class), eq(auctionId), any(BigDecimal.class), any());
 
         // --- THE G1 PROOF: exactly one DEPOSIT_FROZEN, never two, despite two full freeze attempts. ---
-        verify(notificationServiceSpy, times(1)).send(eq(bidderId), eq("DEPOSIT_FROZEN"), anyString(), anyString());
+        verify(notificationServiceSpy, times(1)).sendAfterCommit(eq(bidderId), eq("DEPOSIT_FROZEN"), anyString(), anyString());
     }
 
     // ======================================================================
@@ -303,7 +303,7 @@ class DepositFrozenEventAfterCommitPgIntegrationTest extends AbstractPostgresInt
         Long auctionId = newBareAuction();
 
         doThrow(new RuntimeException("simulated notification failure"))
-                .when(notificationServiceSpy).send(eq(userId), eq("DEPOSIT_FROZEN"), anyString(), anyString());
+                .when(notificationServiceSpy).sendAfterCommit(eq(userId), eq("DEPOSIT_FROZEN"), anyString(), anyString());
 
         org.assertj.core.api.Assertions.assertThatCode(
                         () -> depositService.freezeForAuction(userId, auctionId, REQUIRED_DEPOSIT))
@@ -361,6 +361,6 @@ class DepositFrozenEventAfterCommitPgIntegrationTest extends AbstractPostgresInt
                 .as("the Buy Now transition must not have applied")
                 .isEqualTo(AuctionStatus.CREATED);
 
-        verify(notificationServiceSpy, never()).send(eq(buyerId), eq("DEPOSIT_FROZEN"), anyString(), anyString());
+        verify(notificationServiceSpy, never()).sendAfterCommit(eq(buyerId), eq("DEPOSIT_FROZEN"), anyString(), anyString());
     }
 }

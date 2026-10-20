@@ -60,7 +60,7 @@ public class BidPlacedEventListener {
         Long prevLeaderId = event.prevLeaderId();
         if (prevLeaderId != null && !prevLeaderId.equals(bidderId)) {
             try {
-                notificationService.send(prevLeaderId, "OUTBID",
+                notificationService.sendAfterCommit(prevLeaderId, "OUTBID",
                         "Вашу ставку перебили",
                         String.format("В аукционе \"%s\" сделана новая ставка: %s сом. Успейте сделать новую ставку!",
                                 auction.getVehicleInfo(), event.bidAmount().toPlainString()),
@@ -75,7 +75,7 @@ public class BidPlacedEventListener {
         Long sellerId = auctionSellerResolver.resolveSellerId(auction).orElse(auction.getCreatedBy());
         if (sellerId != null && !sellerId.equals(bidderId)) {
             try {
-                notificationService.send(sellerId, "NEW_BID_ON_VEHICLE",
+                notificationService.sendAfterCommit(sellerId, "NEW_BID_ON_VEHICLE",
                         "Новая ставка на ваш автомобиль",
                         String.format("На ваш автомобиль \"%s\" была сделана новая ставка %s сом.",
                                 auction.getVehicleInfo(), event.bidAmount().toPlainString()),
@@ -86,7 +86,7 @@ public class BidPlacedEventListener {
         }
 
         try {
-            notificationService.send(bidderId, "AUCTION_LEADER",
+            notificationService.sendAfterCommit(bidderId, "AUCTION_LEADER",
                     "Вы лидер торгов!",
                     String.format("Ваша ставка %s сом является максимальной по лоту \"%s\".",
                             event.bidAmount().toPlainString(), auction.getVehicleInfo()),

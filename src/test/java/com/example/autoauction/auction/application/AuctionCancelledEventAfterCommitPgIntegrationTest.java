@@ -127,7 +127,7 @@ class AuctionCancelledEventAfterCommitPgIntegrationTest extends AbstractPostgres
         assertThat(persisted.getStatus()).isEqualTo(AuctionStatus.CANCELLED);
 
         verify(webSocketControllerSpy, times(1)).sendAuctionEnded(auctionId, null, null);
-        verify(notificationServiceSpy, times(1)).send(eq(participantId), eq("AUCTION_CANCELLED"),
+        verify(notificationServiceSpy, times(1)).sendAfterCommit(eq(participantId), eq("AUCTION_CANCELLED"),
                 anyString(), anyString(), eq(auctionId), eq("AUCTION"));
     }
 
@@ -169,7 +169,7 @@ class AuctionCancelledEventAfterCommitPgIntegrationTest extends AbstractPostgres
         // the deferred flush discovered the conflict), but because the transaction rolled back,
         // AFTER_COMMIT must never have fired. ---
         verifyNoInteractions(webSocketControllerSpy);
-        verify(notificationServiceSpy, org.mockito.Mockito.never()).send(
+        verify(notificationServiceSpy, org.mockito.Mockito.never()).sendAfterCommit(
                 any(), eq("AUCTION_CANCELLED"), anyString(), anyString(), any(), anyString());
 
         // --- legitimate retry, exactly as the next scheduler tick would (fresh read) ---
@@ -182,7 +182,7 @@ class AuctionCancelledEventAfterCommitPgIntegrationTest extends AbstractPostgres
         assertThat(afterRetry.getStatus()).isEqualTo(AuctionStatus.CANCELLED);
 
         verify(webSocketControllerSpy, times(1)).sendAuctionEnded(auctionId, null, null);
-        verify(notificationServiceSpy, times(1)).send(eq(participantId), eq("AUCTION_CANCELLED"),
+        verify(notificationServiceSpy, times(1)).sendAfterCommit(eq(participantId), eq("AUCTION_CANCELLED"),
                 anyString(), anyString(), eq(auctionId), eq("AUCTION"));
     }
 
@@ -211,7 +211,7 @@ class AuctionCancelledEventAfterCommitPgIntegrationTest extends AbstractPostgres
         Auction persisted = auctionRepository.findById(auctionId).orElseThrow();
         assertThat(persisted.getStatus()).as("the cancellation remains committed despite the WS failure")
                 .isEqualTo(AuctionStatus.CANCELLED);
-        verify(notificationServiceSpy, times(1)).send(eq(participantId), eq("AUCTION_CANCELLED"),
+        verify(notificationServiceSpy, times(1)).sendAfterCommit(eq(participantId), eq("AUCTION_CANCELLED"),
                 anyString(), anyString(), eq(auctionId), eq("AUCTION"));
     }
 
@@ -230,7 +230,7 @@ class AuctionCancelledEventAfterCommitPgIntegrationTest extends AbstractPostgres
         });
 
         doThrow(new RuntimeException("simulated notification failure"))
-                .when(notificationServiceSpy).send(eq(participant1), eq("AUCTION_CANCELLED"),
+                .when(notificationServiceSpy).sendAfterCommit(eq(participant1), eq("AUCTION_CANCELLED"),
                         anyString(), anyString(), eq(auctionId), eq("AUCTION"));
 
         AtomicReference<Boolean> result = new AtomicReference<>();
@@ -244,7 +244,7 @@ class AuctionCancelledEventAfterCommitPgIntegrationTest extends AbstractPostgres
         assertThat(persisted.getStatus()).as("the cancellation remains committed despite the notification failure")
                 .isEqualTo(AuctionStatus.CANCELLED);
         // independent side effects must still have been attempted
-        verify(notificationServiceSpy, times(1)).send(eq(participant2), eq("AUCTION_CANCELLED"),
+        verify(notificationServiceSpy, times(1)).sendAfterCommit(eq(participant2), eq("AUCTION_CANCELLED"),
                 anyString(), anyString(), eq(auctionId), eq("AUCTION"));
         verify(webSocketControllerSpy, times(1)).sendAuctionEnded(auctionId, null, null);
     }

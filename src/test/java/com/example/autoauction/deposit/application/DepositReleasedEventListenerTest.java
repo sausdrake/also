@@ -50,7 +50,7 @@ class DepositReleasedEventListenerTest {
 
             listener.onDepositReleased(event);
 
-            verify(notificationService, times(1)).send(
+            verify(notificationService, times(1)).sendAfterCommit(
                     eq(userId),
                     eq("DEPOSIT_RELEASED"),
                     eq("Депозит освобождён"),
@@ -68,7 +68,7 @@ class DepositReleasedEventListenerTest {
         @DisplayName("Падение notificationService.send не всплывает наружу из listener'а")
         void notificationFailure_DoesNotPropagate() {
             doThrow(new RuntimeException("boom")).when(notificationService)
-                    .send(eq(userId), eq("DEPOSIT_RELEASED"), org.mockito.ArgumentMatchers.anyString(),
+                    .sendAfterCommit(eq(userId), eq("DEPOSIT_RELEASED"), org.mockito.ArgumentMatchers.anyString(),
                             org.mockito.ArgumentMatchers.anyString());
             DepositReleasedEvent event = new DepositReleasedEvent(userId, auctionId, amount);
 

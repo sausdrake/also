@@ -50,7 +50,7 @@ class DepositFrozenEventListenerTest {
 
             listener.onDepositFrozen(event);
 
-            verify(notificationService, times(1)).send(
+            verify(notificationService, times(1)).sendAfterCommit(
                     eq(userId),
                     eq("DEPOSIT_FROZEN"),
                     eq("Депозит заморожен"),
@@ -68,7 +68,7 @@ class DepositFrozenEventListenerTest {
         @DisplayName("Падение notificationService.send не всплывает наружу из listener'а")
         void notificationFailure_DoesNotPropagate() {
             doThrow(new RuntimeException("boom")).when(notificationService)
-                    .send(eq(userId), eq("DEPOSIT_FROZEN"), org.mockito.ArgumentMatchers.anyString(),
+                    .sendAfterCommit(eq(userId), eq("DEPOSIT_FROZEN"), org.mockito.ArgumentMatchers.anyString(),
                             org.mockito.ArgumentMatchers.anyString());
             DepositFrozenEvent event = new DepositFrozenEvent(userId, auctionId, requiredAmount);
 

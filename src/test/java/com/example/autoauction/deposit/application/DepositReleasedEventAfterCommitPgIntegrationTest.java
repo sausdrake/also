@@ -337,7 +337,7 @@ class DepositReleasedEventAfterCommitPgIntegrationTest extends AbstractPostgresI
         Deposit winnerDeposit = depositRepository.findByUserId(winnerId).orElseThrow();
         assertThat(winnerDeposit.getBlockedAmount()).isEqualByComparingTo(BigDecimal.ZERO);
 
-        verify(notificationServiceSpy, times(1)).send(eq(winnerId), eq("DEPOSIT_RELEASED"), anyString(), anyString());
+        verify(notificationServiceSpy, times(1)).sendAfterCommit(eq(winnerId), eq("DEPOSIT_RELEASED"), anyString(), anyString());
     }
 
     // ======================================================================
@@ -374,7 +374,7 @@ class DepositReleasedEventAfterCommitPgIntegrationTest extends AbstractPostgresI
                 .as("the winner deposit release itself must have been rolled back too")
                 .isEqualByComparingTo("50000");
 
-        verify(notificationServiceSpy, never()).send(eq(winnerId), eq("DEPOSIT_RELEASED"), anyString(), anyString());
+        verify(notificationServiceSpy, never()).sendAfterCommit(eq(winnerId), eq("DEPOSIT_RELEASED"), anyString(), anyString());
     }
 
     // ======================================================================
@@ -407,7 +407,7 @@ class DepositReleasedEventAfterCommitPgIntegrationTest extends AbstractPostgresI
                 .as("the winner deposit release itself must have been rolled back too")
                 .isEqualByComparingTo("50000");
 
-        verify(notificationServiceSpy, never()).send(eq(winnerId), eq("DEPOSIT_RELEASED"), anyString(), anyString());
+        verify(notificationServiceSpy, never()).sendAfterCommit(eq(winnerId), eq("DEPOSIT_RELEASED"), anyString(), anyString());
     }
 
     // ======================================================================
@@ -427,7 +427,7 @@ class DepositReleasedEventAfterCommitPgIntegrationTest extends AbstractPostgresI
 
         Deposit winnerDeposit = depositRepository.findByUserId(winnerId).orElseThrow();
         assertThat(winnerDeposit.getBlockedAmount()).isEqualByComparingTo(BigDecimal.ZERO);
-        verify(notificationServiceSpy, times(1)).send(eq(winnerId), eq("DEPOSIT_RELEASED"), anyString(), anyString());
+        verify(notificationServiceSpy, times(1)).sendAfterCommit(eq(winnerId), eq("DEPOSIT_RELEASED"), anyString(), anyString());
     }
 
     // TEST 5 (a genuine concurrent @Version conflict specifically for releaseWinner's own
@@ -446,7 +446,7 @@ class DepositReleasedEventAfterCommitPgIntegrationTest extends AbstractPostgresI
         freezeAndMarkWinner(winnerId, auctionId, new BigDecimal("50000"));
 
         doThrow(new RuntimeException("simulated notification failure"))
-                .when(notificationServiceSpy).send(eq(winnerId), eq("DEPOSIT_RELEASED"), anyString(), anyString());
+                .when(notificationServiceSpy).sendAfterCommit(eq(winnerId), eq("DEPOSIT_RELEASED"), anyString(), anyString());
 
         assertThatCode(() -> adminAuctionService.releaseWinner(auctionId))
                 .as("a post-commit notification failure must not propagate out of releaseWinner")

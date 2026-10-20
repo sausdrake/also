@@ -37,7 +37,7 @@ public class DepositReleasedEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onDepositReleased(DepositReleasedEvent event) {
         try {
-            notificationService.send(event.userId(), "DEPOSIT_RELEASED",
+            notificationService.sendAfterCommit(event.userId(), "DEPOSIT_RELEASED",
                     "Депозит освобождён",
                     String.format("Заморозка %s сом по аукциону #%d снята администратором.",
                             event.amount().toPlainString(), event.auctionId()));

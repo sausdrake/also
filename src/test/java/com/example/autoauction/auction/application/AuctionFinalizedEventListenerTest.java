@@ -84,11 +84,11 @@ class AuctionFinalizedEventListenerTest {
             listener.onAuctionFinalized(event);
 
             verify(webSocketController, times(1)).sendPersonalUpdate(winnerId, auction, "YOU_WON");
-            verify(notificationService, times(1)).send(eq(winnerId), eq("AUCTION_WON"),
+            verify(notificationService, times(1)).sendAfterCommit(eq(winnerId), eq("AUCTION_WON"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
-            verify(notificationService, times(1)).send(eq(loserId), eq("AUCTION_LOST"),
+            verify(notificationService, times(1)).sendAfterCommit(eq(loserId), eq("AUCTION_LOST"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
-            verify(notificationService, times(1)).send(eq(sellerId), eq("AUCTION_COMPLETED"),
+            verify(notificationService, times(1)).sendAfterCommit(eq(sellerId), eq("AUCTION_COMPLETED"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
             verify(webSocketController, times(1)).sendAuctionEnded(auctionId, winnerId, winningBid);
             verify(webSocketController, times(1)).sendAuctionUpdate(auction, "AUCTION_FINALIZED");
@@ -106,7 +106,7 @@ class AuctionFinalizedEventListenerTest {
             verify(webSocketController, times(1)).sendAuctionEnded(auctionId, null, null);
             verify(webSocketController, times(1)).sendAuctionUpdate(auction, "AUCTION_FINALIZED");
             verifyNoMoreInteractions(webSocketController);
-            verify(notificationService, never()).send(any(), anyString(), anyString(), anyString(), any(), anyString());
+            verify(notificationService, never()).sendAfterCommit(any(), anyString(), anyString(), anyString(), any(), anyString());
         }
 
         @Test
@@ -116,7 +116,7 @@ class AuctionFinalizedEventListenerTest {
 
             listener.onAuctionFinalized(event);
 
-            verify(notificationService, never()).send(any(), eq("AUCTION_LOST"), anyString(), anyString(), any(), anyString());
+            verify(notificationService, never()).sendAfterCommit(any(), eq("AUCTION_LOST"), anyString(), anyString(), any(), anyString());
         }
     }
 
@@ -132,7 +132,7 @@ class AuctionFinalizedEventListenerTest {
 
             assertThatCode(() -> listener.onAuctionFinalized(event)).doesNotThrowAnyException();
 
-            verify(notificationService, times(1)).send(eq(winnerId), eq("AUCTION_WON"),
+            verify(notificationService, times(1)).sendAfterCommit(eq(winnerId), eq("AUCTION_WON"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
             verify(webSocketController, times(1)).sendAuctionUpdate(auction, "AUCTION_FINALIZED");
         }
@@ -141,14 +141,14 @@ class AuctionFinalizedEventListenerTest {
         @DisplayName("Падение AUCTION_WON не всплывает и не мешает AUCTION_LOST/AUCTION_COMPLETED")
         void auctionWonNotificationFailure_DoesNotPropagate_OthersStillRun() {
             doThrow(new RuntimeException("boom")).when(notificationService)
-                    .send(eq(winnerId), eq("AUCTION_WON"), anyString(), anyString(), any(), anyString());
+                    .sendAfterCommit(eq(winnerId), eq("AUCTION_WON"), anyString(), anyString(), any(), anyString());
             AuctionFinalizedEvent event = new AuctionFinalizedEvent(auction, winnerId, winningBid, List.of(winnerId, loserId));
 
             assertThatCode(() -> listener.onAuctionFinalized(event)).doesNotThrowAnyException();
 
-            verify(notificationService, times(1)).send(eq(loserId), eq("AUCTION_LOST"),
+            verify(notificationService, times(1)).sendAfterCommit(eq(loserId), eq("AUCTION_LOST"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
-            verify(notificationService, times(1)).send(eq(sellerId), eq("AUCTION_COMPLETED"),
+            verify(notificationService, times(1)).sendAfterCommit(eq(sellerId), eq("AUCTION_COMPLETED"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
         }
 
@@ -156,12 +156,12 @@ class AuctionFinalizedEventListenerTest {
         @DisplayName("Падение AUCTION_LOST одному участнику не всплывает и не мешает остальным лузерам/продавцу")
         void auctionLostNotificationFailure_DoesNotPropagate_OthersStillRun() {
             doThrow(new RuntimeException("boom")).when(notificationService)
-                    .send(eq(loserId), eq("AUCTION_LOST"), anyString(), anyString(), any(), anyString());
+                    .sendAfterCommit(eq(loserId), eq("AUCTION_LOST"), anyString(), anyString(), any(), anyString());
             AuctionFinalizedEvent event = new AuctionFinalizedEvent(auction, winnerId, winningBid, List.of(winnerId, loserId));
 
             assertThatCode(() -> listener.onAuctionFinalized(event)).doesNotThrowAnyException();
 
-            verify(notificationService, times(1)).send(eq(sellerId), eq("AUCTION_COMPLETED"),
+            verify(notificationService, times(1)).sendAfterCommit(eq(sellerId), eq("AUCTION_COMPLETED"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
             verify(webSocketController, times(1)).sendAuctionEnded(auctionId, winnerId, winningBid);
         }
@@ -170,7 +170,7 @@ class AuctionFinalizedEventListenerTest {
         @DisplayName("Падение AUCTION_COMPLETED не всплывает и не мешает sendAuctionEnded")
         void auctionCompletedNotificationFailure_DoesNotPropagate_OthersStillRun() {
             doThrow(new RuntimeException("boom")).when(notificationService)
-                    .send(eq(sellerId), eq("AUCTION_COMPLETED"), anyString(), anyString(), any(), anyString());
+                    .sendAfterCommit(eq(sellerId), eq("AUCTION_COMPLETED"), anyString(), anyString(), any(), anyString());
             AuctionFinalizedEvent event = new AuctionFinalizedEvent(auction, winnerId, winningBid, List.of(winnerId, loserId));
 
             assertThatCode(() -> listener.onAuctionFinalized(event)).doesNotThrowAnyException();
@@ -221,8 +221,8 @@ class AuctionFinalizedEventListenerTest {
 
         listener.onAuctionFinalized(new AuctionFinalizedEvent(auction, winnerId, winningBid, List.of(winnerId, loserId)));
 
-        verify(notificationService, times(1)).send(eq(owner), eq("AUCTION_COMPLETED"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
-        verify(notificationService, times(1)).send(eq(sellerId), eq("AUCTION_COMPLETED"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
+        verify(notificationService, times(1)).sendAfterCommit(eq(owner), eq("AUCTION_COMPLETED"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
+        verify(notificationService, times(1)).sendAfterCommit(eq(sellerId), eq("AUCTION_COMPLETED"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
     }
 
     @org.junit.jupiter.api.Test
@@ -232,6 +232,6 @@ class AuctionFinalizedEventListenerTest {
 
         listener.onAuctionFinalized(new AuctionFinalizedEvent(auction, winnerId, winningBid, List.of(winnerId)));
 
-        verify(notificationService, times(1)).send(eq(sellerId), eq("AUCTION_COMPLETED"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
+        verify(notificationService, times(1)).sendAfterCommit(eq(sellerId), eq("AUCTION_COMPLETED"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
     }
 }

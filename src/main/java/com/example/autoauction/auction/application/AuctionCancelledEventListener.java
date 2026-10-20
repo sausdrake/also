@@ -57,7 +57,7 @@ public class AuctionCancelledEventListener {
 
         for (Long participantId : event.participantIds()) {
             try {
-                notificationService.send(participantId, "AUCTION_CANCELLED",
+                notificationService.sendAfterCommit(participantId, "AUCTION_CANCELLED",
                         "Аукцион отменён",
                         String.format("Аукцион \"%s\" был отменён администратором. Ваши средства разблокированы.",
                                 auction.getVehicleInfo()),

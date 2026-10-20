@@ -152,7 +152,7 @@ class BuyNowFinalizedEventAfterCommitPgIntegrationTest extends AbstractPostgresI
         assertThat(persisted.getStatus()).isEqualTo(AuctionStatus.WAITING_FOR_PAYMENT);
         assertThat(persisted.getWinnerId()).isEqualTo(buyerId);
 
-        verify(notificationServiceSpy, times(1)).send(eq(buyerId), eq("AUCTION_WON"),
+        verify(notificationServiceSpy, times(1)).sendAfterCommit(eq(buyerId), eq("AUCTION_WON"),
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
                 eq(auctionId), eq("AUCTION"));
         verify(webSocketControllerSpy, times(1)).sendBuyNowNotification(eq(auctionId), eq(buyerId), any(BigDecimal.class));
@@ -233,7 +233,7 @@ class BuyNowFinalizedEventAfterCommitPgIntegrationTest extends AbstractPostgresI
         // (out-of-scope, pre-existing) DEPOSIT_FROZEN notification legitimately fires earlier in
         // this same transaction, before the conflict is discovered. ---
         verifyNoInteractions(webSocketControllerSpy);
-        verify(notificationServiceSpy, org.mockito.Mockito.never()).send(
+        verify(notificationServiceSpy, org.mockito.Mockito.never()).sendAfterCommit(
                 any(), eq("AUCTION_WON"), org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.anyString(), any(), org.mockito.ArgumentMatchers.anyString());
     }
@@ -271,7 +271,7 @@ class BuyNowFinalizedEventAfterCommitPgIntegrationTest extends AbstractPostgresI
         Long auctionId = newBuyNowEligibleAuction(REQUIRED_DEPOSIT);
 
         doThrow(new RuntimeException("simulated notification failure"))
-                .when(notificationServiceSpy).send(eq(buyerId), eq("AUCTION_WON"),
+                .when(notificationServiceSpy).sendAfterCommit(eq(buyerId), eq("AUCTION_WON"),
                         org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
                         eq(auctionId), eq("AUCTION"));
 

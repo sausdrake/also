@@ -85,7 +85,7 @@ class BuyNowFinalizedEventListenerTest {
 
             listener.onBuyNowFinalized(event);
 
-            verify(notificationService, times(1)).send(eq(winnerId), eq("AUCTION_WON"),
+            verify(notificationService, times(1)).sendAfterCommit(eq(winnerId), eq("AUCTION_WON"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
             verify(webSocketController, times(1)).sendBuyNowNotification(auctionId, winnerId, buyNowAmount);
             verify(webSocketController, times(1)).sendAuctionUpdate(auction, "BUY_NOW");
@@ -100,7 +100,7 @@ class BuyNowFinalizedEventListenerTest {
         @DisplayName("Падение notificationService.send не всплывает и не мешает WebSocket-вызовам")
         void notificationFailure_DoesNotPropagate_WebSocketStillSent() {
             doThrow(new RuntimeException("boom")).when(notificationService)
-                    .send(eq(winnerId), eq("AUCTION_WON"), anyString(), anyString(), any(), anyString());
+                    .sendAfterCommit(eq(winnerId), eq("AUCTION_WON"), anyString(), anyString(), any(), anyString());
             BuyNowFinalizedEvent event = new BuyNowFinalizedEvent(auction, winnerId, buyNowAmount);
 
             assertThatCode(() -> listener.onBuyNowFinalized(event)).doesNotThrowAnyException();
@@ -121,7 +121,7 @@ class BuyNowFinalizedEventListenerTest {
             // sendBuyNowNotification throwing aborts the try block before sendAuctionUpdate in the
             // SAME try block runs (matches the original inline code's own grouping) - the point
             // being verified here is only that the exception itself never escapes the listener.
-            verify(notificationService, times(1)).send(eq(winnerId), eq("AUCTION_WON"),
+            verify(notificationService, times(1)).sendAfterCommit(eq(winnerId), eq("AUCTION_WON"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
         }
 
@@ -143,7 +143,7 @@ class BuyNowFinalizedEventListenerTest {
     class CreatorAndFollowers {
 
         private void sentTo(Long userId, String type, int times) {
-            verify(notificationService, times(times)).send(eq(userId), eq(type), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
+            verify(notificationService, times(times)).sendAfterCommit(eq(userId), eq(type), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
         }
 
         @Test
@@ -190,7 +190,7 @@ class BuyNowFinalizedEventListenerTest {
         void oneFollowerFailure_DoesNotStopTheOthers() {
             org.mockito.Mockito.when(lotSubscriptionService.getSubscriberIds(auctionId)).thenReturn(java.util.List.of(200L, 300L));
             doThrow(new RuntimeException("boom")).when(notificationService)
-                    .send(eq(200L), eq("AUCTION_ENDED"), anyString(), anyString(), any(), anyString());
+                    .sendAfterCommit(eq(200L), eq("AUCTION_ENDED"), anyString(), anyString(), any(), anyString());
 
             assertThatCode(() -> listener.onBuyNowFinalized(new BuyNowFinalizedEvent(auction, winnerId, buyNowAmount)))
                     .doesNotThrowAnyException();
@@ -208,9 +208,9 @@ class BuyNowFinalizedEventListenerTest {
 
         listener.onBuyNowFinalized(new BuyNowFinalizedEvent(auction, winnerId, buyNowAmount));
 
-        verify(notificationService, times(1)).send(eq(owner), eq("AUCTION_COMPLETED"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
-        verify(notificationService, times(1)).send(eq(sellerId), eq("AUCTION_COMPLETED"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
-        verify(notificationService, never()).send(eq(owner), eq("AUCTION_ENDED"), anyString(), anyString(), any(), anyString());
-        verify(notificationService, times(1)).send(eq(300L), eq("AUCTION_ENDED"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
+        verify(notificationService, times(1)).sendAfterCommit(eq(owner), eq("AUCTION_COMPLETED"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
+        verify(notificationService, times(1)).sendAfterCommit(eq(sellerId), eq("AUCTION_COMPLETED"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
+        verify(notificationService, never()).sendAfterCommit(eq(owner), eq("AUCTION_ENDED"), anyString(), anyString(), any(), anyString());
+        verify(notificationService, times(1)).sendAfterCommit(eq(300L), eq("AUCTION_ENDED"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
     }
 }

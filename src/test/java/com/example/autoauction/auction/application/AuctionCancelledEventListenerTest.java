@@ -80,9 +80,9 @@ class AuctionCancelledEventListenerTest {
             listener.onAuctionCancelled(event);
 
             verify(webSocketController, times(1)).sendAuctionEnded(auctionId, null, null);
-            verify(notificationService, times(1)).send(eq(participant1), eq("AUCTION_CANCELLED"),
+            verify(notificationService, times(1)).sendAfterCommit(eq(participant1), eq("AUCTION_CANCELLED"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
-            verify(notificationService, times(1)).send(eq(participant2), eq("AUCTION_CANCELLED"),
+            verify(notificationService, times(1)).sendAfterCommit(eq(participant2), eq("AUCTION_CANCELLED"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
         }
 
@@ -94,7 +94,7 @@ class AuctionCancelledEventListenerTest {
             listener.onAuctionCancelled(event);
 
             verify(webSocketController, times(1)).sendAuctionEnded(auctionId, null, null);
-            verify(notificationService, never()).send(any(), anyString(), anyString(), anyString(), any(), anyString());
+            verify(notificationService, never()).sendAfterCommit(any(), anyString(), anyString(), anyString(), any(), anyString());
         }
     }
 
@@ -110,9 +110,9 @@ class AuctionCancelledEventListenerTest {
 
             assertThatCode(() -> listener.onAuctionCancelled(event)).doesNotThrowAnyException();
 
-            verify(notificationService, times(1)).send(eq(participant1), eq("AUCTION_CANCELLED"),
+            verify(notificationService, times(1)).sendAfterCommit(eq(participant1), eq("AUCTION_CANCELLED"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
-            verify(notificationService, times(1)).send(eq(participant2), eq("AUCTION_CANCELLED"),
+            verify(notificationService, times(1)).sendAfterCommit(eq(participant2), eq("AUCTION_CANCELLED"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
         }
 
@@ -120,12 +120,12 @@ class AuctionCancelledEventListenerTest {
         @DisplayName("Падение уведомления одному участнику не всплывает и не мешает уведомлению другого")
         void oneParticipantNotificationFailure_DoesNotPropagate_OtherParticipantStillNotified() {
             doThrow(new RuntimeException("boom")).when(notificationService)
-                    .send(eq(participant1), eq("AUCTION_CANCELLED"), anyString(), anyString(), any(), anyString());
+                    .sendAfterCommit(eq(participant1), eq("AUCTION_CANCELLED"), anyString(), anyString(), any(), anyString());
             AuctionCancelledEvent event = new AuctionCancelledEvent(auction, List.of(participant1, participant2));
 
             assertThatCode(() -> listener.onAuctionCancelled(event)).doesNotThrowAnyException();
 
-            verify(notificationService, times(1)).send(eq(participant2), eq("AUCTION_CANCELLED"),
+            verify(notificationService, times(1)).sendAfterCommit(eq(participant2), eq("AUCTION_CANCELLED"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
         }
     }

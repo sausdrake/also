@@ -38,7 +38,7 @@ public class DepositFrozenEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onDepositFrozen(DepositFrozenEvent event) {
         try {
-            notificationService.send(event.userId(), "DEPOSIT_FROZEN",
+            notificationService.sendAfterCommit(event.userId(), "DEPOSIT_FROZEN",
                     "Депозит заморожен",
                     String.format("Для участия в аукционе #%d заморожено %s сом.",
                             event.auctionId(), event.requiredAmount().toPlainString()));

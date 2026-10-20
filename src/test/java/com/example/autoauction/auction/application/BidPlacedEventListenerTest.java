@@ -104,7 +104,7 @@ class BidPlacedEventListenerTest {
 
             listener.onBidPlaced(event);
 
-            verify(notificationService, times(1)).send(eq(prevLeaderId), eq("OUTBID"),
+            verify(notificationService, times(1)).sendAfterCommit(eq(prevLeaderId), eq("OUTBID"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
         }
 
@@ -115,7 +115,7 @@ class BidPlacedEventListenerTest {
 
             listener.onBidPlaced(event);
 
-            verify(notificationService, never()).send(anyLong(), eq("OUTBID"), anyString(), anyString(), any(), anyString());
+            verify(notificationService, never()).sendAfterCommit(anyLong(), eq("OUTBID"), anyString(), anyString(), any(), anyString());
         }
 
         @Test
@@ -125,7 +125,7 @@ class BidPlacedEventListenerTest {
 
             listener.onBidPlaced(event);
 
-            verify(notificationService, never()).send(anyLong(), eq("OUTBID"), anyString(), anyString(), any(), anyString());
+            verify(notificationService, never()).sendAfterCommit(anyLong(), eq("OUTBID"), anyString(), anyString(), any(), anyString());
         }
 
         @Test
@@ -135,7 +135,7 @@ class BidPlacedEventListenerTest {
 
             listener.onBidPlaced(event);
 
-            verify(notificationService, times(1)).send(eq(sellerId), eq("NEW_BID_ON_VEHICLE"),
+            verify(notificationService, times(1)).sendAfterCommit(eq(sellerId), eq("NEW_BID_ON_VEHICLE"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
         }
 
@@ -146,7 +146,7 @@ class BidPlacedEventListenerTest {
 
             listener.onBidPlaced(event);
 
-            verify(notificationService, times(1)).send(eq(bidderId), eq("AUCTION_LEADER"),
+            verify(notificationService, times(1)).sendAfterCommit(eq(bidderId), eq("AUCTION_LEADER"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
         }
     }
@@ -163,7 +163,7 @@ class BidPlacedEventListenerTest {
 
             assertThatCode(() -> listener.onBidPlaced(event)).doesNotThrowAnyException();
 
-            verify(notificationService, times(1)).send(eq(bidderId), eq("AUCTION_LEADER"),
+            verify(notificationService, times(1)).sendAfterCommit(eq(bidderId), eq("AUCTION_LEADER"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
         }
 
@@ -182,14 +182,14 @@ class BidPlacedEventListenerTest {
         @DisplayName("Падение одного notificationService.send не всплывает и не мешает остальным вызовам")
         void oneNotificationFailure_DoesNotPropagate_OthersStillSent() {
             doThrow(new RuntimeException("boom")).when(notificationService)
-                    .send(eq(prevLeaderId), eq("OUTBID"), anyString(), anyString(), any(), anyString());
+                    .sendAfterCommit(eq(prevLeaderId), eq("OUTBID"), anyString(), anyString(), any(), anyString());
             BidPlacedEvent event = new BidPlacedEvent(auction, bidderId, bidAmount, prevLeaderId, false);
 
             assertThatCode(() -> listener.onBidPlaced(event)).doesNotThrowAnyException();
 
-            verify(notificationService, times(1)).send(eq(sellerId), eq("NEW_BID_ON_VEHICLE"),
+            verify(notificationService, times(1)).sendAfterCommit(eq(sellerId), eq("NEW_BID_ON_VEHICLE"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
-            verify(notificationService, times(1)).send(eq(bidderId), eq("AUCTION_LEADER"),
+            verify(notificationService, times(1)).sendAfterCommit(eq(bidderId), eq("AUCTION_LEADER"),
                     anyString(), anyString(), eq(auctionId), eq("AUCTION"));
         }
     }
@@ -202,7 +202,7 @@ class BidPlacedEventListenerTest {
 
         listener.onBidPlaced(new BidPlacedEvent(auction, bidderId, bidAmount, prevLeaderId, false));
 
-        verify(notificationService, times(1)).send(eq(owner), eq("NEW_BID_ON_VEHICLE"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
-        verify(notificationService, never()).send(eq(sellerId), eq("NEW_BID_ON_VEHICLE"), anyString(), anyString(), any(), anyString());
+        verify(notificationService, times(1)).sendAfterCommit(eq(owner), eq("NEW_BID_ON_VEHICLE"), anyString(), anyString(), eq(auctionId), eq("AUCTION"));
+        verify(notificationService, never()).sendAfterCommit(eq(sellerId), eq("NEW_BID_ON_VEHICLE"), anyString(), anyString(), any(), anyString());
     }
 }

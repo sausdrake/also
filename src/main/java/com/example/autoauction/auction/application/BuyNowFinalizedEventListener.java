@@ -58,7 +58,7 @@ public class BuyNowFinalizedEventListener {
         BigDecimal buyNowAmount = event.buyNowAmount();
 
         try {
-            notificationService.send(winnerId, "AUCTION_WON",
+            notificationService.sendAfterCommit(winnerId, "AUCTION_WON",
                     "Вы выиграли аукцион!",
                     String.format("Поздравляем! Вы купили \"%s\" по цене %s сом (Buy Now).",
                             auction.getVehicleInfo(), buyNowAmount.toPlainString()),
@@ -98,7 +98,7 @@ public class BuyNowFinalizedEventListener {
                 continue;
             }
             try {
-                notificationService.send(creatorId, "AUCTION_COMPLETED",
+                notificationService.sendAfterCommit(creatorId, "AUCTION_COMPLETED",
                         "Аукцион завершён",
                         String.format("Аукцион \"%s\" завершён покупкой по цене Buy Now (%s сом).",
                                 auction.getVehicleInfo(), buyNowAmount.toPlainString()),
@@ -120,7 +120,7 @@ public class BuyNowFinalizedEventListener {
                 continue;
             }
             try {
-                notificationService.send(followerId, "AUCTION_ENDED",
+                notificationService.sendAfterCommit(followerId, "AUCTION_ENDED",
                         "Аукцион завершён",
                         String.format("Автомобиль \"%s\" куплен по цене Buy Now. Торги по этому лоту не состоятся.",
                                 auction.getVehicleInfo()),
