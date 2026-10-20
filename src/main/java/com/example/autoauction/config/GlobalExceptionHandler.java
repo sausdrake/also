@@ -3,6 +3,7 @@
 package com.example.autoauction.config;
 
 import com.example.autoauction.auction.application.RateLimitException;
+import com.example.autoauction.auth.application.RegistrationConflictException;
 import com.example.autoauction.deposit.domain.InsufficientFundsException;
 import com.example.autoauction.identity.application.IdentityVerificationRequiredException;
 import com.example.autoauction.policy.application.PolicyConflictException;
@@ -227,6 +228,26 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(error);
+    }
+
+    // BE-AUTH-01: duplicate username/email at registration - 409 instead of the generic 500 a bare
+    // RuntimeException used to produce. Anti-enumeration: one public code and message for both a
+    // taken username and a taken email; the conflicting field is logged server-side only.
+    @ExceptionHandler(RegistrationConflictException.class)
+    public ResponseEntity<Map<String, Object>> handleRegistrationConflict(RegistrationConflictException e) {
+        log.warn("Registration conflict: {}", e.getReasonCode());
+
+        Map<String, Object> error = new HashMap<>();
+        error.put("timestamp", java.time.LocalDateTime.now().toString());
+        error.put("status", HttpStatus.CONFLICT.value());
+        error.put("error", "Conflict");
+        error.put("code", RegistrationConflictException.PUBLIC_CODE);
+        error.put("message", RegistrationConflictException.PUBLIC_MESSAGE);
+
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(error);
     }

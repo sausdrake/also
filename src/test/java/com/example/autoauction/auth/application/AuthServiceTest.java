@@ -286,6 +286,103 @@ class AuthServiceTest {
         }
     }
 
+    // ==================== BE-AUTH-01: ДУБЛИКАТЫ ПРИ РЕГИСТРАЦИИ ====================
+
+    @Nested
+    @DisplayName("BE-AUTH-01: занятый логин/email - доменная ошибка, а не RuntimeException")
+    class DuplicateRegistrationTests {
+
+        private void freshCandidate() {
+            when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
+            when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
+            when(roleRepository.findByName("ROLE_USER")).thenReturn(Optional.of(userRole));
+            when(passwordEncoder.encode(password)).thenReturn(encodedPassword);
+        }
+
+        private DataIntegrityViolationException violation(String driverMessage) {
+            return new DataIntegrityViolationException("could not execute statement",
+                    new RuntimeException(driverMessage));
+        }
+
+        @Test
+        @DisplayName("занятый логин -> USERNAME_TAKEN, пользователь не сохраняется")
+        void usernameTaken() {
+            when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+
+            RegistrationConflictException e = assertThrows(RegistrationConflictException.class,
+                    () -> authService.register(new AuthService.RegisterRequest(username, "other@example.com", password)));
+
+            assertEquals("USERNAME_TAKEN", e.getReasonCode());
+            assertEquals(RegistrationConflictException.Field.USERNAME, e.getField());
+            // anti-enumeration: the message is the public one, never field-specific
+            assertEquals(RegistrationConflictException.PUBLIC_MESSAGE, e.getMessage());
+            verify(userRepository, never()).save(any(User.class));
+            verify(depositService, never()).createDeposit(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("занятый email -> EMAIL_TAKEN, пользователь не сохраняется")
+        void emailTaken() {
+            when(userRepository.findByUsername("newuser")).thenReturn(Optional.empty());
+            when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+
+            RegistrationConflictException e = assertThrows(RegistrationConflictException.class,
+                    () -> authService.register(new AuthService.RegisterRequest("newuser", email, password)));
+
+            assertEquals("EMAIL_TAKEN", e.getReasonCode());
+            assertEquals(RegistrationConflictException.PUBLIC_MESSAGE, e.getMessage());
+            verify(userRepository, never()).save(any(User.class));
+        }
+
+        @Test
+        @DisplayName("гонка: unique users_email_key при INSERT -> EMAIL_TAKEN")
+        void raceOnEmailConstraint() {
+            freshCandidate();
+            when(userRepository.save(any(User.class))).thenThrow(violation(
+                    "ERROR: duplicate key value violates unique constraint \"users_email_key\""));
+
+            RegistrationConflictException e = assertThrows(RegistrationConflictException.class,
+                    () -> authService.register(new AuthService.RegisterRequest(username, email, password)));
+            assertEquals("EMAIL_TAKEN", e.getReasonCode());
+            verify(depositService, never()).createDeposit(anyLong(), any());
+        }
+
+        @Test
+        @DisplayName("гонка: unique users_username_key при INSERT -> USERNAME_TAKEN")
+        void raceOnUsernameConstraint() {
+            freshCandidate();
+            when(userRepository.save(any(User.class))).thenThrow(violation(
+                    "ERROR: duplicate key value violates unique constraint \"USERS_USERNAME_KEY\""));
+
+            assertEquals("USERNAME_TAKEN", assertThrows(RegistrationConflictException.class,
+                    () -> authService.register(new AuthService.RegisterRequest(username, email, password))).getReasonCode());
+        }
+
+        @Test
+        @DisplayName("другое нарушение целостности не выдаётся за занятый логин/email")
+        void otherIntegrityViolationStaysGeneric() {
+            freshCandidate();
+            when(userRepository.save(any(User.class))).thenThrow(violation(
+                    "ERROR: null value in column \"password_hash\" violates not-null constraint"));
+
+            RuntimeException e = assertThrows(RuntimeException.class,
+                    () -> authService.register(new AuthService.RegisterRequest(username, email, password)));
+            assertFalse(e instanceof RegistrationConflictException);
+            assertEquals("Failed to create user account", e.getMessage());
+        }
+
+        @Test
+        @DisplayName("нарушение без сообщения драйвера не падает NPE и остаётся общим")
+        void violationWithoutMessage() {
+            freshCandidate();
+            when(userRepository.save(any(User.class))).thenThrow(new DataIntegrityViolationException(null));
+
+            RuntimeException e = assertThrows(RuntimeException.class,
+                    () -> authService.register(new AuthService.RegisterRequest(username, email, password)));
+            assertFalse(e instanceof RegistrationConflictException);
+        }
+    }
+
     // ==================== РАСШИРЕННЫЕ ТЕСТЫ АУТЕНТИФИКАЦИИ ====================
 
     @Nested

@@ -99,11 +99,11 @@ public class AuthService {
         synchronized (lockKey) {
             if (userRepository.findByUsername(sanitizedUsername).isPresent()) {
                 log.warn("Registration failed - username already exists: {}", sanitizedUsername);
-                throw new RuntimeException("Username already exists");
+                throw new RegistrationConflictException(RegistrationConflictException.Field.USERNAME);
             }
             if (userRepository.findByEmail(sanitizedEmail).isPresent()) {
                 log.warn("Registration failed - email already exists: {}", sanitizedEmail);
-                throw new RuntimeException("Email already exists");
+                throw new RegistrationConflictException(RegistrationConflictException.Field.EMAIL);
             }
 
             Role userRole = roleRepository.findByName("ROLE_USER")
@@ -125,6 +125,16 @@ public class AuthService {
             try {
                 savedUser = userRepository.save(user);
                 log.info("User created successfully with ID: {}", savedUser.getId());
+            } catch (DataIntegrityViolationException e) {
+                // BE-AUTH-01: a concurrent registration took the username/email between the pre-check
+                // above and this INSERT (the username lock is per JVM and does not cover the email).
+                RegistrationConflictException.Field field = conflictingField(e);
+                if (field == null) {
+                    log.error("Failed to save user: {}", e.getMessage());
+                    throw new RuntimeException("Failed to create user account", e);
+                }
+                log.warn("Registration failed - {} taken concurrently", field);
+                throw new RegistrationConflictException(field, e);
             } catch (DataAccessException e) {
                 log.error("Failed to save user: {}", e.getMessage());
                 throw new RuntimeException("Failed to create user account", e);
@@ -144,6 +154,18 @@ public class AuthService {
             log.debug("Tokens generated for user: {}", savedUser.getUsername());
             return new AuthResponse(jwtToken, refreshToken);
         }
+    }
+
+    /** Which users unique constraint (V1: username/email UNIQUE) the violation names; null for any other. */
+    static RegistrationConflictException.Field conflictingField(DataIntegrityViolationException e) {
+        String text = String.valueOf(e.getMostSpecificCause().getMessage()).toLowerCase(java.util.Locale.ROOT);
+        if (text.contains("users_username_key")) {
+            return RegistrationConflictException.Field.USERNAME;
+        }
+        if (text.contains("users_email_key")) {
+            return RegistrationConflictException.Field.EMAIL;
+        }
+        return null;
     }
 
     // ==================== АУТЕНТИФИКАЦИЯ ====================

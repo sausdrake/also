@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { apiErrorMessage } from '../api/errors';
 
 export const RegisterPage = () => {
   const [username, setUsername] = useState('');
@@ -38,8 +39,10 @@ export const RegisterPage = () => {
       // После регистрации перенаправляем на логин
       navigate('/login', { state: { message: 'Регистрация успешна! Войдите в систему.' } });
       
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка регистрации');
+    } catch (err) {
+      // BE-AUTH-01: a taken username/email is a 409 REGISTRATION_CONFLICT with one Russian message
+      // that does not say which of the two is taken (anti-enumeration).
+      setError(apiErrorMessage(err, 'Ошибка регистрации'));
     } finally {
       setLoading(false);
     }
@@ -99,7 +102,7 @@ export const RegisterPage = () => {
           </div>
 
           {error && (
-            <div className="text-red-500 text-sm text-center">{error}</div>
+            <div role="alert" className="text-red-500 text-sm text-center">{error}</div>
           )}
 
           <div>
