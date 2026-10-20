@@ -3,6 +3,7 @@ import { Routes, Route, NavLink, useLocation, Navigate, useNavigate } from 'reac
 import axios from 'axios';
 import api from '../api/client';
 import { apiErrorMessage } from '../api/errors';
+import { SidebarLayout } from '../components/layout/SidebarLayout';
 import { formatDateTime, formatDate } from '../utils/formatDate';
 import { useAuthStore } from '../store/authStore';
 import { PhotoLightbox } from '../components/PhotoLightbox';
@@ -204,7 +205,7 @@ const NAV_ITEMS = [
   )},
 ];
 
-function AdminSidebar() {
+function AdminSidebar({ onNavigate }: { onNavigate: () => void }) {
   const location  = useLocation();
   const navigate  = useNavigate();
   const logoutFn  = useAuthStore(s => s.logout);
@@ -215,6 +216,7 @@ function AdminSidebar() {
   const isDiagActive = location.pathname.startsWith('/admin/diagnostic');
 
   const handleLogout = async () => {
+    onNavigate();
     await logoutFn();
     navigate('/login');
   };
@@ -237,7 +239,7 @@ function AdminSidebar() {
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {/* Dashboard */}
-        <NavLink to="/admin" end
+        <NavLink onClick={onNavigate} to="/admin" end
           className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
               isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -247,7 +249,7 @@ function AdminSidebar() {
         </NavLink>
 
         {/* Пользователи */}
-        <NavLink to="/admin/users"
+        <NavLink onClick={onNavigate} to="/admin/users"
           className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
               isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -273,14 +275,14 @@ function AdminSidebar() {
           </button>
           {diagOpen && (
             <div className="ml-8 mt-1 space-y-1">
-              <NavLink to="/admin/diagnostic/templates"
+              <NavLink onClick={onNavigate} to="/admin/diagnostic/templates"
                 className={({ isActive }) =>
                   `block px-3 py-2 rounded-lg text-sm transition-colors ${
                     isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
                   }`}>
                 Шаблоны
               </NavLink>
-              <NavLink to="/admin/diagnostic/reports"
+              <NavLink onClick={onNavigate} to="/admin/diagnostic/reports"
                 className={({ isActive }) =>
                   `block px-3 py-2 rounded-lg text-sm transition-colors ${
                     isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
@@ -292,7 +294,7 @@ function AdminSidebar() {
         </div>
 
         {/* Аукционы */}
-        <NavLink to="/admin/auctions"
+        <NavLink onClick={onNavigate} to="/admin/auctions"
           className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
               isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -302,7 +304,7 @@ function AdminSidebar() {
         </NavLink>
 
         {/* Ценовая политика */}
-        <NavLink to="/admin/policy"
+        <NavLink onClick={onNavigate} to="/admin/policy"
           className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
               isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -312,7 +314,7 @@ function AdminSidebar() {
         </NavLink>
 
         {/* Депозиты */}
-        <NavLink to="/admin/deposits"
+        <NavLink onClick={onNavigate} to="/admin/deposits"
           className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
               isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -322,7 +324,7 @@ function AdminSidebar() {
         </NavLink>
 
         {/* Заявки на вывод (F6, ручная выплата) */}
-        <NavLink to="/admin/withdrawals"
+        <NavLink onClick={onNavigate} to="/admin/withdrawals"
           className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
               isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -332,7 +334,7 @@ function AdminSidebar() {
         </NavLink>
 
         {/* Поздние успешные платежи */}
-        <NavLink to="/admin/payments/late-successes"
+        <NavLink onClick={onNavigate} to="/admin/payments/late-successes"
           className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
               isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -342,7 +344,7 @@ function AdminSidebar() {
         </NavLink>
 
         {/* Настройки */}
-        <NavLink to="/admin/settings"
+        <NavLink onClick={onNavigate} to="/admin/settings"
           className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
               isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -352,7 +354,7 @@ function AdminSidebar() {
         </NavLink>
 
         {/* Подтверждение личности */}
-        <NavLink to="/admin/identity"
+        <NavLink onClick={onNavigate} to="/admin/identity"
           className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
               isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -362,7 +364,7 @@ function AdminSidebar() {
         </NavLink>
 
         {/* Сверка платежей */}
-        <NavLink to="/admin/reconciliation"
+        <NavLink onClick={onNavigate} to="/admin/reconciliation"
           className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
               isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -2991,10 +2993,9 @@ function SettingsPage() {
 
 export function AdminDashboard() {
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <AdminSidebar />
-      <main className="flex-1 overflow-y-auto">
-        <div className="p-6 max-w-6xl mx-auto">
+    // FE-MOBILE-02: the shared role-area layout - a drawer below lg instead of a fixed 240px column.
+    <SidebarLayout title="Администратор" sidebar={onNavigate => <AdminSidebar onNavigate={onNavigate} />}>
+        <div className="p-4 sm:p-6 max-w-6xl mx-auto">
           <Routes>
             <Route index element={<DashboardPage />} />
             <Route path="users" element={<UsersPage />} />
@@ -3013,7 +3014,6 @@ export function AdminDashboard() {
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Routes>
         </div>
-      </main>
-    </div>
+    </SidebarLayout>
   );
 }
