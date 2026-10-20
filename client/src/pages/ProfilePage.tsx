@@ -3,7 +3,8 @@ import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import * as subscriptions from '../api/subscriptions';
 import type { WatchedAuction } from '../api/subscriptions';
-import { apiErrorMessage } from '../api/errors';
+import { apiErrorMessage, parseApiError } from '../api/errors';
+import { KycRequiredNotice } from '../components/identity/KycRequiredNotice';
 import { AUCTION_STATUS_LABELS } from '../domain/auction';
 import { labelOf } from '../domain/parse';
 import { useAuthStore } from '../store/authStore';
@@ -38,6 +39,8 @@ function DepositTab() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [msg, setMsg] = useState<{ text: string; ok: boolean }>({ text: '', ok: true });
+  // FE-KYC-01: 403 IDENTITY_VERIFICATION_REQUIRED from POST /withdrawals -> guidance, not a bare error.
+  const [withdrawKyc, setWithdrawKyc] = useState<string | null>(null);
   // Stable idempotency key for the withdrawal currently being attempted: generated once
   // for a given amount and reused on retry (e.g. after a network error) so the backend's
   // idempotency check protects against double-withdrawal. Regenerated only when the amount
@@ -76,6 +79,7 @@ function DepositTab() {
     const avail = availableBalance ?? 0;
     const err = validateAmount(withdrawAmount, avail);
     if (err) { showMsg(err, false); return; }
+    setWithdrawKyc(null);
     try {
       await api.post('/withdrawals',
         { amount: parseFloat(withdrawAmount), idempotencyKey: getWithdrawKey(withdrawAmount) });
@@ -85,8 +89,14 @@ function DepositTab() {
       fetchDeposit();
       reloadTransactions();
       reloadWithdrawals();
-    } catch (e: any) {
-      showMsg(e.response?.data?.message || 'Ошибка', false);
+    } catch (e) {
+      const error = parseApiError(e, 'Не удалось создать заявку на вывод');
+      if (error.kind === 'kyc_required') {
+        setMsg({ text: '', ok: true });
+        setWithdrawKyc(error.message);
+      } else {
+        showMsg(error.message, false);
+      }
     }
   };
 
@@ -94,6 +104,7 @@ function DepositTab() {
 
   return (
     <div className="space-y-6">
+      {withdrawKyc !== null && <KycRequiredNotice action="вывести средства" message={withdrawKyc} />}
       {msg.text && (
         <div className={`rounded p-3 border text-sm ${msg.ok ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-700'}`}>
           {msg.text}
@@ -374,7 +385,10 @@ function RequestsTab() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ brand: '', model: '', year: '', vin: '' });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [msg, setMsg] = useState('');
+  // FE-KYC-01: errors are red (they used to share the blue "Заявка создана" style); a KYC refusal
+  // of POST /diagnostic/requests is guidance with a link to the identity tab.
+  const [msg, setMsg] = useState<{ text: string; ok: boolean }>({ text: '', ok: true });
+  const [createKyc, setCreateKyc] = useState<string | null>(null);
   // Scenario 1 step 4: "Просмотр" opens the request's details (incl. why it was rejected).
   const [viewedId, setViewedId] = useState<number | null>(null);
 
@@ -405,6 +419,7 @@ function RequestsTab() {
     const errs = validateForm();
     if (Object.keys(errs).length > 0) { setFormErrors(errs); return; }
     setFormErrors({});
+    setCreateKyc(null);
     try {
       await api.post('/diagnostic/requests', {
         brand: form.brand.trim(),
@@ -412,22 +427,28 @@ function RequestsTab() {
         year: parseInt(form.year),
         vin: form.vin.trim().toUpperCase(),
       });
-      setMsg('Заявка создана');
+      setMsg({ text: 'Заявка создана', ok: true });
       setShowForm(false);
       setForm({ brand: '', model: '', year: '', vin: '' });
       loadRequests();
-    } catch (e: any) {
-      setMsg(e.response?.data?.message || 'Ошибка создания заявки');
+    } catch (e) {
+      const error = parseApiError(e, 'Ошибка создания заявки');
+      if (error.kind === 'kyc_required') {
+        setMsg({ text: '', ok: true });
+        setCreateKyc(error.message);
+      } else {
+        setMsg({ text: error.message, ok: false });
+      }
     }
   };
 
   const handleCancel = async (id: number) => {
     try {
       await api.delete(`/diagnostic/requests/${id}`);
-      setMsg('Заявка отозвана');
+      setMsg({ text: 'Заявка отозвана', ok: true });
       loadRequests();
-    } catch (e: any) {
-      setMsg(e.response?.data?.message || 'Ошибка');
+    } catch (e) {
+      setMsg({ text: apiErrorMessage(e, 'Не удалось отозвать заявку'), ok: false });
     }
   };
 
@@ -443,7 +464,13 @@ function RequestsTab() {
 
   return (
     <div className="space-y-4">
-      {msg && <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded p-3">{msg}</div>}
+      {createKyc !== null && <KycRequiredNotice action="подать заявку на диагностику" message={createKyc} />}
+      {msg.text && (
+        <div role={msg.ok ? 'status' : 'alert'}
+          className={`rounded p-3 border ${msg.ok ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-red-50 border-red-200 text-red-700'}`}>
+          {msg.text}
+        </div>
+      )}
 
       <div className="flex justify-between items-center">
         <h3 className="font-semibold text-gray-700">Мои заявки на диагностику</h3>

@@ -7,7 +7,8 @@ import { useAuthStore } from '../store/authStore';
 import { PhotoLightbox } from '../components/PhotoLightbox';
 import { BuyerSaleStatusPanel } from '../components/sale/BuyerSaleStatusPanel';
 import * as subscriptions from '../api/subscriptions';
-import { apiErrorMessage } from '../api/errors';
+import { apiErrorMessage, parseApiError } from '../api/errors';
+import { KycRequiredNotice } from '../components/identity/KycRequiredNotice';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
@@ -232,6 +233,9 @@ export const AuctionPage = () => {
 
   const [bidAmount, setBidAmount] = useState('');
   const [bidError, setBidError]   = useState('');
+  // FE-KYC-01: a bid / Buy Now refused with 403 IDENTITY_VERIFICATION_REQUIRED keeps a notice with
+  // a link to the identity tab (a 5-second flash used to be the only trace).
+  const [kycRefusal, setKycRefusal] = useState<{ action: string; message: string } | null>(null);
   const [message, setMessage]     = useState<{ text: string; type: 'success' | 'error' | 'warning' } | null>(null);
 
   const [liveBids, setLiveBids] = useState<LiveBid[]>(() => id ? loadStoredBids(id) : []);
@@ -363,11 +367,12 @@ export const AuctionPage = () => {
     setBidError('');
     try {
       await axios.post(`${BASE_URL}/api/auctions/${id}/bids`, { amount: Number(bidAmount) }, { headers: authHeaders() });
+      setKycRefusal(null);
       showMsg(`Ставка ${fmt(Number(bidAmount))} сом принята!`, 'success');
-    } catch (e: any) {
-      const status = e.response?.status;
-      const msg = e.response?.data?.message || 'Ошибка при размещении ставки';
-      showMsg(msg, status === 429 ? 'warning' : 'error');
+    } catch (e) {
+      const error = parseApiError(e, 'Ошибка при размещении ставки');
+      if (error.kind === 'kyc_required') setKycRefusal({ action: 'делать ставки', message: error.message });
+      else showMsg(error.message, error.kind === 'rate_limited' ? 'warning' : 'error');
     }
   };
 
@@ -376,10 +381,13 @@ export const AuctionPage = () => {
     if (!auction?.buyNowPrice) return;
     try {
       await axios.post(`${BASE_URL}/api/auctions/${id}/buy-now`, {}, { headers: authHeaders() });
+      setKycRefusal(null);
       showMsg(`Поздравляем! Куплено за ${fmt(auction.buyNowPrice)} сом`, 'success');
       fetchAuction();
-    } catch (e: any) {
-      showMsg(e.response?.data?.message || 'Ошибка при покупке', 'error');
+    } catch (e) {
+      const error = parseApiError(e, 'Ошибка при покупке');
+      if (error.kind === 'kyc_required') setKycRefusal({ action: 'купить по цене Buy Now', message: error.message });
+      else showMsg(error.message, 'error');
     }
   };
 
@@ -758,6 +766,8 @@ export const AuctionPage = () => {
               </div>
 
               <AuctionTimer startTime={auction.startTime} endTime={auction.endTime} status={auction.status} extended={wasExtended} />
+
+              {kycRefusal && <KycRequiredNotice action={kycRefusal.action} message={kycRefusal.message} />}
 
               {/* Flash message */}
               {message && (
