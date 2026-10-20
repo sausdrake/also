@@ -4,6 +4,7 @@ import axios from 'axios';
 import api from '../api/client';
 import { apiErrorMessage } from '../api/errors';
 import { SidebarLayout } from '../components/layout/SidebarLayout';
+import { roleLabel } from '../domain/role';
 import { ReportItemMedia } from '../components/admin/diagnostic/ReportItemMedia';
 import { formatDateTime, formatDate } from '../utils/formatDate';
 import { useAuthStore } from '../store/authStore';
@@ -582,7 +583,7 @@ function UsersPage() {
     if (!roleTarget || !newRole.trim()) return;
     try {
       await api.patch(`/admin/users/${roleTarget.id}/role`, { role: newRole.trim() });
-      notify(`Роль ${roleTarget.username} изменена → ${newRole.replace('ROLE_', '')}`);
+      notify(`Роль ${roleTarget.username} изменена → ${roleLabel(newRole)}`);
       setRoleTarget(null); load();
     } catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); }
   };
@@ -672,7 +673,7 @@ function UsersPage() {
                 <span className="text-gray-500 w-32 shrink-0">Роли:</span>
                 <div className="flex gap-1 flex-wrap">
                   {viewTarget.roles.map(r => (
-                    <span key={r} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs">{r.replace('ROLE_', '')}</span>
+                    <span key={r} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs">{roleLabel(r)}</span>
                   ))}
                 </div>
               </div>
@@ -766,7 +767,7 @@ function UsersPage() {
                       <div className="flex gap-1 flex-wrap">
                         {u.roles.map(r => (
                           <span key={r} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
-                            {r.replace('ROLE_', '')}
+                            {roleLabel(r)}
                           </span>
                         ))}
                       </div>

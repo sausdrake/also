@@ -103,7 +103,11 @@ export function SaleFailurePanel({ auctionId, status, onDone, notify }: Props) {
                 <label key={v.id} className="flex items-center gap-2 text-xs text-gray-600 border rounded-lg px-2 py-1.5">
                   <input type="checkbox" checked={selectedViolationIds.includes(v.id)}
                     onChange={() => toggleViolation(v.id)} />
-                  <span title={v.description}>{v.code}</span>
+                  <span>
+                    {/* FE-UX-01: the description is what the admin reads; the code stays as a reference */}
+                    <span className="text-gray-800">{v.description || v.code}</span>
+                    {v.description && <span className="ml-1 font-mono text-gray-400">{v.code}</span>}
+                  </span>
                 </label>
               ))}
             </div>

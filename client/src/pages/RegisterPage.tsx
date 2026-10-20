@@ -37,7 +37,8 @@ export const RegisterPage = () => {
       });
       
       // После регистрации перенаправляем на логин
-      navigate('/login', { state: { message: 'Регистрация успешна! Войдите в систему.' } });
+      // FE-UX-01: LoginPage shows `state.notice` (the key ChangePasswordPage uses); `message` was never read.
+      navigate('/login', { state: { notice: 'Регистрация успешна! Войдите в систему.' } });
       
     } catch (err) {
       // BE-AUTH-01: a taken username/email is a 409 REGISTRATION_CONFLICT with one Russian message

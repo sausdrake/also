@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { formatDateTime } from '../../../utils/formatDate';
+import { IDENTITY_STATUS_LABELS, parseIdentityStatus } from '../../../domain/identity';
+import { labelOf } from '../../../domain/parse';
 import {
   approve,
   getDocumentUrlAdmin,
@@ -162,7 +164,7 @@ export function IdentityReviewPanel({ item, onActioned }: Props) {
     <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 space-y-4">
       <div>
         <h3 className="font-semibold text-gray-800 text-sm">Заявка #{item.id} · Пользователь #{item.userId}</h3>
-        <p className="text-xs text-gray-500 mt-0.5">{item.status}</p>
+        <p className="text-xs text-gray-500 mt-0.5">{labelOf(IDENTITY_STATUS_LABELS, parseIdentityStatus(item.status))}</p>
       </div>
 
       {msg && (

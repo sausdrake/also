@@ -7,6 +7,7 @@ import { apiErrorMessage, parseApiError } from '../api/errors';
 import { KycRequiredNotice } from '../components/identity/KycRequiredNotice';
 import { AUCTION_STATUS_LABELS } from '../domain/auction';
 import { labelOf, type Parsed } from '../domain/parse';
+import { roleLabel } from '../domain/role';
 import {
   WITHDRAWAL_OWNER_LABELS, parseWithdrawalStatus, toWithdrawalAmount, validateWithdrawalAmount, type WithdrawalStatus,
 } from '../domain/withdrawal';
@@ -841,7 +842,7 @@ function ProfileTab() {
           <p className="text-sm text-gray-500">Роли</p>
           <div className="flex gap-2 mt-1">
             {user?.roles?.map(r => (
-              <span key={r} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">{r}</span>
+              <span key={r} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">{roleLabel(r)}</span>
             ))}
           </div>
         </div>

@@ -114,8 +114,8 @@ describe('SellerViolationResolutionPanel', () => {
       );
 
       expect(apiGet).toHaveBeenCalledWith('/admin/policy/violation-definitions');
-      expect(await screen.findByRole('checkbox', { name: 'MISSING_VIN_PHOTO' })).toBeInTheDocument();
-      expect(screen.getByRole('checkbox', { name: 'FALSE_MILEAGE' })).toBeInTheDocument();
+      expect(await screen.findByRole('checkbox', { name: /MISSING_VIN_PHOTO/ })).toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: /FALSE_MILEAGE/ })).toBeInTheDocument();
     });
   });
 
@@ -135,7 +135,7 @@ describe('SellerViolationResolutionPanel', () => {
       const trigger = await screen.findByRole('button', { name: 'Разрешить нарушение' });
       expect(trigger).toBeDisabled();
 
-      fireEvent.click(screen.getByRole('checkbox', { name: 'FALSE_MILEAGE' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: /FALSE_MILEAGE/ }));
 
       expect(trigger).toBeEnabled();
     });
@@ -154,7 +154,7 @@ describe('SellerViolationResolutionPanel', () => {
         />
       );
 
-      fireEvent.click(await screen.findByRole('checkbox', { name: 'FALSE_MILEAGE' }));
+      fireEvent.click(await screen.findByRole('checkbox', { name: /FALSE_MILEAGE/ }));
       fireEvent.click(screen.getByRole('button', { name: 'Разрешить нарушение' }));
 
       expect(await screen.findByRole('button', { name: 'Подтвердить' })).toBeInTheDocument();
@@ -182,7 +182,7 @@ describe('SellerViolationResolutionPanel', () => {
         />
       );
 
-      fireEvent.click(await screen.findByRole('checkbox', { name: 'FALSE_MILEAGE' }));
+      fireEvent.click(await screen.findByRole('checkbox', { name: /FALSE_MILEAGE/ }));
       fireEvent.click(screen.getByRole('button', { name: 'Разрешить нарушение' }));
       fireEvent.click(await screen.findByRole('button', { name: 'Подтвердить' }));
 
@@ -209,8 +209,8 @@ describe('SellerViolationResolutionPanel', () => {
         />
       );
 
-      fireEvent.click(await screen.findByRole('checkbox', { name: 'MISSING_VIN_PHOTO' }));
-      fireEvent.click(screen.getByRole('checkbox', { name: 'FALSE_MILEAGE' }));
+      fireEvent.click(await screen.findByRole('checkbox', { name: /MISSING_VIN_PHOTO/ }));
+      fireEvent.click(screen.getByRole('checkbox', { name: /FALSE_MILEAGE/ }));
       fireEvent.click(screen.getByRole('button', { name: 'Разрешить нарушение' }));
       fireEvent.click(await screen.findByRole('button', { name: 'Подтвердить' }));
 
@@ -238,7 +238,7 @@ describe('SellerViolationResolutionPanel', () => {
         />
       );
 
-      fireEvent.click(await screen.findByRole('checkbox', { name: 'FALSE_MILEAGE' }));
+      fireEvent.click(await screen.findByRole('checkbox', { name: /FALSE_MILEAGE/ }));
       fireEvent.click(screen.getByRole('button', { name: 'Разрешить нарушение' }));
       fireEvent.click(await screen.findByRole('button', { name: 'Подтвердить' }));
 
@@ -276,7 +276,7 @@ describe('SellerViolationResolutionPanel', () => {
         />
       );
 
-      fireEvent.click(await screen.findByRole('checkbox', { name: 'FALSE_MILEAGE' }));
+      fireEvent.click(await screen.findByRole('checkbox', { name: /FALSE_MILEAGE/ }));
       fireEvent.click(screen.getByRole('button', { name: 'Разрешить нарушение' }));
       fireEvent.click(await screen.findByRole('button', { name: 'Подтвердить' }));
 
@@ -300,7 +300,7 @@ describe('SellerViolationResolutionPanel', () => {
         />
       );
 
-      fireEvent.click(await screen.findByRole('checkbox', { name: 'FALSE_MILEAGE' }));
+      fireEvent.click(await screen.findByRole('checkbox', { name: /FALSE_MILEAGE/ }));
       fireEvent.click(screen.getByRole('button', { name: 'Разрешить нарушение' }));
       fireEvent.click(await screen.findByRole('button', { name: 'Подтвердить' }));
 

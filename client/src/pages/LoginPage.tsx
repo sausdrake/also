@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { parseApiError } from '../api/errors';
 import { useAuthStore } from '../store/authStore';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
@@ -55,8 +56,11 @@ export const LoginPage = () => {
       } else {
         navigate('/');
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Неверный логин или пароль');
+    } catch (err) {
+      // FE-UX-01: every authentication failure is one masked 401 "Invalid username or password" on
+      // the backend (it does not reveal whether the account exists or is disabled) - say it in Russian.
+      const error = parseApiError(err, 'Не удалось войти. Повторите попытку.');
+      setError(error.kind === 'unauthorized' ? 'Неверное имя пользователя или пароль.' : error.message);
     } finally {
       setLoading(false);
     }
