@@ -6,6 +6,12 @@ import api from '../api/client';
 import { formatDate } from '../utils/formatDate';
 import { useAuthStore } from '../store/authStore';
 import { DiagnosticMediaSection, type ItemReadiness } from '../components/diagnostic/DiagnosticMediaSection';
+import { TemplateBinding, type TemplateOption } from '../components/diagnostic/TemplateBinding';
+import { apiErrorMessage, parseApiError } from '../api/errors';
+import { labelOf } from '../domain/parse';
+import {
+  DIAGNOSTIC_STATUS_LABELS, diagnosticianCanEdit, needsTemplate, parseDiagnosticRequestStatus,
+} from '../domain/diagnosticRequest';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
@@ -66,8 +72,11 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   REJECTED:    { label: 'Отклонён',        color: 'bg-red-100 text-red-700' },
 };
 
-const isEditable = (status: string) =>
-  status === 'DRAFT' || status === 'IN_PROGRESS' || status === 'REJECTED';
+/** FE-DIAG-01: the report is opened only for an accepted request (IN_PROGRESS); REJECTED goes through "rework" first. */
+const canOpenReport = (status: string) => {
+  const s = parseDiagnosticRequestStatus(status);
+  return s.known && s.value === 'IN_PROGRESS';
+};
 
 // ─── PhotoCapture ─────────────────────────────────────────────────────────────
 
@@ -214,16 +223,18 @@ function FieldInput({ item, ans, onChange, hasError }: {
 
 // ─── ReportForm ───────────────────────────────────────────────────────────────
 
-function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => void }) {
+function ReportForm({ request, onDone }: { request: DiagRequest; onDone: () => void }) {
+  const requestId = request.id;
   const [data, setData] = useState<any>(null);
+  const [needsBinding, setNeedsBinding] = useState(false);
   const [answers, setAnswers] = useState<Record<number, Answer>>({});
   const [openGroups, setOpenGroups] = useState<Set<number>>(new Set());
   const [msg, setMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Set<number>>(new Set());
   const [missingFields, setMissingFields] = useState<string[]>([]);
-  const [templates, setTemplates] = useState<{ id: number; name: string; vehicleType: string }[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
+  const [templates, setTemplates] = useState<TemplateOption[]>([]);
+  const [templatesError, setTemplatesError] = useState('');
   const [itemReadiness, setItemReadiness] = useState<Record<number, ItemReadiness>>({});
 
   // Frontend readiness is advisory only - the backend completion gate remains
@@ -232,11 +243,12 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
     setItemReadiness(prev => (prev[itemId] === readiness ? prev : { ...prev, [itemId]: readiness }));
   }, []);
 
-  const loadForm = (templateId?: number) => {
-    const url = templateId
-      ? `/diagnostic/work/${requestId}?templateId=${templateId}`
-      : `/diagnostic/work/${requestId}`;
-    api.get(url).then(r => {
+  // FE-DIAG-01: the form is always the request's bound template (GET /diagnostic/work/{id}); the
+  // backend ignores any ?templateId and refuses (409) an accepted request with no template bound yet.
+  const loadForm = () => {
+    setMsg('');
+    api.get(`/diagnostic/work/${requestId}`).then(r => {
+      setNeedsBinding(false);
       setData(r.data);
       const groups: Group[] = r.data?.template?.groups ?? [];
       setOpenGroups(new Set(groups.map((g: Group) => g.id)));
@@ -252,12 +264,25 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
         };
       });
       setAnswers(initial);
-    }).catch(() => setMsg('Не удалось загрузить заявку'));
+    }).catch(e => {
+      const err = parseApiError(e, 'Не удалось загрузить заявку');
+      // The response carries no templateId: for a request this diagnostician holds IN_PROGRESS,
+      // a 409 here is getRequestWithTemplate's "no template bound yet" refusal.
+      const status = parseDiagnosticRequestStatus(request.status);
+      if (err.kind === 'conflict' && needsTemplate({ status, templateId: null })) {
+        setNeedsBinding(true);
+        return;
+      }
+      setNeedsBinding(false);
+      setMsg(err.message);
+    });
   };
 
   useEffect(() => {
     loadForm();
-    api.get('/diagnostic/work/templates').then(r => setTemplates(r.data || [])).catch(() => {});
+    api.get('/diagnostic/work/templates')
+      .then(r => setTemplates(Array.isArray(r.data) ? r.data : []))
+      .catch(e => setTemplatesError(apiErrorMessage(e, 'Не удалось загрузить шаблоны анкеты')));
   }, [requestId]);
 
   const setAnswer = (itemId: number, field: keyof Answer, value: any) => {
@@ -320,11 +345,34 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
       setMsg(isSubmit ? 'Отчёт отправлен на проверку!' : 'Черновик сохранён');
       if (isSubmit) setTimeout(onDone, 1500);
     } catch (e: any) {
-      setMsg(e.response?.data?.message || 'Ошибка сохранения');
+      setMsg(apiErrorMessage(e, 'Ошибка сохранения'));
     } finally {
       setSubmitting(false);
     }
   };
+
+  const breadcrumb = (vehicle: { brand?: string; model?: string; year?: number; vin?: string }) => (
+    <div className="flex items-center gap-2 text-sm">
+      <button onClick={onDone} className="flex items-center gap-1 text-gray-500 hover:text-gray-700">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        Мои отчёты
+      </button>
+      <span className="text-gray-300">/</span>
+      <span className="font-medium text-gray-900">{vehicle.brand} {vehicle.model} {vehicle.year}</span>
+      <span className="text-gray-400 font-mono text-xs hidden sm:inline">{vehicle.vin}</span>
+    </div>
+  );
+
+  if (needsBinding) return (
+    <div className="p-6 max-w-3xl space-y-4">
+      {breadcrumb(request)}
+      <div className="bg-white border rounded-xl p-4 shadow-sm">
+        <TemplateBinding requestId={requestId} templates={templates} loadError={templatesError} onBound={loadForm} />
+      </div>
+    </div>
+  );
 
   if (!data) return (
     <div className="flex items-center justify-center py-16 p-6">
@@ -334,8 +382,8 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
 
   const template: Template = data.template;
   const groups: Group[] = template?.groups ?? [];
-  const status: string = data.status || 'IN_PROGRESS';
-  const editable = isEditable(status);
+  const status = parseDiagnosticRequestStatus(data.status);
+  const editable = diagnosticianCanEdit({ status, templateId: template?.id ?? null });
 
   const totalRequired = groups.flatMap(g => g.items).filter(i => i.isRequired).length;
   const filledRequired = groups.flatMap(g => g.items).filter(i => {
@@ -362,38 +410,13 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
 
   return (
     <div className="p-6 max-w-3xl space-y-4">
-      <div className="flex items-center gap-2 text-sm">
-        <button onClick={onDone} className="flex items-center gap-1 text-gray-500 hover:text-gray-700">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Мои отчёты
-        </button>
-        <span className="text-gray-300">/</span>
-        <span className="font-medium text-gray-900">{data.brand} {data.model} {data.year}</span>
-        <span className="text-gray-400 font-mono text-xs hidden sm:inline">{data.vin}</span>
-      </div>
+      {breadcrumb(data)}
 
       <div className="bg-white border rounded-xl p-4 shadow-sm space-y-3">
-        {editable && templates.length > 0 && (
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block font-medium">Шаблон анкеты</label>
-            <select
-              value={selectedTemplateId ?? (template?.id ?? '')}
-              onChange={e => {
-                const id = Number(e.target.value);
-                setSelectedTemplateId(id);
-                setAnswers({});
-                setValidationErrors(new Set());
-                setMissingFields([]);
-                loadForm(id);
-              }}
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
-              {templates.map(t => (
-                <option key={t.id} value={t.id}>{t.name} ({t.vehicleType})</option>
-              ))}
-            </select>
-          </div>
+        {template && (
+          <p className="text-sm text-gray-600">
+            Шаблон анкеты: <strong>{template.name}</strong>{template.vehicleType ? ` (${template.vehicleType})` : ''}
+          </p>
         )}
         {!template && (
           <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
@@ -402,7 +425,7 @@ function ReportForm({ requestId, onDone }: { requestId: number; onDone: () => vo
         )}
         {!editable && (
           <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600">
-            Редактирование недоступно — статус: <strong>{STATUS_LABELS[status]?.label || status}</strong>
+            Редактирование недоступно — статус: <strong>{labelOf(DIAGNOSTIC_STATUS_LABELS.diagnostician, status)}</strong>
           </div>
         )}
         {template && editable && (
@@ -672,11 +695,11 @@ function AvailablePage() {
     setTaking(id);
     try {
       await api.post(`/diagnostic/work/${id}/assign`);
-      setMsg(`Заявка #${id} принята в работу`);
+      setMsg(`Заявка #${id} принята в работу. Откройте «Мои отчёты», чтобы выбрать шаблон анкеты.`);
       setMsgOk(true);
       load();
     } catch (e: any) {
-      setMsg(e.response?.data?.message || 'Ошибка при принятии заявки');
+      setMsg(apiErrorMessage(e, 'Ошибка при принятии заявки'));
       setMsgOk(false);
     } finally {
       setTaking(null);
@@ -781,16 +804,17 @@ function AvailablePage() {
 function MyReportsPage() {
   const [requests, setRequests] = useState<DiagRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeReport, setActiveReport] = useState<number | null>(null);
+  const [activeReport, setActiveReport] = useState<DiagRequest | null>(null);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [search, setSearch] = useState('');
   const [actionMsg, setActionMsg] = useState('');
+  const [actionOk, setActionOk] = useState(true);
 
   const load = () => {
     setLoading(true);
     api.get('/diagnostic/work/my?size=100')
       .then(r => setRequests(r.data.content || []))
-      .catch(() => {})
+      .catch(e => { setActionMsg(apiErrorMessage(e, 'Не удалось загрузить заявки')); setActionOk(false); })
       .finally(() => setLoading(false));
   };
   useEffect(load, []);
@@ -799,9 +823,11 @@ function MyReportsPage() {
     try {
       await api.post(`/diagnostic/work/${id}/rework`);
       setActionMsg('Статус изменён — теперь можете исправить и повторно отправить отчёт');
+      setActionOk(true);
       load();
-    } catch (e: any) {
-      setActionMsg(e.response?.data?.message || 'Ошибка');
+    } catch (e) {
+      setActionMsg(apiErrorMessage(e, 'Не удалось вернуть отчёт на исправление'));
+      setActionOk(false);
     }
   };
 
@@ -829,7 +855,7 @@ function MyReportsPage() {
   ];
 
   if (activeReport != null) {
-    return <ReportForm requestId={activeReport} onDone={() => { setActiveReport(null); load(); }} />;
+    return <ReportForm request={activeReport} onDone={() => { setActiveReport(null); load(); }} />;
   }
 
   return (
@@ -849,7 +875,9 @@ function MyReportsPage() {
       </div>
 
       {actionMsg && (
-        <div className="mb-4 p-3 rounded-xl text-sm bg-blue-50 text-blue-700 border border-blue-200">
+        <div className={`mb-4 p-3 rounded-xl text-sm border ${
+          actionOk ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-red-50 text-red-700 border-red-200'
+        }`}>
           {actionMsg}
         </div>
       )}
@@ -904,7 +932,7 @@ function MyReportsPage() {
             <tbody className="divide-y">
               {filtered.map(r => {
                 const s = STATUS_LABELS[r.status] ?? { label: r.status, color: 'bg-gray-100 text-gray-600' };
-                const editable = isEditable(r.status);
+                const canOpen = canOpenReport(r.status);
                 return (
                   <React.Fragment key={r.id}>
                     <tr className={`hover:bg-gray-50 transition-colors ${r.status === 'REJECTED' ? 'bg-red-50/40' : ''}`}>
@@ -927,8 +955,8 @@ function MyReportsPage() {
                             className="bg-orange-500 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-orange-600 transition-colors">
                             Исправить и отправить
                           </button>
-                        ) : editable ? (
-                          <button onClick={() => setActiveReport(r.id)}
+                        ) : canOpen ? (
+                          <button onClick={() => setActiveReport(r)}
                             className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700 transition-colors">
                             Заполнить
                           </button>
