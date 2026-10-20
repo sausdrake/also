@@ -2870,8 +2870,11 @@ function DepositsPage() {
 // ─── Settings ─────────────────────────────────────────────────────────────────
 
 const SETTINGS_META: Record<string, { label: string; description: string; min: number; max: number; step: number }> = {
-  deposit_percent:                      { label: 'Депозит для аукциона (%)',          description: 'Процент от стартовой цены, замораживаемый при входе в аукцион',          min: 0, max: 50, step: 1 },
-  default_bid_step_percent:             { label: 'Минимальный шаг ставки (%)',         description: 'Минимальный шаг ставки в процентах от текущей цены аукциона',            min: 0, max: 50, step: 0.5 },
+  // FE-SETTINGS-01 reachability audit: deposit_percent, default_bid_step_percent and
+  // completed_auction_visibility_hours have no reader in the backend (SystemSettingsService is read
+  // only for diagnostic_deposit_amount, diagnostic_fee_amount and auction_confirm_hours). The deposit
+  // and the bid step are entered per lot when the auction is created; editing these rows changed
+  // nothing, so they are no longer offered. Their backend keys and stored rows are left as they are.
   // commission_percent / platform_fee_percent removed: commission is configured only via the
   // PolicyVersion admin surface (/admin/policy). The legacy system_settings row is inert.
   diagnostic_deposit_amount:            { label: 'Залог для диагностики (сом)',        description: 'Фиксированная сумма заморозки при подаче заявки на диагностику',          min: 0, max: 100000, step: 1000 },
@@ -2879,7 +2882,6 @@ const SETTINGS_META: Record<string, { label: string; description: string; min: n
   // value has ever been approved, so none is pre-filled here).
   diagnostic_fee_amount:                { label: 'Стоимость диагностики (сом)',        description: 'Плата за диагностику, удерживаемая с продавца из залога. Пока не задана, заявки на диагностику не принимаются', min: 0, max: 100000, step: 100 },
   auction_confirm_hours:                { label: 'Подтверждение аукциона (ч)',         description: 'Часов на подтверждение аукциона администратором после создания',          min: 1, max: 168, step: 1 },
-  completed_auction_visibility_hours:   { label: 'Видимость завершённых аукционов (ч)', description: 'Часов, в течение которых показываются завершённые аукционы',              min: 1, max: 8760, step: 24 },
 };
 
 function SettingsPage() {
@@ -2888,10 +2890,22 @@ function SettingsPage() {
   const [msg, setMsg]           = useState('');
   const [msgErr, setMsgErr]     = useState(false);
   const [errors, setErrors]     = useState<Record<string, string>>({});
+  // A failed load must not show every setting as "Не задано" (e.g. the diagnostic fee looking unset).
+  const [loadError, setLoadError] = useState('');
 
-  useEffect(() => {
-    api.get('/admin/settings').then(r => setSettings(r.data)).finally(() => setLoading(false));
-  }, []);
+  const fetchSettings = () =>
+    api.get('/admin/settings')
+      .then(r => {
+        if (!r.data || typeof r.data !== 'object' || Array.isArray(r.data)) throw new Error('Malformed settings response');
+        setSettings(r.data);
+        setLoadError('');
+      })
+      .catch(e => setLoadError(apiErrorMessage(e, 'Не удалось загрузить настройки')))
+      .finally(() => setLoading(false));
+
+  const retryLoad = () => { setLoading(true); void fetchSettings(); };
+
+  useEffect(() => { void fetchSettings(); }, []);
 
   // Only filled-in values are validated and sent: a setting that has never been configured is
   // shown as an empty field and simply stays unset until the admin enters a value.
@@ -2917,7 +2931,7 @@ function SettingsPage() {
     try {
       await api.put('/admin/settings', safe);
       setMsg('Настройки сохранены'); setMsgErr(false); setTimeout(() => setMsg(''), 3000);
-    } catch (e: any) { setMsg(e.response?.data?.message || 'Ошибка'); setMsgErr(true); }
+    } catch (e) { setMsg(apiErrorMessage(e, 'Не удалось сохранить настройки')); setMsgErr(true); }
   };
 
   return (
@@ -2931,6 +2945,13 @@ function SettingsPage() {
 
       {loading ? (
         <div className="p-8 text-center text-gray-400">Загрузка...</div>
+      ) : loadError ? (
+        <div role="alert" className="max-w-xl rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 space-y-2">
+          <p>{loadError}</p>
+          <button onClick={retryLoad} className="px-3 py-1.5 bg-white border border-red-300 rounded-lg text-xs font-medium">
+            Повторить
+          </button>
+        </div>
       ) : (
         <div className="max-w-xl space-y-4">
           <div className="bg-white border border-gray-100 rounded-2xl shadow-sm divide-y divide-gray-50">

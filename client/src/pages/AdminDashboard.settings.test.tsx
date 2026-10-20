@@ -58,7 +58,10 @@ describe('AdminDashboard SettingsPage - diagnostic fee', () => {
     fireEvent.click(screen.getByText('Сохранить настройки'));
 
     await waitFor(() => expect(apiPut).toHaveBeenCalledTimes(1));
-    expect(apiPut).toHaveBeenCalledWith('/admin/settings', { ...stored, diagnostic_fee_amount: '4000' });
+    // FE-SETTINGS-01: only the settings the backend reads are offered and sent; the dead rows
+    // (deposit_percent, default_bid_step_percent, completed_auction_visibility_hours) stay untouched.
+    expect(apiPut).toHaveBeenCalledWith('/admin/settings',
+      { diagnostic_deposit_amount: '10000', auction_confirm_hours: '24', diagnostic_fee_amount: '4000' });
     expect(await screen.findByText('Настройки сохранены')).toBeInTheDocument();
   });
 
