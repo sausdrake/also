@@ -7,6 +7,7 @@ import { formatDate } from '../utils/formatDate';
 import { useAuthStore } from '../store/authStore';
 import { DiagnosticMediaSection, type ItemReadiness } from '../components/diagnostic/DiagnosticMediaSection';
 import { TemplateBinding, type TemplateOption } from '../components/diagnostic/TemplateBinding';
+import { SidebarLayout } from '../components/layout/SidebarLayout';
 import { apiErrorMessage, parseApiError } from '../api/errors';
 import { labelOf } from '../domain/parse';
 import {
@@ -366,7 +367,7 @@ function ReportForm({ request, onDone }: { request: DiagRequest; onDone: () => v
   );
 
   if (needsBinding) return (
-    <div className="p-6 max-w-3xl space-y-4">
+    <div className="p-4 sm:p-6 max-w-3xl space-y-4">
       {breadcrumb(request)}
       <div className="bg-white border rounded-xl p-4 shadow-sm">
         <TemplateBinding requestId={requestId} templates={templates} loadError={templatesError} onBound={loadForm} />
@@ -409,7 +410,7 @@ function ReportForm({ request, onDone }: { request: DiagRequest; onDone: () => v
   }).map(i => i.title);
 
   return (
-    <div className="p-6 max-w-3xl space-y-4">
+    <div className="p-4 sm:p-6 max-w-3xl space-y-4">
       {breadcrumb(data)}
 
       <div className="bg-white border rounded-xl p-4 shadow-sm space-y-3">
@@ -717,8 +718,8 @@ function AvailablePage() {
   }, [requests, search]);
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="p-4 sm:p-6">
+      <div className="flex flex-wrap gap-3 justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Доступные заявки</h1>
           <p className="text-sm text-gray-400 mt-0.5">Заявки, ожидающие назначения диагноста</p>
@@ -738,7 +739,7 @@ function AvailablePage() {
         }`}>{msg}</div>
       )}
 
-      <div className="mb-4 relative w-72">
+      <div className="mb-4 relative w-full sm:w-72">
         <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
           fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -760,14 +761,14 @@ function AvailablePage() {
           <p>{requests.length === 0 ? 'Нет доступных заявок' : 'Ничего не найдено'}</p>
         </div>
       ) : (
-        <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
+        <div className="bg-white border rounded-xl overflow-x-auto shadow-sm">
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Автомобиль</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">VIN</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Владелец</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Дата</th>
+                <th className="hidden sm:table-cell text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">VIN</th>
+                <th className="hidden md:table-cell text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Владелец</th>
+                <th className="hidden sm:table-cell text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Дата</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -777,12 +778,14 @@ function AvailablePage() {
                   <td className="px-4 py-3">
                     <p className="font-medium text-gray-900">{r.brand} {r.model}</p>
                     <p className="text-xs text-gray-400">{r.year} г.</p>
+                    {/* FE-MOBILE-01: the VIN column is hidden on a phone - keep the VIN with the car */}
+                    <p className="sm:hidden font-mono text-xs text-gray-500 break-all">{r.vin || '—'}</p>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="hidden sm:table-cell px-4 py-3">
                     <span className="font-mono text-sm text-gray-700">{r.vin || '—'}</span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{r.ownerName || '—'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{formatDate(r.createdAt)}</td>
+                  <td className="hidden md:table-cell px-4 py-3 text-sm text-gray-600">{r.ownerName || '—'}</td>
+                  <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-500">{formatDate(r.createdAt)}</td>
                   <td className="px-4 py-3 text-right">
                     <button onClick={() => takeWork(r.id)} disabled={taking === r.id}
                       className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors whitespace-nowrap">
@@ -859,8 +862,8 @@ function MyReportsPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="p-4 sm:p-6">
+      <div className="flex flex-wrap gap-3 justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Мои отчёты</h1>
           <p className="text-sm text-gray-400 mt-0.5">Все заявки, закреплённые за вами</p>
@@ -895,7 +898,7 @@ function MyReportsPage() {
             </button>
           ))}
         </div>
-        <div className="sm:ml-auto relative w-64">
+        <div className="sm:ml-auto relative w-full sm:w-64">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
             fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -918,13 +921,13 @@ function MyReportsPage() {
           <p>{requests.length === 0 ? 'У вас пока нет заявок. Перейдите в «Доступные заявки».' : 'Ничего не найдено'}</p>
         </div>
       ) : (
-        <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
+        <div className="bg-white border rounded-xl overflow-x-auto shadow-sm">
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Автомобиль</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">VIN</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Дата</th>
+                <th className="hidden sm:table-cell text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">VIN</th>
+                <th className="hidden md:table-cell text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Дата</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Статус</th>
                 <th className="px-4 py-3"></th>
               </tr>
@@ -939,17 +942,18 @@ function MyReportsPage() {
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-900">{r.brand} {r.model}</p>
                         <p className="text-xs text-gray-400">{r.year} г.</p>
+                        <p className="sm:hidden font-mono text-xs text-gray-500 break-all">{r.vin || '—'}</p>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="hidden sm:table-cell px-4 py-3">
                         <span className="font-mono text-sm text-gray-700">{r.vin || '—'}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">{formatDate(r.createdAt)}</td>
+                      <td className="hidden md:table-cell px-4 py-3 text-sm text-gray-500">{formatDate(r.createdAt)}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${s.color}`}>
                           {s.label}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <td className="px-4 py-3 text-right sm:whitespace-nowrap">
                         {r.status === 'REJECTED' ? (
                           <button onClick={() => rework(r.id)}
                             className="bg-orange-500 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-orange-600 transition-colors">
@@ -993,12 +997,13 @@ function MyReportsPage() {
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
-function DiagSidebar() {
+function DiagSidebar({ onNavigate }: { onNavigate: () => void }) {
   const navigate = useNavigate();
   const user = useAuthStore(s => s.user);
   const logoutFn = useAuthStore(s => s.logout);
 
   const handleLogout = async () => {
+    onNavigate();
     await logoutFn();
     navigate('/login');
   };
@@ -1055,7 +1060,7 @@ function DiagSidebar() {
 
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
         {navItems.map(item => (
-          <NavLink key={item.path} to={item.path}
+          <NavLink key={item.path} to={item.path} onClick={onNavigate}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                 isActive
@@ -1087,16 +1092,13 @@ function DiagSidebar() {
 
 export function DiagnosticDashboard() {
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <DiagSidebar />
-      <main className="flex-1 overflow-y-auto">
-        <Routes>
-          <Route index element={<Navigate to="/diagnostic/dashboard" replace />} />
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="available" element={<AvailablePage />} />
-          <Route path="reports" element={<MyReportsPage />} />
-        </Routes>
-      </main>
-    </div>
+    <SidebarLayout title="Диагностика" sidebar={onNavigate => <DiagSidebar onNavigate={onNavigate} />}>
+      <Routes>
+        <Route index element={<Navigate to="/diagnostic/dashboard" replace />} />
+        <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="available" element={<AvailablePage />} />
+        <Route path="reports" element={<MyReportsPage />} />
+      </Routes>
+    </SidebarLayout>
   );
 }
