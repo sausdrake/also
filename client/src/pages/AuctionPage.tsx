@@ -20,6 +20,8 @@ interface AuctionDetail {
   reservePrice: number | null;
   buyNowPrice: number | null;
   minBidStep: number;
+  /** Fixed deposit the admin set for this lot; without it the backend refuses bids and Buy Now. */
+  requiredDepositAmount?: number | null;
   status: string;
   startTime: string;
   endTime: string;
@@ -519,6 +521,8 @@ export const AuctionPage = () => {
                   {[
                     ['Стартовая цена',  `${fmt(auction.startingPrice)} сом`],
                     ['Минимальный шаг', `${fmt(auction.minBidStep)} сом`],
+                    ['Депозит для участия', auction.requiredDepositAmount != null && auction.requiredDepositAmount > 0
+                      ? `${fmt(auction.requiredDepositAmount)} сом` : 'Не настроен'],
                     ['Лот',            `#${auction.id}`],
                   ].map(([k, v]) => (
                     <div key={k} className="bg-gray-50 rounded-xl p-3">

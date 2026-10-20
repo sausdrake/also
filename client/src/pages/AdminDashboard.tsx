@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Routes, Route, NavLink, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import api from '../api/client';
+import { apiErrorMessage } from '../api/errors';
 import { formatDateTime, formatDate } from '../utils/formatDate';
 import { useAuthStore } from '../store/authStore';
 import { PhotoLightbox } from '../components/PhotoLightbox';
@@ -2114,6 +2115,9 @@ function AuctionsPage() {
   const [form, setForm] = useState({
     vehicleId: '', startingPrice: '', minBidStep: '',
     startTime: '', endTime: '', buyNowPrice: '', reservePrice: '',
+    // FE-AUCTION-01: entered by the admin for each lot (AuctionCreateRequest.requiredDepositAmount);
+    // no default - BidService refuses every bid and Buy Now on a lot without it.
+    requiredDepositAmount: '',
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [auctionPhotos, setAuctionPhotos] = useState<string[]>([]);
@@ -2237,6 +2241,10 @@ function AuctionsPage() {
     if (sp > 999_999_999) errs.startingPrice = 'Слишком большая сумма';
     const step = parseFloat(form.minBidStep);
     if (!form.minBidStep || isNaN(step) || step <= 0) errs.minBidStep = 'Введите шаг ставки';
+    const deposit = Number(form.requiredDepositAmount);
+    if (!form.requiredDepositAmount.trim() || !Number.isFinite(deposit) || deposit <= 0)
+      errs.requiredDepositAmount = 'Укажите депозит для участия (больше 0)';
+    else if (deposit > 999_999_999) errs.requiredDepositAmount = 'Слишком большая сумма';
     if (!form.startTime) errs.startTime = 'Укажите дату начала';
     if (!form.endTime) errs.endTime = 'Укажите дату окончания';
     if (form.startTime && form.endTime && form.startTime >= form.endTime)
@@ -2287,15 +2295,16 @@ function AuctionsPage() {
         endTime: new Date(form.endTime).toISOString(),
         buyNowPrice: form.buyNowPrice ? parseFloat(form.buyNowPrice) : null,
         reservePrice: form.reservePrice ? parseFloat(form.reservePrice) : null,
+        requiredDepositAmount: Number(form.requiredDepositAmount),
         mainPhotoUrl,
         additionalPhotoUrls,
       });
       notify('Аукцион создан');
       setShowCreate(false);
-      setForm({ vehicleId: '', startingPrice: '', minBidStep: '', startTime: '', endTime: '', buyNowPrice: '', reservePrice: '' });
+      setForm({ vehicleId: '', startingPrice: '', minBidStep: '', startTime: '', endTime: '', buyNowPrice: '', reservePrice: '', requiredDepositAmount: '' });
       setAuctionPhotos([]);
       loadAuctions();
-    } catch (e: any) { notify(e.response?.data?.message || 'Не удалось создать аукцион', true); }
+    } catch (e) { notify(apiErrorMessage(e, 'Не удалось создать аукцион'), true); }
   };
 
   const AUCTION_STATUS_LABELS: Record<string, string> = {
@@ -2351,16 +2360,21 @@ function AuctionsPage() {
                   { f: 'minBidStep',    label: 'Шаг ставки *' },
                   { f: 'reservePrice',  label: 'Резервная цена (опц.)' },
                   { f: 'buyNowPrice',   label: 'Buy Now (опц.)' },
+                  { f: 'requiredDepositAmount', label: 'Депозит для участия *' },
                 ].map(({ f, label }) => (
                   <div key={f}>
                     <label className="text-xs text-gray-500 mb-1 block">{label}</label>
-                    <input type="number" placeholder="0" min={0} max={999999999}
+                    <input type="number" placeholder="0" min={0} max={999999999} aria-label={label}
                       value={(form as any)[f]}
                       onChange={e => setForm({...form, [f]: e.target.value})}
                       className={`w-full border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none ${(formErrors as any)[f] ? 'border-red-400' : 'border-gray-200'}`} />
                     {(formErrors as any)[f] && <p className="text-red-500 text-xs mt-0.5">{(formErrors as any)[f]}</p>}
                   </div>
                 ))}
+                <p className="col-span-2 text-xs text-gray-400 -mt-1">
+                  Депозит для участия — фиксированная сумма для этого лота (не процент от цены).
+                  Без него ставки и Buy Now на лоте невозможны.
+                </p>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Дата начала *</label>
                   <input type="datetime-local" value={form.startTime}
