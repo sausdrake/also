@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import api from '../api/client';
+import * as subscriptions from '../api/subscriptions';
+import type { WatchedAuction } from '../api/subscriptions';
+import { apiErrorMessage } from '../api/errors';
+import { AUCTION_STATUS_LABELS } from '../domain/auction';
+import { labelOf } from '../domain/parse';
 import { useAuthStore } from '../store/authStore';
 import { useDepositStore } from '../store/depositStore';
 import { parseDate } from '../utils/formatDate';
@@ -8,16 +13,6 @@ import { formatDateTime } from '../utils/formatDate';
 import { depositTxTypeLabel } from '../utils/depositTransactionLabels';
 import { RequestVehicleStatus } from '../components/seller/RequestVehicleStatus';
 import { IdentityVerificationTab } from '../components/identity/IdentityVerificationTab';
-
-interface WatchedAuction {
-  auctionId: number;
-  vehicleInfo: string;
-  currentPrice: number;
-  startingPrice: number;
-  status: string;
-  endTime: string;
-  mainPhotoUrl?: string;
-}
 
 // ─────────────────── Deposit Tab ───────────────────
 
@@ -574,34 +569,28 @@ function useCountdown(targetIso: string | null) {
 
 interface WatchedCardProps {
   a: WatchedAuction;
+  unsubscribing: boolean;
   onUnsubscribe: (id: number) => void;
   onNavigate: (id: number) => void;
 }
 
-function WatchedCard({ a, onUnsubscribe, onNavigate }: WatchedCardProps) {
-  const countdown = useCountdown(a.status === 'ACTIVE' ? a.endTime : null);
+function WatchedCard({ a, unsubscribing, onUnsubscribe, onNavigate }: WatchedCardProps) {
+  const active = a.status.known && a.status.value === 'ACTIVE';
+  const countdown = useCountdown(active ? a.endTime : null);
 
-  const statusColor = (status: string) => {
-    if (status === 'ACTIVE') return 'bg-green-100 text-green-700';
-    if (status === 'CREATED') return 'bg-blue-100 text-blue-700';
-    return 'bg-gray-100 text-gray-600';
-  };
-
-  const statusLabel = (status: string) => {
-    if (status === 'ACTIVE') return 'Активен';
-    if (status === 'CREATED') return 'Создан';
-    if (status === 'COMPLETED') return 'Завершён';
-    if (status === 'EXPIRED') return 'Истёк';
-    if (status === 'CANCELLED') return 'Отменён';
-    return status;
-  };
+  // FE-SUB-01: labels come from the domain model (FE-STATE-01); an unknown status shows its raw value.
+  const statusColor = active ? 'bg-green-100 text-green-700'
+    : a.status.known && a.status.value === 'CREATED' ? 'bg-blue-100 text-blue-700'
+    : 'bg-gray-100 text-gray-600';
 
   return (
     <div className="bg-white border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow relative">
       <button
         onClick={() => onUnsubscribe(a.auctionId)}
-        className="absolute top-2 right-2 z-10 w-6 h-6 bg-white/80 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center text-xs font-bold border"
+        disabled={unsubscribing}
+        className="absolute top-2 right-2 z-10 w-6 h-6 bg-white/80 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center text-xs font-bold border disabled:opacity-50"
         title="Отписаться"
+        aria-label={`Отписаться от лота #${a.auctionId}`}
       >
         ✕
       </button>
@@ -617,16 +606,16 @@ function WatchedCard({ a, onUnsubscribe, onNavigate }: WatchedCardProps) {
       )}
       <div className="p-3 space-y-2">
         <div className="flex items-start justify-between gap-2">
-          <p className="font-medium text-sm text-gray-900 leading-tight line-clamp-2">{a.vehicleInfo || `Лот #${a.auctionId}`}</p>
-          <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(a.status)}`}>
-            {statusLabel(a.status)}
+          <p className="font-medium text-sm text-gray-900 leading-tight line-clamp-2 break-words min-w-0">{a.vehicleInfo || `Лот #${a.auctionId}`}</p>
+          <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${statusColor}`}>
+            {labelOf(AUCTION_STATUS_LABELS, a.status)}
           </span>
         </div>
         <div>
           <p className="text-xs text-gray-400">Текущая цена</p>
-          <p className="font-bold text-blue-600">{Number(a.currentPrice).toLocaleString('ru')} сом</p>
+          <p className="font-bold text-blue-600">{a.currentPrice !== null ? `${a.currentPrice.toLocaleString('ru')} сом` : '—'}</p>
         </div>
-        {a.status === 'ACTIVE' && countdown && (
+        {active && countdown && (
           <p className="text-xs font-medium text-orange-600">Осталось: {countdown}</p>
         )}
         <button
@@ -640,37 +629,75 @@ function WatchedCard({ a, onUnsubscribe, onNavigate }: WatchedCardProps) {
   );
 }
 
+type WatchedSort = 'price_asc' | 'price_desc' | 'time_asc' | 'time_desc';
+
+/** Missing values (null price, absent or unparseable end time) always sort last, in either direction. */
+function compareWatched(a: WatchedAuction, b: WatchedAuction, sort: WatchedSort): number {
+  const key = (w: WatchedAuction) => sort.startsWith('price')
+    ? w.currentPrice
+    : w.endTime !== null ? Date.parse(w.endTime) : null;
+  const ka = key(a);
+  const kb = key(b);
+  if (ka === null && kb === null) return 0;
+  if (ka === null) return 1;
+  if (kb === null) return -1;
+  return sort.endsWith('asc') ? ka - kb : kb - ka;
+}
+
+type WatchedLoad =
+  | { kind: 'loading' }
+  | { kind: 'error'; message: string }
+  | { kind: 'ok'; items: WatchedAuction[] };
+
 function WatchedTab() {
-  const [watchedAuctions, setWatchedAuctions] = useState<WatchedAuction[]>([]);
+  // FE-SUB-01: an empty list is shown only after a successful [] - a failed or malformed answer is
+  // an error with a retry, never "Вы не следите ни за одним лотом".
+  const [load, setLoad] = useState<WatchedLoad>({ kind: 'loading' });
   const [watchSearch, setWatchSearch] = useState('');
-  const [watchSort, setWatchSort] = useState<'price_asc' | 'price_desc' | 'time_asc' | 'time_desc'>('time_asc');
-  const [loading, setLoading] = useState(true);
+  const [watchSort, setWatchSort] = useState<WatchedSort>('time_asc');
+  const [unsubscribing, setUnsubscribing] = useState<Set<number>>(new Set());
+  const [actionError, setActionError] = useState('');
   const navigate = useNavigate();
 
   const loadWatched = () => {
-    api.get('/subscriptions').then(r => setWatchedAuctions(r.data)).catch(() => {}).finally(() => setLoading(false));
+    setLoad({ kind: 'loading' });
+    subscriptions.list()
+      .then(items => setLoad({ kind: 'ok', items }))
+      .catch(e => setLoad({ kind: 'error', message: apiErrorMessage(e, 'Не удалось загрузить отслеживаемые лоты') }));
   };
 
   useEffect(() => { loadWatched(); }, []);
 
   const handleUnsubscribe = async (auctionId: number) => {
+    if (unsubscribing.has(auctionId)) return;
+    setUnsubscribing(prev => new Set(prev).add(auctionId));
+    setActionError('');
     try {
-      await api.delete(`/subscriptions/${auctionId}`);
-      setWatchedAuctions(prev => prev.filter(a => a.auctionId !== auctionId));
-    } catch {}
+      await subscriptions.unsubscribe(auctionId);
+      setLoad(prev => prev.kind === 'ok' ? { kind: 'ok', items: prev.items.filter(a => a.auctionId !== auctionId) } : prev);
+    } catch (e) {
+      setActionError(apiErrorMessage(e, 'Не удалось отписаться от лота'));
+    } finally {
+      setUnsubscribing(prev => { const s = new Set(prev); s.delete(auctionId); return s; });
+    }
   };
 
-  const filtered = watchedAuctions
-    .filter(a => !watchSearch || a.vehicleInfo?.toLowerCase().includes(watchSearch.toLowerCase()))
-    .sort((a, b) => {
-      if (watchSort === 'price_asc') return a.currentPrice - b.currentPrice;
-      if (watchSort === 'price_desc') return b.currentPrice - a.currentPrice;
-      if (watchSort === 'time_asc') return new Date(a.endTime).getTime() - new Date(b.endTime).getTime();
-      if (watchSort === 'time_desc') return new Date(b.endTime).getTime() - new Date(a.endTime).getTime();
-      return 0;
-    });
+  if (load.kind === 'loading') return <div className="p-4">Загрузка...</div>;
 
-  if (loading) return <div className="p-4">Загрузка...</div>;
+  if (load.kind === 'error') return (
+    <div role="alert" className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 space-y-3">
+      <p>{load.message}</p>
+      <button onClick={loadWatched}
+        className="px-4 py-2 bg-white border border-red-300 rounded-lg text-red-700 font-medium hover:bg-red-100">
+        Повторить
+      </button>
+    </div>
+  );
+
+  const query = watchSearch.toLowerCase();
+  const filtered = load.items
+    .filter(a => !watchSearch || (a.vehicleInfo ?? '').toLowerCase().includes(query))
+    .sort((a, b) => compareWatched(a, b, watchSort));
 
   return (
     <div className="space-y-4">
@@ -680,11 +707,12 @@ function WatchedTab() {
           value={watchSearch}
           onChange={e => setWatchSearch(e.target.value)}
           placeholder="Поиск по названию..."
-          className="flex-1 border rounded-lg px-3 py-2 text-sm"
+          className="flex-1 min-w-0 border rounded-lg px-3 py-2 text-sm"
         />
         <select
           value={watchSort}
-          onChange={e => setWatchSort(e.target.value as typeof watchSort)}
+          onChange={e => setWatchSort(e.target.value as WatchedSort)}
+          aria-label="Сортировка"
           className="border rounded-lg px-3 py-2 text-sm"
         >
           <option value="time_asc">По времени (сначала ранние)</option>
@@ -693,6 +721,10 @@ function WatchedTab() {
           <option value="price_desc">По цене (сначала дорогие)</option>
         </select>
       </div>
+
+      {actionError && (
+        <div role="alert" className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{actionError}</div>
+      )}
 
       {filtered.length === 0 ? (
         <div className="bg-white border rounded-xl p-8 text-center text-gray-400">
@@ -704,6 +736,7 @@ function WatchedTab() {
             <WatchedCard
               key={a.auctionId}
               a={a}
+              unsubscribing={unsubscribing.has(a.auctionId)}
               onUnsubscribe={handleUnsubscribe}
               onNavigate={id => navigate(`/auction/${id}`)}
             />

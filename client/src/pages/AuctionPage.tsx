@@ -6,7 +6,8 @@ import { AuctionTimer } from '../components/AuctionTimer';
 import { useAuthStore } from '../store/authStore';
 import { PhotoLightbox } from '../components/PhotoLightbox';
 import { BuyerSaleStatusPanel } from '../components/sale/BuyerSaleStatusPanel';
-import api from '../api/client';
+import * as subscriptions from '../api/subscriptions';
+import { apiErrorMessage } from '../api/errors';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
@@ -236,8 +237,13 @@ export const AuctionPage = () => {
   const [liveBids, setLiveBids] = useState<LiveBid[]>(() => id ? loadStoredBids(id) : []);
   const bidsEndRef = useRef<HTMLDivElement>(null);
 
-  const [isSubscribed, setIsSubscribed] = useState(false);
+  // FE-SUB-01: 'unknown' until the backend confirms the status - a failed or malformed status
+  // never shows "Вы подписаны"; the state changes only after a confirmed POST/DELETE.
+  const [subState, setSubState] = useState<'unknown' | 'subscribed' | 'not_subscribed'>('unknown');
+  const [subStatusError, setSubStatusError] = useState(false);
   const [subLoading, setSubLoading] = useState(false);
+  const subInFlight = useRef(false);
+  const isSubscribed = subState === 'subscribed';
   const [wasExtended, setWasExtended] = useState(false);
 
   // WebSocket updates
@@ -279,9 +285,13 @@ export const AuctionPage = () => {
 
   useEffect(() => {
     if (!isAuthenticated || !id) return;
-    api.get(`/subscriptions/${id}/status`)
-      .then(r => setIsSubscribed(r.data.subscribed))
-      .catch(() => {});
+    let cancelled = false;
+    setSubState('unknown');
+    setSubStatusError(false);
+    subscriptions.status(Number(id))
+      .then(subscribed => { if (!cancelled) setSubState(subscribed ? 'subscribed' : 'not_subscribed'); })
+      .catch(() => { if (!cancelled) setSubStatusError(true); });
+    return () => { cancelled = true; };
   }, [id, isAuthenticated]);
 
   const authHeaders = () => {
@@ -295,17 +305,22 @@ export const AuctionPage = () => {
   };
 
   const handleToggleSub = async () => {
-    if (!isAuthenticated || !id) return;
+    if (!isAuthenticated || !id || subInFlight.current) return;
+    subInFlight.current = true;
     setSubLoading(true);
     try {
       if (isSubscribed) {
-        await api.delete(`/subscriptions/${id}`);
-        setIsSubscribed(false);
+        await subscriptions.unsubscribe(Number(id));
+        setSubState('not_subscribed');
       } else {
-        await api.post(`/subscriptions/${id}`);
-        setIsSubscribed(true);
+        await subscriptions.subscribe(Number(id));
+        setSubState('subscribed');
       }
-    } catch {} finally {
+      setSubStatusError(false);
+    } catch (e) {
+      showMsg(apiErrorMessage(e, isSubscribed ? 'Не удалось отписаться от лота' : 'Не удалось подписаться на лот'), 'error');
+    } finally {
+      subInFlight.current = false;
       setSubLoading(false);
     }
   };
@@ -814,10 +829,14 @@ export const AuctionPage = () => {
                 />
               )}
 
+              {isAuthenticated && subStatusError && subState === 'unknown' && (
+                <p className="text-xs text-gray-500">Не удалось проверить подписку на этот лот.</p>
+              )}
               {isAuthenticated && (
                 <button
                   onClick={handleToggleSub}
                   disabled={subLoading}
+                  aria-pressed={isSubscribed}
                   className={`w-full py-2 rounded-lg text-sm font-medium border transition-colors ${
                     isSubscribed
                       ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
