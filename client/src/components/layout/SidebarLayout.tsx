@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { BrandLogo } from '../brand/BrandLogo';
 
 export interface SidebarLayoutProps {
   /** Shown in the mobile top bar and used to name the drawer. */
@@ -55,6 +56,8 @@ export function SidebarLayout({ title, sidebar, children }: SidebarLayoutProps) 
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
+          {/* FE-BRAND-01: compact place -> the simple mark */}
+          <BrandLogo variant="simple" className="h-7 w-auto shrink-0" />
           <span className="font-semibold text-sm text-gray-900 truncate">{title}</span>
         </div>
         <main className="flex-1 overflow-y-auto min-w-0">{children}</main>

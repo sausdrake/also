@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useNotifications } from '../hooks/useNotifications';
 import { NotificationPanel } from './notifications/NotificationPanel';
+import { BrandLogo } from './brand/BrandLogo';
 
 export function Header() {
   const { user, isAuthenticated, logout } = useAuthStore();
@@ -35,8 +36,8 @@ export function Header() {
     <header className="bg-white border-b shadow-sm sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-4">
         {/* Логотип */}
-        <Link to="/" className="text-xl font-bold text-blue-600 shrink-0">
-          AlSo
+        <Link to="/" aria-label="AlSo — на главную" className="shrink-0 flex items-center">
+          <BrandLogo variant="full" className="h-9 w-auto" />
         </Link>
 
         {/* Spacer */}

@@ -5,6 +5,7 @@ import api from '../api/client';
 import { apiErrorMessage } from '../api/errors';
 import { SidebarLayout } from '../components/layout/SidebarLayout';
 import { roleLabel } from '../domain/role';
+import { BrandLogo } from '../components/brand/BrandLogo';
 import { ReportItemMedia } from '../components/admin/diagnostic/ReportItemMedia';
 import { formatDateTime, formatDate } from '../utils/formatDate';
 import { useAuthStore } from '../store/authStore';
@@ -226,17 +227,8 @@ function AdminSidebar({ onNavigate }: { onNavigate: () => void }) {
   return (
     <aside className="w-60 bg-white border-r border-gray-100 flex flex-col shrink-0 h-screen sticky top-0">
       <div className="px-5 py-5 border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-sm font-bold text-gray-900">AlSo</p>
-            <p className="text-xs text-gray-400">Администратор</p>
-          </div>
-        </div>
+        <BrandLogo variant="full" className="h-9 w-auto" />
+        <p className="text-xs text-gray-400 mt-1">Администратор</p>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">

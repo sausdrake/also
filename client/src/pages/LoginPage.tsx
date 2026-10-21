@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { parseApiError } from '../api/errors';
+import { BrandLogo } from '../components/brand/BrandLogo';
 import { useAuthStore } from '../store/authStore';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
@@ -70,7 +71,7 @@ export const LoginPage = () => {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <h1 className="text-center text-3xl font-extrabold text-gray-900">AlSo</h1>
+          <h1 className="flex justify-center"><BrandLogo variant="full" className="h-14 w-auto" /></h1>
           <h2 className="mt-2 text-center text-xl text-gray-600">Вход в систему</h2>
         </div>
 
