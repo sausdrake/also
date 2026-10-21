@@ -3,6 +3,7 @@ import { Routes, Route, NavLink, useLocation, Navigate, useNavigate } from 'reac
 import axios from 'axios';
 import api from '../api/client';
 import { apiErrorMessage } from '../api/errors';
+import { LoadErrorAlert } from '../components/LoadErrorAlert';
 import { SidebarLayout } from '../components/layout/SidebarLayout';
 import { roleLabel } from '../domain/role';
 import { AUCTION_STATUSES as AUCTION_STATUS_VALUES, AUCTION_STATUS_LABELS, type AuctionStatus } from '../domain/auction';
@@ -2117,6 +2118,7 @@ function AuctionsPage() {
   const [search, setSearch]           = useState('');
   const [showCreate, setShowCreate]   = useState(false);
   const [vehicles, setVehicles]       = useState<any[]>([]);
+  const [vehiclesError, setVehiclesError] = useState('');
   const [cancelTarget, setCancelTarget] = useState<number | null>(null);
   const [userMap, setUserMap] = useState<Record<number, string>>({});
   const [form, setForm] = useState({
@@ -2144,11 +2146,14 @@ function AuctionsPage() {
       .finally(() => setLoading(false));
   };
 
+  // BL-24: a failed load is not "no approved vehicles"
+  const loadVehicles = () => api.get('/admin/vehicles/approved')
+    .then(r => { setVehicles(Array.isArray(r.data) ? r.data : (r.data.content || [])); setVehiclesError(''); })
+    .catch(e => setVehiclesError(apiErrorMessage(e, 'Не удалось загрузить одобренные автомобили')));
+
   useEffect(() => {
     loadAuctions();
-    api.get('/admin/vehicles/approved')
-      .then(r => setVehicles(Array.isArray(r.data) ? r.data : (r.data.content || [])))
-      .catch(() => {});
+    loadVehicles();
     api.get('/admin/users?size=500')
       .then(r => {
         const list: any[] = Array.isArray(r.data) ? r.data : (r.data.content || []);
@@ -2339,7 +2344,9 @@ function AuctionsPage() {
       {showCreate && (
         <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm space-y-4">
           <h4 className="font-semibold text-gray-900">Новый аукцион</h4>
-          {vehicles.length === 0 ? (
+          {vehiclesError ? (
+            <LoadErrorAlert message={vehiclesError} onRetry={loadVehicles} />
+          ) : vehicles.length === 0 ? (
             <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
               <p className="font-medium">Нет доступных автомобилей</p>
               <p className="mt-1 text-amber-700">Для создания аукциона необходим автомобиль с одобрённым диагностическим отчётом. Сначала создайте диагностическую заявку, пройдите диагностику и дождитесь одобрения.</p>

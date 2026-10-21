@@ -5,6 +5,7 @@ import * as subscriptions from '../api/subscriptions';
 import type { WatchedAuction } from '../api/subscriptions';
 import { apiErrorMessage, parseApiError } from '../api/errors';
 import { KycRequiredNotice } from '../components/identity/KycRequiredNotice';
+import { LoadErrorAlert } from '../components/LoadErrorAlert';
 import { AUCTION_STATUS_LABELS } from '../domain/auction';
 import { labelOf, type Parsed } from '../domain/parse';
 import { roleLabel } from '../domain/role';
@@ -81,7 +82,10 @@ function DepositTab() {
   const [withdrawing, setWithdrawing] = useState(false);
   const withdrawInFlight = useRef(false);
 
-  const reloadTransactions = () => api.get('/deposits/my/transactions').then(r => setTransactions(r.data)).catch(() => {});
+  const [transactionsError, setTransactionsError] = useState('');
+  const reloadTransactions = () => api.get('/deposits/my/transactions')
+    .then(r => { setTransactions(r.data); setTransactionsError(''); })
+    .catch(e => setTransactionsError(apiErrorMessage(e, 'Не удалось загрузить историю транзакций')));
   const reloadWithdrawals = () =>
     api.get('/withdrawals/my')
       .then(r => {
@@ -223,7 +227,9 @@ function DepositTab() {
         <div className="px-4 py-3 border-b bg-gray-50">
           <h3 className="font-semibold">История транзакций</h3>
         </div>
-        {transactions.length === 0 ? (
+        {transactionsError ? (
+          <div className="p-3"><LoadErrorAlert message={transactionsError} onRetry={reloadTransactions} /></div>
+        ) : transactions.length === 0 ? (
           <p className="text-center text-gray-400 py-8">Нет транзакций</p>
         ) : (
           <div className="overflow-x-auto">
@@ -297,19 +303,26 @@ function BidsTab() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  useEffect(() => {
+  const [error, setError] = useState('');
+
+  // loading starts true; a retry sets it again before calling load (no setState inside the effect)
+  const load = () => {
     api.get('/auctions/participated')
-      .then(r => setAuctions(r.data || []))
-      .catch(() => {})
+      .then(r => { setAuctions(r.data || []); setError(''); })
+      .catch(e => setError(apiErrorMessage(e, 'Не удалось загрузить аукционы с вашим участием')))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { load(); }, []);
 
   if (loading) return <div className="p-4">Загрузка...</div>;
 
   return (
     <div className="space-y-4">
       <p className="text-gray-500 text-sm">Аукционы, в которых вы делали ставки</p>
-      {auctions.length === 0 ? (
+      {error ? (
+        <LoadErrorAlert message={error} onRetry={() => { setLoading(true); load(); }} />
+      ) : auctions.length === 0 ? (
         <div className="bg-white border rounded-xl p-8 text-center text-gray-400">
           Вы ещё не участвовали ни в одном аукционе
         </div>
@@ -343,6 +356,7 @@ function WonTab() {
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   const load = (p: number) => {
@@ -352,8 +366,9 @@ function WonTab() {
         setAuctions(r.data.content || []);
         setTotalPages(r.data.totalPages ?? 0);
         setPage(p);
+        setError('');
       })
-      .catch(() => {})
+      .catch(e => setError(apiErrorMessage(e, 'Не удалось загрузить выигранные аукционы')))
       .finally(() => setLoading(false));
   };
 
@@ -364,7 +379,9 @@ function WonTab() {
   return (
     <div className="space-y-4">
       <p className="text-gray-500 text-sm">Аукционы, которые вы выиграли</p>
-      {auctions.length === 0 ? (
+      {error ? (
+        <LoadErrorAlert message={error} onRetry={() => load(page)} />
+      ) : auctions.length === 0 ? (
         <div className="bg-white border rounded-xl p-8 text-center text-gray-400">
           Вы ещё не выиграли ни одного аукциона
         </div>
@@ -437,10 +454,12 @@ function RequestsTab() {
   // Scenario 1 step 4: "Просмотр" opens the request's details (incl. why it was rejected).
   const [viewedId, setViewedId] = useState<number | null>(null);
 
+  const [requestsError, setRequestsError] = useState('');
+
   const loadRequests = () => {
     api.get('/diagnostic/requests/my?page=0&size=20')
-      .then(r => setRequests(r.data.content || []))
-      .catch(() => {})
+      .then(r => { setRequests(r.data.content || []); setRequestsError(''); })
+      .catch(e => setRequestsError(apiErrorMessage(e, 'Не удалось загрузить заявки на диагностику')))
       .finally(() => setLoading(false));
   };
 
@@ -563,7 +582,9 @@ function RequestsTab() {
         </div>
       )}
 
-      {requests.length === 0 ? (
+      {requestsError ? (
+        <LoadErrorAlert message={requestsError} onRetry={loadRequests} />
+      ) : requests.length === 0 ? (
         <div className="bg-white border rounded-xl p-8 text-center text-gray-400">
           Нет заявок на диагностику
         </div>
