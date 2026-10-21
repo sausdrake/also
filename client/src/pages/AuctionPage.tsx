@@ -247,6 +247,10 @@ export const AuctionPage = () => {
   const [subStatusError, setSubStatusError] = useState(false);
   const [subLoading, setSubLoading] = useState(false);
   const subInFlight = useRef(false);
+  // FE-INFLIGHT-01: one bid / Buy Now POST at a time. The backend already refuses a duplicate,
+  // but a double tap used to replace the success message with that refusal.
+  const moneyActionInFlight = useRef(false);
+  const [pendingAction, setPendingAction] = useState<'bid' | 'buyNow' | null>(null);
   const isSubscribed = subState === 'subscribed';
   const [wasExtended, setWasExtended] = useState(false);
 
@@ -362,9 +366,12 @@ export const AuctionPage = () => {
 
   const placeBid = async () => {
     if (!isAuthenticated) { navigate('/login'); return; }
+    if (moneyActionInFlight.current) return;
     const err = validateBid(bidAmount);
     if (err) { setBidError(err); return; }
     setBidError('');
+    moneyActionInFlight.current = true;
+    setPendingAction('bid');
     try {
       await axios.post(`${BASE_URL}/api/auctions/${id}/bids`, { amount: Number(bidAmount) }, { headers: authHeaders() });
       setKycRefusal(null);
@@ -373,12 +380,18 @@ export const AuctionPage = () => {
       const error = parseApiError(e, 'Ошибка при размещении ставки');
       if (error.kind === 'kyc_required') setKycRefusal({ action: 'делать ставки', message: error.message });
       else showMsg(error.message, error.kind === 'rate_limited' ? 'warning' : 'error');
+    } finally {
+      moneyActionInFlight.current = false;
+      setPendingAction(null);
     }
   };
 
   const buyNow = async () => {
     if (!isAuthenticated) { navigate('/login'); return; }
     if (!auction?.buyNowPrice) return;
+    if (moneyActionInFlight.current) return;
+    moneyActionInFlight.current = true;
+    setPendingAction('buyNow');
     try {
       await axios.post(`${BASE_URL}/api/auctions/${id}/buy-now`, {}, { headers: authHeaders() });
       setKycRefusal(null);
@@ -388,6 +401,9 @@ export const AuctionPage = () => {
       const error = parseApiError(e, 'Ошибка при покупке');
       if (error.kind === 'kyc_required') setKycRefusal({ action: 'купить по цене Buy Now', message: error.message });
       else showMsg(error.message, 'error');
+    } finally {
+      moneyActionInFlight.current = false;
+      setPendingAction(null);
     }
   };
 
@@ -785,9 +801,9 @@ export const AuctionPage = () => {
               {/* Buy Now */}
               {auction.buyNowPrice && isCreated && (
                 <div>
-                  <button onClick={buyNow}
-                    className="w-full py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 font-semibold">
-                    Купить сейчас за {fmt(auction.buyNowPrice)} сом
+                  <button onClick={buyNow} disabled={pendingAction !== null}
+                    className="w-full py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                    {pendingAction === 'buyNow' ? 'Отправка…' : `Купить сейчас за ${fmt(auction.buyNowPrice)} сом`}
                   </button>
                   <p className="text-xs text-gray-400 text-center mt-1">До начала аукциона — по фиксированной цене</p>
                 </div>
@@ -816,9 +832,9 @@ export const AuctionPage = () => {
                       placeholder={fmt(minNextBid)}
                       disabled={!isAuthenticated}
                     />
-                    <button onClick={placeBid} disabled={!isAuthenticated}
+                    <button onClick={placeBid} disabled={!isAuthenticated || pendingAction !== null}
                       className="px-5 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold disabled:opacity-50 disabled:cursor-not-allowed">
-                      Ставка
+                      {pendingAction === 'bid' ? 'Отправка…' : 'Ставка'}
                     </button>
                   </div>
                   {bidError && <p className="text-red-500 text-xs">{bidError}</p>}

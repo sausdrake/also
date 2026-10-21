@@ -430,6 +430,10 @@ function RequestsTab() {
   // of POST /diagnostic/requests is guidance with a link to the identity tab.
   const [msg, setMsg] = useState<{ text: string; ok: boolean }>({ text: '', ok: true });
   const [createKyc, setCreateKyc] = useState<string | null>(null);
+  // FE-INFLIGHT-01 (BL-21): one POST /diagnostic/requests at a time - a double tap used to send two,
+  // and the second one's conflict replaced "Заявка создана".
+  const createInFlight = useRef(false);
+  const [creating, setCreating] = useState(false);
   // Scenario 1 step 4: "Просмотр" opens the request's details (incl. why it was rejected).
   const [viewedId, setViewedId] = useState<number | null>(null);
 
@@ -457,10 +461,13 @@ function RequestsTab() {
   };
 
   const handleCreate = async () => {
+    if (createInFlight.current) return;
     const errs = validateForm();
     if (Object.keys(errs).length > 0) { setFormErrors(errs); return; }
     setFormErrors({});
     setCreateKyc(null);
+    createInFlight.current = true;
+    setCreating(true);
     try {
       await api.post('/diagnostic/requests', {
         brand: form.brand.trim(),
@@ -480,6 +487,9 @@ function RequestsTab() {
       } else {
         setMsg({ text: error.message, ok: false });
       }
+    } finally {
+      createInFlight.current = false;
+      setCreating(false);
     }
   };
 
@@ -541,9 +551,9 @@ function RequestsTab() {
             ))}
           </div>
           <div className="flex gap-2">
-            <button onClick={handleCreate}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
-              Создать
+            <button onClick={handleCreate} disabled={creating}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+              {creating ? 'Отправка…' : 'Создать'}
             </button>
             <button onClick={() => { setShowForm(false); setFormErrors({}); }}
               className="border px-4 py-2 rounded-lg hover:bg-gray-50 text-sm">

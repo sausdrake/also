@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { ProfilePage } from './ProfilePage';
 import api from '../api/client';
@@ -64,5 +64,43 @@ describe('ProfilePage requests - "Просмотр" (scenario 1.4)', () => {
     const details = screen.getByTestId('request-details-1');
     expect(within(details).getByText('ещё не назначен')).toBeInTheDocument();
     expect(within(details).queryByText('Причина отклонения')).not.toBeInTheDocument();
+  });
+});
+
+describe('FE-INFLIGHT-01 (BL-21): "Создать" sends one request at a time', () => {
+  const apiPost = api.post as unknown as ReturnType<typeof vi.fn>;
+
+  async function fillForm() {
+    await renderRequests();
+    fireEvent.click(screen.getByText('+ Подать заявку'));
+    fireEvent.change(screen.getByPlaceholderText(/^Марка/), { target: { value: 'Toyota' } });
+    fireEvent.change(screen.getByPlaceholderText(/^Модель/), { target: { value: 'Camry' } });
+    fireEvent.change(screen.getByPlaceholderText(/^Год/), { target: { value: '2019' } });
+    fireEvent.change(screen.getByPlaceholderText(/^VIN/), { target: { value: 'JTNB11HK0K3000001' } });
+  }
+
+  it('a double tap posts once, the button is disabled in flight, and "Заявка создана" stays', async () => {
+    let resolve!: (v: unknown) => void;
+    apiPost.mockReset().mockImplementation(() => new Promise(res => { resolve = res; }));
+    await fillForm();
+    const button = screen.getByRole('button', { name: 'Создать' });
+    // two clicks handled before React re-renders the button (both reach the handler)
+    act(() => { button.click(); button.click(); });
+    expect(apiPost).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Отправка…' })).toBeDisabled();
+    resolve({ data: {} });
+    expect(await screen.findByText('Заявка создана')).toBeInTheDocument();
+  });
+
+  it('after a refusal the button is usable again', async () => {
+    apiPost.mockReset().mockRejectedValueOnce(Object.assign(new Error('HTTP 409'), {
+      isAxiosError: true, response: { status: 409, data: { status: 409, message: 'Заявка по этому VIN уже существует' } },
+    }));
+    await fillForm();
+    fireEvent.click(screen.getByRole('button', { name: 'Создать' }));
+    expect(await screen.findByText('Заявка по этому VIN уже существует')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Создать' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Создать' }));
+    expect(apiPost).toHaveBeenCalledTimes(2);
   });
 });

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { AdminDashboard } from './AdminDashboard';
 import api from '../api/client';
@@ -77,5 +77,34 @@ describe('AdminDashboard DepositsPage - deposit adjustment', () => {
     const values = Array.from((screen.getByLabelText('Причина *') as HTMLSelectElement).options)
       .map(o => o.value).filter(Boolean);
     expect(values).toEqual(['RECONCILIATION', 'MANUAL_REFUND', 'CHARGEBACK', 'SUPPORT_CORRECTION', 'OTHER']);
+  });
+});
+
+describe('FE-INFLIGHT-01 (BL-21): "Применить" sends one adjustment at a time', () => {
+  it('a double click posts once and the button is disabled while it is in flight', async () => {
+    let resolve!: (v: unknown) => void;
+    apiPost.mockReset().mockImplementation(() => new Promise(res => { resolve = res; }));
+    await openAdjust();
+    fireEvent.change(screen.getByLabelText('Причина *'), { target: { value: 'RECONCILIATION' } });
+    fireEvent.change(screen.getByLabelText('Основание (ссылка) *'), { target: { value: 'BANK-1' } });
+    const button = screen.getByRole('button', { name: 'Применить' });
+    // two clicks handled before React re-renders the button (both reach the handler)
+    act(() => { button.click(); button.click(); });
+    expect(apiPost).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Отправка…' })).toBeDisabled();
+    resolve({ data: {} });
+    expect(await screen.findByText('Депозит скорректирован на +5000 сом')).toBeInTheDocument();
+  });
+
+  it('after a refusal the same adjustment can be retried (same idempotency key)', async () => {
+    apiPost.mockReset().mockRejectedValueOnce({ response: { data: { message: 'Сервис временно недоступен' } } }).mockResolvedValue({ data: {} });
+    await openAdjust();
+    fireEvent.change(screen.getByLabelText('Причина *'), { target: { value: 'RECONCILIATION' } });
+    fireEvent.change(screen.getByLabelText('Основание (ссылка) *'), { target: { value: 'BANK-2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Применить' }));
+    expect(await screen.findByText('Сервис временно недоступен')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Применить' }));
+    await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(2));
+    expect(apiPost.mock.calls[1][1].idempotencyKey).toBe(apiPost.mock.calls[0][1].idempotencyKey);
   });
 });

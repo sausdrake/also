@@ -2649,6 +2649,10 @@ function DepositsPage() {
   // actually protects against double-submission. A fresh key is only generated when a new
   // adjustment is started (modal re-opened), never per HTTP request.
   const [adjustKey, setAdjustKey] = useState('');
+  // FE-INFLIGHT-01 (BL-21): one adjust POST at a time; the idempotency key already prevents a
+  // second credit, this keeps a double click from turning the success into "уже обработана".
+  const adjustInFlight = useRef(false);
+  const [adjusting, setAdjusting] = useState(false);
   const [txTarget, setTxTarget]   = useState<DepositItem | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [txLoading, setTxLoading] = useState(false);
@@ -2690,12 +2694,16 @@ function DepositsPage() {
     if (!adjustTarget || !adjustAmount || !adjustReason || !adjustReference.trim()) return;
     const amount = parseFloat(adjustAmount);
     if (isNaN(amount)) { notify('Некорректная сумма', true); return; }
+    if (adjustInFlight.current) return;
+    adjustInFlight.current = true;
+    setAdjusting(true);
     try {
       await api.post(`/admin/deposits/${adjustTarget.userId}/adjust`,
         { amount, reason: adjustReason, reference: adjustReference.trim(), idempotencyKey: adjustKey });
       notify(`Депозит скорректирован на ${amount > 0 ? '+' : ''}${amount} сом`);
       setAdjustTarget(null); setAdjustAmount(''); setAdjustReason(''); setAdjustReference(''); load();
     } catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); }
+    finally { adjustInFlight.current = false; setAdjusting(false); }
   };
 
   const loadTransactions = async (d: DepositItem) => {
@@ -2744,8 +2752,8 @@ function DepositsPage() {
             </div>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setAdjustTarget(null)} className="px-4 py-2 border border-gray-200 rounded-xl text-sm hover:bg-gray-50">Отмена</button>
-              <button onClick={adjustDeposit} disabled={!adjustAmount || !adjustReason || !adjustReference.trim()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm disabled:opacity-50 hover:bg-blue-700">Применить</button>
+              <button onClick={adjustDeposit} disabled={adjusting || !adjustAmount || !adjustReason || !adjustReference.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm disabled:opacity-50 hover:bg-blue-700">{adjusting ? 'Отправка…' : 'Применить'}</button>
             </div>
           </div>
         </Modal>
