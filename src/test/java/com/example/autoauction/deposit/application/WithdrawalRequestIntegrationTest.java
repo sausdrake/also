@@ -90,7 +90,7 @@ class WithdrawalRequestIntegrationTest {
             Long doc = identityDocumentRepository.save(new IdentityDocument(
                     "identity-documents/wd" + System.nanoTime(), id, "image/jpeg", 1L, now)).getId();
             IdentityVerification iv = IdentityVerification.firstSubmission(id, "KG", DocumentType.NATIONAL_ID,
-                    "WD" + System.nanoTime(), doc, doc, now);
+                    "WD" + System.nanoTime(), doc, doc, doc, now);
             iv.approve(now);
             identityVerificationRepository.save(iv);
         }

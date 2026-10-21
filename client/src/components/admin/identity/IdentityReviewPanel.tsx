@@ -5,6 +5,7 @@ import { IDENTITY_STATUS_LABELS, parseIdentityStatus } from '../../../domain/ide
 import { labelOf } from '../../../domain/parse';
 import {
   approve,
+  getDocumentBackUrlAdmin,
   getDocumentUrlAdmin,
   getHistoryAdmin,
   getSelfieUrlAdmin,
@@ -17,6 +18,7 @@ import {
 
 const DOCUMENT_TYPE_LABEL: Record<string, string> = {
   NATIONAL_ID: 'Удостоверение личности (ID-карта)',
+  DRIVER_LICENSE: 'Водительское удостоверение',
   INTERNATIONAL_PASSPORT: 'Загранпаспорт',
 };
 
@@ -100,6 +102,16 @@ export function IdentityReviewPanel({ item, onActioned }: Props) {
     getDocumentUrlAdmin(item.id)
       .then(url => { setDocUrl(url); window.open(url, '_blank', 'noopener'); })
       .catch(() => setDocError('Не удалось получить ссылку на документ'))
+      .finally(() => setDocLoading(false));
+  };
+
+  // KYC-CAPTURE-01: the back side of an ID card / driver licence, opened like the front.
+  const viewDocumentBack = () => {
+    setDocError(null);
+    setDocLoading(true);
+    getDocumentBackUrlAdmin(item.id)
+      .then(url => { window.open(url, '_blank', 'noopener'); })
+      .catch(() => setDocError('Не удалось получить ссылку на обратную сторону документа'))
       .finally(() => setDocLoading(false));
   };
 
@@ -201,6 +213,12 @@ export function IdentityReviewPanel({ item, onActioned }: Props) {
           className="text-xs px-3 py-1.5 rounded-lg border text-gray-600 hover:bg-gray-50 disabled:opacity-50">
           {docLoading ? 'Загрузка...' : 'Просмотреть документ'}
         </button>
+        {item.documentBackProvided && (
+          <button onClick={viewDocumentBack} disabled={docLoading}
+            className="ml-2 text-xs px-3 py-1.5 rounded-lg border text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+            Просмотреть обратную сторону
+          </button>
+        )}
         {docError && <p className="text-xs text-red-600 mt-1">{docError}</p>}
         {docUrl && !docError && <p className="text-xs text-gray-400 mt-1">Документ открыт в новой вкладке.</p>}
       </div>

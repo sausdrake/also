@@ -34,6 +34,9 @@ public class JpaIdentityVerificationHistoryEntity {
     @Column(name = "document_reference_id")
     private Long documentReferenceId;
 
+    @Column(name = "document_back_reference_id")   // KYC-CAPTURE-01 / V62
+    private Long documentBackReferenceId;
+
     @Column(name = "actor_admin_id")
     private Long actorAdminId;
 
@@ -75,6 +78,8 @@ public class JpaIdentityVerificationHistoryEntity {
     public void setCanonicalDocumentNumber(String canonicalDocumentNumber) { this.canonicalDocumentNumber = canonicalDocumentNumber; }
     public Long getDocumentReferenceId() { return documentReferenceId; }
     public void setDocumentReferenceId(Long documentReferenceId) { this.documentReferenceId = documentReferenceId; }
+    public Long getDocumentBackReferenceId() { return documentBackReferenceId; }
+    public void setDocumentBackReferenceId(Long documentBackReferenceId) { this.documentBackReferenceId = documentBackReferenceId; }
     public Long getActorAdminId() { return actorAdminId; }
     public void setActorAdminId(Long actorAdminId) { this.actorAdminId = actorAdminId; }
     public RevocationReason getRevocationReasonCode() { return revocationReasonCode; }

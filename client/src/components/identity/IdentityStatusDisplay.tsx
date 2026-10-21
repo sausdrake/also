@@ -23,6 +23,7 @@ const STATUS_COLOR: Record<string, string> = {
 
 const DOCUMENT_TYPE_LABEL: Record<string, string> = {
   NATIONAL_ID: 'Удостоверение личности (ID-карта)',
+  DRIVER_LICENSE: 'Водительское удостоверение',
   INTERNATIONAL_PASSPORT: 'Загранпаспорт',
 };
 

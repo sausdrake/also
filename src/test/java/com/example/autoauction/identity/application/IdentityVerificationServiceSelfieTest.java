@@ -2,6 +2,7 @@ package com.example.autoauction.identity.application;
 
 import com.example.autoauction.diagnostic.media.infrastructure.storage.FakeStorageClient;
 import com.example.autoauction.identity.domain.DocumentType;
+import com.example.autoauction.identity.domain.IdentityCaptureSide;
 import com.example.autoauction.identity.domain.IdentityDocument;
 import com.example.autoauction.identity.domain.IdentityVerification;
 import com.example.autoauction.identity.domain.port.IdentityDocumentRepository;
@@ -51,12 +52,15 @@ class IdentityVerificationServiceSelfieTest {
     private static final Long OTHER_USER_ID = 2L;
     private static final String DOC_KEY = "identity-documents/doc";
     private static final String SELFIE_KEY = "identity-documents/selfie";
+    private static final String BACK_KEY = "identity-documents/back";
 
     @BeforeEach
     void setUp() {
         storageClient = new FakeStorageClient();
-        Clock clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
-        service = new IdentityVerificationService(identityVerificationRepository, historyRepository, documentRepository, storageClient, clock);
+        Clock clock = IdentityCaptures.CLOCK;
+        service = new IdentityVerificationService(identityVerificationRepository, historyRepository, documentRepository, storageClient,
+                new IdentityCaptureVerifier(documentRepository, storageClient), clock);
+        lenient().when(documentRepository.markConsumed(any(), any())).thenReturn(true);
         lenient().when(identityVerificationRepository.findByUserIdWithLock(any())).thenReturn(Optional.empty());
         lenient().when(identityVerificationRepository.save(any())).thenAnswer(inv -> {
             IdentityVerification iv = inv.getArgument(0);
@@ -65,17 +69,23 @@ class IdentityVerificationServiceSelfieTest {
             }
             return iv;
         });
-        ownedUpload(10L, DOC_KEY, USER_ID, "image/jpeg");
+        ownedUpload(10L, DOC_KEY, USER_ID, IdentityCaptureSide.FRONT, "image/jpeg");
+        ownedUpload(13L, BACK_KEY, USER_ID, IdentityCaptureSide.BACK, "image/jpeg");
     }
 
     private void ownedUpload(Long id, String key, Long owner, String mimeType) {
+        ownedUpload(id, key, owner, IdentityCaptureSide.SELFIE, mimeType);
+    }
+
+    private void ownedUpload(Long id, String key, Long owner, IdentityCaptureSide side, String mimeType) {
+        DocumentType type = side == IdentityCaptureSide.SELFIE ? null : DocumentType.NATIONAL_ID;
         lenient().when(documentRepository.findByStorageKey(key))
-                .thenReturn(Optional.of(new IdentityDocument(id, key, owner, mimeType, 3L, OffsetDateTime.now())));
+                .thenReturn(Optional.of(IdentityCaptures.capture(id, key, owner, side, type, mimeType)));
         storageClient.simulateUpload(key, new byte[]{1, 2, 3}, mimeType);
     }
 
     private IdentityVerification submit(String selfieKey) {
-        return service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", DOC_KEY, selfieKey);
+        return service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", DOC_KEY, BACK_KEY, selfieKey);
     }
 
     private void assertNothingPersisted() {
@@ -131,7 +141,7 @@ class IdentityVerificationServiceSelfieTest {
     @DisplayName("an issued selfie slot that was never uploaded is refused")
     void selfieNeverUploaded_isRefused() {
         when(documentRepository.findByStorageKey(SELFIE_KEY))
-                .thenReturn(Optional.of(new IdentityDocument(11L, SELFIE_KEY, USER_ID, "image/jpeg", null, OffsetDateTime.now())));
+                .thenReturn(Optional.of(IdentityCaptures.selfie(11L, SELFIE_KEY, USER_ID)));
 
         assertThatThrownBy(() -> submit(SELFIE_KEY)).isInstanceOf(IllegalArgumentException.class);
         assertNothingPersisted();
@@ -150,7 +160,7 @@ class IdentityVerificationServiceSelfieTest {
     @DisplayName("resubmission after a rejection replaces both the document and the selfie")
     void resubmission_replacesSelfie() {
         IdentityVerification rejected = IdentityVerification.firstSubmission(
-                USER_ID, "KG", DocumentType.NATIONAL_ID, "OLD1234", 5L, 6L, OffsetDateTime.now());
+                USER_ID, "KG", DocumentType.NATIONAL_ID, "OLD1234", 5L, 5L, 6L, OffsetDateTime.now());
         rejected.reject(OffsetDateTime.now());
         when(identityVerificationRepository.findByUserIdWithLock(USER_ID)).thenReturn(Optional.of(rejected));
         ownedUpload(11L, SELFIE_KEY, USER_ID, "image/jpeg");

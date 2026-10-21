@@ -130,7 +130,7 @@ class AdminUserCreatedAtApiIntegrationTest {
         Long doc = identityDocumentRepository.save(new IdentityDocument(
                 "identity-documents/bl19-" + userId + "-" + System.nanoTime(), userId, "image/jpeg", 1000L, now)).getId();
         IdentityVerification iv = IdentityVerification.firstSubmission(
-                userId, "KG", DocumentType.NATIONAL_ID, "B19" + System.nanoTime(), doc, doc, now);
+                userId, "KG", DocumentType.NATIONAL_ID, "B19" + System.nanoTime(), doc, doc, doc, now);
         iv.approve(now);
         identityVerificationRepository.save(iv);
 

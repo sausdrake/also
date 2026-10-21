@@ -24,7 +24,7 @@ function pending(overrides: Partial<IdentityStatusResponse> = {}): IdentityStatu
   return {
     id: 7, userId: 70, status: 'PENDING_REVIEW', issuingCountry: 'KG', documentType: 'NATIONAL_ID',
     canonicalDocumentNumber: 'AN1234567', createdAt: '2026-10-15T00:00:00Z', updatedAt: '2026-10-15T00:00:00Z',
-    selfieProvided: true, ...overrides,
+    selfieProvided: true, documentBackProvided: true, ...overrides,
   };
 }
 

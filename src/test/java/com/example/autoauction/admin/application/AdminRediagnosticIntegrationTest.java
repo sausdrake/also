@@ -113,7 +113,7 @@ class AdminRediagnosticIntegrationTest {
         if (verified) {
             OffsetDateTime now = OffsetDateTime.now();
             Long doc = identityDocumentRepository.save(new IdentityDocument("identity-documents/rd" + System.nanoTime(), id, "image/jpeg", 1L, now)).getId();
-            IdentityVerification iv = IdentityVerification.firstSubmission(id, "KG", DocumentType.NATIONAL_ID, "RD" + System.nanoTime(), doc, doc, now);
+            IdentityVerification iv = IdentityVerification.firstSubmission(id, "KG", DocumentType.NATIONAL_ID, "RD" + System.nanoTime(), doc, doc, doc, now);
             iv.approve(now);
             identityVerificationRepository.save(iv);
         }

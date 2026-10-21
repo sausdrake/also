@@ -35,7 +35,7 @@ describe('SelfieCamera (MVP-004 live selfie)', () => {
     expect(container.querySelector('input[type="file"]')).toBeNull();
   });
 
-  it('captures a JPEG from the live camera and releases the camera', async () => {
+  it('captures a JPEG from the live camera, releases the camera, reports it after Подтвердить', async () => {
     const getUserMedia = vi.fn().mockResolvedValue(fakeStream);
     setMediaDevices(getUserMedia);
     const onCapture = vi.fn();
@@ -46,6 +46,8 @@ describe('SelfieCamera (MVP-004 live selfie)', () => {
     expect(getUserMedia).toHaveBeenCalledWith({ video: { facingMode: 'user' }, audio: false });
 
     fireEvent.click(screen.getByText('Сделать снимок'));
+    expect(onCapture).not.toHaveBeenCalled();   // KYC-CAPTURE-01: reported only after an explicit confirm
+    fireEvent.click(screen.getByText('Подтвердить'));
 
     expect(onCapture).toHaveBeenCalledTimes(1);
     expect(onCapture).toHaveBeenCalledWith(capturedJpeg);

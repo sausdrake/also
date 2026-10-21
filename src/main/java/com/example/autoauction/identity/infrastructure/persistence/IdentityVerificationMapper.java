@@ -17,6 +17,7 @@ public class IdentityVerificationMapper {
         entity.setCanonicalDocumentNumber(domain.getCanonicalDocumentNumber());
         entity.setCurrentDocumentId(domain.getCurrentDocumentId());
         entity.setCurrentSelfieDocumentId(domain.getCurrentSelfieDocumentId());
+        entity.setCurrentDocumentBackId(domain.getCurrentDocumentBackId());
         entity.setCreatedAt(domain.getCreatedAt());
         entity.setUpdatedAt(domain.getUpdatedAt());
         entity.setVersion(domain.getVersion());
@@ -33,6 +34,7 @@ public class IdentityVerificationMapper {
                 entity.getDocumentType(),
                 entity.getCanonicalDocumentNumber(),
                 entity.getCurrentDocumentId(),
+                entity.getCurrentDocumentBackId(),
                 entity.getCurrentSelfieDocumentId(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),

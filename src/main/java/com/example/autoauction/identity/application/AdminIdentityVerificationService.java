@@ -77,6 +77,18 @@ public class AdminIdentityVerificationService {
         return storageClient.createPresignedReadUrl(document.getStorageKey(), READ_URL_TTL);
     }
 
+    /** KYC-CAPTURE-01: the back side of an ID card / driver licence. */
+    @Transactional(readOnly = true)
+    public URI getDocumentBackUrl(Long id) {
+        IdentityVerification iv = inspect(id);
+        if (iv.getCurrentDocumentBackId() == null) {
+            throw new IllegalArgumentException("Обратная сторона документа не найдена");
+        }
+        IdentityDocument back = documentRepository.findById(iv.getCurrentDocumentBackId())
+                .orElseThrow(() -> new IllegalArgumentException("Обратная сторона документа не найдена"));
+        return storageClient.createPresignedReadUrl(back.getStorageKey(), READ_URL_TTL);
+    }
+
     /** MVP-004: the live selfie the administrator compares with the document. */
     @Transactional(readOnly = true)
     public URI getSelfieUrl(Long id) {

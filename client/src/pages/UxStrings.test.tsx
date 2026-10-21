@@ -45,7 +45,7 @@ describe('FE-UX-01: readable admin strings', () => {
   it('the identity review shows the status label, not the enum', () => {
     apiGet.mockResolvedValue({ data: [] });
     render(<IdentityReviewPanel onActioned={vi.fn()} item={{ id: 3, userId: 9, status: 'PENDING_REVIEW', issuingCountry: 'KG', documentType: 'NATIONAL_ID',
-      canonicalDocumentNumber: 'AN1234567', createdAt: '2026-10-20T10:00:00Z', updatedAt: '2026-10-20T10:00:00Z', selfieProvided: true }} />);
+      canonicalDocumentNumber: 'AN1234567', createdAt: '2026-10-20T10:00:00Z', updatedAt: '2026-10-20T10:00:00Z', selfieProvided: true, documentBackProvided: true }} />);
     expect(screen.getByText('KYC: На рассмотрении')).toBeInTheDocument();   // KYC-01: labelled as KYC next to the trust line
     expect(screen.queryByText('PENDING_REVIEW')).not.toBeInTheDocument();
   });

@@ -14,7 +14,10 @@ public class IdentityDocumentMapper {
                 domain.getUploaderUserId(),
                 domain.getMimeType(),
                 domain.getSizeBytes(),
-                domain.getCreatedAt());
+                domain.getCreatedAt(),
+                domain.getCaptureSide(),
+                domain.getDocumentType(),
+                domain.getConsumedAt());
     }
 
     public IdentityDocument toDomain(JpaIdentityDocumentEntity entity) {
@@ -25,6 +28,9 @@ public class IdentityDocumentMapper {
                 entity.getUploaderUserId(),
                 entity.getMimeType(),
                 entity.getSizeBytes(),
-                entity.getCreatedAt());
+                entity.getCreatedAt(),
+                entity.getCaptureSide(),
+                entity.getDocumentType(),
+                entity.getConsumedAt());
     }
 }

@@ -72,7 +72,7 @@ class KycTrustedAccessMatrixApiIntegrationTest {
         OffsetDateTime now = OffsetDateTime.now();
         Long doc = identityDocumentRepository.save(new IdentityDocument(
                 "identity-documents/" + UUID.randomUUID(), id, "image/jpeg", 1000L, now)).getId();
-        IdentityVerification iv = IdentityVerification.firstSubmission(id, "KG", DocumentType.NATIONAL_ID, "K" + System.nanoTime(), doc, doc, now);
+        IdentityVerification iv = IdentityVerification.firstSubmission(id, "KG", DocumentType.NATIONAL_ID, "K" + System.nanoTime(), doc, doc, doc, now);
         switch (kyc) {
             case PENDING_REVIEW -> { }
             case VERIFIED -> iv.approve(now);

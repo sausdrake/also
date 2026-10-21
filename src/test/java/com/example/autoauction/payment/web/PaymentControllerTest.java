@@ -72,13 +72,13 @@ class PaymentControllerTest {
         IdentityVerification iv;
         if (existing == null) {
             iv = IdentityVerification.firstSubmission(
-                    userId, "KG", DocumentType.NATIONAL_ID, "PC" + System.nanoTime(), documentId, documentId, now);
+                    userId, "KG", DocumentType.NATIONAL_ID, "PC" + System.nanoTime(), documentId, documentId, documentId, now);
         } else {
             iv = existing;
             if (iv.getStatus() == IdentityVerificationStatus.PENDING_REVIEW) {
                 iv.reject(now);
             }
-            iv.resubmit("KG", DocumentType.NATIONAL_ID, "PC" + System.nanoTime(), documentId, documentId, now);
+            iv.resubmit("KG", DocumentType.NATIONAL_ID, "PC" + System.nanoTime(), documentId, documentId, documentId, now);
         }
         iv.approve(now);
         identityVerificationRepository.save(iv);

@@ -81,7 +81,7 @@ class IdentityControllerApiIntegrationTest {
         mockMvc.perform(post("/api/v1/identity/documents/upload-url")
                         .with(user(userId, "USER"))
                         .contentType("application/json")
-                        .content("{\"contentType\":\"image/jpeg\"}"))
+                        .content("{\"contentType\":\"image/jpeg\",\"side\":\"FRONT\",\"documentType\":\"NATIONAL_ID\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.storageKey").value(org.hamcrest.Matchers.startsWith("identity-documents/")));
     }
@@ -93,7 +93,7 @@ class IdentityControllerApiIntegrationTest {
         String uploadResponse = mockMvc.perform(post("/api/v1/identity/documents/upload-url")
                         .with(user(userId, "USER"))
                         .contentType("application/json")
-                        .content("{\"contentType\":\"image/jpeg\"}"))
+                        .content("{\"contentType\":\"image/jpeg\",\"side\":\"FRONT\",\"documentType\":\"NATIONAL_ID\"}"))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         String storageKey = com.jayway.jsonpath.JsonPath.read(uploadResponse, "$.storageKey");
@@ -101,12 +101,14 @@ class IdentityControllerApiIntegrationTest {
         // Simulate the real browser upload directly into the shared FakeStorageClient bean.
         uploadFakeObject(storageKey);
         String selfieKey = uploadedSelfieKey(userId);
+        String backKey = uploadedBackKey(userId);
 
         mockMvc.perform(post("/api/v1/identity/submissions")
                         .with(user(userId, "USER"))
                         .contentType("application/json")
                         .content("{\"issuingCountry\":\"KG\",\"documentType\":\"NATIONAL_ID\","
                                 + "\"rawDocumentNumber\":\"AB1234567\",\"documentStorageKey\":\"" + storageKey + "\","
+                                + "\"documentBackStorageKey\":\"" + backKey + "\","
                                 + "\"selfieStorageKey\":\"" + selfieKey + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PENDING_REVIEW"))
@@ -125,17 +127,19 @@ class IdentityControllerApiIntegrationTest {
         String uploadResponse = mockMvc.perform(post("/api/v1/identity/documents/upload-url")
                         .with(user(userId, "USER"))
                         .contentType("application/json")
-                        .content("{\"contentType\":\"image/jpeg\"}"))
+                        .content("{\"contentType\":\"image/jpeg\",\"side\":\"FRONT\",\"documentType\":\"NATIONAL_ID\"}"))
                 .andReturn().getResponse().getContentAsString();
         String storageKey = com.jayway.jsonpath.JsonPath.read(uploadResponse, "$.storageKey");
         uploadFakeObject(storageKey);
         String selfieKey = uploadedSelfieKey(userId);
+        String backKey = uploadedBackKey(userId);
 
         mockMvc.perform(post("/api/v1/identity/submissions")
                 .with(user(userId, "USER"))
                 .contentType("application/json")
                 .content("{\"issuingCountry\":\"KG\",\"documentType\":\"NATIONAL_ID\","
                         + "\"rawDocumentNumber\":\"CD7654321\",\"documentStorageKey\":\"" + storageKey + "\","
+                        + "\"documentBackStorageKey\":\"" + backKey + "\","
                         + "\"selfieStorageKey\":\"" + selfieKey + "\"}"));
 
         String statusJson = mockMvc.perform(get("/api/v1/identity/me").with(user(userId, "USER")))
@@ -152,10 +156,19 @@ class IdentityControllerApiIntegrationTest {
 
     /** MVP-004: a live-selfie upload slot obtained and filled exactly like the document's. */
     private String uploadedSelfieKey(Long userId) throws Exception {
+        return uploadedKey(userId, "{\"contentType\":\"image/jpeg\",\"side\":\"SELFIE\"}");
+    }
+
+    /** KYC-CAPTURE-01: the BACK capture an ID card submission needs. */
+    private String uploadedBackKey(Long userId) throws Exception {
+        return uploadedKey(userId, "{\"contentType\":\"image/jpeg\",\"side\":\"BACK\",\"documentType\":\"NATIONAL_ID\"}");
+    }
+
+    private String uploadedKey(Long userId, String body) throws Exception {
         String response = mockMvc.perform(post("/api/v1/identity/documents/upload-url")
                         .with(user(userId, "USER"))
                         .contentType("application/json")
-                        .content("{\"contentType\":\"image/jpeg\"}"))
+                        .content(body))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         String key = com.jayway.jsonpath.JsonPath.read(response, "$.storageKey");

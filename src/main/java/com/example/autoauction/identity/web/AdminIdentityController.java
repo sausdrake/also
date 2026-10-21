@@ -78,6 +78,13 @@ public class AdminIdentityController {
         return ResponseEntity.ok(new IdentityDocumentUrlResponse(url.toString()));
     }
 
+    @GetMapping("/{id}/document-back-url")
+    @Operation(summary = "Получить временную ссылку на обратную сторону документа заявки")
+    public ResponseEntity<IdentityDocumentUrlResponse> getDocumentBackUrl(@PathVariable Long id) {
+        var url = adminIdentityVerificationService.getDocumentBackUrl(id);
+        return ResponseEntity.ok(new IdentityDocumentUrlResponse(url.toString()));
+    }
+
     @GetMapping("/{id}/selfie-url")
     @Operation(summary = "Получить временную ссылку на живое селфи заявки")
     public ResponseEntity<IdentityDocumentUrlResponse> getSelfieUrl(@PathVariable Long id) {

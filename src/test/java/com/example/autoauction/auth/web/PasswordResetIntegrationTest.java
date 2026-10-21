@@ -92,7 +92,7 @@ class PasswordResetIntegrationTest {
             Long doc = identityDocumentRepository.save(new IdentityDocument(
                     "identity-documents/auth01-" + user.getId() + "-" + System.nanoTime(), user.getId(), "image/jpeg", 1000L, now)).getId();
             IdentityVerification iv = IdentityVerification.firstSubmission(
-                    user.getId(), "KG", DocumentType.NATIONAL_ID, "A1" + System.nanoTime(), doc, doc, now);
+                    user.getId(), "KG", DocumentType.NATIONAL_ID, "A1" + System.nanoTime(), doc, doc, doc, now);
             iv.approve(now);
             identityVerificationRepository.save(iv);
         }

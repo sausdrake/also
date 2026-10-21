@@ -21,6 +21,9 @@ public record IdentitySubmissionRequest(
         @NotBlank(message = "documentStorageKey обязателен")
         String documentStorageKey,
 
+        // KYC-CAPTURE-01: the BACK capture - required for NATIONAL_ID / DRIVER_LICENSE, refused for a passport
+        String documentBackStorageKey,
+
         // MVP-004: storage key of the live selfie captured through the platform camera
         @NotBlank(message = "selfieStorageKey обязателен")
         String selfieStorageKey

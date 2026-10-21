@@ -50,17 +50,22 @@ class IdentityVerificationServiceSubmissionRuleTest {
     private static final Long USER_ID = 1L;
     private static final String KEY = "identity-documents/rule-test";
     private static final String SELFIE_KEY = "identity-documents/rule-test-selfie";
+    private static final String BACK_KEY = "identity-documents/rule-test-back";
 
     @BeforeEach
     void setUp() {
         storageClient = new FakeStorageClient();
         storageClient.simulateUpload(KEY, new byte[]{1, 2, 3}, "image/jpeg");
         storageClient.simulateUpload(SELFIE_KEY, new byte[]{4, 5, 6}, "image/jpeg");
-        Clock clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
-        service = new IdentityVerificationService(identityVerificationRepository, historyRepository, documentRepository, storageClient, clock);
-        IdentityDocument ownDoc = new IdentityDocument(10L, KEY, USER_ID, "image/jpeg", 3L, OffsetDateTime.now());
+        storageClient.simulateUpload(BACK_KEY, new byte[]{7, 8, 9}, "image/jpeg");
+        Clock clock = IdentityCaptures.CLOCK;
+        service = new IdentityVerificationService(identityVerificationRepository, historyRepository, documentRepository, storageClient,
+                new IdentityCaptureVerifier(documentRepository, storageClient), clock);
+        lenient().when(documentRepository.markConsumed(any(), any())).thenReturn(true);
+        IdentityDocument ownDoc = IdentityCaptures.front(10L, KEY, USER_ID);
+        lenient().when(documentRepository.findByStorageKey(BACK_KEY)).thenReturn(Optional.of(IdentityCaptures.back(12L, BACK_KEY, USER_ID)));
         lenient().when(documentRepository.findByStorageKey(KEY)).thenReturn(Optional.of(ownDoc));
-        IdentityDocument ownSelfie = new IdentityDocument(11L, SELFIE_KEY, USER_ID, "image/jpeg", 3L, OffsetDateTime.now());
+        IdentityDocument ownSelfie = IdentityCaptures.selfie(11L, SELFIE_KEY, USER_ID);
         lenient().when(documentRepository.findByStorageKey(SELFIE_KEY)).thenReturn(Optional.of(ownSelfie));
         lenient().when(identityVerificationRepository.save(any())).thenAnswer(inv -> {
             IdentityVerification iv = inv.getArgument(0);
@@ -76,7 +81,7 @@ class IdentityVerificationServiceSubmissionRuleTest {
     void noExistingRow_CreatesNewPendingReview() {
         when(identityVerificationRepository.findByUserIdWithLock(USER_ID)).thenReturn(Optional.empty());
 
-        IdentityVerification result = service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", KEY, SELFIE_KEY);
+        IdentityVerification result = service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", KEY, BACK_KEY, SELFIE_KEY);
 
         assertThat(result.getStatus()).isEqualTo(IdentityVerificationStatus.PENDING_REVIEW);
         verify(historyRepository).save(any());
@@ -86,11 +91,11 @@ class IdentityVerificationServiceSubmissionRuleTest {
     @DisplayName("Row 2: PENDING_REVIEW + SAME identity -> idempotent 200, no new history row")
     void pendingReview_SameIdentity_IdempotentNoStateChange() {
         IdentityVerification existing = IdentityVerification.firstSubmission(
-                USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", 10L, 10L, OffsetDateTime.now());
+                USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", 10L, 10L, 10L, OffsetDateTime.now());
         existing.setVersion(0L);
         when(identityVerificationRepository.findByUserIdWithLock(USER_ID)).thenReturn(Optional.of(existing));
 
-        IdentityVerification result = service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", KEY, SELFIE_KEY);
+        IdentityVerification result = service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "AB1234567", KEY, BACK_KEY, SELFIE_KEY);
 
         assertThat(result.getStatus()).isEqualTo(IdentityVerificationStatus.PENDING_REVIEW);
         verify(identityVerificationRepository, never()).save(any());
@@ -101,10 +106,10 @@ class IdentityVerificationServiceSubmissionRuleTest {
     @DisplayName("Row 3: PENDING_REVIEW + DIFFERENT identity -> fail closed, zero state change")
     void pendingReview_DifferentIdentity_FailsClosedNoStateChange() {
         IdentityVerification existing = IdentityVerification.firstSubmission(
-                USER_ID, "KG", DocumentType.NATIONAL_ID, "OLDIDENT1", 10L, 10L, OffsetDateTime.now());
+                USER_ID, "KG", DocumentType.NATIONAL_ID, "OLDIDENT1", 10L, 10L, 10L, OffsetDateTime.now());
         when(identityVerificationRepository.findByUserIdWithLock(USER_ID)).thenReturn(Optional.of(existing));
 
-        assertThatThrownBy(() -> service.submit(USER_ID, "KG", DocumentType.INTERNATIONAL_PASSPORT, "NEWIDENT1", KEY, SELFIE_KEY))
+        assertThatThrownBy(() -> service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "NEWIDENT1", KEY, BACK_KEY, SELFIE_KEY))
                 .isInstanceOf(IllegalStateException.class);
 
         verify(identityVerificationRepository, never()).save(any());
@@ -116,11 +121,11 @@ class IdentityVerificationServiceSubmissionRuleTest {
     @DisplayName("Row 4: VERIFIED -> fail closed, replacement not supported in MVP")
     void verified_FailsClosed() {
         IdentityVerification existing = IdentityVerification.firstSubmission(
-                USER_ID, "KG", DocumentType.NATIONAL_ID, "VERIFIED1", 10L, 10L, OffsetDateTime.now());
+                USER_ID, "KG", DocumentType.NATIONAL_ID, "VERIFIED1", 10L, 10L, 10L, OffsetDateTime.now());
         existing.approve(OffsetDateTime.now());
         when(identityVerificationRepository.findByUserIdWithLock(USER_ID)).thenReturn(Optional.of(existing));
 
-        assertThatThrownBy(() -> service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "DIFFERENT1", KEY, SELFIE_KEY))
+        assertThatThrownBy(() -> service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "DIFFERENT1", KEY, BACK_KEY, SELFIE_KEY))
                 .isInstanceOf(IllegalStateException.class);
 
         verify(identityVerificationRepository, never()).save(any());
@@ -132,11 +137,11 @@ class IdentityVerificationServiceSubmissionRuleTest {
     @DisplayName("Row 5a: REJECTED -> resubmission allowed, new PENDING_REVIEW")
     void rejected_ResubmissionAllowed() {
         IdentityVerification existing = IdentityVerification.firstSubmission(
-                USER_ID, "KG", DocumentType.NATIONAL_ID, "REJECTED1", 10L, 10L, OffsetDateTime.now());
+                USER_ID, "KG", DocumentType.NATIONAL_ID, "REJECTED1", 10L, 10L, 10L, OffsetDateTime.now());
         existing.reject(OffsetDateTime.now());
         when(identityVerificationRepository.findByUserIdWithLock(USER_ID)).thenReturn(Optional.of(existing));
 
-        IdentityVerification result = service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "NEWAFTERREJ", KEY, SELFIE_KEY);
+        IdentityVerification result = service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "NEWAFTERREJ", KEY, BACK_KEY, SELFIE_KEY);
 
         assertThat(result.getStatus()).isEqualTo(IdentityVerificationStatus.PENDING_REVIEW);
         assertThat(result.getCanonicalDocumentNumber()).isEqualTo("NEWAFTERREJ");
@@ -146,12 +151,12 @@ class IdentityVerificationServiceSubmissionRuleTest {
     @DisplayName("Row 5b: REVOKED -> resubmission allowed, new PENDING_REVIEW")
     void revoked_ResubmissionAllowed() {
         IdentityVerification existing = IdentityVerification.firstSubmission(
-                USER_ID, "KG", DocumentType.NATIONAL_ID, "REVOKED1", 10L, 10L, OffsetDateTime.now());
+                USER_ID, "KG", DocumentType.NATIONAL_ID, "REVOKED1", 10L, 10L, 10L, OffsetDateTime.now());
         existing.approve(OffsetDateTime.now());
         existing.revoke(OffsetDateTime.now());
         when(identityVerificationRepository.findByUserIdWithLock(USER_ID)).thenReturn(Optional.of(existing));
 
-        IdentityVerification result = service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "NEWAFTERREV", KEY, SELFIE_KEY);
+        IdentityVerification result = service.submit(USER_ID, "KG", DocumentType.NATIONAL_ID, "NEWAFTERREV", KEY, BACK_KEY, SELFIE_KEY);
 
         assertThat(result.getStatus()).isEqualTo(IdentityVerificationStatus.PENDING_REVIEW);
     }
@@ -159,7 +164,7 @@ class IdentityVerificationServiceSubmissionRuleTest {
     @Test
     @DisplayName("unsupported issuing country rejected before any repository interaction")
     void unsupportedIssuingCountry_Rejected() {
-        assertThatThrownBy(() -> service.submit(USER_ID, "RU", DocumentType.NATIONAL_ID, "AB1234567", KEY, SELFIE_KEY))
+        assertThatThrownBy(() -> service.submit(USER_ID, "RU", DocumentType.NATIONAL_ID, "AB1234567", KEY, BACK_KEY, SELFIE_KEY))
                 .isInstanceOf(IllegalArgumentException.class);
 
         verify(identityVerificationRepository, never()).findByUserIdWithLock(any());

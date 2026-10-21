@@ -32,7 +32,7 @@ class VerifiedIdentityGateTest {
     private static IdentityVerification verificationWithStatus(IdentityVerificationStatus status) {
         OffsetDateTime now = OffsetDateTime.now();
         IdentityVerification iv = IdentityVerification.firstSubmission(
-                USER_ID, "KG", DocumentType.NATIONAL_ID, "AN1234567", 7L, 7L, now);
+                USER_ID, "KG", DocumentType.NATIONAL_ID, "AN1234567", 7L, 7L, 7L, now);
         switch (status) {
             case PENDING_REVIEW -> { }
             case VERIFIED -> iv.approve(now);

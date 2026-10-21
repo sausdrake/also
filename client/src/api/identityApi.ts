@@ -2,7 +2,17 @@ import axios from 'axios';
 import api from './client';
 
 export type IdentityStatus = 'PENDING_REVIEW' | 'VERIFIED' | 'REJECTED' | 'REVOKED';
-export type DocumentType = 'NATIONAL_ID' | 'INTERNATIONAL_PASSPORT';
+export type DocumentType = 'NATIONAL_ID' | 'INTERNATIONAL_PASSPORT' | 'DRIVER_LICENSE';
+/** KYC-CAPTURE-01: what one camera capture shows (backend IdentityCaptureSide). */
+export type CaptureSide = 'FRONT' | 'BACK' | 'DATA_PAGE' | 'SELFIE';
+/** The sides a document type must be photographed with, in order - served by the backend, never hard-coded. */
+export interface CaptureRequirement {
+  documentType: DocumentType;
+  sides: CaptureSide[];
+}
+
+/** The platform camera encodes captures as JPEG; the backend accepts nothing else for KYC. */
+export const CAPTURE_CONTENT_TYPE = 'image/jpeg';
 export type RevocationReasonCode = 'ADMIN_ERROR' | 'FRAUD_DISCOVERED' | 'DOCUMENT_INVALID' | 'IDENTITY_MISMATCH' | 'OTHER';
 
 /** The only issuing country the backend accepts (IdentityVerificationService.SUPPORTED_ISSUING_COUNTRY) - never invented. */
@@ -19,6 +29,8 @@ export interface IdentityStatusResponse {
   updatedAt: string;
   /** MVP-004: false only for submissions made before the live selfie became mandatory. */
   selfieProvided: boolean;
+  /** KYC-CAPTURE-01: the back side of an ID card / driver licence was photographed. */
+  documentBackProvided: boolean;
 }
 
 export interface IdentityHistoryEventResponse {
@@ -39,8 +51,18 @@ export interface IdentityUploadUrlResponse {
 
 // ─────────────────── Self-service (USER) ───────────────────
 
-export async function requestUploadUrl(contentType: string): Promise<IdentityUploadUrlResponse> {
-  const { data } = await api.post<IdentityUploadUrlResponse>('/identity/documents/upload-url', { contentType });
+export async function getCaptureRequirements(): Promise<CaptureRequirement[]> {
+  const { data } = await api.get<CaptureRequirement[]>('/identity/capture-requirements');
+  return data;
+}
+
+/**
+ * KYC-CAPTURE-01: a slot for ONE camera capture - its side and, for a document side, the document type.
+ * The server signs the upload for JPEG only and accepts the key only in that role, once.
+ */
+export async function requestUploadUrl(side: CaptureSide, documentType?: DocumentType): Promise<IdentityUploadUrlResponse> {
+  const { data } = await api.post<IdentityUploadUrlResponse>('/identity/documents/upload-url',
+    { contentType: CAPTURE_CONTENT_TYPE, side, ...(documentType ? { documentType } : {}) });
   return data;
 }
 
@@ -58,6 +80,7 @@ export async function submitIdentity(
   documentType: DocumentType,
   rawDocumentNumber: string,
   documentStorageKey: string,
+  documentBackStorageKey: string | null,
   selfieStorageKey: string,
 ): Promise<IdentityStatusResponse> {
   const { data } = await api.post<IdentityStatusResponse>('/identity/submissions', {
@@ -65,6 +88,7 @@ export async function submitIdentity(
     documentType,
     rawDocumentNumber,
     documentStorageKey,
+    ...(documentBackStorageKey ? { documentBackStorageKey } : {}),
     selfieStorageKey,
   });
   return data;
@@ -99,6 +123,12 @@ export async function getById(id: number): Promise<IdentityStatusResponse> {
 
 export async function getDocumentUrlAdmin(id: number): Promise<string> {
   const { data } = await api.get<{ url: string }>(`/admin/identity/${id}/document-url`);
+  return data.url;
+}
+
+/** KYC-CAPTURE-01: the back side of an ID card / driver licence. */
+export async function getDocumentBackUrlAdmin(id: number): Promise<string> {
+  const { data } = await api.get<{ url: string }>(`/admin/identity/${id}/document-back-url`);
   return data.url;
 }
 

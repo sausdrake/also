@@ -20,7 +20,7 @@ class IdentityVerificationTest {
     private final OffsetDateTime now = OffsetDateTime.now();
 
     private IdentityVerification pending() {
-        return IdentityVerification.firstSubmission(1L, "KG", DocumentType.NATIONAL_ID, "AB1234", 10L, 10L, now);
+        return IdentityVerification.firstSubmission(1L, "KG", DocumentType.NATIONAL_ID, "AB1234", 10L, 10L, 10L, now);
     }
 
     @Test
@@ -86,7 +86,7 @@ class IdentityVerificationTest {
     void resubmit_FromRejected_Succeeds() {
         IdentityVerification iv = pending();
         iv.reject(now.plusMinutes(1));
-        iv.resubmit("KG", DocumentType.INTERNATIONAL_PASSPORT, "CD5678", 20L, 20L, now.plusMinutes(2));
+        iv.resubmit("KG", DocumentType.INTERNATIONAL_PASSPORT, "CD5678", 20L, null, 20L, now.plusMinutes(2));
         assertThat(iv.getStatus()).isEqualTo(IdentityVerificationStatus.PENDING_REVIEW);
         assertThat(iv.getDocumentType()).isEqualTo(DocumentType.INTERNATIONAL_PASSPORT);
         assertThat(iv.getCanonicalDocumentNumber()).isEqualTo("CD5678");
@@ -99,7 +99,7 @@ class IdentityVerificationTest {
         IdentityVerification iv = pending();
         iv.approve(now.plusMinutes(1));
         iv.revoke(now.plusMinutes(2));
-        iv.resubmit("KG", DocumentType.NATIONAL_ID, "EF9999", 30L, 30L, now.plusMinutes(3));
+        iv.resubmit("KG", DocumentType.NATIONAL_ID, "EF9999", 30L, 30L, 30L, now.plusMinutes(3));
         assertThat(iv.getStatus()).isEqualTo(IdentityVerificationStatus.PENDING_REVIEW);
     }
 
@@ -107,7 +107,7 @@ class IdentityVerificationTest {
     @DisplayName("resubmit() from PENDING_REVIEW fails closed - caller must handle this case before calling")
     void resubmit_FromPendingReview_Throws() {
         IdentityVerification iv = pending();
-        assertThatThrownBy(() -> iv.resubmit("KG", DocumentType.NATIONAL_ID, "ZZ9999", 99L, 99L, now.plusMinutes(1)))
+        assertThatThrownBy(() -> iv.resubmit("KG", DocumentType.NATIONAL_ID, "ZZ9999", 99L, 99L, 99L, now.plusMinutes(1)))
                 .isInstanceOf(IllegalStateException.class);
     }
 
@@ -116,7 +116,7 @@ class IdentityVerificationTest {
     void resubmit_FromVerified_Throws() {
         IdentityVerification iv = pending();
         iv.approve(now.plusMinutes(1));
-        assertThatThrownBy(() -> iv.resubmit("KG", DocumentType.NATIONAL_ID, "ZZ9999", 99L, 99L, now.plusMinutes(2)))
+        assertThatThrownBy(() -> iv.resubmit("KG", DocumentType.NATIONAL_ID, "ZZ9999", 99L, 99L, 99L, now.plusMinutes(2)))
                 .isInstanceOf(IllegalStateException.class);
     }
 
@@ -133,7 +133,7 @@ class IdentityVerificationTest {
     @Test
     @DisplayName("MVP-004: a submission without a live selfie cannot be created")
     void firstSubmission_WithoutSelfie_Throws() {
-        assertThatThrownBy(() -> IdentityVerification.firstSubmission(1L, "KG", DocumentType.NATIONAL_ID, "AB1234", 10L, null, now))
+        assertThatThrownBy(() -> IdentityVerification.firstSubmission(1L, "KG", DocumentType.NATIONAL_ID, "AB1234", 10L, 10L, null, now))
                 .isInstanceOf(NullPointerException.class);
     }
 
@@ -142,7 +142,7 @@ class IdentityVerificationTest {
     void resubmit_WithoutSelfie_Throws() {
         IdentityVerification iv = pending();
         iv.reject(now.plusMinutes(1));
-        assertThatThrownBy(() -> iv.resubmit("KG", DocumentType.NATIONAL_ID, "CD5678", 20L, null, now.plusMinutes(2)))
+        assertThatThrownBy(() -> iv.resubmit("KG", DocumentType.NATIONAL_ID, "CD5678", 20L, 20L, null, now.plusMinutes(2)))
                 .isInstanceOf(NullPointerException.class);
         assertThat(iv.getStatus()).isEqualTo(IdentityVerificationStatus.REJECTED);
     }
@@ -152,7 +152,7 @@ class IdentityVerificationTest {
     void resubmit_RecordsNewSelfie() {
         IdentityVerification iv = pending();
         iv.reject(now.plusMinutes(1));
-        iv.resubmit("KG", DocumentType.NATIONAL_ID, "CD5678", 20L, 21L, now.plusMinutes(2));
+        iv.resubmit("KG", DocumentType.NATIONAL_ID, "CD5678", 20L, 20L, 21L, now.plusMinutes(2));
         assertThat(iv.getCurrentDocumentId()).isEqualTo(20L);
         assertThat(iv.getCurrentSelfieDocumentId()).isEqualTo(21L);
     }
@@ -161,7 +161,7 @@ class IdentityVerificationTest {
     @DisplayName("MVP-004: a pre-selfie PENDING_REVIEW row cannot be approved, but can be rejected")
     void approve_LegacyRowWithoutSelfie_FailsClosed() {
         IdentityVerification legacy = new IdentityVerification(5L, 1L, IdentityVerificationStatus.PENDING_REVIEW, "KG",
-                DocumentType.NATIONAL_ID, "AB1234", 10L, null, now, now, 0L);
+                DocumentType.NATIONAL_ID, "AB1234", 10L, 10L, null, now, now, 0L);
         assertThatThrownBy(() -> legacy.approve(now.plusMinutes(1))).isInstanceOf(IllegalStateException.class);
         assertThat(legacy.getStatus()).isEqualTo(IdentityVerificationStatus.PENDING_REVIEW);
 

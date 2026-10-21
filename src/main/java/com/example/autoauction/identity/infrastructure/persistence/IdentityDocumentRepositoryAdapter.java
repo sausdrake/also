@@ -5,6 +5,7 @@ import com.example.autoauction.identity.domain.port.IdentityDocumentRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.Optional;
 
 @Component
@@ -35,5 +36,11 @@ public class IdentityDocumentRepositoryAdapter implements IdentityDocumentReposi
     @Transactional(readOnly = true)
     public Optional<IdentityDocument> findById(Long id) {
         return jpaRepository.findById(id).map(mapper::toDomain);
+    }
+
+    @Override
+    @Transactional
+    public boolean markConsumed(Long id, OffsetDateTime at) {
+        return jpaRepository.markConsumed(id, at) == 1;
     }
 }

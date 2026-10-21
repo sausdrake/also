@@ -3,9 +3,12 @@ package com.example.autoauction.identity.web;
 import com.example.autoauction.auth.domain.UserPrincipal;
 import com.example.autoauction.auth.infrastructure.security.CurrentUser;
 import com.example.autoauction.identity.application.IdentityVerificationService;
+import com.example.autoauction.identity.domain.DocumentCapturePolicy;
 import com.example.autoauction.identity.domain.DocumentType;
+import com.example.autoauction.identity.domain.IdentityCaptureSide;
 import com.example.autoauction.identity.domain.IdentityVerification;
 import com.example.autoauction.identity.domain.IdentityVerificationHistory;
+import com.example.autoauction.identity.web.dto.CaptureRequirementResponse;
 import com.example.autoauction.identity.web.dto.IdentityDocumentUrlResponse;
 import com.example.autoauction.identity.web.dto.IdentityHistoryEventResponse;
 import com.example.autoauction.identity.web.dto.IdentityStatusResponse;
@@ -25,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -52,8 +56,11 @@ public class IdentityController {
             @Parameter(hidden = true) @CurrentUser UserPrincipal currentUser
     ) {
         Long userId = currentUser.getUserId();
-        log.info("User {} requesting identity document upload slot", userId);
-        var slot = identityVerificationService.requestUploadSlot(userId, request.contentType());
+        log.info("User {} requesting identity capture slot {}", userId, request.side());
+        DocumentType documentType = request.documentType() == null || request.documentType().isBlank()
+                ? null : DocumentType.valueOf(request.documentType());
+        var slot = identityVerificationService.requestUploadSlot(userId, request.contentType(),
+                IdentityCaptureSide.valueOf(request.side()), documentType);
         return ResponseEntity.ok(IdentityUploadUrlResponse.fromSlot(slot));
     }
 
@@ -68,8 +75,17 @@ public class IdentityController {
         log.info("User {} submitting identity verification", userId);
         IdentityVerification iv = identityVerificationService.submit(
                 userId, request.issuingCountry(), documentType, request.rawDocumentNumber(), request.documentStorageKey(),
-                request.selfieStorageKey());
+                request.documentBackStorageKey(), request.selfieStorageKey());
         return ResponseEntity.ok(IdentityStatusResponse.fromDomain(iv));
+    }
+
+    @GetMapping("/capture-requirements")
+    @Operation(summary = "Какие стороны документа нужно сфотографировать для каждого типа документа")
+    public List<CaptureRequirementResponse> getCaptureRequirements() {
+        // KYC-CAPTURE-01: the frontend never hard-codes the rule - DocumentCapturePolicy is the only source
+        return Arrays.stream(DocumentType.values())
+                .map(t -> new CaptureRequirementResponse(t.name(), DocumentCapturePolicy.requiredSides(t).stream().map(Enum::name).toList()))
+                .toList();
     }
 
     @GetMapping("/me")

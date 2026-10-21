@@ -155,14 +155,21 @@ class BusinessCycleE2EPgIntegrationTest extends AbstractPostgresIntegrationTest 
 
     // ------------------------------------------------------------------ steps
 
+    private String capture(Actor user, String slotRequest, int marker) throws Exception {
+        String key = JsonPath.read(postJson("/api/v1/identity/documents/upload-url", user, slotRequest, 200), "$.storageKey");
+        fakeStorageClient.simulateUpload(key, new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) marker}, "image/jpeg");
+        return key;
+    }
+
     private void verifyIdentity(Actor user, Actor admin) throws Exception {
-        String doc = JsonPath.read(postJson("/api/v1/identity/documents/upload-url", user, "{\"contentType\":\"image/jpeg\"}", 200), "$.storageKey");
-        fakeStorageClient.simulateUpload(doc, new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 1}, "image/jpeg");
-        String selfie = JsonPath.read(postJson("/api/v1/identity/documents/upload-url", user, "{\"contentType\":\"image/jpeg\"}", 200), "$.storageKey");
-        fakeStorageClient.simulateUpload(selfie, new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 2}, "image/jpeg");
+        // KYC-CAPTURE-01: an ID card is photographed front and back, plus the live selfie - each its own camera slot
+        String doc = capture(user, "{\"contentType\":\"image/jpeg\",\"side\":\"FRONT\",\"documentType\":\"NATIONAL_ID\"}", 1);
+        String back = capture(user, "{\"contentType\":\"image/jpeg\",\"side\":\"BACK\",\"documentType\":\"NATIONAL_ID\"}", 2);
+        String selfie = capture(user, "{\"contentType\":\"image/jpeg\",\"side\":\"SELFIE\"}", 3);
         String submission = postJson("/api/v1/identity/submissions", user,
                 "{\"issuingCountry\":\"KG\",\"documentType\":\"NATIONAL_ID\",\"rawDocumentNumber\":\"E2E" + user.id() + run
-                        + "\",\"documentStorageKey\":\"" + doc + "\",\"selfieStorageKey\":\"" + selfie + "\"}", 200);
+                        + "\",\"documentStorageKey\":\"" + doc + "\",\"documentBackStorageKey\":\"" + back
+                        + "\",\"selfieStorageKey\":\"" + selfie + "\"}", 200);
         call(post("/api/v1/admin/identity/" + id(submission, "$.id") + "/approve"), admin, 200);
         assertThat((String) JsonPath.read(call(get("/api/v1/identity/me"), user, 200), "$.status")).isEqualTo("VERIFIED");
     }

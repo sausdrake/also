@@ -2,7 +2,9 @@ package com.example.autoauction.identity.application;
 
 import com.example.autoauction.diagnostic.media.domain.port.StorageClient;
 import com.example.autoauction.identity.domain.CanonicalDocumentNumber;
+import com.example.autoauction.identity.domain.DocumentCapturePolicy;
 import com.example.autoauction.identity.domain.DocumentType;
+import com.example.autoauction.identity.domain.IdentityCaptureSide;
 import com.example.autoauction.identity.domain.IdentityDocument;
 import com.example.autoauction.identity.domain.IdentityVerification;
 import com.example.autoauction.identity.domain.IdentityVerificationHistory;
@@ -46,17 +48,20 @@ public class IdentityVerificationService {
     private final IdentityVerificationHistoryRepository historyRepository;
     private final IdentityDocumentRepository documentRepository;
     private final StorageClient storageClient;
+    private final IdentityCaptureVerifier captureVerifier;
     private final Clock clock;
 
     public IdentityVerificationService(IdentityVerificationRepository identityVerificationRepository,
                                         IdentityVerificationHistoryRepository historyRepository,
                                         IdentityDocumentRepository documentRepository,
                                         StorageClient storageClient,
+                                        IdentityCaptureVerifier captureVerifier,
                                         Clock clock) {
         this.identityVerificationRepository = identityVerificationRepository;
         this.historyRepository = historyRepository;
         this.documentRepository = documentRepository;
         this.storageClient = storageClient;
+        this.captureVerifier = captureVerifier;
         this.clock = clock;
     }
 
@@ -67,12 +72,19 @@ public class IdentityVerificationService {
     /**
      * Phase 3.1 §4 step 1: server generates the opaque key and immediately creates the
      * ownership row - the client never chooses or influences the key.
+     *
+     * <p>KYC-CAPTURE-01: the slot is a camera capture of one side (of one document type) - JPEG only, the
+     * content type the presigned PUT is signed with, so storage refuses any other file type.
      */
     @Transactional
-    public IdentityUploadSlot requestUploadSlot(Long userId, String contentType) {
+    public IdentityUploadSlot requestUploadSlot(Long userId, String contentType, IdentityCaptureSide side,
+                                               DocumentType documentType) {
         Objects.requireNonNull(userId, "userId не может быть null");
+        if (!IdentityCaptureVerifier.CAPTURE_CONTENT_TYPE.equals(contentType)) {
+            throw new IllegalArgumentException("Документы и селфи принимаются только как снимок камеры (image/jpeg)");
+        }
         String storageKey = STORAGE_KEY_PREFIX + UUID.randomUUID();
-        IdentityDocument document = new IdentityDocument(storageKey, userId, contentType, null, now());
+        IdentityDocument document = IdentityDocument.captureSlot(storageKey, userId, side, documentType, contentType, now());
         documentRepository.save(document);
         StorageClient.PresignedUpload upload = storageClient.createPresignedUpload(storageKey, contentType, UPLOAD_URL_TTL);
         return new IdentityUploadSlot(storageKey, upload.uploadUrl(), upload.expiresAt());
@@ -81,47 +93,48 @@ public class IdentityVerificationService {
     /**
      * Phase 3.1 §2: the single uniform submission rule. Phase 4 §4: raw value is canonicalized
      * immediately and never persisted.
+     *
+     * <p>KYC-CAPTURE-01: the document is the camera captures its type requires ({@link DocumentCapturePolicy}:
+     * ID card / driver licence = FRONT + BACK, passport = DATA_PAGE only) plus the live selfie (MVP-004);
+     * every capture passes {@link IdentityCaptureVerifier} and is consumed by this submission.
      */
     @Transactional
     public IdentityVerification submit(Long userId, String issuingCountry, DocumentType documentType,
-                                        String rawDocumentNumber, String documentStorageKey, String selfieStorageKey) {
+                                        String rawDocumentNumber, String documentStorageKey,
+                                        String documentBackStorageKey, String selfieStorageKey) {
         if (!SUPPORTED_ISSUING_COUNTRY.equals(issuingCountry)) {
             throw new IllegalArgumentException("Неподдерживаемая страна выдачи документа: " + issuingCountry);
         }
         Objects.requireNonNull(documentType, "documentType не может быть null");
         String canonical = CanonicalDocumentNumber.from(rawDocumentNumber).value();
 
-        // Phase 3.1 §4 step 3: ownership + purpose + existence verification before trusting the key.
-        IdentityDocument document = requireOwnedUpload(userId, documentStorageKey,
-                "Указанный документ не найден", "Документ не принадлежит текущему пользователю",
-                "Файл документа не был загружен");
+        OffsetDateTime at = now();
 
-        // MVP-004: the live selfie (taken through the platform camera) is a separate upload,
-        // validated by exactly the same ownership/existence rules as the document image.
-        if (selfieStorageKey == null || selfieStorageKey.isBlank()) {
-            throw new IllegalArgumentException("Требуется живое селфи, сделанное камерой на платформе");
+        // Phase 3.1 §4 step 3 + KYC-CAPTURE-01: ownership, purpose (side + type), single use, validity, JPEG.
+        IdentityDocument document = captureVerifier.require(userId, documentStorageKey,
+                DocumentCapturePolicy.mainSide(documentType), documentType, at);
+        IdentityDocument back = null;
+        if (DocumentCapturePolicy.requiresBack(documentType)) {
+            back = captureVerifier.require(userId, documentBackStorageKey, IdentityCaptureSide.BACK, documentType, at);
+        } else if (documentBackStorageKey != null && !documentBackStorageKey.isBlank()) {
+            throw new IllegalArgumentException("Для загранпаспорта нужна только страница с данными, без обратной стороны");
         }
-        if (selfieStorageKey.equals(documentStorageKey)) {
-            throw new IllegalArgumentException("Селфи должно быть отдельным снимком, а не файлом документа");
-        }
-        IdentityDocument selfie = requireOwnedUpload(userId, selfieStorageKey,
-                "Указанное селфи не найдено", "Селфи не принадлежит текущему пользователю",
-                "Файл селфи не был загружен");
-        if (selfie.getMimeType() == null || !selfie.getMimeType().startsWith("image/")) {
-            throw new IllegalArgumentException("Селфи должно быть изображением");
-        }
+        // MVP-004: the live selfie taken through the platform camera - its own capture, never a document image.
+        IdentityDocument selfie = captureVerifier.require(userId, selfieStorageKey, IdentityCaptureSide.SELFIE, null, at);
+        Long backId = back == null ? null : back.getId();
+        captureVerifier.consume(back == null ? List.of(document, selfie) : List.of(document, back, selfie), at);
 
         IdentityVerification existing = identityVerificationRepository.findByUserIdWithLock(userId).orElse(null);
 
         if (existing == null) {
             IdentityVerification created = IdentityVerification.firstSubmission(
-                    userId, issuingCountry, documentType, canonical, document.getId(), selfie.getId(), now());
+                    userId, issuingCountry, documentType, canonical, document.getId(), backId, selfie.getId(), now());
             // save() returns the persisted instance carrying the generated id - the mapper
             // reconstructs a NEW IdentityVerification rather than mutating `created` in place, so
             // the return value must be captured, never discarded.
             created = identityVerificationRepository.save(created);
             historyRepository.save(IdentityVerificationHistory.submission(
-                    created.getId(), canonical, document.getId(), now()));
+                    created.getId(), canonical, document.getId(), backId, now()));
             log.info("User {} submitted a new identity verification", userId);
             return created;
         }
@@ -140,24 +153,11 @@ public class IdentityVerificationService {
         }
 
         // REJECTED or REVOKED -> resubmission allowed, unlimited (Phase 2 §5).
-        existing.resubmit(issuingCountry, documentType, canonical, document.getId(), selfie.getId(), now());
+        existing.resubmit(issuingCountry, documentType, canonical, document.getId(), backId, selfie.getId(), now());
         identityVerificationRepository.save(existing);
-        historyRepository.save(IdentityVerificationHistory.submission(existing.getId(), canonical, document.getId(), now()));
+        historyRepository.save(IdentityVerificationHistory.submission(existing.getId(), canonical, document.getId(), backId, now()));
         log.info("User {} resubmitted a new identity verification", userId);
         return existing;
-    }
-
-    private IdentityDocument requireOwnedUpload(Long userId, String storageKey, String notFoundMessage,
-                                                String foreignMessage, String notUploadedMessage) {
-        IdentityDocument document = documentRepository.findByStorageKey(storageKey)
-                .orElseThrow(() -> new IllegalArgumentException(notFoundMessage));
-        if (!document.isOwnedBy(userId)) {
-            throw new SecurityException(foreignMessage);
-        }
-        if (storageClient.headObject(storageKey).isEmpty()) {
-            throw new IllegalArgumentException(notUploadedMessage);
-        }
-        return document;
     }
 
     @Transactional(readOnly = true)

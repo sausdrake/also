@@ -98,7 +98,7 @@ class AdminRediagnosticApiIntegrationTest {
         depositService.createDeposit(seller, new BigDecimal("50000"));
         OffsetDateTime now = OffsetDateTime.now();
         Long doc = identityDocumentRepository.save(new IdentityDocument("identity-documents/rdapi" + System.nanoTime(), seller, "image/jpeg", 1L, now)).getId();
-        IdentityVerification iv = IdentityVerification.firstSubmission(seller, "KG", DocumentType.NATIONAL_ID, "RA" + System.nanoTime(), doc, doc, now);
+        IdentityVerification iv = IdentityVerification.firstSubmission(seller, "KG", DocumentType.NATIONAL_ID, "RA" + System.nanoTime(), doc, doc, doc, now);
         iv.approve(now);
         identityVerificationRepository.save(iv);
 

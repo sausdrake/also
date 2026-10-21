@@ -47,6 +47,9 @@ public class JpaIdentityVerificationEntity {
     @Column(name = "current_selfie_document_id")
     private Long currentSelfieDocumentId;
 
+    @Column(name = "current_document_back_id")   // KYC-CAPTURE-01 / V62
+    private Long currentDocumentBackId;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -76,6 +79,8 @@ public class JpaIdentityVerificationEntity {
     public void setCurrentDocumentId(Long currentDocumentId) { this.currentDocumentId = currentDocumentId; }
     public Long getCurrentSelfieDocumentId() { return currentSelfieDocumentId; }
     public void setCurrentSelfieDocumentId(Long currentSelfieDocumentId) { this.currentSelfieDocumentId = currentSelfieDocumentId; }
+    public Long getCurrentDocumentBackId() { return currentDocumentBackId; }
+    public void setCurrentDocumentBackId(Long currentDocumentBackId) { this.currentDocumentBackId = currentDocumentBackId; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }

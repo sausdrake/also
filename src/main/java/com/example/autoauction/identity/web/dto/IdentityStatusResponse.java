@@ -19,7 +19,9 @@ public record IdentityStatusResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt,
         // MVP-004: false only for submissions made before the live selfie became mandatory
-        boolean selfieProvided
+        boolean selfieProvided,
+        // KYC-CAPTURE-01: true when the back side of an ID card / driver licence was photographed
+        boolean documentBackProvided
 ) {
     public static IdentityStatusResponse fromDomain(IdentityVerification iv) {
         return new IdentityStatusResponse(
@@ -31,6 +33,7 @@ public record IdentityStatusResponse(
                 iv.getCanonicalDocumentNumber(),
                 iv.getCreatedAt(),
                 iv.getUpdatedAt(),
-                iv.getCurrentSelfieDocumentId() != null);
+                iv.getCurrentSelfieDocumentId() != null,
+                iv.getCurrentDocumentBackId() != null);
     }
 }

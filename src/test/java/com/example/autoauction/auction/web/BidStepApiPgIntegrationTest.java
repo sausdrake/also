@@ -82,7 +82,7 @@ class BidStepApiPgIntegrationTest extends AbstractPostgresIntegrationTest {
         Long doc = identityDocumentRepository.save(new IdentityDocument(
                 "identity-documents/" + UUID.randomUUID(), id, "image/jpeg", 1000L, now)).getId();
         IdentityVerification iv = IdentityVerification.firstSubmission(id, "KG", DocumentType.NATIONAL_ID,
-                "K" + System.nanoTime(), doc, doc, now);
+                "K" + System.nanoTime(), doc, doc, doc, now);
         iv.approve(now);
         identityVerificationRepository.save(iv);
         return id;

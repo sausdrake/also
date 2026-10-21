@@ -62,11 +62,15 @@ class IdentitySelfieApiIntegrationTest {
         return SecurityMockMvcRequestPostProcessors.user(TestUserPrincipal.createWithRoles(userId, "u" + userId, roles));
     }
 
-    private String uploadedKey(Long userId) throws Exception {
+    /** KYC-CAPTURE-01: a capture slot for one side (FRONT / BACK of an ID card, or SELFIE). */
+    private String uploadedKey(Long userId, String side) throws Exception {
+        String body = "SELFIE".equals(side)
+                ? "{\"contentType\":\"image/jpeg\",\"side\":\"SELFIE\"}"
+                : "{\"contentType\":\"image/jpeg\",\"side\":\"" + side + "\",\"documentType\":\"NATIONAL_ID\"}";
         String response = mockMvc.perform(post("/api/v1/identity/documents/upload-url")
                         .with(user(userId, "USER"))
                         .contentType("application/json")
-                        .content("{\"contentType\":\"image/jpeg\"}"))
+                        .content(body))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         String key = JsonPath.read(response, "$.storageKey");
@@ -74,9 +78,9 @@ class IdentitySelfieApiIntegrationTest {
         return key;
     }
 
-    private static String submission(String number, String documentKey, String selfieKey) {
+    private static String submission(String number, String documentKey, String backKey, String selfieKey) {
         return "{\"issuingCountry\":\"KG\",\"documentType\":\"NATIONAL_ID\",\"rawDocumentNumber\":\"" + number + "\","
-                + "\"documentStorageKey\":\"" + documentKey + "\""
+                + "\"documentStorageKey\":\"" + documentKey + "\",\"documentBackStorageKey\":\"" + backKey + "\""
                 + (selfieKey == null ? "" : ",\"selfieStorageKey\":\"" + selfieKey + "\"") + "}";
     }
 
@@ -88,10 +92,10 @@ class IdentitySelfieApiIntegrationTest {
     @DisplayName("a submission without a selfie is refused with 400 and creates nothing")
     void submissionWithoutSelfie_400() throws Exception {
         Long userId = createUser("noselfie");
-        String documentKey = uploadedKey(userId);
+        String documentKey = uploadedKey(userId, "FRONT");
 
         mockMvc.perform(post("/api/v1/identity/submissions").with(user(userId, "USER"))
-                        .contentType("application/json").content(submission(number(), documentKey, null)))
+                        .contentType("application/json").content(submission(number(), documentKey, uploadedKey(userId, "BACK"), null)))
                 .andExpect(status().isBadRequest());
 
         assertThat(identityVerificationRepository.findByUserId(userId)).isEmpty();
@@ -101,10 +105,10 @@ class IdentitySelfieApiIntegrationTest {
     @DisplayName("the document image re-sent as the selfie is refused with 400 and creates nothing")
     void documentReusedAsSelfie_400() throws Exception {
         Long userId = createUser("sameimage");
-        String documentKey = uploadedKey(userId);
+        String documentKey = uploadedKey(userId, "FRONT");
 
         mockMvc.perform(post("/api/v1/identity/submissions").with(user(userId, "USER"))
-                        .contentType("application/json").content(submission(number(), documentKey, documentKey)))
+                        .contentType("application/json").content(submission(number(), documentKey, uploadedKey(userId, "BACK"), documentKey)))
                 .andExpect(status().isBadRequest());
 
         assertThat(identityVerificationRepository.findByUserId(userId)).isEmpty();
@@ -115,14 +119,16 @@ class IdentitySelfieApiIntegrationTest {
     void fullFlow_adminSeesSelfieAndApproves() throws Exception {
         Long userId = createUser("selfieflow");
         Long adminId = createUser("selfieadmin");
-        String documentKey = uploadedKey(userId);
-        String selfieKey = uploadedKey(userId);
+        String documentKey = uploadedKey(userId, "FRONT");
+        String backKey = uploadedKey(userId, "BACK");
+        String selfieKey = uploadedKey(userId, "SELFIE");
 
         String statusJson = mockMvc.perform(post("/api/v1/identity/submissions").with(user(userId, "USER"))
-                        .contentType("application/json").content(submission(number(), documentKey, selfieKey)))
+                        .contentType("application/json").content(submission(number(), documentKey, backKey, selfieKey)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PENDING_REVIEW"))
                 .andExpect(jsonPath("$.selfieProvided").value(true))
+                .andExpect(jsonPath("$.documentBackProvided").value(true))
                 .andReturn().getResponse().getContentAsString();
         Integer id = JsonPath.read(statusJson, "$.id");
 
@@ -136,6 +142,10 @@ class IdentitySelfieApiIntegrationTest {
                         .with(user(adminId, "ADMIN")))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.url");
         assertThat(selfieUrl).contains(selfieKey).isNotEqualTo(documentUrl);
+        String backUrl = JsonPath.read(mockMvc.perform(get("/api/v1/admin/identity/{id}/document-back-url", id)
+                        .with(user(adminId, "ADMIN")))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.url");
+        assertThat(backUrl).contains(backKey).isNotEqualTo(documentUrl);
 
         mockMvc.perform(post("/api/v1/admin/identity/{id}/approve", id).with(user(adminId, "ADMIN")))
                 .andExpect(status().isOk());
@@ -149,7 +159,7 @@ class IdentitySelfieApiIntegrationTest {
         Long userId = createUser("selfieowner");
         String statusJson = mockMvc.perform(post("/api/v1/identity/submissions").with(user(userId, "USER"))
                         .contentType("application/json")
-                        .content(submission(number(), uploadedKey(userId), uploadedKey(userId))))
+                        .content(submission(number(), uploadedKey(userId, "FRONT"), uploadedKey(userId, "BACK"), uploadedKey(userId, "SELFIE"))))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         Integer id = JsonPath.read(statusJson, "$.id");
 
@@ -166,7 +176,7 @@ class IdentitySelfieApiIntegrationTest {
         Long docId = documentRepository.save(new IdentityDocument(
                 "identity-documents/legacy-" + System.nanoTime(), userId, "image/jpeg", 3L, now)).getId();
         IdentityVerification legacy = identityVerificationRepository.save(new IdentityVerification(null, userId,
-                IdentityVerificationStatus.PENDING_REVIEW, "KG", DocumentType.NATIONAL_ID, number(), docId, null,
+                IdentityVerificationStatus.PENDING_REVIEW, "KG", DocumentType.NATIONAL_ID, number(), docId, docId, null,
                 now, now, null));
 
         mockMvc.perform(get("/api/v1/admin/identity/{id}", legacy.getId()).with(user(adminId, "ADMIN")))

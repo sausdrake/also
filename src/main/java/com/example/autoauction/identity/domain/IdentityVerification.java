@@ -28,6 +28,8 @@ public class IdentityVerification {
     private String canonicalDocumentNumber;
     private Long currentDocumentId;
     private Long currentSelfieDocumentId;
+    /** KYC-CAPTURE-01: back side of an ID card / driver licence; null for a passport and for legacy rows. */
+    private Long currentDocumentBackId;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
     private Long version;
@@ -35,10 +37,12 @@ public class IdentityVerification {
     /**
      * First-ever submission for a user who has no existing row. MVP-004: every submission carries
      * both the identity-document image and the live selfie taken through the platform camera.
+     * KYC-CAPTURE-01: plus the back side exactly when the document type has one.
      */
     public static IdentityVerification firstSubmission(Long userId, String issuingCountry, DocumentType documentType,
                                                          String canonicalDocumentNumber, Long documentId,
-                                                         Long selfieDocumentId, OffsetDateTime now) {
+                                                         Long documentBackId, Long selfieDocumentId, OffsetDateTime now) {
+        requireBackSideShape(documentType, documentBackId);
         IdentityVerification iv = new IdentityVerification(userId);
         iv.status = IdentityVerificationStatus.PENDING_REVIEW;
         iv.issuingCountry = Objects.requireNonNull(issuingCountry, "issuingCountry не может быть null");
@@ -46,6 +50,7 @@ public class IdentityVerification {
         iv.canonicalDocumentNumber = Objects.requireNonNull(canonicalDocumentNumber, "canonicalDocumentNumber не может быть null");
         iv.currentDocumentId = Objects.requireNonNull(documentId, "documentId не может быть null");
         iv.currentSelfieDocumentId = Objects.requireNonNull(selfieDocumentId, "selfieDocumentId не может быть null");
+        iv.currentDocumentBackId = documentBackId;
         iv.createdAt = now;
         iv.updatedAt = now;
         iv.version = 0L;
@@ -59,8 +64,8 @@ public class IdentityVerification {
     /** Reconstruction constructor, used exclusively by the persistence mapper. */
     public IdentityVerification(Long id, Long userId, IdentityVerificationStatus status, String issuingCountry,
                                  DocumentType documentType, String canonicalDocumentNumber, Long currentDocumentId,
-                                 Long currentSelfieDocumentId, OffsetDateTime createdAt, OffsetDateTime updatedAt,
-                                 Long version) {
+                                 Long currentDocumentBackId, Long currentSelfieDocumentId, OffsetDateTime createdAt,
+                                 OffsetDateTime updatedAt, Long version) {
         this.id = id;
         this.userId = Objects.requireNonNull(userId, "userId не может быть null");
         this.status = Objects.requireNonNull(status, "status не может быть null");
@@ -68,6 +73,7 @@ public class IdentityVerification {
         this.documentType = documentType;
         this.canonicalDocumentNumber = canonicalDocumentNumber;
         this.currentDocumentId = currentDocumentId;
+        this.currentDocumentBackId = currentDocumentBackId;
         this.currentSelfieDocumentId = currentSelfieDocumentId;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -83,7 +89,7 @@ public class IdentityVerification {
      * identity) or {@code VERIFIED} - both of which must fail closed with no state change.
      */
     public void resubmit(String issuingCountry, DocumentType documentType, String canonicalDocumentNumber,
-                          Long documentId, Long selfieDocumentId, OffsetDateTime now) {
+                          Long documentId, Long documentBackId, Long selfieDocumentId, OffsetDateTime now) {
         if (status != IdentityVerificationStatus.REJECTED && status != IdentityVerificationStatus.REVOKED) {
             throw new IllegalStateException(String.format(
                     "Невозможно отправить новую заявку для пользователя %d в статусе '%s'. Повторная отправка доступна только после REJECTED или REVOKED",
@@ -91,13 +97,30 @@ public class IdentityVerification {
         }
         // MVP-004: validated before any mutation - a resubmission without a selfie changes nothing.
         Objects.requireNonNull(selfieDocumentId, "selfieDocumentId не может быть null");
+        requireBackSideShape(Objects.requireNonNull(documentType, "documentType не может быть null"), documentBackId);
         this.status = IdentityVerificationStatus.PENDING_REVIEW;
         this.issuingCountry = Objects.requireNonNull(issuingCountry, "issuingCountry не может быть null");
         this.documentType = Objects.requireNonNull(documentType, "documentType не может быть null");
         this.canonicalDocumentNumber = Objects.requireNonNull(canonicalDocumentNumber, "canonicalDocumentNumber не может быть null");
         this.currentDocumentId = Objects.requireNonNull(documentId, "documentId не может быть null");
         this.currentSelfieDocumentId = selfieDocumentId;
+        this.currentDocumentBackId = documentBackId;
         this.updatedAt = now;
+    }
+
+    /**
+     * KYC-CAPTURE-01: an ID card / driver licence carries its back side, a passport never does
+     * ({@link DocumentCapturePolicy}).
+     */
+    private static void requireBackSideShape(DocumentType documentType, Long documentBackId) {
+        Objects.requireNonNull(documentType, "documentType не может быть null");
+        boolean requiresBack = DocumentCapturePolicy.requiresBack(documentType);
+        if (requiresBack && documentBackId == null) {
+            throw new IllegalArgumentException("Для этого документа нужна фотография обратной стороны");
+        }
+        if (!requiresBack && documentBackId != null) {
+            throw new IllegalArgumentException("Для загранпаспорта нужна только страница с данными, без обратной стороны");
+        }
     }
 
     /** True if the given identity exactly matches this row's current identity. */
@@ -120,6 +143,13 @@ public class IdentityVerification {
         if (currentSelfieDocumentId == null) {
             throw new IllegalStateException(String.format(
                     "Невозможно подтвердить заявку пользователя %d: в ней нет живого селфи. "
+                            + "Отклоните заявку, чтобы пользователь отправил её повторно", userId));
+        }
+        // KYC-CAPTURE-01: an ID card / driver licence is approved only with both sides - a submission made
+        // before the back side became mandatory must be rejected and resubmitted (same rule as the selfie).
+        if (documentType != null && DocumentCapturePolicy.requiresBack(documentType) && currentDocumentBackId == null) {
+            throw new IllegalStateException(String.format(
+                    "Невозможно подтвердить заявку пользователя %d: нет фотографии обратной стороны документа. "
                             + "Отклоните заявку, чтобы пользователь отправил её повторно", userId));
         }
         this.status = IdentityVerificationStatus.VERIFIED;
@@ -156,6 +186,7 @@ public class IdentityVerification {
     public String getCanonicalDocumentNumber() { return canonicalDocumentNumber; }
     public Long getCurrentDocumentId() { return currentDocumentId; }
     public Long getCurrentSelfieDocumentId() { return currentSelfieDocumentId; }
+    public Long getCurrentDocumentBackId() { return currentDocumentBackId; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }
     public Long getVersion() { return version; }

@@ -26,3 +26,11 @@ export const kycCanSubmit = (s: KycState) =>
   s === null || (s.known && (s.value === 'REJECTED' || s.value === 'REVOKED'));
 
 export const kycIsVerified = (s: KycState) => s !== null && s.known && s.value === 'VERIFIED';
+
+/** KYC-CAPTURE-01: how each camera step is named to the user (which steps a document needs comes from the backend). */
+export const CAPTURE_SIDE_LABELS: Record<'FRONT' | 'BACK' | 'DATA_PAGE' | 'SELFIE', string> = {
+  FRONT: 'Лицевая сторона',
+  BACK: 'Обратная сторона',
+  DATA_PAGE: 'Страница с фотографией и данными',
+  SELFIE: 'Селфи',
+};

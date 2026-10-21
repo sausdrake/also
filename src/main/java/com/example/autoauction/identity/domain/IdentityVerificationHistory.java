@@ -29,6 +29,8 @@ public class IdentityVerificationHistory {
     private final RevocationReason revocationReasonCode;
     private final String reasonText;
     private final OffsetDateTime occurredAt;
+    /** KYC-CAPTURE-01: the back-side image a SUBMISSION carried (ID card / driver licence); null otherwise. */
+    private Long documentBackReferenceId;
 
     private IdentityVerificationHistory(Long identityVerificationId, IdentityEventType eventType,
                                          String canonicalDocumentNumber, Long documentReferenceId,
@@ -52,6 +54,19 @@ public class IdentityVerificationHistory {
         this(identityVerificationId, eventType, canonicalDocumentNumber, documentReferenceId, actorAdminId,
                 revocationReasonCode, reasonText, occurredAt);
         this.id = id;
+    }
+
+    /** Reconstruction constructor with the back-side reference (KYC-CAPTURE-01), used by the persistence mapper. */
+    public IdentityVerificationHistory(Long id, Long identityVerificationId, IdentityEventType eventType,
+                                        String canonicalDocumentNumber, Long documentReferenceId,
+                                        Long documentBackReferenceId, Long actorAdminId,
+                                        RevocationReason revocationReasonCode, String reasonText, OffsetDateTime occurredAt) {
+        this(id, identityVerificationId, eventType, canonicalDocumentNumber, documentReferenceId, actorAdminId,
+                revocationReasonCode, reasonText, occurredAt);
+        if (documentBackReferenceId != null && eventType != IdentityEventType.SUBMISSION) {
+            throw new IllegalArgumentException("documentBackReferenceId допустим только для SUBMISSION");
+        }
+        this.documentBackReferenceId = documentBackReferenceId;
     }
 
     /**
@@ -128,8 +143,17 @@ public class IdentityVerificationHistory {
 
     public static IdentityVerificationHistory submission(Long identityVerificationId, String canonicalDocumentNumber,
                                                            Long documentReferenceId, OffsetDateTime occurredAt) {
-        return new IdentityVerificationHistory(identityVerificationId, IdentityEventType.SUBMISSION,
+        return submission(identityVerificationId, canonicalDocumentNumber, documentReferenceId, null, occurredAt);
+    }
+
+    /** KYC-CAPTURE-01: a submission with its back-side image (null for a passport). */
+    public static IdentityVerificationHistory submission(Long identityVerificationId, String canonicalDocumentNumber,
+                                                           Long documentReferenceId, Long documentBackReferenceId,
+                                                           OffsetDateTime occurredAt) {
+        IdentityVerificationHistory event = new IdentityVerificationHistory(identityVerificationId, IdentityEventType.SUBMISSION,
                 canonicalDocumentNumber, documentReferenceId, null, null, null, occurredAt);
+        event.documentBackReferenceId = documentBackReferenceId;
+        return event;
     }
 
     public static IdentityVerificationHistory approval(Long identityVerificationId, String canonicalDocumentNumber,
@@ -162,6 +186,7 @@ public class IdentityVerificationHistory {
     public IdentityEventType getEventType() { return eventType; }
     public String getCanonicalDocumentNumber() { return canonicalDocumentNumber; }
     public Long getDocumentReferenceId() { return documentReferenceId; }
+    public Long getDocumentBackReferenceId() { return documentBackReferenceId; }
     public Long getActorAdminId() { return actorAdminId; }
     public RevocationReason getRevocationReasonCode() { return revocationReasonCode; }
     public String getReasonText() { return reasonText; }

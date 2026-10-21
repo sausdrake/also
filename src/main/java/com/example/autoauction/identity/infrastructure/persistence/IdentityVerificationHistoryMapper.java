@@ -8,7 +8,7 @@ public class IdentityVerificationHistoryMapper {
 
     public JpaIdentityVerificationHistoryEntity toEntity(IdentityVerificationHistory domain) {
         if (domain == null) return null;
-        return new JpaIdentityVerificationHistoryEntity(
+        JpaIdentityVerificationHistoryEntity entity = new JpaIdentityVerificationHistoryEntity(
                 domain.getId(),
                 domain.getIdentityVerificationId(),
                 domain.getEventType(),
@@ -18,6 +18,8 @@ public class IdentityVerificationHistoryMapper {
                 domain.getRevocationReasonCode(),
                 domain.getReasonText(),
                 domain.getOccurredAt());
+        entity.setDocumentBackReferenceId(domain.getDocumentBackReferenceId());
+        return entity;
     }
 
     public IdentityVerificationHistory toDomain(JpaIdentityVerificationHistoryEntity entity) {
@@ -28,6 +30,7 @@ public class IdentityVerificationHistoryMapper {
                 entity.getEventType(),
                 entity.getCanonicalDocumentNumber(),
                 entity.getDocumentReferenceId(),
+                entity.getDocumentBackReferenceId(),
                 entity.getActorAdminId(),
                 entity.getRevocationReasonCode(),
                 entity.getReasonText(),
