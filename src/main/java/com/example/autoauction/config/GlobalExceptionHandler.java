@@ -5,6 +5,7 @@ package com.example.autoauction.config;
 import com.example.autoauction.auction.application.RateLimitException;
 import com.example.autoauction.auction.application.TrustedParticipantRequiredException;
 import com.example.autoauction.auth.application.RegistrationConflictException;
+import com.example.autoauction.auth.application.TelegramAuthException;
 import com.example.autoauction.deposit.domain.InsufficientFundsException;
 import com.example.autoauction.identity.application.IdentityVerificationRequiredException;
 import com.example.autoauction.policy.application.PolicyConflictException;
@@ -229,6 +230,24 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(error);
+    }
+
+    // AUTH-TELEGRAM-01: a Telegram sign-in / link refusal - its own safe code and message, never the provider's text
+    @ExceptionHandler(TelegramAuthException.class)
+    public ResponseEntity<Map<String, Object>> handleTelegramAuth(TelegramAuthException e) {
+        log.warn("Telegram auth refused: {}", e.getReason().code());
+
+        Map<String, Object> error = new HashMap<>();
+        error.put("timestamp", java.time.LocalDateTime.now().toString());
+        error.put("status", e.getReason().status().value());
+        error.put("error", e.getReason().status().getReasonPhrase());
+        error.put("code", e.getReason().code());
+        error.put("message", e.getMessage());
+
+        return ResponseEntity
+                .status(e.getReason().status())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(error);
     }

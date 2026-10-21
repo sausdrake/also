@@ -2,18 +2,12 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { parseApiError } from '../api/errors';
+import { homePathFor, sessionUserFromToken } from '../auth/session';
 import { BrandLogo } from '../components/brand/BrandLogo';
+import { TelegramLoginButton } from '../components/auth/TelegramLoginButton';
 import { useAuthStore } from '../store/authStore';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
-
-function decodePayload(token: string): Record<string, any> | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    return JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-  } catch { return null; }
-}
 
 export const LoginPage = () => {
   const [username, setUsername] = useState('');
@@ -37,26 +31,10 @@ export const LoginPage = () => {
 
       if (!accessToken) throw new Error('Токен не получен');
 
-      const payload = decodePayload(accessToken);
-      const roles: string[] = payload?.roles ?? payload?.authorities ?? [];
-      const user = {
-        id: payload?.userId ?? payload?.sub ?? 0,
-        username: payload?.username ?? username,
-        email: payload?.email ?? '',
-        roles,
-      };
-
+      const user = sessionUserFromToken(accessToken, username);
       login(user, accessToken, refreshToken);
-
       // Редирект по роли
-      const normalized = roles.map(r => r.replace('ROLE_', '').toUpperCase());
-      if (normalized.includes('ADMIN')) {
-        navigate('/admin');
-      } else if (normalized.includes('DIAGNOSTIC')) {
-        navigate('/diagnostic');
-      } else {
-        navigate('/');
-      }
+      navigate(homePathFor(user.roles));
     } catch (err) {
       // FE-UX-01: every authentication failure is one masked 401 "Invalid username or password" on
       // the backend (it does not reveal whether the account exists or is disabled) - say it in Russian.
@@ -76,6 +54,9 @@ export const LoginPage = () => {
         </div>
 
         {notice && <div role="status" className="text-green-700 text-sm text-center bg-green-50 border border-green-200 rounded-lg p-3">{notice}</div>}
+
+        {/* AUTH-TELEGRAM-01: Telegram-first - the same button signs in and creates an account */}
+        <TelegramLoginButton />
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-xl shadow-sm space-y-3">

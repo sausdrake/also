@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { apiErrorMessage } from '../api/errors';
+import { TelegramLoginButton } from '../components/auth/TelegramLoginButton';
 
 export const RegisterPage = () => {
   const [username, setUsername] = useState('');
@@ -57,6 +58,9 @@ export const RegisterPage = () => {
             Регистрация
           </h2>
         </div>
+
+        {/* AUTH-TELEGRAM-01: no email, phone or password needed - Telegram creates the account */}
+        <TelegramLoginButton label="Продолжить с Telegram" />
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">

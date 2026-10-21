@@ -19,6 +19,7 @@ import { formatDateTime } from '../utils/formatDate';
 import { depositTxTypeLabel } from '../utils/depositTransactionLabels';
 import { RequestVehicleStatus } from '../components/seller/RequestVehicleStatus';
 import { IdentityVerificationTab } from '../components/identity/IdentityVerificationTab';
+import { TelegramLinkCard } from '../components/auth/TelegramLinkCard';
 
 // ─────────────────── Deposit Tab ───────────────────
 
@@ -869,6 +870,7 @@ function ProfileTab() {
           <p className="text-sm text-gray-500">Email</p>
           <p className="font-medium">{user?.email ?? '—'}</p>
         </div>
+        <TelegramLinkCard />
         <div>
           <p className="text-sm text-gray-500">Роли</p>
           <div className="flex gap-2 mt-1">

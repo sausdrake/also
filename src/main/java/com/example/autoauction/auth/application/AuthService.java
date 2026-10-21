@@ -224,6 +224,22 @@ public class AuthService {
         }
     }
 
+    // ==================== ВХОД ЧЕРЕЗ ВНЕШНЮЮ ИДЕНТИЧНОСТЬ ====================
+
+    /**
+     * AUTH-TELEGRAM-01: the same AlSo access + refresh tokens a password login issues, for an account whose
+     * external identity (Telegram) the caller has already validated. The account's own roles go into the token;
+     * an inactive account is refused exactly like at password login.
+     */
+    @Transactional
+    public AuthResponse issueTokens(User user) {
+        if (!user.isActive()) {
+            throw new DisabledException("User account is inactive");
+        }
+        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getUsername());
+        return new AuthResponse(generateAccessToken(userDetails, user), generateAndSaveRefreshToken(user));
+    }
+
     // ==================== ОБНОВЛЕНИЕ ТОКЕНА ====================
 
     @Transactional

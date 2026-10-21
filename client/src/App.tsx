@@ -4,6 +4,7 @@ import { Header } from './components/Header';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { TelegramCallbackPage } from './pages/TelegramCallbackPage';
 import { ForbiddenPage } from './pages/ForbiddenPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -38,6 +39,7 @@ function AppContent() {
           {/* Публичные маршруты */}
           <Route path="/login"    element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/auth/telegram/callback" element={<TelegramCallbackPage />} />
           <Route path="/forbidden" element={<ForbiddenPage />} />
 
           {/* Публичная лента */}

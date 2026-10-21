@@ -4,7 +4,8 @@ import { persist } from 'zustand/middleware';
 interface AuthUser {
   id: number;
   username: string;
-  email: string;
+  /** AUTH-TELEGRAM-01: optional - an account created with Telegram has no email. */
+  email: string | null;
   roles: string[];
 }
 

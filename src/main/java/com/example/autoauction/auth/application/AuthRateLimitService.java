@@ -37,8 +37,10 @@ public class AuthRateLimitService {
 
     static final int LOGIN_PER_MINUTE = 5;
     static final int REGISTER_PER_MINUTE = 3;
+    /** AUTH-TELEGRAM-01: Telegram sign-in start + callback, per IP (one sign-in = 2 requests). */
+    static final int TELEGRAM_PER_MINUTE = 10;
 
-    public enum Scope { LOGIN, REGISTER }
+    public enum Scope { LOGIN, REGISTER, TELEGRAM }
 
     // Bucket + timestamp последнего использования для eviction
     private final Map<String, BucketEntry> buckets = new ConcurrentHashMap<>();
@@ -82,6 +84,7 @@ public class AuthRateLimitService {
         int capacity = switch (scope) {
             case LOGIN -> LOGIN_PER_MINUTE;
             case REGISTER -> REGISTER_PER_MINUTE;
+            case TELEGRAM -> TELEGRAM_PER_MINUTE;
         };
         Bandwidth limit = Bandwidth.builder()
                 .capacity(capacity)

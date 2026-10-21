@@ -19,7 +19,7 @@ public class JpaUserEntity {
     @Column(unique = true, nullable = false, length = 50)
     private String username;
 
-    @Column(unique = true, nullable = false)
+    @Column(unique = true)   // AUTH-TELEGRAM-01 (V63): optional - a Telegram account has no email
     private String email;
 
     @Column(name = "password_hash", nullable = false)
