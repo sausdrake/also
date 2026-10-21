@@ -475,6 +475,14 @@ public class AdminAuctionService {
     public Map<String, Object> forceUnfreezeAll(Long auctionId) {
         Auction auction = auctionRepository.findById(auctionId)
                 .orElseThrow(() -> new IllegalArgumentException("Аукцион не найден: " + auctionId));
+        // BALANCE-01: a lot that still takes bids (ACTIVE) or Buy Now (CREATED) must keep every
+        // participant's deposit frozen - BidService treats an existing participant row as "deposit
+        // already frozen", so unfreezing here would let that participant keep bidding without one.
+        if (auction.getStatus() == AuctionStatus.CREATED || auction.getStatus() == AuctionStatus.ACTIVE) {
+            throw new IllegalStateException(String.format(
+                    "Нельзя принудительно размораживать депозиты аукциона в статусе '%s': аукцион ещё принимает ставки",
+                    auction.getStatus()));
+        }
         List<Long> userIds = participantRepository.getParticipants(auctionId);
         int count = 0;
         for (Long userId : userIds) {
