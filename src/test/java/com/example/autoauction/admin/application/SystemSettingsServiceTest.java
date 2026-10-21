@@ -23,6 +23,31 @@ import static org.mockito.Mockito.*;
 @DisplayName("Тесты SystemSettingsService")
 class SystemSettingsServiceTest {
 
+    @Nested
+    @DisplayName("DEPOSIT-01: participation deposit value")
+    class ParticipationDepositValidationTests {
+
+        @org.junit.jupiter.params.ParameterizedTest
+        @org.junit.jupiter.params.provider.CsvSource({"10000,10000.00", "' 15000 ',15000.00", "0.01,0.01", "2500.5,2500.50",
+                "1.230,1.23", "99999999.99,99999999.99", "1e3,1000.00"})
+        void acceptedAndNormalised(String in, String stored) {
+            org.assertj.core.api.Assertions.assertThat(SystemSettingsService.validParticipationDeposit(in)).isEqualTo(stored);
+        }
+
+        @org.junit.jupiter.params.ParameterizedTest
+        @org.junit.jupiter.params.provider.ValueSource(strings = {"0", "0.00", "-1", "abc", "", "  ", "1.234", "100000000", "99999999.991", "NaN", "Infinity"})
+        void refused(String in) {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> SystemSettingsService.validParticipationDeposit(in))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Депозит для участия");
+        }
+
+        @Test
+        void nullRefused() {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> SystemSettingsService.validParticipationDeposit(null))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
     @Mock
     private JdbcTemplate jdbc;
 

@@ -43,13 +43,14 @@ beforeEach(() => {
 });
 
 describe('FE-SETTINGS-01: only live settings', () => {
-  it('shows exactly the three settings the backend reads', async () => {
+  it('shows exactly the four settings the backend reads (DEPOSIT-01 added the participation deposit)', async () => {
     mockSettings({ ...STORED });
     renderSettings();
     expect(await screen.findByLabelText(/Стоимость диагностики/)).toHaveValue(3000);
     expect(screen.getByLabelText(/Залог для диагностики/)).toHaveValue(10000);
     expect(screen.getByLabelText(/Подтверждение аукциона/)).toHaveValue(24);
-    expect(screen.getAllByRole('spinbutton')).toHaveLength(3);
+    expect(screen.getByLabelText(/Депозит для участия в аукционах/)).toBeInTheDocument();
+    expect(screen.getAllByRole('spinbutton')).toHaveLength(4);
     for (const dead of [/Депозит для аукциона/, /Минимальный шаг ставки/, /Видимость завершённых/, /Комиссия/]) {
       expect(screen.queryByText(dead)).not.toBeInTheDocument();
     }

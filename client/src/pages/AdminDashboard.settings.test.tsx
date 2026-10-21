@@ -21,6 +21,7 @@ const stored = {
   deposit_percent: '1',
   default_bid_step_percent: '1',
   diagnostic_deposit_amount: '10000',
+  auction_participation_deposit_amount: '10000.00',   // DEPOSIT-01: set, so only the fee is "Не задано"
   auction_confirm_hours: '24',
   completed_auction_visibility_hours: '24',
 };
@@ -61,7 +62,7 @@ describe('AdminDashboard SettingsPage - diagnostic fee', () => {
     // FE-SETTINGS-01: only the settings the backend reads are offered and sent; the dead rows
     // (deposit_percent, default_bid_step_percent, completed_auction_visibility_hours) stay untouched.
     expect(apiPut).toHaveBeenCalledWith('/admin/settings',
-      { diagnostic_deposit_amount: '10000', auction_confirm_hours: '24', diagnostic_fee_amount: '4000' });
+      { diagnostic_deposit_amount: '10000', auction_participation_deposit_amount: '10000.00', auction_confirm_hours: '24', diagnostic_fee_amount: '4000' });
     expect(await screen.findByText('Настройки сохранены')).toBeInTheDocument();
   });
 

@@ -181,7 +181,8 @@ class BusinessCycleE2EPgIntegrationTest extends AbstractPostgresIntegrationTest 
         Actor diagnostician = staff("e2ediag", "DIAGNOSTIC");
 
         call(put("/api/v1/admin/settings").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"diagnostic_fee_amount\":\"4000\",\"diagnostic_deposit_amount\":\"10000\"}"), adminA, 200);
+                .content("{\"diagnostic_fee_amount\":\"4000\",\"diagnostic_deposit_amount\":\"10000\""
+                        + ",\"auction_participation_deposit_amount\":\"20000\"}"), adminA, 200);   // DEPOSIT-01: global deposit
         String draft = postJson("/api/v1/admin/policy/drafts", adminA, "{\"commissionRate\":0.05}", 201);
         postJson("/api/v1/admin/policy/drafts/" + id(draft, "$.id") + "/publish", adminB,
                 "{\"observedConfigurationRevision\":" + id(draft, "$.configurationRevision") + "}", 200);
@@ -235,7 +236,7 @@ class BusinessCycleE2EPgIntegrationTest extends AbstractPostgresIntegrationTest 
         OffsetDateTime now = OffsetDateTime.now();
         DateTimeFormatter iso = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
         String auction = postJson("/api/v1/admin/auctions", adminA, "{\"vehicleId\":" + vehicleId
-                + ",\"startingPrice\":100000,\"minBidStep\":1000,\"requiredDepositAmount\":20000"
+                + ",\"startingPrice\":100000,\"minBidStep\":1000"
                 + ",\"startTime\":\"" + now.plusMinutes(1).format(iso) + "\",\"endTime\":\"" + now.plusDays(3).format(iso)
                 + "\",\"mainPhotoUrl\":\"https://media.example/e2e.jpg\"}", 201);
         Long auctionId = id(auction, "$.id");

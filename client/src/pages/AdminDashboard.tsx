@@ -2149,10 +2149,10 @@ function AuctionsPage() {
   const [form, setForm] = useState({
     vehicleId: '', startingPrice: '', minBidStep: '',
     startTime: '', endTime: '', buyNowPrice: '', reservePrice: '',
-    // FE-AUCTION-01: entered by the admin for each lot (AuctionCreateRequest.requiredDepositAmount);
-    // no default - BidService refuses every bid and Buy Now on a lot without it.
-    requiredDepositAmount: '',
   });
+  // DEPOSIT-01 (BD-01): the participation deposit is the global setting the server snapshots at creation -
+  // shown here, never entered. undefined = loading, null = not set (creation is refused), '' = load failed.
+  const [participationDeposit, setParticipationDeposit] = useState<string | null | undefined>(undefined);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [auctionPhotos, setAuctionPhotos] = useState<string[]>([]);
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -2176,9 +2176,17 @@ function AuctionsPage() {
     .then(r => { setVehicles(Array.isArray(r.data) ? r.data : (r.data.content || [])); setVehiclesError(''); })
     .catch(e => setVehiclesError(apiErrorMessage(e, 'Не удалось загрузить одобренные автомобили')));
 
+  const loadParticipationDeposit = () => api.get('/admin/settings')
+    .then(r => {
+      const v = r.data?.auction_participation_deposit_amount;
+      setParticipationDeposit(typeof v === 'string' && v.trim() && Number(v) > 0 ? v : null);
+    })
+    .catch(() => setParticipationDeposit(''));
+
   useEffect(() => {
     loadAuctions();
     loadVehicles();
+    loadParticipationDeposit();
     api.get('/admin/users?size=500')
       .then(r => {
         const list: any[] = Array.isArray(r.data) ? r.data : (r.data.content || []);
@@ -2278,10 +2286,6 @@ function AuctionsPage() {
     if (sp > 999_999_999) errs.startingPrice = 'Слишком большая сумма';
     const step = parseFloat(form.minBidStep);
     if (!form.minBidStep || isNaN(step) || step <= 0) errs.minBidStep = 'Введите шаг ставки';
-    const deposit = Number(form.requiredDepositAmount);
-    if (!form.requiredDepositAmount.trim() || !Number.isFinite(deposit) || deposit <= 0)
-      errs.requiredDepositAmount = 'Укажите депозит для участия (больше 0)';
-    else if (deposit > 999_999_999) errs.requiredDepositAmount = 'Слишком большая сумма';
     if (!form.startTime) errs.startTime = 'Укажите дату начала';
     if (!form.endTime) errs.endTime = 'Укажите дату окончания';
     if (form.startTime && form.endTime && form.startTime >= form.endTime)
@@ -2332,13 +2336,12 @@ function AuctionsPage() {
         endTime: new Date(form.endTime).toISOString(),
         buyNowPrice: form.buyNowPrice ? parseFloat(form.buyNowPrice) : null,
         reservePrice: form.reservePrice ? parseFloat(form.reservePrice) : null,
-        requiredDepositAmount: Number(form.requiredDepositAmount),
         mainPhotoUrl,
         additionalPhotoUrls,
       });
       notify('Аукцион создан');
       setShowCreate(false);
-      setForm({ vehicleId: '', startingPrice: '', minBidStep: '', startTime: '', endTime: '', buyNowPrice: '', reservePrice: '', requiredDepositAmount: '' });
+      setForm({ vehicleId: '', startingPrice: '', minBidStep: '', startTime: '', endTime: '', buyNowPrice: '', reservePrice: '' });
       setAuctionPhotos([]);
       loadAuctions();
     } catch (e) { notify(apiErrorMessage(e, 'Не удалось создать аукцион'), true); }
@@ -2395,7 +2398,6 @@ function AuctionsPage() {
                   { f: 'minBidStep',    label: 'Шаг ставки *' },
                   { f: 'reservePrice',  label: 'Резервная цена (опц.)' },
                   { f: 'buyNowPrice',   label: 'Buy Now (опц.)' },
-                  { f: 'requiredDepositAmount', label: 'Депозит для участия *' },
                 ].map(({ f, label }) => (
                   <div key={f}>
                     <label className="text-xs text-gray-500 mb-1 block">{label}</label>
@@ -2406,10 +2408,24 @@ function AuctionsPage() {
                     {(formErrors as any)[f] && <p className="text-red-500 text-xs mt-0.5">{(formErrors as any)[f]}</p>}
                   </div>
                 ))}
-                <p className="col-span-2 text-xs text-gray-400 -mt-1">
-                  Депозит для участия — фиксированная сумма для этого лота (не процент от цены).
-                  Без него ставки и Buy Now на лоте невозможны.
-                </p>
+                <div className="col-span-2 text-xs" data-testid="participation-deposit">
+                  {participationDeposit === undefined && <p className="text-gray-400">Загрузка депозита для участия…</p>}
+                  {participationDeposit === '' && (
+                    <p className="rounded-lg bg-red-50 text-red-700 px-3 py-1.5">Не удалось загрузить депозит для участия.{' '}
+                      <button type="button" onClick={loadParticipationDeposit} className="underline">Повторить</button></p>
+                  )}
+                  {participationDeposit === null && (
+                    <p className="rounded-lg bg-amber-50 text-amber-800 px-3 py-1.5">
+                      Депозит для участия не задан. Задайте его в разделе «Настройки» — без него аукцион не создаётся.
+                    </p>
+                  )}
+                  {participationDeposit && (
+                    <p className="text-gray-500">
+                      Депозит для участия: <span className="font-medium text-gray-700">{Number(participationDeposit).toLocaleString('ru')} сом</span>
+                      {' '}— единая сумма из «Настроек»; сохраняется в аукционе при создании.
+                    </p>
+                  )}
+                </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Дата начала *</label>
                   <input type="datetime-local" value={form.startTime}
@@ -2461,7 +2477,8 @@ function AuctionsPage() {
               </div>
 
               <div className="flex gap-2 pt-2 border-t border-gray-100">
-                <button onClick={createAuction} className="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-medium hover:bg-blue-700">Создать</button>
+                <button onClick={createAuction} disabled={!participationDeposit}
+                  className="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Создать</button>
                 <button onClick={() => { setShowCreate(false); setFormErrors({}); setAuctionPhotos([]); }}
                   className="border border-gray-200 px-4 py-2 rounded-xl text-sm hover:bg-gray-50">Отмена</button>
               </div>
@@ -2912,7 +2929,7 @@ function DepositsPage() {
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
 
-const SETTINGS_META: Record<string, { label: string; description: string; min: number; max: number; step: number }> = {
+const SETTINGS_META: Record<string, { label: string; description: string; min: number; max: number; step: number; positive?: boolean; decimals?: number }> = {
   // FE-SETTINGS-01 reachability audit: deposit_percent, default_bid_step_percent and
   // completed_auction_visibility_hours have no reader in the backend (SystemSettingsService is read
   // only for diagnostic_deposit_amount, diagnostic_fee_amount and auction_confirm_hours). The deposit
@@ -2924,6 +2941,9 @@ const SETTINGS_META: Record<string, { label: string; description: string; min: n
   // Fail-closed on the server: until it is set, diagnostic requests are refused (no default
   // value has ever been approved, so none is pre-filled here).
   diagnostic_fee_amount:                { label: 'Стоимость диагностики (сом)',        description: 'Плата за диагностику, удерживаемая с продавца из залога. Пока не задана, заявки на диагностику не принимаются', min: 0, max: 100000, step: 100 },
+  // DEPOSIT-01 (BD-01): one fixed participation deposit for every new auction, snapshotted at creation.
+  // The max is the technical capacity of the auction column (validated on the server too), not a business limit.
+  auction_participation_deposit_amount: { label: 'Депозит для участия в аукционах (сом)', description: 'Единая сумма для всех новых аукционов. Изменение не затрагивает уже созданные аукционы и замороженные депозиты. Пока не задана, аукционы не создаются', min: 0, max: 99999999.99, step: 1000, positive: true, decimals: 2 },
   auction_confirm_hours:                { label: 'Подтверждение аукциона (ч)',         description: 'Часов на подтверждение аукциона администратором после создания',          min: 1, max: 168, step: 1 },
 };
 
@@ -2962,6 +2982,9 @@ function SettingsPage() {
       const num = Number(val);
       if (isNaN(num) || num < meta.min) errs[key] = `Минимум: ${meta.min}`;
       if (num > meta.max) errs[key] = `Максимум: ${meta.max}`;
+      if (meta.positive && !(num > 0)) errs[key] = 'Должно быть больше 0';
+      if (meta.decimals !== undefined && /\.\d+$/.test(String(val).trim()) && String(val).trim().split('.')[1].length > meta.decimals)
+        errs[key] = `Не больше ${meta.decimals} знаков после запятой`;
     }
     return errs;
   };

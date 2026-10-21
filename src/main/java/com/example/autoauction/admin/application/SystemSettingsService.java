@@ -15,7 +15,22 @@ import java.util.Set;
 @Service
 public class SystemSettingsService {
 
+    /**
+     * DEPOSIT-01 (BD-01): the one fixed participation deposit for every NEW auction, set by the
+     * administrator. Snapshotted into Auction.requiredDepositAmount when an auction is created; a
+     * later change never touches existing auctions or frozen deposits. No default - creation fails
+     * closed until it is set.
+     */
+    public static final String PARTICIPATION_DEPOSIT_KEY = "auction_participation_deposit_amount";
+
+    /**
+     * Technical capacity of auctions.required_deposit_amount (NUMERIC(10,2)) - NOT a business maximum;
+     * a larger value could never be stored on the auction.
+     */
+    static final BigDecimal PARTICIPATION_DEPOSIT_CAPACITY = new BigDecimal("99999999.99");
+
     public static final Set<String> ALLOWED_KEYS = Set.of(
+            PARTICIPATION_DEPOSIT_KEY,
             "deposit_percent",
             "platform_fee_percent",
             "commission_percent",
@@ -109,6 +124,9 @@ public class SystemSettingsService {
             throw new IllegalArgumentException("Недопустимый ключ настройки: '" + key +
                     "'. Разрешены: " + ALLOWED_KEYS);
         }
+        if (PARTICIPATION_DEPOSIT_KEY.equals(key)) {
+            value = validParticipationDeposit(value);
+        }
         int updated = jdbc.update(
                 "UPDATE system_settings SET setting_value = ?, updated_at = NOW() WHERE setting_key = ?",
                 value, key);
@@ -118,6 +136,26 @@ public class SystemSettingsService {
                     key, value);
         }
         log.info("System setting '{}' updated to '{}'", key, value);
+    }
+
+    /** DEPOSIT-01: a positive amount with at most 2 decimals that fits the auction column; stored normalized. */
+    static String validParticipationDeposit(String value) {
+        BigDecimal amount;
+        try {
+            amount = new BigDecimal(value == null ? "" : value.trim());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Депозит для участия должен быть числом, например 10000");
+        }
+        if (amount.signum() <= 0) {
+            throw new IllegalArgumentException("Депозит для участия должен быть больше 0");
+        }
+        if (amount.stripTrailingZeros().scale() > 2) {
+            throw new IllegalArgumentException("Депозит для участия: не больше двух знаков после запятой");
+        }
+        if (amount.compareTo(PARTICIPATION_DEPOSIT_CAPACITY) > 0) {
+            throw new IllegalArgumentException("Депозит для участия не может быть больше " + PARTICIPATION_DEPOSIT_CAPACITY.toPlainString());
+        }
+        return amount.setScale(2).toPlainString();
     }
 
     @CacheEvict(value = "systemSettings", allEntries = true)

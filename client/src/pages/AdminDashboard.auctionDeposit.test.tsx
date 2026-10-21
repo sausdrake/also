@@ -6,9 +6,9 @@ import { AdminDashboard } from './AdminDashboard';
 import api from '../api/client';
 
 /**
- * FE-AUCTION-01: the deposit to take part in a lot is a fixed amount the admin enters per lot
- * (AuctionCreateRequest.requiredDepositAmount - "НЕ процент от стартовой цены"). BidService refuses
- * every bid and Buy Now on a lot without it, so the form requires it and never invents a value.
+ * DEPOSIT-01 (BD-01): the participation deposit is ONE global admin setting
+ * (auction_participation_deposit_amount) that the server snapshots into each new auction. The create
+ * form shows it, never asks for it, and never sends a per-lot amount.
  */
 
 vi.mock('axios', () => ({ default: { get: vi.fn(), post: vi.fn() } }));
@@ -20,12 +20,17 @@ const apiGet = api.get as unknown as ReturnType<typeof vi.fn>;
 const apiPost = api.post as unknown as ReturnType<typeof vi.fn>;
 const axiosPost = axios.post as unknown as ReturnType<typeof vi.fn>;
 
-beforeEach(() => {
+function mockApi(settings: Promise<unknown>) {
   apiGet.mockReset().mockImplementation((url: string) => {
     if (url.startsWith('/admin/auctions?')) return Promise.resolve({ data: { content: [] } });
     if (url === '/admin/vehicles/approved') return Promise.resolve({ data: [{ id: 9, brand: 'BMW', model: 'X5', year: 2020, vin: 'WBA00000000000001' }] });
+    if (url === '/admin/settings') return settings;
     return Promise.resolve({ data: [] });
   });
+}
+
+beforeEach(() => {
+  mockApi(Promise.resolve({ data: { auction_participation_deposit_amount: '15000.00', diagnostic_fee_amount: '3000' } }));
   apiPost.mockReset().mockResolvedValue({ data: {} });
   axiosPost.mockReset().mockResolvedValue({ data: { publicUrl: 'https://cdn.example/main.jpg' } });
 });
@@ -37,11 +42,10 @@ async function openCreateForm() {
   return container;
 }
 
-async function fillValidForm(container: HTMLElement, deposit: string) {
+async function fillValidForm(container: HTMLElement) {
   fireEvent.change(container.querySelector('select')!, { target: { value: '9' } });
   fireEvent.change(screen.getByLabelText('Стартовая цена *'), { target: { value: '1000000' } });
   fireEvent.change(screen.getByLabelText('Шаг ставки *'), { target: { value: '10000' } });
-  if (deposit !== '') fireEvent.change(screen.getByLabelText('Депозит для участия *'), { target: { value: deposit } });
   const [start, end] = Array.from(container.querySelectorAll('input[type="datetime-local"]'));
   fireEvent.change(start, { target: { value: '2026-11-01T10:00' } });
   fireEvent.change(end, { target: { value: '2026-11-08T10:00' } });
@@ -52,41 +56,53 @@ async function fillValidForm(container: HTMLElement, deposit: string) {
 
 const createCalls = () => apiPost.mock.calls.filter(c => c[0] === '/admin/auctions');
 
-describe('FE-AUCTION-01: the admin sets the deposit for each lot', () => {
-  it('sends the entered deposit as requiredDepositAmount', async () => {
+describe('DEPOSIT-01: the create form uses the global participation deposit', () => {
+  it('shows the configured amount and offers no deposit input', async () => {
+    await openCreateForm();
+    expect(await screen.findByTestId('participation-deposit')).toHaveTextContent(/Депозит для участия: 15\s000 сом/);
+    expect(screen.queryByLabelText('Депозит для участия *')).toBeNull();
+  });
+
+  it('the create request carries no per-lot deposit (the server snapshots the setting)', async () => {
     const container = await openCreateForm();
-    await fillValidForm(container, '50000');
+    await waitFor(() => expect(screen.getByTestId('participation-deposit')).toHaveTextContent(/15\s000 сом/));
+    await fillValidForm(container);
     fireEvent.click(screen.getByText('Создать'));
 
     await waitFor(() => expect(createCalls()).toHaveLength(1));
-    expect(createCalls()[0][1]).toMatchObject({ vehicleId: 9, startingPrice: 1000000, minBidStep: 10000, requiredDepositAmount: 50000 });
+    expect(createCalls()[0][1]).toMatchObject({ vehicleId: 9, startingPrice: 1000000, minBidStep: 10000 });
+    expect(createCalls()[0][1]).not.toHaveProperty('requiredDepositAmount');
   });
 
-  it('the deposit is not pre-filled or derived from the price', async () => {
-    await openCreateForm();
-    expect(screen.getByLabelText('Депозит для участия *')).toHaveValue(null);
-    fireEvent.change(screen.getByLabelText('Стартовая цена *'), { target: { value: '1000000' } });
-    expect(screen.getByLabelText('Депозит для участия *')).toHaveValue(null);
-  });
-
-  it('the backend validation message is shown when the create is refused', async () => {
-    apiPost.mockRejectedValue(Object.assign(new Error('400'), { isAxiosError: true, response: { status: 400,
-      data: { error: 'Ошибка валидации', details: { requiredDepositAmount: 'Требуемый депозит должен быть больше 0' } } } }));
+  it('not set: a warning points to the settings and "Создать" is disabled - nothing is sent', async () => {
+    mockApi(Promise.resolve({ data: { diagnostic_fee_amount: '3000' } }));
     const container = await openCreateForm();
-    await fillValidForm(container, '50000');
-    fireEvent.click(screen.getByText('Создать'));
-    expect(await screen.findByText('Требуемый депозит должен быть больше 0')).toBeInTheDocument();
+    expect(await screen.findByText(/Депозит для участия не задан/)).toBeInTheDocument();
+    await fillValidForm(container);
+    expect(screen.getByRole('button', { name: 'Создать' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Создать' }));
+    expect(createCalls()).toHaveLength(0);
   });
-});
 
-describe('FE-AUCTION-01 adversarial: no lot without a positive deposit', () => {
-  for (const [name, value] of [['empty', ''], ['zero', '0'], ['negative', '-5'], ['too large', '1000000000'], ['scientific junk', '1e']] as const) {
-    it(`${name} deposit blocks the create and sends nothing`, async () => {
-      const container = await openCreateForm();
-      await fillValidForm(container, value);
-      fireEvent.click(screen.getByText('Создать'));
-      expect(await screen.findByText(value === '1000000000' ? 'Слишком большая сумма' : 'Укажите депозит для участия (больше 0)')).toBeInTheDocument();
-      expect(createCalls()).toHaveLength(0);
-    });
-  }
+  it('settings failing to load: an error with a retry, "Создать" disabled; the retry shows the amount', async () => {
+    mockApi(Promise.reject(Object.assign(new Error('down'), { isAxiosError: true })));
+    await openCreateForm();
+    expect(await screen.findByText(/Не удалось загрузить депозит для участия/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Создать' })).toBeDisabled();
+
+    mockApi(Promise.resolve({ data: { auction_participation_deposit_amount: '20000.00' } }));
+    fireEvent.click(screen.getByText('Повторить'));
+    await waitFor(() => expect(screen.getByTestId('participation-deposit')).toHaveTextContent(/Депозит для участия: 20\s000 сом/));
+    expect(screen.getByRole('button', { name: 'Создать' })).toBeEnabled();
+  });
+
+  it('the backend refusal message is shown when the create is refused', async () => {
+    apiPost.mockRejectedValue(Object.assign(new Error('409'), { isAxiosError: true, response: { status: 409,
+      data: { message: 'Депозит для участия в аукционах не задан. Укажите его в разделе «Настройки».' } } }));
+    const container = await openCreateForm();
+    await waitFor(() => expect(screen.getByTestId('participation-deposit')).toHaveTextContent(/15\s000 сом/));
+    await fillValidForm(container);
+    fireEvent.click(screen.getByText('Создать'));
+    expect(await screen.findByText(/Укажите его в разделе «Настройки»/)).toBeInTheDocument();
+  });
 });

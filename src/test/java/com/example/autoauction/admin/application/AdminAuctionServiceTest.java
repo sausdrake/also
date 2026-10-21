@@ -74,6 +74,12 @@ class AdminAuctionServiceTest {
     @Mock
     private com.example.autoauction.deposit.application.DepositService depositService;
 
+    @Mock
+    private SystemSettingsService settingsService;
+
+    /** DEPOSIT-01: the global participation deposit every created auction snapshots. */
+    private static final BigDecimal PARTICIPATION_DEPOSIT = new BigDecimal("15000.00");
+
     @InjectMocks
     private AdminAuctionService adminAuctionService;
 
@@ -142,11 +148,66 @@ class AdminAuctionServiceTest {
         // per-test), this IS a mock call that MockitoExtension's strict stubbing would flag as
         // unnecessary for every test that throws before reaching this point.
         lenient().when(auctionCommitmentResolver.resolveEligibleCommitment(anyLong())).thenReturn(DEFAULT_COMMITMENT_ID);
+        // DEPOSIT-01: same lenient convention - only tests that reach createAuctionFromRequest read it
+        lenient().when(settingsService.getRequiredBigDecimal(SystemSettingsService.PARTICIPATION_DEPOSIT_KEY))
+                .thenReturn(PARTICIPATION_DEPOSIT);
     }
 
     @Nested
     @DisplayName("Тесты создания аукциона")
     class CreateAuctionTests {
+
+        private void stubCreatablePath() {
+            doNothing().when(auctionValidator).validateBasicRequest(any());
+            doNothing().when(auctionValidator).validateBusinessRules(any(), any());
+            when(vehicleService.getVehicleDetails(1L)).thenReturn(approvedVehicle);
+            when(auctionRepository.existsByVehicleIdAndStatusIn(eq(1L), anyList())).thenReturn(false);
+            // lenient: the fail-closed test stops at the deposit snapshot, before the policy is read
+            lenient().when(policyVersionService.getCurrentPublished()).thenReturn(currentPolicy);
+            lenient().when(policyVersionService.getById(currentPolicy.getId())).thenReturn(currentPolicy);
+        }
+
+        @Test
+        @DisplayName("DEPOSIT-01: the created auction snapshots the global participation deposit")
+        void createAuction_SnapshotsGlobalParticipationDeposit() {
+            stubCreatablePath();
+            ArgumentCaptor<Auction> saved = ArgumentCaptor.forClass(Auction.class);
+            when(auctionRepository.save(saved.capture())).thenAnswer(invocation -> invocation.getArgument(0));
+
+            adminAuctionService.createAuction(validRequest, adminId);
+
+            assertEquals(0, PARTICIPATION_DEPOSIT.compareTo(saved.getValue().getRequiredDepositAmount()));
+            verify(settingsService).getRequiredBigDecimal(SystemSettingsService.PARTICIPATION_DEPOSIT_KEY);
+        }
+
+        @Test
+        @DisplayName("DEPOSIT-01: a setting change between two creations - each auction keeps the value read at its creation")
+        void createAuction_EachAuctionKeepsItsOwnSnapshot() {
+            stubCreatablePath();
+            List<Auction> saved = new ArrayList<>();
+            when(auctionRepository.save(any(Auction.class))).thenAnswer(invocation -> { saved.add(invocation.getArgument(0)); return invocation.getArgument(0); });
+            when(settingsService.getRequiredBigDecimal(SystemSettingsService.PARTICIPATION_DEPOSIT_KEY))
+                    .thenReturn(new BigDecimal("10000.00"), new BigDecimal("15000.00"));
+
+            adminAuctionService.createAuction(validRequest, adminId);
+            adminAuctionService.createAuction(validRequest, adminId);
+
+            assertEquals(0, new BigDecimal("10000").compareTo(saved.get(0).getRequiredDepositAmount()));
+            assertEquals(0, new BigDecimal("15000").compareTo(saved.get(1).getRequiredDepositAmount()));
+        }
+
+        @Test
+        @DisplayName("DEPOSIT-01: setting not set -> fail closed, nothing saved")
+        void createAuction_FailsClosedWithoutParticipationDeposit() {
+            stubCreatablePath();
+            when(settingsService.getRequiredBigDecimal(SystemSettingsService.PARTICIPATION_DEPOSIT_KEY))
+                    .thenThrow(new IllegalStateException("Обязательная настройка не задана"));
+
+            IllegalStateException e = assertThrows(IllegalStateException.class, () -> adminAuctionService.createAuction(validRequest, adminId));
+
+            assertTrue(e.getMessage().contains("Депозит для участия в аукционах не задан"));
+            verify(auctionRepository, never()).save(any(Auction.class));
+        }
 
         @Test
         @DisplayName("Успешное создание аукциона с валидными данными")

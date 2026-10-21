@@ -169,6 +169,20 @@ public class AdminAuctionService {
         return AuctionResponse.fromDomain(auction, resolveCommissionRate(auction));
     }
 
+    private BigDecimal participationDeposit() {
+        BigDecimal amount;
+        try {
+            amount = settingsService.getRequiredBigDecimal(SystemSettingsService.PARTICIPATION_DEPOSIT_KEY);
+        } catch (IllegalStateException e) {
+            amount = null;
+        }
+        if (amount == null || amount.signum() <= 0) {
+            throw new IllegalStateException(
+                    "Депозит для участия в аукционах не задан. Укажите его в разделе «Настройки».");
+        }
+        return amount;
+    }
+
     private VehicleResponse getValidatedVehicle(Long vehicleId) {
         log.debug("Проверка автомобиля с ID: {}", vehicleId);
 
@@ -220,9 +234,9 @@ public class AdminAuctionService {
         // Javadoc for the single-call-site discipline.
         auction.setSellerDiagnosticCommitmentId(sellerDiagnosticCommitmentId);
 
-        if (request.requiredDepositAmount() != null) {
-            auction.setRequiredDepositAmount(request.requiredDepositAmount());
-        }
+        // DEPOSIT-01 (BD-01): the global participation deposit is the only source; it is snapshotted
+        // here, so a later change of the setting never alters this auction or its frozen deposits.
+        auction.setRequiredDepositAmount(participationDeposit());
 
         if (request.mainPhotoUrl() != null) {
             auction.setMainPhotoUrl(request.mainPhotoUrl());

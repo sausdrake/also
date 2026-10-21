@@ -50,24 +50,8 @@ public record AuctionCreateRequest(
         String mainPhotoUrl,
 
         @Schema(description = "JSON-строка дополнительных фото", example = "[\"url1\",\"url2\"]")
-        String additionalPhotoUrls,
-
-        @Schema(description = "Требуемая фиксированная сумма депозита для участия в этом аукционе " +
-                "(задаётся администратором индивидуально для лота, НЕ процент от стартовой цены)",
-                example = "10000")
-        @DecimalMin(value = "0.01", message = "Требуемый депозит должен быть больше 0")
-        BigDecimal requiredDepositAmount
+        String additionalPhotoUrls
+        // DEPOSIT-01 (BD-01): no deposit field - the participation deposit is the global admin setting
+        // (SystemSettingsService.PARTICIPATION_DEPOSIT_KEY), snapshotted by the server at creation.
 ) {
-    /**
-     * Обратно-совместимый конструктор без requiredDepositAmount — для существующих
-     * вызывающих кодов/тестов, которые ещё не знают об этом поле. requiredDepositAmount
-     * остаётся null (см. AuctionMapper/Auction.setRequiredDepositAmount).
-     */
-    public AuctionCreateRequest(Long vehicleId, BigDecimal startingPrice, BigDecimal reservePrice,
-                                 BigDecimal buyNowPrice, BigDecimal minBidStep,
-                                 OffsetDateTime startTime, OffsetDateTime endTime,
-                                 String mainPhotoUrl, String additionalPhotoUrls) {
-        this(vehicleId, startingPrice, reservePrice, buyNowPrice, minBidStep,
-                startTime, endTime, mainPhotoUrl, additionalPhotoUrls, null);
-    }
 }

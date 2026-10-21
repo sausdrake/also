@@ -18,6 +18,8 @@ beforeEach(() => {
     if (url.startsWith('/admin/auctions?')) return Promise.resolve({ data: { content: [] } });
     // the create form is only offered when an approved vehicle exists
     if (url === '/admin/vehicles/approved') return Promise.resolve({ data: [{ id: 9, brand: 'BMW', model: 'X5', year: 2020, vin: 'WBA00000000000001' }] });
+    // DEPOSIT-01: "Создать" needs the global participation deposit to be set
+    if (url === '/admin/settings') return Promise.resolve({ data: { auction_participation_deposit_amount: '10000.00' } });
     return Promise.resolve({ data: [] });
   });
   apiPost.mockReset().mockResolvedValue({ data: {} });

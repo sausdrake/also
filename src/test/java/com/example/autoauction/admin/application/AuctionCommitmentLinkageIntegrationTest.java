@@ -79,6 +79,10 @@ class AuctionCommitmentLinkageIntegrationTest {
     private RoleRepository roleRepository;
     @Autowired
     private PolicyVersionService policyVersionService;
+    // DEPOSIT-01: system_settings is a JdbcTemplate table absent from the H2 test schema (see
+    // DiagnosticRequestVinUniquenessIntegrationTest) - only the global participation deposit is stubbed
+    @org.springframework.boot.test.mock.mockito.MockBean
+    private SystemSettingsService systemSettingsService;
 
     private record Setup(Long vehicleId, Long commitmentId, Long requestId) {}
 
@@ -143,6 +147,9 @@ class AuctionCommitmentLinkageIntegrationTest {
     }
 
     private Long publishPolicyVersion() {
+        // DEPOSIT-01: auction creation also snapshots the global participation deposit (fail-closed without it)
+        org.mockito.Mockito.when(systemSettingsService.getRequiredBigDecimal(SystemSettingsService.PARTICIPATION_DEPOSIT_KEY))
+                .thenReturn(new BigDecimal("10000.00"));
         return policyVersionService.publish(
                 policyVersionService.create(new BigDecimal("0.05"), 999L).getId(), 998L, 0L).getId();
     }
