@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import api from '../../../api/client';
 import { formatDateTime } from '../../../utils/formatDate';
 import { IDENTITY_STATUS_LABELS, parseIdentityStatus } from '../../../domain/identity';
 import { labelOf } from '../../../domain/parse';
@@ -68,6 +69,8 @@ export function IdentityReviewPanel({ item, onActioned }: Props) {
   const [revokeReasonText, setRevokeReasonText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  // KYC-01: the separate trusted (bidding) status of the same user - null while unknown
+  const [trusted, setTrusted] = useState<boolean | null>(null);
 
   useEffect(() => {
     setActiveAction(null);
@@ -80,6 +83,14 @@ export function IdentityReviewPanel({ item, onActioned }: Props) {
     setSelfieError(null);
     getHistoryAdmin(item.id).then(setHistory).catch(() => setHistory([]));
   }, [item.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get(`/admin/users/${item.userId}`)
+      .then(r => { if (!cancelled) setTrusted(typeof r.data?.trusted === 'boolean' ? r.data.trusted : null); })
+      .catch(() => { if (!cancelled) setTrusted(null); });
+    return () => { cancelled = true; };
+  }, [item.userId]);
 
   const notify = (text: string, ok = true) => { setMsg({ text, ok }); setTimeout(() => setMsg(null), 5000); };
 
@@ -113,7 +124,9 @@ export function IdentityReviewPanel({ item, onActioned }: Props) {
     setSubmitting(true);
     try {
       await approve(item.id);
-      notify('Личность подтверждена');
+      notify(trusted
+        ? 'Личность подтверждена'
+        : 'Личность подтверждена. Статус доверенного пользователя для торгов не выдан — он выдаётся отдельно в разделе «Пользователи».');
     } catch (e: any) {
       notify(e.response?.status === 409
         ? 'Уже обработано другим администратором — статус обновлён'
@@ -164,7 +177,10 @@ export function IdentityReviewPanel({ item, onActioned }: Props) {
     <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 space-y-4">
       <div>
         <h3 className="font-semibold text-gray-800 text-sm">Заявка #{item.id} · Пользователь #{item.userId}</h3>
-        <p className="text-xs text-gray-500 mt-0.5">{labelOf(IDENTITY_STATUS_LABELS, parseIdentityStatus(item.status))}</p>
+        <p className="text-xs text-gray-500 mt-0.5">KYC: {labelOf(IDENTITY_STATUS_LABELS, parseIdentityStatus(item.status))}</p>
+        <p className="text-xs text-gray-500" data-testid="identity-review-trust">
+          Доверие (участие в торгах): {trusted === null ? '—' : trusted ? 'Предоставлено' : 'Не предоставлено'}
+        </p>
       </div>
 
       {msg && (
@@ -238,6 +254,11 @@ export function IdentityReviewPanel({ item, onActioned }: Props) {
           )}
 
           {activeAction === 'approve' && (
+            <div className="space-y-2">
+            <p className="text-xs rounded-lg px-3 py-1.5 bg-blue-50 text-blue-800">
+              Подтверждение личности не делает пользователя доверенным: статус доверенного для участия в торгах
+              выдаётся отдельно в разделе «Пользователи».
+            </p>
             <div className="flex gap-2">
               <button onClick={runApprove} disabled={submitting}
                 className="px-4 py-2 rounded-lg bg-green-700 text-white text-sm font-medium hover:bg-green-800 disabled:opacity-50">
@@ -247,6 +268,7 @@ export function IdentityReviewPanel({ item, onActioned }: Props) {
                 className="px-4 py-2 rounded-lg border text-sm text-gray-600 hover:bg-gray-50">
                 Отмена
               </button>
+            </div>
             </div>
           )}
 

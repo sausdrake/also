@@ -23,6 +23,14 @@ describe('FE-ERR-01: every backend error shape becomes a typed kind and a readab
     expect(parseApiError(res(403, { error: 'PASSWORD_CHANGE_REQUIRED' })).kind).toBe('password_change_required');
   });
 
+  it('KYC-01: 403 TRUSTED_PARTICIPANT_REQUIRED -> trusted_required (not kyc_required, not plain forbidden)', () => {
+    const msg = 'Для участия в торгах нужен статус доверенного пользователя.';
+    expect(parseApiError(res(403, { error: 'Forbidden', code: 'TRUSTED_PARTICIPANT_REQUIRED', message: msg })))
+      .toMatchObject({ kind: 'trusted_required', message: msg });
+    expect(parseApiError(res(403, { error: 'Forbidden', code: 'TRUSTED_PARTICIPANT_REQUIRED' })).message)
+      .toBe('Для участия в торгах нужен статус доверенного пользователя.');
+  });
+
   it('403 with a Russian business reason keeps it (trusted gate)', () => {
     const msg = 'Участие в торгах доступно только доверенным пользователям. Обратитесь к администратору для получения доступа.';
     expect(parseApiError(res(403, { error: 'Forbidden', message: msg }))).toMatchObject({ kind: 'forbidden', message: msg });

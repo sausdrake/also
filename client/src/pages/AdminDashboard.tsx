@@ -6,6 +6,8 @@ import { apiErrorMessage } from '../api/errors';
 import { LoadErrorAlert } from '../components/LoadErrorAlert';
 import { SidebarLayout } from '../components/layout/SidebarLayout';
 import { roleLabel } from '../domain/role';
+import { IDENTITY_STATUS_LABELS, parseIdentityStatus } from '../domain/identity';
+import { labelOf } from '../domain/parse';
 import { AUCTION_STATUSES as AUCTION_STATUS_VALUES, AUCTION_STATUS_LABELS, type AuctionStatus } from '../domain/auction';
 import { BrandLogo } from '../components/brand/BrandLogo';
 import { ReportItemMedia } from '../components/admin/diagnostic/ReportItemMedia';
@@ -62,6 +64,8 @@ interface UserItem {
   trusted: boolean;
   roles: string[]; balance?: number; availableBalance?: number;
   createdAt?: string;
+  /** KYC-01: identity verification status; null/absent = nothing submitted. Independent of `trusted`. */
+  identityStatus?: string | null;
 }
 
 interface DepositItem {
@@ -101,6 +105,15 @@ const BADGE_COLORS: Record<string, string> = {
   SUBMITTED:   'bg-yellow-100 text-yellow-700',
   APPROVED:    'bg-green-100 text-green-700',
   REJECTED:    'bg-red-100 text-red-700',
+};
+
+// KYC-01: identity verification and the trusted (bidding) status are shown side by side, never merged.
+const kycText = (status: string | null | undefined) =>
+  status ? labelOf(IDENTITY_STATUS_LABELS, parseIdentityStatus(status)) : 'Не подавалась';
+const trustText = (trusted: boolean) => (trusted ? 'Предоставлено' : 'Не предоставлено');
+const KYC_BADGE: Record<string, string> = {
+  VERIFIED: 'bg-green-100 text-green-700', PENDING_REVIEW: 'bg-amber-100 text-amber-700',
+  REJECTED: 'bg-red-100 text-red-700', REVOKED: 'bg-red-100 text-red-700',
 };
 
 const BADGE_LABELS: Record<string, string> = {
@@ -682,11 +695,18 @@ function UsersPage() {
                 </span>
               </div>
               <div className="flex gap-2">
-                <span className="text-gray-500 w-32 shrink-0">Доверие:</span>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${viewTarget.trusted ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                  {viewTarget.trusted ? 'Доверен' : 'Не рассмотрен'}
+                <span className="text-gray-500 w-32 shrink-0">KYC:</span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${KYC_BADGE[viewTarget.identityStatus ?? ''] ?? 'bg-gray-100 text-gray-500'}`}>
+                  {kycText(viewTarget.identityStatus)}
                 </span>
               </div>
+              <div className="flex gap-2">
+                <span className="text-gray-500 w-32 shrink-0">Доверие:</span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${viewTarget.trusted ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {trustText(viewTarget.trusted)}
+                </span>
+              </div>
+              <p className="text-xs text-gray-400">KYC и доверие независимы: подтверждение личности не делает пользователя доверенным для торгов.</p>
               {viewTarget.createdAt && (
                 <div className="flex gap-2">
                   <span className="text-gray-500 w-32 shrink-0">Регистрация:</span>
@@ -751,7 +771,7 @@ function UsersPage() {
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  {['Имя', 'Email', 'Роль', 'Дата регистрации', 'Статус', 'Доверие', 'Действия'].map(h => (
+                  {['Имя', 'Email', 'Роль', 'Дата регистрации', 'Статус', 'KYC', 'Доверие', 'Действия'].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -778,9 +798,14 @@ function UsersPage() {
                         {u.active ? 'Активен' : 'Заблокирован'}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${KYC_BADGE[u.identityStatus ?? ''] ?? 'bg-gray-100 text-gray-500'}`}>
+                        {kycText(u.identityStatus)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${u.trusted ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                        {u.trusted ? 'Доверен' : 'Не рассмотрен'}
+                        {trustText(u.trusted)}
                       </span>
                     </td>
                     <td className="px-4 py-3">

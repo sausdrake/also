@@ -3,6 +3,7 @@
 package com.example.autoauction.config;
 
 import com.example.autoauction.auction.application.RateLimitException;
+import com.example.autoauction.auction.application.TrustedParticipantRequiredException;
 import com.example.autoauction.auth.application.RegistrationConflictException;
 import com.example.autoauction.deposit.domain.InsufficientFundsException;
 import com.example.autoauction.identity.application.IdentityVerificationRequiredException;
@@ -218,6 +219,25 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IdentityVerificationRequiredException.class)
     public ResponseEntity<Map<String, Object>> handleIdentityVerificationRequired(IdentityVerificationRequiredException e) {
         log.warn("Identity verification required: {}", e.getCode());
+
+        Map<String, Object> error = new HashMap<>();
+        error.put("timestamp", java.time.LocalDateTime.now().toString());
+        error.put("status", HttpStatus.FORBIDDEN.value());
+        error.put("error", "Forbidden");
+        error.put("code", e.getCode());
+        error.put("message", e.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(error);
+    }
+
+    // KYC-01: trust gate refusal (bid / Buy Now) - 403 with its own code, so a user whose identity is
+    // already verified is told about the trusted status instead of being sent to verify again.
+    @ExceptionHandler(TrustedParticipantRequiredException.class)
+    public ResponseEntity<Map<String, Object>> handleTrustedParticipantRequired(TrustedParticipantRequiredException e) {
+        log.warn("Trusted participant required: {}", e.getCode());
 
         Map<String, Object> error = new HashMap<>();
         error.put("timestamp", java.time.LocalDateTime.now().toString());

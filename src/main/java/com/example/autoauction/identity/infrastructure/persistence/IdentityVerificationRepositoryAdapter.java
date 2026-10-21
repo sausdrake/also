@@ -6,6 +6,7 @@ import com.example.autoauction.identity.domain.port.IdentityVerificationReposito
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -58,6 +59,15 @@ public class IdentityVerificationRepositoryAdapter implements IdentityVerificati
     @Transactional(readOnly = true)
     public Optional<IdentityVerification> findByUserId(Long userId) {
         return jpaRepository.findByUserId(userId).map(mapper::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<IdentityVerification> findByUserIdIn(Collection<Long> userIds) {
+        if (userIds.isEmpty()) {
+            return List.of();
+        }
+        return jpaRepository.findByUserIdIn(userIds).stream().map(mapper::toDomain).toList();
     }
 
     @Override

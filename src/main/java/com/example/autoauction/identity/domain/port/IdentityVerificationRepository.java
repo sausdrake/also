@@ -3,6 +3,7 @@ package com.example.autoauction.identity.domain.port;
 import com.example.autoauction.identity.domain.IdentityVerification;
 import com.example.autoauction.identity.domain.IdentityVerificationStatus;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,6 +26,9 @@ public interface IdentityVerificationRepository {
     Optional<IdentityVerification> findByIdWithLock(Long id);
 
     Optional<IdentityVerification> findByUserId(Long userId);
+
+    /** KYC-01: the verifications of many users in one query (admin user list). */
+    List<IdentityVerification> findByUserIdIn(Collection<Long> userIds);
 
     /** Pessimistic write lock by user id - used by self-service submission (Phase 3 §13). */
     Optional<IdentityVerification> findByUserIdWithLock(Long userId);

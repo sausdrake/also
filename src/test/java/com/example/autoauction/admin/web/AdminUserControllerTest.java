@@ -51,6 +51,9 @@ class AdminUserControllerTest {
     @MockBean
     private com.example.autoauction.auth.application.PasswordService passwordService;   // AUTH-01
 
+    @MockBean
+    private com.example.autoauction.identity.application.IdentityStatusLookup identityStatusLookup;   // KYC-01
+
     private User testUser;
 
     @BeforeEach

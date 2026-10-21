@@ -6,7 +6,7 @@
  * typed kind and a message the user can read.
  */
 export type ApiErrorKind =
-  | 'network' | 'validation' | 'unauthorized' | 'forbidden' | 'kyc_required' | 'password_change_required'
+  | 'network' | 'validation' | 'unauthorized' | 'forbidden' | 'kyc_required' | 'trusted_required' | 'password_change_required'
   | 'not_found' | 'conflict' | 'insufficient_funds' | 'rate_limited' | 'server' | 'unknown';
 
 export interface ApiError {
@@ -24,6 +24,7 @@ const DEFAULT_MESSAGES: Record<ApiErrorKind, string> = {
   unauthorized: 'Требуется вход в систему.',
   forbidden: 'Недостаточно прав для этого действия.',
   kyc_required: 'Операция доступна только после подтверждения личности.',
+  trusted_required: 'Для участия в торгах нужен статус доверенного пользователя.',
   password_change_required: 'Сначала смените временный пароль.',
   not_found: 'Запрошенные данные не найдены.',
   conflict: 'Действие сейчас недоступно: данные изменились. Обновите страницу.',
@@ -56,6 +57,8 @@ function fieldErrorsOf(details: unknown): Record<string, string> {
 function kindOf(status: number | null, code: string | null, errorField: string | null): ApiErrorKind {
   if (status === null) return 'network';
   if (code === 'IDENTITY_VERIFICATION_REQUIRED') return 'kyc_required';
+  // KYC-01: the separate trust gate (bid / Buy Now) - never dressed up as a KYC refusal
+  if (code === 'TRUSTED_PARTICIPANT_REQUIRED') return 'trusted_required';
   if (status === 403 && errorField === 'PASSWORD_CHANGE_REQUIRED') return 'password_change_required';
   if (status === 400) return 'validation';
   if (status === 401) return 'unauthorized';

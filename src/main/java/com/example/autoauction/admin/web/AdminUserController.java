@@ -5,6 +5,8 @@ import com.example.autoauction.auth.domain.UserPrincipal;
 import com.example.autoauction.auth.infrastructure.security.CurrentUser;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.deposit.web.dto.DepositResponse;
+import com.example.autoauction.identity.application.IdentityStatusLookup;
+import com.example.autoauction.identity.domain.IdentityVerificationStatus;
 import com.example.autoauction.user.application.UserService;
 import com.example.autoauction.user.domain.User;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,6 +33,7 @@ public class AdminUserController {
     private final UserService userService;
     private final DepositService depositService;
     private final PasswordService passwordService;
+    private final IdentityStatusLookup identityStatusLookup;
 
     @GetMapping
     @Operation(summary = "Список пользователей (фильтры: role, active, withBalance)")
@@ -47,24 +50,33 @@ public class AdminUserController {
         } else {
             users = userService.listUsers();
         }
+        // KYC-01: the KYC status next to the separate trusted flag, one query for the whole list
+        Map<Long, IdentityVerificationStatus> kyc = identityStatusLookup.statusesOf(users.stream().map(User::getId).toList());
         if (withBalance) {
             return users.stream().map(u -> {
+                UserDto dto;
                 try {
                     DepositResponse dep = depositService.getDepositByUserId(u.getId());
-                    return UserDto.fromWithBalance(u, dep);
+                    dto = UserDto.fromWithBalance(u, dep);
                 } catch (Exception e) {
-                    return UserDto.fromWithBalance(u, null);
+                    dto = UserDto.fromWithBalance(u, null);
                 }
+                return dto.withIdentityStatus(kyc.get(u.getId()));
             }).toList();
         }
-        return users.stream().map(UserDto::from).toList();
+        return users.stream().map(u -> UserDto.from(u).withIdentityStatus(kyc.get(u.getId()))).toList();
+    }
+
+    /** A single user with its KYC status (KYC-01). */
+    private UserDto dto(User u) {
+        return UserDto.from(u).withIdentityStatus(identityStatusLookup.statusOf(u.getId()).orElse(null));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Детали пользователя")
     public ResponseEntity<UserDto> getUser(@PathVariable Long id) {
         return userService.getUser(id)
-                .map(UserDto::from)
+                .map(this::dto)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -73,14 +85,14 @@ public class AdminUserController {
     @Operation(summary = "Заблокировать пользователя")
     public ResponseEntity<UserDto> blockUser(@PathVariable Long id,
                                              @Parameter(hidden = true) @CurrentUser UserPrincipal currentUser) {
-        return ResponseEntity.ok(UserDto.from(userService.blockUser(id, currentUser.getUserId())));
+        return ResponseEntity.ok(dto(userService.blockUser(id, currentUser.getUserId())));
     }
 
     @PatchMapping("/{id}/unblock")
     @Operation(summary = "Разблокировать пользователя")
     public ResponseEntity<UserDto> unblockUser(@PathVariable Long id,
                                                @Parameter(hidden = true) @CurrentUser UserPrincipal currentUser) {
-        return ResponseEntity.ok(UserDto.from(userService.unblockUser(id, currentUser.getUserId())));
+        return ResponseEntity.ok(dto(userService.unblockUser(id, currentUser.getUserId())));
     }
 
     /**
@@ -95,7 +107,7 @@ public class AdminUserController {
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserPrincipal currentUser
     ) {
-        return ResponseEntity.ok(UserDto.from(userService.trustUser(id, currentUser.getUserId())));
+        return ResponseEntity.ok(dto(userService.trustUser(id, currentUser.getUserId())));
     }
 
     @PatchMapping("/{id}/untrust")
@@ -104,7 +116,7 @@ public class AdminUserController {
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserPrincipal currentUser
     ) {
-        return ResponseEntity.ok(UserDto.from(userService.untrustUser(id, currentUser.getUserId())));
+        return ResponseEntity.ok(dto(userService.untrustUser(id, currentUser.getUserId())));
     }
 
     @PatchMapping("/{id}/role")
@@ -118,7 +130,7 @@ public class AdminUserController {
         if (roleName == null || roleName.isBlank()) {
             throw new IllegalArgumentException("Поле role обязательно");
         }
-        return ResponseEntity.ok(UserDto.from(userService.setUserRole(id, roleName, currentUser.getUserId())));
+        return ResponseEntity.ok(dto(userService.setUserRole(id, roleName, currentUser.getUserId())));
     }
 
     /** SEC-06: who blocked, unblocked, trusted or changed the roles of this user, and when (newest first). */
@@ -174,13 +186,15 @@ public class AdminUserController {
             List<String> roles,
             java.math.BigDecimal balance,
             java.math.BigDecimal availableBalance,
-            java.time.OffsetDateTime createdAt
+            java.time.OffsetDateTime createdAt,
+            // KYC-01: PENDING_REVIEW / VERIFIED / REJECTED / REVOKED, null = nothing submitted; independent of `trusted`
+            String identityStatus
     ) {
         static UserDto from(User u) {
             return new UserDto(
                     u.getId(), u.getUsername(), u.getEmail(), u.isActive(), u.isTrusted(),
                     u.getRoles().stream().map(r -> r.getName()).toList(),
-                    null, null, u.getCreatedAt()
+                    null, null, u.getCreatedAt(), null
             );
         }
 
@@ -190,8 +204,13 @@ public class AdminUserController {
                     u.getRoles().stream().map(r -> r.getName()).toList(),
                     dep != null ? dep.balance() : null,
                     dep != null ? dep.availableBalance() : null,
-                    u.getCreatedAt()
+                    u.getCreatedAt(), null
             );
+        }
+
+        UserDto withIdentityStatus(IdentityVerificationStatus status) {
+            return new UserDto(id, username, email, active, trusted, roles, balance, availableBalance, createdAt,
+                    status == null ? null : status.name());
         }
     }
 }

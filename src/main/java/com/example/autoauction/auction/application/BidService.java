@@ -62,7 +62,8 @@ public class BidService {
      * Slice 1A: fail-closed controlled-beta trust gate for the protected participant actions
      * (bidding, Buy Now). Reused by both placeBid() and buyNow() rather than duplicated. Checked
      * before any auction lookup/deposit freeze/participant registration - an untrusted caller's
-     * request is rejected with zero side effects. Uses SecurityException, the established
+     * request is rejected with zero side effects. Uses SecurityException (KYC-01: its coded subclass
+     * TrustedParticipantRequiredException), the established
      * convention in this codebase for "this actor is not permitted to do this" application-layer
      * rejections (mirrors VehicleService/DiagnosticRequestService), mapped to 403 by
      * GlobalExceptionHandler.
@@ -71,9 +72,7 @@ public class BidService {
         User user = userService.getUser(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден: " + userId));
         if (!user.isTrusted()) {
-            throw new SecurityException(
-                    "Участие в торгах доступно только доверенным пользователям. "
-                            + "Обратитесь к администратору для получения доступа.");
+            throw new TrustedParticipantRequiredException();
         }
     }
 

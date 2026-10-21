@@ -9,6 +9,7 @@ import { BuyerSaleStatusPanel } from '../components/sale/BuyerSaleStatusPanel';
 import * as subscriptions from '../api/subscriptions';
 import { apiErrorMessage, parseApiError } from '../api/errors';
 import { KycRequiredNotice } from '../components/identity/KycRequiredNotice';
+import { TrustedStatusRequiredNotice } from '../components/identity/TrustedStatusRequiredNotice';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
@@ -236,6 +237,8 @@ export const AuctionPage = () => {
   // FE-KYC-01: a bid / Buy Now refused with 403 IDENTITY_VERIFICATION_REQUIRED keeps a notice with
   // a link to the identity tab (a 5-second flash used to be the only trace).
   const [kycRefusal, setKycRefusal] = useState<{ action: string; message: string } | null>(null);
+  // KYC-01: the trust gate's refusal (identity already verified) - its own lasting notice
+  const [trustRefusal, setTrustRefusal] = useState<{ action: string } | null>(null);
   const [message, setMessage]     = useState<{ text: string; type: 'success' | 'error' | 'warning' } | null>(null);
 
   const [liveBids, setLiveBids] = useState<LiveBid[]>(() => id ? loadStoredBids(id) : []);
@@ -375,11 +378,15 @@ export const AuctionPage = () => {
     try {
       await axios.post(`${BASE_URL}/api/auctions/${id}/bids`, { amount: Number(bidAmount) }, { headers: authHeaders() });
       setKycRefusal(null);
+      setTrustRefusal(null);
       showMsg(`Ставка ${fmt(Number(bidAmount))} сом принята!`, 'success');
     } catch (e) {
       const error = parseApiError(e, 'Ошибка при размещении ставки');
-      if (error.kind === 'kyc_required') setKycRefusal({ action: 'делать ставки', message: error.message });
-      else showMsg(error.message, error.kind === 'rate_limited' ? 'warning' : 'error');
+      setKycRefusal(error.kind === 'kyc_required' ? { action: 'делать ставки', message: error.message } : null);
+      setTrustRefusal(error.kind === 'trusted_required' ? { action: 'делать ставки' } : null);
+      if (error.kind !== 'kyc_required' && error.kind !== 'trusted_required') {
+        showMsg(error.message, error.kind === 'rate_limited' ? 'warning' : 'error');
+      }
     } finally {
       moneyActionInFlight.current = false;
       setPendingAction(null);
@@ -395,12 +402,14 @@ export const AuctionPage = () => {
     try {
       await axios.post(`${BASE_URL}/api/auctions/${id}/buy-now`, {}, { headers: authHeaders() });
       setKycRefusal(null);
+      setTrustRefusal(null);
       showMsg(`Поздравляем! Куплено за ${fmt(auction.buyNowPrice)} сом`, 'success');
       fetchAuction();
     } catch (e) {
       const error = parseApiError(e, 'Ошибка при покупке');
-      if (error.kind === 'kyc_required') setKycRefusal({ action: 'купить по цене Buy Now', message: error.message });
-      else showMsg(error.message, 'error');
+      setKycRefusal(error.kind === 'kyc_required' ? { action: 'купить по цене Buy Now', message: error.message } : null);
+      setTrustRefusal(error.kind === 'trusted_required' ? { action: 'купить по цене Buy Now' } : null);
+      if (error.kind !== 'kyc_required' && error.kind !== 'trusted_required') showMsg(error.message, 'error');
     } finally {
       moneyActionInFlight.current = false;
       setPendingAction(null);
@@ -784,6 +793,7 @@ export const AuctionPage = () => {
               <AuctionTimer startTime={auction.startTime} endTime={auction.endTime} status={auction.status} extended={wasExtended} />
 
               {kycRefusal && <KycRequiredNotice action={kycRefusal.action} message={kycRefusal.message} />}
+              {trustRefusal && <TrustedStatusRequiredNotice action={trustRefusal.action} />}
 
               {/* Flash message */}
               {message && (
