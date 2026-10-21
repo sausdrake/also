@@ -173,13 +173,14 @@ public class AdminUserController {
             boolean trusted,
             List<String> roles,
             java.math.BigDecimal balance,
-            java.math.BigDecimal availableBalance
+            java.math.BigDecimal availableBalance,
+            java.time.OffsetDateTime createdAt
     ) {
         static UserDto from(User u) {
             return new UserDto(
                     u.getId(), u.getUsername(), u.getEmail(), u.isActive(), u.isTrusted(),
                     u.getRoles().stream().map(r -> r.getName()).toList(),
-                    null, null
+                    null, null, u.getCreatedAt()
             );
         }
 
@@ -188,7 +189,8 @@ public class AdminUserController {
                     u.getId(), u.getUsername(), u.getEmail(), u.isActive(), u.isTrusted(),
                     u.getRoles().stream().map(r -> r.getName()).toList(),
                     dep != null ? dep.balance() : null,
-                    dep != null ? dep.availableBalance() : null
+                    dep != null ? dep.availableBalance() : null,
+                    u.getCreatedAt()
             );
         }
     }

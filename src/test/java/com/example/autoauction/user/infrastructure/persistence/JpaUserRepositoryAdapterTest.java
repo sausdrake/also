@@ -10,8 +10,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
+import jakarta.persistence.EntityManager;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -105,5 +108,37 @@ class JpaUserRepositoryAdapterTest {
 
         // then
         assertThat(saved.getRoles()).isEmpty();
+    }
+
+    @Autowired
+    private EntityManager entityManager;
+
+    @Test
+    @DisplayName("BL-19/BL-23: createdAt is set on insert, read back, and never rewritten by an update")
+    void createdAt_SetOnInsert_KeptOnUpdate() {
+        User saved = userRepository.save(new User(null, "created", "created@example.com", "pw", true, Set.of(userRole)));
+        assertThat(saved.getCreatedAt()).isNotNull();
+
+        OffsetDateTime registered = OffsetDateTime.of(2025, 1, 2, 3, 4, 5, 0, ZoneOffset.UTC);
+        entityManager.flush();
+        entityManager.createNativeQuery("UPDATE users SET created_at = ?1 WHERE id = ?2")
+                .setParameter(1, registered).setParameter(2, saved.getId()).executeUpdate();
+        entityManager.clear();
+
+        User loaded = userRepository.findById(saved.getId()).orElseThrow();
+        assertThat(loaded.getCreatedAt()).isAtSameInstantAs(registered);
+
+        // a full copy (the UserService pattern) keeps it
+        User trusted = userRepository.save(new User(loaded.getId(), loaded.getUsername(), loaded.getEmail(),
+                loaded.getPasswordHash(), loaded.isActive(), loaded.getRoles(), true, 7L, OffsetDateTime.now(),
+                loaded.getCreatedAt()));
+        assertThat(trusted.getCreatedAt()).isAtSameInstantAs(registered);
+
+        // a copy that does not carry it (older constructor) still cannot rewrite the column
+        userRepository.save(new User(loaded.getId(), loaded.getUsername(), loaded.getEmail(),
+                loaded.getPasswordHash(), false, loaded.getRoles()));
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(userRepository.findById(saved.getId()).orElseThrow().getCreatedAt()).isAtSameInstantAs(registered);
     }
 }

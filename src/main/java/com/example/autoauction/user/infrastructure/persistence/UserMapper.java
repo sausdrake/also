@@ -28,7 +28,8 @@ public final class UserMapper {
                 roles,
                 entity.isTrusted(),
                 entity.getVerifiedByAdminId(),
-                entity.getVerifiedAt()
+                entity.getVerifiedAt(),
+                entity.getCreatedAt()
         );
     }
 
@@ -52,6 +53,9 @@ public final class UserMapper {
                 domain.isActive()
         );
         entity.setId(domain.getId());
+        if (domain.getCreatedAt() != null) {
+            entity.setCreatedAt(domain.getCreatedAt());
+        }
 
         // Загружаем роли из БД, а не создаём новые transient объекты
         Set<JpaRoleEntity> roleEntities = domain.getRoles().stream()

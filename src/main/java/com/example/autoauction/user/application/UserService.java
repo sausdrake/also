@@ -81,7 +81,7 @@ public class UserService {
         // admin action and must never silently reset trusted/verifiedByAdminId/verifiedAt.
         User blocked = new User(user.getId(), user.getUsername(), user.getEmail(),
                 user.getPasswordHash(), false, user.getRoles(),
-                user.isTrusted(), user.getVerifiedByAdminId(), user.getVerifiedAt());
+                user.isTrusted(), user.getVerifiedByAdminId(), user.getVerifiedAt(), user.getCreatedAt());
         User saved = userRepository.save(blocked);
         journal(userId, actingAdminId, AdminUserActionType.BLOCK, null);
         log.info("User {} blocked by admin {}", userId, actingAdminId);
@@ -96,7 +96,7 @@ public class UserService {
         // Slice 1A: same preservation as blockUser above.
         User unblocked = new User(user.getId(), user.getUsername(), user.getEmail(),
                 user.getPasswordHash(), true, user.getRoles(),
-                user.isTrusted(), user.getVerifiedByAdminId(), user.getVerifiedAt());
+                user.isTrusted(), user.getVerifiedByAdminId(), user.getVerifiedAt(), user.getCreatedAt());
         User saved = userRepository.save(unblocked);
         journal(userId, actingAdminId, AdminUserActionType.UNBLOCK, null);
         log.info("User {} unblocked by admin {}", userId, actingAdminId);
@@ -123,7 +123,7 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден: " + userId));
         User trusted = new User(user.getId(), user.getUsername(), user.getEmail(), user.getPasswordHash(),
-                user.isActive(), user.getRoles(), true, actingAdminId, OffsetDateTime.now());
+                user.isActive(), user.getRoles(), true, actingAdminId, OffsetDateTime.now(), user.getCreatedAt());
         User saved = userRepository.save(trusted);
         journal(userId, actingAdminId, AdminUserActionType.TRUST, null);
         log.info("User {} trusted by admin {}", userId, actingAdminId);
@@ -136,7 +136,7 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден: " + userId));
         User untrusted = new User(user.getId(), user.getUsername(), user.getEmail(), user.getPasswordHash(),
-                user.isActive(), user.getRoles(), false, actingAdminId, OffsetDateTime.now());
+                user.isActive(), user.getRoles(), false, actingAdminId, OffsetDateTime.now(), user.getCreatedAt());
         User saved = userRepository.save(untrusted);
         journal(userId, actingAdminId, AdminUserActionType.UNTRUST, null);
         log.info("User {} untrusted by admin {}", userId, actingAdminId);
@@ -156,7 +156,7 @@ public class UserService {
         // must never silently reset the existing trust decision.
         User updated = new User(user.getId(), user.getUsername(), user.getEmail(),
                 user.getPasswordHash(), user.isActive(), roles,
-                user.isTrusted(), user.getVerifiedByAdminId(), user.getVerifiedAt());
+                user.isTrusted(), user.getVerifiedByAdminId(), user.getVerifiedAt(), user.getCreatedAt());
         User saved = userRepository.save(updated);
         journal(userId, actingAdminId, AdminUserActionType.ROLE_SET, roleNames(user.getRoles()) + " -> " + roleNames(roles));
         log.info("User {} role set to {} by admin {}", userId, roleName, actingAdminId);
@@ -177,7 +177,8 @@ public class UserService {
         Set<Role> roles = new HashSet<>(user.getRoles());
         roles.add(role);
         User updated = new User(user.getId(), user.getUsername(), user.getEmail(), user.getPasswordHash(),
-                user.isActive(), roles, user.isTrusted(), user.getVerifiedByAdminId(), user.getVerifiedAt());
+                user.isActive(), roles, user.isTrusted(), user.getVerifiedByAdminId(), user.getVerifiedAt(),
+                user.getCreatedAt());
         User saved = userRepository.save(updated);
         journal(userId, actingAdminId, AdminUserActionType.ROLE_ADD, roleNames(user.getRoles()) + " -> " + roleNames(roles));
         log.info("Role {} added to user {} by admin {}", roleName, userId, actingAdminId);

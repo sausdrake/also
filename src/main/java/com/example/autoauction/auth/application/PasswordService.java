@@ -133,6 +133,7 @@ public class PasswordService {
     /** Keeps everything else - active flag, roles and the trust decision - exactly as it was. */
     private static User withPasswordHash(User user, String passwordHash) {
         return new User(user.getId(), user.getUsername(), user.getEmail(), passwordHash, user.isActive(),
-                user.getRoles(), user.isTrusted(), user.getVerifiedByAdminId(), user.getVerifiedAt());
+                user.getRoles(), user.isTrusted(), user.getVerifiedByAdminId(), user.getVerifiedAt(),
+                user.getCreatedAt());
     }
 }

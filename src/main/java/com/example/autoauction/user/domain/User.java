@@ -46,6 +46,13 @@ public class User {
     private final OffsetDateTime verifiedAt;
 
     /**
+     * BL-19: when the account was registered (users.created_at). Null for a User that has not
+     * been persisted yet - persistence sets it once and never changes it (BL-23).
+     */
+    @Schema(description = "Когда пользователь зарегистрирован", accessMode = Schema.AccessMode.READ_ONLY)
+    private final OffsetDateTime createdAt;
+
+    /**
      * Original constructor, unchanged - every existing call site continues to compile and now
      * means exactly what the locked business rule requires: a newly constructed User defaults to
      * untrusted, never-yet-reviewed (trusted=false, verifiedByAdminId=null, verifiedAt=null).
@@ -62,6 +69,15 @@ public class User {
      */
     public User(Long id, String username, String email, String passwordHash, boolean active, Set<Role> roles,
                  boolean trusted, Long verifiedByAdminId, OffsetDateTime verifiedAt) {
+        this(id, username, email, passwordHash, active, roles, trusted, verifiedByAdminId, verifiedAt, null);
+    }
+
+    /**
+     * BL-19: full state including the registration time - used by persistence reconstruction and
+     * by every copy of an existing user, so that an update never loses createdAt.
+     */
+    public User(Long id, String username, String email, String passwordHash, boolean active, Set<Role> roles,
+                 boolean trusted, Long verifiedByAdminId, OffsetDateTime verifiedAt, OffsetDateTime createdAt) {
         this.id = id;
         this.username = username;
         this.email = email;
@@ -71,6 +87,7 @@ public class User {
         this.trusted = trusted;
         this.verifiedByAdminId = verifiedByAdminId;
         this.verifiedAt = verifiedAt;
+        this.createdAt = createdAt;
     }
 
     public Long getId() { return id; }
@@ -82,4 +99,5 @@ public class User {
     public boolean isTrusted() { return trusted; }
     public Long getVerifiedByAdminId() { return verifiedByAdminId; }
     public OffsetDateTime getVerifiedAt() { return verifiedAt; }
+    public OffsetDateTime getCreatedAt() { return createdAt; }
 }

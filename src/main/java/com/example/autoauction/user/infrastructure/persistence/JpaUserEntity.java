@@ -41,7 +41,8 @@ public class JpaUserEntity {
     @Column(name = "verified_at")
     private OffsetDateTime verifiedAt;
 
-    @Column(name = "created_at")
+    // BL-23: set once on INSERT; an update (merge of a re-built entity) must never rewrite it
+    @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
 
     @Column(name = "updated_at")
