@@ -5,6 +5,7 @@ import api from '../api/client';
 import { apiErrorMessage } from '../api/errors';
 import { SidebarLayout } from '../components/layout/SidebarLayout';
 import { roleLabel } from '../domain/role';
+import { AUCTION_STATUSES as AUCTION_STATUS_VALUES, AUCTION_STATUS_LABELS, type AuctionStatus } from '../domain/auction';
 import { BrandLogo } from '../components/brand/BrandLogo';
 import { ReportItemMedia } from '../components/admin/diagnostic/ReportItemMedia';
 import { formatDateTime, formatDate } from '../utils/formatDate';
@@ -80,7 +81,9 @@ const REPORT_BACKEND_TO_UI: Record<string, string> = {
 };
 
 const REPORT_STATUSES_UI = ['ALL', 'DRAFT', 'IN_PROGRESS', 'SUBMITTED', 'APPROVED', 'REJECTED'];
-const AUCTION_STATUSES = ['ALL', 'CREATED', 'ACTIVE', 'COMPLETED', 'CANCELLED'];
+// BL-22: every backend auction status, worded by domain/auction.ts (closed auctions used to be reachable only via "Все").
+const AUCTION_STATUSES = ['ALL', ...AUCTION_STATUS_VALUES];
+const auctionStatusText = (s: string) => AUCTION_STATUS_LABELS[s as AuctionStatus] ?? s;
 
 const BADGE_COLORS: Record<string, string> = {
   ACTIVE:      'bg-green-100 text-green-700',
@@ -90,6 +93,8 @@ const BADGE_COLORS: Record<string, string> = {
   CANCELLED:   'bg-red-100 text-red-700',
   EXPIRED:     'bg-orange-100 text-orange-700',
   SOLD:        'bg-teal-100 text-teal-700',
+  WAITING_FOR_PAYMENT: 'bg-amber-100 text-amber-700',
+  SALE_FAILED: 'bg-red-100 text-red-700',
   DRAFT:       'bg-gray-100 text-gray-600',
   IN_PROGRESS: 'bg-blue-100 text-blue-700',
   SUBMITTED:   'bg-yellow-100 text-yellow-700',
@@ -106,9 +111,9 @@ const BADGE_LABELS: Record<string, string> = {
 
 // ─── Shared UI ────────────────────────────────────────────────────────────────
 
-const Badge = ({ status }: { status: string }) => (
+const Badge = ({ status, label }: { status: string; label?: string }) => (
   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${BADGE_COLORS[status] || 'bg-gray-100 text-gray-600'}`}>
-    {BADGE_LABELS[status] || status}
+    {label ?? (BADGE_LABELS[status] || status)}
   </span>
 );
 
@@ -499,7 +504,7 @@ function RecentActivity() {
             e.type === 'auction' ? 'bg-blue-400' : 'bg-orange-400'
           }`} />
           <p className="text-sm text-gray-700 flex-1 truncate">{e.label}</p>
-          <Badge status={e.status} />
+          <Badge status={e.status} label={e.type === 'auction' ? auctionStatusText(e.status) : undefined} />
           <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">{formatDate(e.time)}</span>
         </div>
       ))}
@@ -2309,10 +2314,6 @@ function AuctionsPage() {
     } catch (e) { notify(apiErrorMessage(e, 'Не удалось создать аукцион'), true); }
   };
 
-  const AUCTION_STATUS_LABELS: Record<string, string> = {
-    CREATED: 'Создан', ACTIVE: 'Активен', COMPLETED: 'Завершён', CANCELLED: 'Отменён',
-  };
-
   return (
     <div className="space-y-4">
       {cancelTarget != null && (
@@ -2444,7 +2445,7 @@ function AuctionsPage() {
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}>
-              {s === 'ALL' ? `Все (${counts.ALL})` : `${AUCTION_STATUS_LABELS[s] || s} (${counts[s] || 0})`}
+              {s === 'ALL' ? `Все (${counts.ALL})` : `${auctionStatusText(s)} (${counts[s] || 0})`}
             </button>
           ))}
         </div>
@@ -2488,7 +2489,7 @@ function AuctionsPage() {
                     </td>
                     <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">{formatDateTime(a.startTime)}</td>
                     <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">{formatDateTime(a.endTime)}</td>
-                    <td className="px-4 py-3"><Badge status={a.status} /></td>
+                    <td className="px-4 py-3"><Badge status={a.status} label={auctionStatusText(a.status)} /></td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1.5">
                         {a.status === 'CREATED' && !a.confirmedStart && (
@@ -2549,7 +2550,7 @@ function AuctionsPage() {
               {/* Info grid */}
               <div className="grid grid-cols-2 gap-3 text-sm">
                 {[
-                  { label: 'Статус', value: <Badge status={auctionDetail.status} /> },
+                  { label: 'Статус', value: <Badge status={auctionDetail.status} label={auctionStatusText(auctionDetail.status)} /> },
                   { label: 'Текущая цена', value: `${Number(auctionDetail.currentPrice).toLocaleString('ru')} сом` },
                   { label: 'Начало', value: formatDateTime(auctionDetail.startTime) },
                   { label: 'Окончание', value: formatDateTime(auctionDetail.endTime) },
