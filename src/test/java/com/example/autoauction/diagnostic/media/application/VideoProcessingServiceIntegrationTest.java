@@ -24,6 +24,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
@@ -49,9 +50,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @Transactional (rollback-per-test): processPending()/findPendingProcessing()
  * scan by status across ALL rows, not by ID - same reasoning as
  * DiagnosticMediaRepositoryProcessingTest and LegacyMediaMigrationServiceIntegrationTest.
+ *
+ * TEST-ISO-01: for the same reason the class needs a database without rows committed by
+ * earlier classes of the shared context (DiagnosticMediaServiceIntegrationTest,
+ * MediaReconciliationServiceIntegrationTest commit media). BEFORE_CLASS gives it a fresh
+ * context and with it a fresh in-memory database.
  */
 @SpringBootTest
 @ActiveProfiles("test")
+@DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_CLASS)
 @Transactional
 @DisplayName("MEDIA-3.4: VideoProcessingService")
 class VideoProcessingServiceIntegrationTest {
