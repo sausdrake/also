@@ -158,7 +158,7 @@ class AuctionCommitmentLinkageIntegrationTest {
         OffsetDateTime start = OffsetDateTime.now().plusDays(1);
         return new AuctionCreateRequest(
                 vehicleId, new BigDecimal("1000000"), new BigDecimal("1200000"),
-                new BigDecimal("1500000"), new BigDecimal("10000"),
+                new BigDecimal("1500000"),
                 start, start.plusDays(7), null, null);
     }
 

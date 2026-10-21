@@ -25,6 +25,7 @@ function mockApi(settings: Promise<unknown>) {
     if (url.startsWith('/admin/auctions?')) return Promise.resolve({ data: { content: [] } });
     if (url === '/admin/vehicles/approved') return Promise.resolve({ data: [{ id: 9, brand: 'BMW', model: 'X5', year: 2020, vin: 'WBA00000000000001' }] });
     if (url === '/admin/settings') return settings;
+    if (url === '/admin/auctions/bid-step') return Promise.resolve({ data: { startingPrice: 1000000, minimumBidStep: 10000, minimumFirstBid: 1010000 } });
     return Promise.resolve({ data: [] });
   });
 }
@@ -45,7 +46,6 @@ async function openCreateForm() {
 async function fillValidForm(container: HTMLElement) {
   fireEvent.change(container.querySelector('select')!, { target: { value: '9' } });
   fireEvent.change(screen.getByLabelText('Стартовая цена *'), { target: { value: '1000000' } });
-  fireEvent.change(screen.getByLabelText('Шаг ставки *'), { target: { value: '10000' } });
   const [start, end] = Array.from(container.querySelectorAll('input[type="datetime-local"]'));
   fireEvent.change(start, { target: { value: '2026-11-01T10:00' } });
   fireEvent.change(end, { target: { value: '2026-11-08T10:00' } });
@@ -70,7 +70,8 @@ describe('DEPOSIT-01: the create form uses the global participation deposit', ()
     fireEvent.click(screen.getByText('Создать'));
 
     await waitFor(() => expect(createCalls()).toHaveLength(1));
-    expect(createCalls()[0][1]).toMatchObject({ vehicleId: 9, startingPrice: 1000000, minBidStep: 10000 });
+    expect(createCalls()[0][1]).toMatchObject({ vehicleId: 9, startingPrice: 1000000 });
+    expect(createCalls()[0][1]).not.toHaveProperty('minBidStep');   // AUCTION-01: derived by the server
     expect(createCalls()[0][1]).not.toHaveProperty('requiredDepositAmount');
   });
 

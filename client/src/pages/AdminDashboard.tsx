@@ -12,6 +12,7 @@ import { AUCTION_STATUSES as AUCTION_STATUS_VALUES, AUCTION_STATUS_LABELS, type 
 import { BrandLogo } from '../components/brand/BrandLogo';
 import { ReportItemMedia } from '../components/admin/diagnostic/ReportItemMedia';
 import { formatDateTime, formatDate } from '../utils/formatDate';
+import { MONEY_CAPACITY, formatSom, moneyInputError, toMoney } from '../domain/money';
 import { useAuthStore } from '../store/authStore';
 import { PhotoLightbox } from '../components/PhotoLightbox';
 import { PolicyPage } from './admin/PolicyPage';
@@ -2147,9 +2148,15 @@ function AuctionsPage() {
   const [cancelTarget, setCancelTarget] = useState<number | null>(null);
   const [userMap, setUserMap] = useState<Record<number, string>>({});
   const [form, setForm] = useState({
-    vehicleId: '', startingPrice: '', minBidStep: '',
+    vehicleId: '', startingPrice: '',
     startTime: '', endTime: '', buyNowPrice: '', reservePrice: '',
   });
+  // AUCTION-01 (BD-02): the bid step is never entered - the server derives it from the starting price.
+  // Kept with the price it answers; undefined = nothing to show, null = the server refused this price.
+  const [bidStepAnswer, setBidStepAnswer] = useState<{
+    price: string; value: { minimumBidStep: number; minimumFirstBid: number } | null | undefined } | null>(null);
+  const previewPrice = form.startingPrice.trim();
+  const bidStepPreview = bidStepAnswer?.price === previewPrice ? bidStepAnswer.value : undefined;
   // DEPOSIT-01 (BD-01): the participation deposit is the global setting the server snapshots at creation -
   // shown here, never entered. undefined = loading, null = not set (creation is refused), '' = load failed.
   const [participationDeposit, setParticipationDeposit] = useState<string | null | undefined>(undefined);
@@ -2182,6 +2189,18 @@ function AuctionsPage() {
       setParticipationDeposit(typeof v === 'string' && v.trim() && Number(v) > 0 ? v : null);
     })
     .catch(() => setParticipationDeposit(''));
+
+  useEffect(() => {
+    if (moneyInputError(previewPrice) !== null) return;
+    let stale = false;
+    const timer = setTimeout(() => {
+      api.get('/admin/auctions/bid-step', { params: { startingPrice: previewPrice.replace(',', '.') } })
+        .then(r => { if (!stale) setBidStepAnswer({ price: previewPrice, value: r.data }); })
+        // only a 400 means "this price has no valid step"; a network failure must not block the form
+        .catch(e => { if (!stale) setBidStepAnswer({ price: previewPrice, value: e?.response?.status === 400 ? null : undefined }); });
+    }, 250);
+    return () => { stale = true; clearTimeout(timer); };
+  }, [previewPrice]);
 
   useEffect(() => {
     loadAuctions();
@@ -2281,19 +2300,21 @@ function AuctionsPage() {
     if (!form.vehicleId) errs.vehicleId = 'Выберите автомобиль';
     // Scenarios 5.3 / 17.2: the main photo (the first one) is mandatory.
     if (auctionPhotos.length === 0) errs.photos = 'Загрузите главное фото (обязательно)';
-    const sp = parseFloat(form.startingPrice);
-    if (!form.startingPrice || isNaN(sp) || sp <= 0) errs.startingPrice = 'Введите стартовую цену';
-    if (sp > 999_999_999) errs.startingPrice = 'Слишком большая сумма';
-    const step = parseFloat(form.minBidStep);
-    if (!form.minBidStep || isNaN(step) || step <= 0) errs.minBidStep = 'Введите шаг ставки';
+    // AUCTION-01: prices are money the backend stores as NUMERIC(10,2) - checked here, never silently rounded
+    if (!form.startingPrice.trim()) errs.startingPrice = 'Введите стартовую цену';
+    else {
+      const e = moneyInputError(form.startingPrice);
+      if (e) errs.startingPrice = e;
+      else if (bidStepPreview === null) errs.startingPrice = 'Слишком маленькая цена: шаг ставки округляется до 0';
+    }
+    for (const f of ['reservePrice', 'buyNowPrice'] as const) {
+      const e = form[f].trim() ? moneyInputError(form[f]) : null;
+      if (e) errs[f] = e;
+    }
     if (!form.startTime) errs.startTime = 'Укажите дату начала';
     if (!form.endTime) errs.endTime = 'Укажите дату окончания';
     if (form.startTime && form.endTime && form.startTime >= form.endTime)
       errs.endTime = 'Дата окончания должна быть позже начала';
-    if (form.buyNowPrice) {
-      const bnp = parseFloat(form.buyNowPrice);
-      if (isNaN(bnp) || bnp <= 0) errs.buyNowPrice = 'Некорректная цена Buy Now';
-    }
     return errs;
   };
 
@@ -2330,18 +2351,17 @@ function AuctionsPage() {
       const additionalPhotoUrls = auctionPhotos.length > 1 ? JSON.stringify(auctionPhotos.slice(1)) : null;
       await api.post('/admin/auctions', {
         vehicleId: parseInt(form.vehicleId),
-        startingPrice: parseFloat(form.startingPrice),
-        minBidStep: parseFloat(form.minBidStep),
+        startingPrice: toMoney(form.startingPrice),
         startTime: new Date(form.startTime).toISOString(),
         endTime: new Date(form.endTime).toISOString(),
-        buyNowPrice: form.buyNowPrice ? parseFloat(form.buyNowPrice) : null,
-        reservePrice: form.reservePrice ? parseFloat(form.reservePrice) : null,
+        buyNowPrice: form.buyNowPrice.trim() ? toMoney(form.buyNowPrice) : null,
+        reservePrice: form.reservePrice.trim() ? toMoney(form.reservePrice) : null,
         mainPhotoUrl,
         additionalPhotoUrls,
       });
       notify('Аукцион создан');
       setShowCreate(false);
-      setForm({ vehicleId: '', startingPrice: '', minBidStep: '', startTime: '', endTime: '', buyNowPrice: '', reservePrice: '' });
+      setForm({ vehicleId: '', startingPrice: '', startTime: '', endTime: '', buyNowPrice: '', reservePrice: '' });
       setAuctionPhotos([]);
       loadAuctions();
     } catch (e) { notify(apiErrorMessage(e, 'Не удалось создать аукцион'), true); }
@@ -2395,19 +2415,28 @@ function AuctionsPage() {
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { f: 'startingPrice', label: 'Стартовая цена *' },
-                  { f: 'minBidStep',    label: 'Шаг ставки *' },
                   { f: 'reservePrice',  label: 'Резервная цена (опц.)' },
                   { f: 'buyNowPrice',   label: 'Buy Now (опц.)' },
                 ].map(({ f, label }) => (
                   <div key={f}>
                     <label className="text-xs text-gray-500 mb-1 block">{label}</label>
-                    <input type="number" placeholder="0" min={0} max={999999999} aria-label={label}
+                    <input type="number" placeholder="0" min={0.01} max={MONEY_CAPACITY} step={0.01} aria-label={label}
                       value={(form as any)[f]}
                       onChange={e => setForm({...form, [f]: e.target.value})}
                       className={`w-full border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none ${(formErrors as any)[f] ? 'border-red-400' : 'border-gray-200'}`} />
                     {(formErrors as any)[f] && <p className="text-red-500 text-xs mt-0.5">{(formErrors as any)[f]}</p>}
                   </div>
                 ))}
+                <div className="col-span-2 rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600 space-y-0.5" data-testid="bid-step-preview">
+                  <p>Стартовая цена: <span className="font-medium text-gray-800">{bidStepPreview ? `${formatSom(toMoney(form.startingPrice))} сом` : '—'}</span></p>
+                  <p>Минимальный шаг: <span className="font-medium text-gray-800">{bidStepPreview ? `${formatSom(bidStepPreview.minimumBidStep, 3)} сом` : '—'}</span></p>
+                  <p>Минимальная первая ставка: <span className="font-medium text-gray-800">{bidStepPreview ? `${formatSom(bidStepPreview.minimumFirstBid)} сом` : '—'}</span></p>
+                  <p className="text-gray-400">
+                    {bidStepPreview === null
+                      ? 'Для этой цены шаг не рассчитывается — проверьте стартовую цену.'
+                      : 'Шаг рассчитывается автоматически: 1% от стартовой цены, округление до 3 знаков.'}
+                  </p>
+                </div>
                 <div className="col-span-2 text-xs" data-testid="participation-deposit">
                   {participationDeposit === undefined && <p className="text-gray-400">Загрузка депозита для участия…</p>}
                   {participationDeposit === '' && (

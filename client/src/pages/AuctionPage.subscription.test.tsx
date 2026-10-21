@@ -28,7 +28,7 @@ const SUBS = { baseURL: 'http://api.test/api' };
 const httpError = (status: number, data: unknown) => Object.assign(new Error(`HTTP ${status}`), { isAxiosError: true, response: { status, data } });
 const auction = {
   id: 1, vehicleId: 9, vehicleInfo: 'BMW X5 2020', status: 'ACTIVE', startingPrice: 1000000, currentPrice: 1000000,
-  minBidStep: 10000, buyNowPrice: null, startTime: '2026-10-15T00:00:00Z', endTime: '2099-12-31T00:00:00Z', totalBids: 0,
+  minBidStep: 10000, minimumNextBid: 1010000, buyNowPrice: null, startTime: '2026-10-15T00:00:00Z', endTime: '2099-12-31T00:00:00Z', totalBids: 0,
   requiredDepositAmount: 50000,
 };
 

@@ -1,5 +1,6 @@
 package com.example.autoauction.admin.application;
 
+import com.example.autoauction.auction.domain.BidStepPolicy;
 import com.example.autoauction.auction.web.dto.AuctionCreateRequest;
 import com.example.autoauction.vehicle.web.dto.VehicleResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +19,6 @@ public class AuctionValidator {
     private static final long MIN_AUCTION_DURATION_HOURS = 1;
     private static final long MAX_AUCTION_DURATION_DAYS = 30;
     private static final long MIN_HOURS_BEFORE_START = 0;
-    private static final BigDecimal MIN_BID_STEP_PERCENTAGE = new BigDecimal("0.01");
 
     private final Clock clock;
 
@@ -31,7 +31,6 @@ public class AuctionValidator {
 
         Objects.requireNonNull(request.vehicleId(), "ID автомобиля не может быть null");
         Objects.requireNonNull(request.startingPrice(), "Стартовая цена не может быть null");
-        Objects.requireNonNull(request.minBidStep(), "Шаг ставки не может быть null");
         Objects.requireNonNull(request.startTime(), "Время начала не может быть null");
         Objects.requireNonNull(request.endTime(), "Время окончания не может быть null");
     }
@@ -40,7 +39,8 @@ public class AuctionValidator {
         log.debug("Валидация бизнес-правил для аукциона");
 
         validatePrices(request);
-        validateBidStep(request);
+        // AUCTION-01 (BD-02): the step is derived, never entered - only check that it is not zero
+        BidStepPolicy.minimumBidStep(request.startingPrice());
         validateTime(request);
 
         validateVehicleCompatibility(request, vehicle);
@@ -79,22 +79,6 @@ public class AuctionValidator {
                                 request.buyNowPrice(), request.startingPrice())
                 );
             }
-        }
-    }
-
-    private void validateBidStep(AuctionCreateRequest request) {
-        if (request.minBidStep().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException(
-                    String.format("Шаг ставки должен быть больше 0. Получено: %s", request.minBidStep())
-            );
-        }
-
-        BigDecimal minAllowedStep = request.startingPrice().multiply(MIN_BID_STEP_PERCENTAGE);
-        if (request.minBidStep().compareTo(minAllowedStep) < 0) {
-            throw new IllegalArgumentException(
-                    String.format("Шаг ставки (%s) не может быть меньше 1%% от стартовой цены (%s)",
-                            request.minBidStep(), minAllowedStep)
-            );
         }
     }
 

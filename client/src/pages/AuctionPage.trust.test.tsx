@@ -22,7 +22,7 @@ const TRUST = httpError(403, { status: 403, error: 'Forbidden', code: 'TRUSTED_P
 const KYC = httpError(403, { status: 403, error: 'Forbidden', code: 'IDENTITY_VERIFICATION_REQUIRED', message: 'Пройдите верификацию личности.' });
 
 const lot = (status: string, extra: Record<string, unknown> = {}) => ({
-  id: 1, vehicleId: 9, vehicleInfo: 'BMW X5 2020', status, startingPrice: 1000000, currentPrice: 1000000, minBidStep: 10000,
+  id: 1, vehicleId: 9, vehicleInfo: 'BMW X5 2020', status, startingPrice: 1000000, currentPrice: 1000000, minBidStep: 10000, minimumNextBid: 1010000,
   buyNowPrice: null, startTime: '2026-10-15T00:00:00Z', endTime: '2099-12-31T00:00:00Z', totalBids: 0, requiredDepositAmount: 50000, ...extra,
 });
 

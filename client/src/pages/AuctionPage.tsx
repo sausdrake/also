@@ -10,6 +10,7 @@ import * as subscriptions from '../api/subscriptions';
 import { apiErrorMessage, parseApiError } from '../api/errors';
 import { KycRequiredNotice } from '../components/identity/KycRequiredNotice';
 import { TrustedStatusRequiredNotice } from '../components/identity/TrustedStatusRequiredNotice';
+import { MONEY_CAPACITY, moneyInputError, toMoney } from '../domain/money';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
@@ -23,6 +24,8 @@ interface AuctionDetail {
   reservePrice: number | null;
   buyNowPrice: number | null;
   minBidStep: number;
+  /** AUCTION-01: the smallest valid next bid (to the tyiyn), derived by the server - never recomputed here. */
+  minimumNextBid?: number | null;
   /** Fixed deposit the admin set for this lot; without it the backend refuses bids and Buy Now. */
   requiredDepositAmount?: number | null;
   status: string;
@@ -66,7 +69,6 @@ interface LiveBid {
   bidderId?: number;
 }
 
-const MAX_BID = 999_999_999;
 const BID_HISTORY_MAX = 50;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -222,6 +224,7 @@ export const AuctionPage = () => {
   const auctionId = parseInt(id || '0');
   const { isAuthenticated, accessToken, user } = useAuthStore();
   const { isConnected, lastMessage } = useWebSocket(auctionId);
+  const liveBid = lastMessage?.messageType === 'BID_PLACED' ? lastMessage : null;
 
   const [auction, setAuction]   = useState<AuctionDetail | null>(null);
   const [vehicle, setVehicle]   = useState<VehicleDetail | null>(null);
@@ -273,7 +276,6 @@ export const AuctionPage = () => {
         if (id) storeBids(id, updated);
         return updated;
       });
-      setBidAmount(String(lastMessage.currentPrice + (auction?.minBidStep ?? 0)));
       showMsg(`Новая ставка: ${fmt(lastMessage.currentPrice)} сом`, 'success');
     }
     if (lastMessage.messageType === 'AUCTION_EXTENDED') {
@@ -282,7 +284,8 @@ export const AuctionPage = () => {
     }
   }, [lastMessage]);
 
-  useEffect(() => { fetchAuction(); }, [id]);
+  // AUCTION-01: after a live bid the new minimum next bid comes from the server, never from price + step
+  useEffect(() => { fetchAuction(); }, [id, liveBid]);
 
   useEffect(() => {
     if (!auction?.vehicleId) return;
@@ -340,7 +343,7 @@ export const AuctionPage = () => {
     try {
       const { data } = await axios.get(`${BASE_URL}/api/public/auctions/${id}`, { headers: authHeaders() });
       setAuction(data);
-      setBidAmount(String(data.currentPrice + data.minBidStep));
+      setBidAmount(data.minimumNextBid != null ? String(data.minimumNextBid) : '');
       // Seed bid history only when localStorage has no history for this auction
       if (data.totalBids > 0 && id) {
         const stored = loadStoredBids(id);
@@ -358,12 +361,12 @@ export const AuctionPage = () => {
   };
 
   const validateBid = (raw: string) => {
-    const val = Number(raw);
-    if (!raw.trim() || isNaN(val)) return 'Введите сумму ставки';
-    if (val <= 0) return 'Сумма должна быть больше 0';
-    if (val > MAX_BID) return `Максимум ${fmt(MAX_BID)} сом`;
-    if (auction && val < auction.currentPrice + auction.minBidStep)
-      return `Минимальная ставка: ${fmt(auction.currentPrice + auction.minBidStep)} сом`;
+    if (!raw.trim()) return 'Введите сумму ставки';
+    const formatError = moneyInputError(raw);
+    if (formatError) return formatError;
+    const val = toMoney(raw)!;
+    if (auction?.minimumNextBid != null && val < auction.minimumNextBid)
+      return `Минимальная ставка: ${fmt(auction.minimumNextBid)} сом`;
     return null;
   };
 
@@ -376,10 +379,10 @@ export const AuctionPage = () => {
     moneyActionInFlight.current = true;
     setPendingAction('bid');
     try {
-      await axios.post(`${BASE_URL}/api/auctions/${id}/bids`, { amount: Number(bidAmount) }, { headers: authHeaders() });
+      await axios.post(`${BASE_URL}/api/auctions/${id}/bids`, { amount: toMoney(bidAmount) }, { headers: authHeaders() });
       setKycRefusal(null);
       setTrustRefusal(null);
-      showMsg(`Ставка ${fmt(Number(bidAmount))} сом принята!`, 'success');
+      showMsg(`Ставка ${fmt(toMoney(bidAmount))} сом принята!`, 'success');
     } catch (e) {
       const error = parseApiError(e, 'Ошибка при размещении ставки');
       setKycRefusal(error.kind === 'kyc_required' ? { action: 'делать ставки', message: error.message } : null);
@@ -439,7 +442,7 @@ export const AuctionPage = () => {
     return [auction.mainPhotoUrl, ...extras].filter(Boolean) as string[];
   })();
 
-  const minNextBid = auction.currentPrice + auction.minBidStep;
+  const minNextBid = auction.minimumNextBid ?? null;
   const isActive    = auction.status === 'ACTIVE';
   const isCreated   = auction.status === 'CREATED';
   const isCompleted = ['COMPLETED', 'SOLD', 'EXPIRED', 'CANCELLED', 'WAITING_FOR_PAYMENT', 'SALE_FAILED'].includes(auction.status);
@@ -828,18 +831,21 @@ export const AuctionPage = () => {
                       {' '}чтобы участвовать в торгах
                     </div>
                   )}
-                  <label className="text-xs text-gray-400">Мин. ставка: {fmt(minNextBid)} сом</label>
+                  <label className="text-xs text-gray-400" data-testid="min-next-bid">
+                    Мин. ставка: {minNextBid != null ? `${fmt(minNextBid)} сом` : '—'}
+                  </label>
                   <div className="flex gap-2">
                     <input
                       type="number"
                       value={bidAmount}
-                      min={minNextBid}
-                      max={MAX_BID}
+                      min={minNextBid ?? undefined}
+                      max={MONEY_CAPACITY}
+                      step={0.01}
                       onChange={e => { setBidAmount(e.target.value); setBidError(''); }}
                       className={`flex-1 px-4 py-3 border rounded-xl text-base focus:ring-2 focus:ring-blue-500 focus:outline-none ${
                         bidError ? 'border-red-400' : 'border-gray-200'
                       }`}
-                      placeholder={fmt(minNextBid)}
+                      placeholder={minNextBid != null ? fmt(minNextBid) : ''}
                       disabled={!isAuthenticated}
                     />
                     <button onClick={placeBid} disabled={!isAuthenticated || pendingAction !== null}

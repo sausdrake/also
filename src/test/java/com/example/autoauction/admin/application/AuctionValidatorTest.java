@@ -24,28 +24,26 @@ class AuctionValidatorTest {
     private static final OffsetDateTime NOW = OffsetDateTime.ofInstant(FIXED_INSTANT, ZoneOffset.UTC);
     private static final OffsetDateTime START = NOW.plusHours(1);
     private static final BigDecimal START_PRICE = new BigDecimal("1000.00");
-    private static final BigDecimal STEP = new BigDecimal("10.00");
 
     private final AuctionValidator validator = new AuctionValidator(Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC));
 
     private static AuctionCreateRequest request(Long vehicleId, BigDecimal startingPrice, BigDecimal reservePrice,
-                                                BigDecimal buyNowPrice, BigDecimal minBidStep,
+                                                BigDecimal buyNowPrice,
                                                 OffsetDateTime startTime, OffsetDateTime endTime) {
-        return new AuctionCreateRequest(vehicleId, startingPrice, reservePrice, buyNowPrice, minBidStep,
+        return new AuctionCreateRequest(vehicleId, startingPrice, reservePrice, buyNowPrice,
                 startTime, endTime, null, null);
     }
 
     private static AuctionCreateRequest valid() {
-        return request(1L, START_PRICE, null, null, STEP, START, START.plusHours(2));
+        return request(1L, START_PRICE, null, null, START, START.plusHours(2));
     }
 
-    private static AuctionCreateRequest withPrices(BigDecimal start, BigDecimal reserve, BigDecimal buyNow,
-                                                   BigDecimal step) {
-        return request(1L, start, reserve, buyNow, step, START, START.plusHours(2));
+    private static AuctionCreateRequest withPrices(BigDecimal start, BigDecimal reserve, BigDecimal buyNow) {
+        return request(1L, start, reserve, buyNow, START, START.plusHours(2));
     }
 
     private static AuctionCreateRequest withTimes(OffsetDateTime start, OffsetDateTime end) {
-        return request(1L, START_PRICE, null, null, STEP, start, end);
+        return request(1L, START_PRICE, null, null, start, end);
     }
 
     private void assertRejected(AuctionCreateRequest request) {
@@ -66,36 +64,30 @@ class AuctionValidatorTest {
     @Test
     void basicRequest_optionalPricesNull_passes() {
         assertDoesNotThrow(() -> validator.validateBasicRequest(
-                request(1L, START_PRICE, null, null, STEP, START, START.plusHours(2))));
+                request(1L, START_PRICE, null, null, START, START.plusHours(2))));
     }
 
     @Test
     void basicRequest_nullVehicleId_throwsNpe() {
-        var r = request(null, START_PRICE, null, null, STEP, START, START.plusHours(2));
+        var r = request(null, START_PRICE, null, null, START, START.plusHours(2));
         assertThrows(NullPointerException.class, () -> validator.validateBasicRequest(r));
     }
 
     @Test
     void basicRequest_nullStartingPrice_throwsNpe() {
-        var r = request(1L, null, null, null, STEP, START, START.plusHours(2));
-        assertThrows(NullPointerException.class, () -> validator.validateBasicRequest(r));
-    }
-
-    @Test
-    void basicRequest_nullMinBidStep_throwsNpe() {
-        var r = request(1L, START_PRICE, null, null, null, START, START.plusHours(2));
+        var r = request(1L, null, null, null, START, START.plusHours(2));
         assertThrows(NullPointerException.class, () -> validator.validateBasicRequest(r));
     }
 
     @Test
     void basicRequest_nullStartTime_throwsNpe() {
-        var r = request(1L, START_PRICE, null, null, STEP, null, START.plusHours(2));
+        var r = request(1L, START_PRICE, null, null, null, START.plusHours(2));
         assertThrows(NullPointerException.class, () -> validator.validateBasicRequest(r));
     }
 
     @Test
     void basicRequest_nullEndTime_throwsNpe() {
-        var r = request(1L, START_PRICE, null, null, STEP, START, null);
+        var r = request(1L, START_PRICE, null, null, START, null);
         assertThrows(NullPointerException.class, () -> validator.validateBasicRequest(r));
     }
 
@@ -110,110 +102,90 @@ class AuctionValidatorTest {
 
     @Test
     void startingPrice_zero_rejected() {
-        assertRejected(withPrices(BigDecimal.ZERO, null, null, STEP));
+        assertRejected(withPrices(BigDecimal.ZERO, null, null));
     }
 
     @Test
     void startingPrice_negative_rejected() {
-        assertRejected(withPrices(new BigDecimal("-1.00"), null, null, STEP));
+        assertRejected(withPrices(new BigDecimal("-1.00"), null, null));
     }
 
     @Test
-    void startingPrice_smallestPositive_accepted() {
-        assertAccepted(withPrices(new BigDecimal("0.01"), null, null, new BigDecimal("0.01")));
+    void startingPrice_oneTyiyn_rejectedBecauseItsStepRoundsToZero() {
+        // AUCTION-01: the derived step of 0.01 is 0.0001 -> 0.000; the "step > 0" rule still holds
+        assertRejected(withPrices(new BigDecimal("0.01"), null, null));
     }
 
     @Test
     void reservePrice_zero_rejected() {
-        assertRejected(withPrices(START_PRICE, BigDecimal.ZERO, null, STEP));
+        assertRejected(withPrices(START_PRICE, BigDecimal.ZERO, null));
     }
 
     @Test
     void reservePrice_negative_rejected() {
-        assertRejected(withPrices(START_PRICE, new BigDecimal("-5.00"), null, STEP));
+        assertRejected(withPrices(START_PRICE, new BigDecimal("-5.00"), null));
     }
 
     @Test
     void reservePrice_belowStartingPrice_rejected() {
-        assertRejected(withPrices(START_PRICE, new BigDecimal("999.99"), null, STEP));
+        assertRejected(withPrices(START_PRICE, new BigDecimal("999.99"), null));
     }
 
     @Test
     void reservePrice_equalToStartingPrice_accepted() {
-        assertAccepted(withPrices(START_PRICE, START_PRICE, null, STEP));
+        assertAccepted(withPrices(START_PRICE, START_PRICE, null));
     }
 
     @Test
     void reservePrice_aboveStartingPrice_accepted() {
-        assertAccepted(withPrices(START_PRICE, new BigDecimal("1000.01"), null, STEP));
+        assertAccepted(withPrices(START_PRICE, new BigDecimal("1000.01"), null));
     }
 
     @Test
     void buyNowPrice_zero_rejected() {
-        assertRejected(withPrices(START_PRICE, null, BigDecimal.ZERO, STEP));
+        assertRejected(withPrices(START_PRICE, null, BigDecimal.ZERO));
     }
 
     @Test
     void buyNowPrice_negative_rejected() {
-        assertRejected(withPrices(START_PRICE, null, new BigDecimal("-1.00"), STEP));
+        assertRejected(withPrices(START_PRICE, null, new BigDecimal("-1.00")));
     }
 
     @Test
     void buyNowPrice_zeroWithValidReserve_rejected() {
-        assertRejected(withPrices(START_PRICE, new BigDecimal("1200.00"), BigDecimal.ZERO, STEP));
+        assertRejected(withPrices(START_PRICE, new BigDecimal("1200.00"), BigDecimal.ZERO));
     }
 
     @Test
     void buyNowPrice_belowStartingPrice_rejected() {
-        assertRejected(withPrices(START_PRICE, null, new BigDecimal("999.99"), STEP));
+        assertRejected(withPrices(START_PRICE, null, new BigDecimal("999.99")));
     }
 
     @Test
     void buyNowPrice_equalToStartingPrice_rejected() {
-        assertRejected(withPrices(START_PRICE, null, START_PRICE, STEP));
+        assertRejected(withPrices(START_PRICE, null, START_PRICE));
     }
 
     @Test
     void buyNowPrice_aboveStartingPriceByOneCent_accepted() {
-        assertAccepted(withPrices(START_PRICE, null, new BigDecimal("1000.01"), STEP));
+        assertAccepted(withPrices(START_PRICE, null, new BigDecimal("1000.01")));
     }
 
     @Test
     void reserveAndBuyNow_bothValid_accepted() {
-        assertAccepted(withPrices(START_PRICE, new BigDecimal("1200.00"), new BigDecimal("1500.00"), STEP));
+        assertAccepted(withPrices(START_PRICE, new BigDecimal("1200.00"), new BigDecimal("1500.00")));
     }
 
-    // ---- bid step ----
+    // ---- bid step (AUCTION-01, BD-02: derived as ROUND(startingPrice x 0.01, 3), never entered) ----
 
     @Test
-    void bidStep_zero_rejected() {
-        assertRejected(withPrices(START_PRICE, null, null, BigDecimal.ZERO));
-    }
-
-    @Test
-    void bidStep_negative_rejected() {
-        assertRejected(withPrices(START_PRICE, null, null, new BigDecimal("-10.00")));
+    void bidStep_priceWhoseStepRoundsToZero_rejected() {
+        assertRejected(withPrices(new BigDecimal("0.04"), null, null));   // 0.0004 -> 0.000
     }
 
     @Test
-    void bidStep_exactlyOnePercentOfStartingPrice_accepted() {
-        assertAccepted(withPrices(START_PRICE, null, null, new BigDecimal("10.00")));
-    }
-
-    @Test
-    void bidStep_justBelowOnePercent_rejected() {
-        assertRejected(withPrices(START_PRICE, null, null, new BigDecimal("9.99")));
-    }
-
-    @Test
-    void bidStep_comparisonIsScaleInsensitive() {
-        assertAccepted(withPrices(START_PRICE, null, null, new BigDecimal("10")));
-        assertAccepted(withPrices(START_PRICE, null, null, new BigDecimal("10.000")));
-    }
-
-    @Test
-    void bidStep_largeStep_accepted() {
-        assertAccepted(withPrices(START_PRICE, null, null, new BigDecimal("5000.00")));
+    void bidStep_smallestPriceWithNonZeroStep_accepted() {
+        assertAccepted(withPrices(new BigDecimal("0.05"), null, null));   // 0.0005 -> 0.001 (half-up)
     }
 
     // ---- time ----

@@ -121,8 +121,7 @@ class ParticipationDepositSettingPgIntegrationTest extends AbstractPostgresInteg
 
     private Long createAuction() {
         OffsetDateTime start = OffsetDateTime.now().plusDays(1);
-        return adminAuctionService.createAuction(new AuctionCreateRequest(eligibleVehicle(), new BigDecimal("1000000"), null, null,
-                new BigDecimal("10000"), start, start.plusDays(2), "https://media.example/dep01.jpg", null), 999L).id();
+        return adminAuctionService.createAuction(new AuctionCreateRequest(eligibleVehicle(), new BigDecimal("1000000"), null, null, start, start.plusDays(2), "https://media.example/dep01.jpg", null), 999L).id();
     }
 
     private BigDecimal snapshot(Long auctionId) {
@@ -223,8 +222,7 @@ class ParticipationDepositSettingPgIntegrationTest extends AbstractPostgresInteg
             Future<Long> create = pool.submit(() -> {
                 barrier.await();
                 OffsetDateTime start = OffsetDateTime.now().plusDays(1);
-                return adminAuctionService.createAuction(new AuctionCreateRequest(vehicle, new BigDecimal("1000000"), null, null,
-                        new BigDecimal("10000"), start, start.plusDays(2), "https://media.example/dep01.jpg", null), 999L).id();
+                return adminAuctionService.createAuction(new AuctionCreateRequest(vehicle, new BigDecimal("1000000"), null, null, start, start.plusDays(2), "https://media.example/dep01.jpg", null), 999L).id();
             });
             change.get(30, TimeUnit.SECONDS);
             assertThat(snapshot(create.get(30, TimeUnit.SECONDS))).isIn(new BigDecimal("10000.00"), new BigDecimal("20000.00"));

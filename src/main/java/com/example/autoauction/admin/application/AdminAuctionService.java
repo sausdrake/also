@@ -5,6 +5,7 @@ import com.example.autoauction.auction.application.AuctionCommitmentResolver;
 import com.example.autoauction.auction.application.AuctionFinalizer;
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
+import com.example.autoauction.auction.domain.BidStepPolicy;
 import com.example.autoauction.auction.domain.port.AuctionParticipantRepository;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.auction.web.dto.AuctionCreateRequest;
@@ -219,7 +220,7 @@ public class AdminAuctionService {
                 request.startingPrice(),
                 request.reservePrice(),
                 request.buyNowPrice(),
-                request.minBidStep(),
+                BidStepPolicy.minimumBidStep(request.startingPrice()),   // AUCTION-01 (BD-02): never entered
                 request.startTime(),
                 request.endTime(),
                 adminId

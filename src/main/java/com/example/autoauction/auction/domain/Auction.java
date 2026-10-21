@@ -233,6 +233,9 @@ public class Auction {
     public BigDecimal getReservePrice() { return reservePrice; }
     public BigDecimal getBuyNowPrice() { return buyNowPrice; }
     public BigDecimal getMinBidStep() { return minBidStep; }
+
+    /** AUCTION-01: the exact threshold a bid must reach - current price plus this auction's own step. */
+    public BigDecimal minimumNextBid() { return currentPrice.add(minBidStep); }
     public Long getPolicyVersionId() { return policyVersionId; }
     public Long getSellerDiagnosticCommitmentId() { return sellerDiagnosticCommitmentId; }
     public BigDecimal getRequiredDepositAmount() { return requiredDepositAmount; }
@@ -658,11 +661,17 @@ public class Auction {
             );
         }
 
-        BigDecimal minimumNextBid = this.currentPrice.add(this.minBidStep);
+        // AUCTION-01: a bid is money - som and tyiyn - that fits its column: never a finer amount the database
+        // would round silently, never one that would overflow NUMERIC(10,2) into a database error
+        if (!BidStepPolicy.isStorableMoney(amount)) {
+            throw new IllegalArgumentException(
+                    "Сумма ставки: больше 0, не больше 99999999.99 и не больше двух знаков после запятой");
+        }
+        BigDecimal minimumNextBid = minimumNextBid();
         if (amount.compareTo(minimumNextBid) < 0) {
             throw new IllegalArgumentException(
                     String.format("Сумма ставки %s слишком мала. Минимальная следующая ставка: %s",
-                            amount, minimumNextBid)
+                            amount.toPlainString(), BidStepPolicy.smallestValidBid(minimumNextBid).toPlainString())
             );
         }
 

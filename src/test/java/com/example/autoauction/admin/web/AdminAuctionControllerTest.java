@@ -79,7 +79,6 @@ class AdminAuctionControllerTest {
                 new BigDecimal("1000000"),
                 new BigDecimal("1200000"),
                 new BigDecimal("1500000"),
-                new BigDecimal("10000"),
                 startTime,
                 endTime,
                 "https://cdn.test/main.jpg", null
@@ -150,8 +149,7 @@ class AdminAuctionControllerTest {
         @DisplayName("Создание аукциона с невалидными данными - должно вернуть 400")
         void createAuction_WithInvalidData_ShouldReturnBadRequest() throws Exception {
             AuctionCreateRequest invalidRequest = new AuctionCreateRequest(
-                    null, new BigDecimal("-1000"), null, null,
-                    new BigDecimal("0"), null, null,
+                    null, new BigDecimal("-1000"), null, null, null, null,
                     null, null
             );
 
@@ -171,7 +169,7 @@ class AdminAuctionControllerTest {
         void createAuction_WithoutMainPhoto_ShouldReturnBadRequest(String mainPhotoUrl) throws Exception {
             AuctionCreateRequest noPhoto = new AuctionCreateRequest(
                     validCreateRequest.vehicleId(), validCreateRequest.startingPrice(), validCreateRequest.reservePrice(),
-                    validCreateRequest.buyNowPrice(), validCreateRequest.minBidStep(), validCreateRequest.startTime(),
+                    validCreateRequest.buyNowPrice(), validCreateRequest.startTime(),
                     validCreateRequest.endTime(), mainPhotoUrl, null);
 
             mockMvc.perform(post("/api/v1/admin/auctions")

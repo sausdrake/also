@@ -4,8 +4,10 @@ package com.example.autoauction.admin.web;
 import com.example.autoauction.admin.application.AdminAuctionService;
 import com.example.autoauction.auth.domain.UserPrincipal;
 import com.example.autoauction.auth.infrastructure.security.CurrentUser;
+import com.example.autoauction.auction.domain.BidStepPolicy;
 import com.example.autoauction.auction.web.dto.AuctionCreateRequest;
 import com.example.autoauction.auction.web.dto.AuctionResponse;
+import com.example.autoauction.auction.web.dto.BidStepPreviewResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,6 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -51,6 +54,19 @@ public class AdminAuctionController {
 
         AuctionResponse response = adminAuctionService.createAuction(request, adminId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @GetMapping("/bid-step")
+    @Operation(summary = "Рассчитать минимальный шаг ставки и минимальную первую ставку по стартовой цене")
+    public ResponseEntity<BidStepPreviewResponse> bidStep(@RequestParam BigDecimal startingPrice) {
+        // AUCTION-01: the same BidStepPolicy that createAuction stores - the form never repeats the formula
+        if (!BidStepPolicy.isStorableMoney(startingPrice)) {
+            throw new IllegalArgumentException(
+                    "Стартовая цена: больше 0, не больше 99999999.99 и не больше двух знаков после запятой");
+        }
+        BigDecimal step = BidStepPolicy.minimumBidStep(startingPrice);
+        return ResponseEntity.ok(new BidStepPreviewResponse(startingPrice, step,
+                BidStepPolicy.smallestValidBid(startingPrice.add(step))));
     }
 
     @GetMapping

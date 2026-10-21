@@ -2,6 +2,7 @@ package com.example.autoauction.auction.web.dto;
 
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
+import com.example.autoauction.auction.domain.BidStepPolicy;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -81,8 +82,18 @@ public record AuctionResponse(
         OffsetDateTime paymentDeadline,
 
         @Schema(description = "Дедлайн уже прошёл (справочно; не влияет автоматически на статус)")
-        boolean overdue
+        boolean overdue,
+
+        @Schema(description = "Минимальная допустимая следующая ставка (до тыйына): текущая цена + шаг, " +
+                "округлённые вверх. Рассчитывается сервером - клиент не повторяет формулу", example = "1010000.00")
+        BigDecimal minimumNextBid
 ) {
+    /** AUCTION-01: the smallest valid bid, derived from the same rule {@link Auction#addBid} enforces. */
+    static BigDecimal minimumNextBidOf(BigDecimal currentPrice, BigDecimal minBidStep) {
+        return currentPrice == null || minBidStep == null
+                ? null : BidStepPolicy.smallestValidBid(currentPrice.add(minBidStep));
+    }
+
     /**
      * Обратно-совместимый конструктор для существующего кода/тестов, построенных до
      * появления requiredDepositAmount.
@@ -97,7 +108,7 @@ public record AuctionResponse(
         this(id, vehicleId, vehicleInfo, startingPrice, currentPrice, reservePrice, buyNowPrice,
                 minBidStep, startTime, endTime, status, totalBids, winnerId, winningBid, createdBy,
                 createdAt, confirmedStart, mainPhotoUrl, additionalPhotoUrls, videoUrl, extensionCount,
-                null, null, false);
+                null, null, false, minimumNextBidOf(currentPrice, minBidStep));
     }
 
     /**
@@ -114,7 +125,7 @@ public record AuctionResponse(
         this(id, vehicleId, vehicleInfo, startingPrice, currentPrice, reservePrice, buyNowPrice,
                 minBidStep, startTime, endTime, status, totalBids, winnerId, winningBid, createdBy,
                 createdAt, confirmedStart, mainPhotoUrl, additionalPhotoUrls, videoUrl, extensionCount,
-                requiredDepositAmount, null, false);
+                requiredDepositAmount, null, false, minimumNextBidOf(currentPrice, minBidStep));
     }
 
     /**
@@ -159,7 +170,8 @@ public record AuctionResponse(
                 auction.getExtensionCount(),
                 auction.getRequiredDepositAmount(),
                 deadline,
-                overdue
+                overdue,
+                BidStepPolicy.smallestValidBid(auction.minimumNextBid())
         );
     }
 }

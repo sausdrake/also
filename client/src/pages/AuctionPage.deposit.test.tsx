@@ -14,7 +14,7 @@ const axiosGet = axios.get as unknown as ReturnType<typeof vi.fn>;
 
 const auction = {
   id: 1, vehicleId: 9, vehicleInfo: 'BMW X5 2020', status: 'ACTIVE', startingPrice: 1000000, currentPrice: 1000000,
-  minBidStep: 10000, buyNowPrice: null, startTime: '2026-10-15T00:00:00Z', endTime: '2026-12-31T00:00:00Z',
+  minBidStep: 10000, minimumNextBid: 1010000, buyNowPrice: null, startTime: '2026-10-15T00:00:00Z', endTime: '2026-12-31T00:00:00Z',
   confirmedStart: true, photos: [], mainPhotoUrl: null, bidCount: 0,
 };
 

@@ -236,7 +236,7 @@ class BusinessCycleE2EPgIntegrationTest extends AbstractPostgresIntegrationTest 
         OffsetDateTime now = OffsetDateTime.now();
         DateTimeFormatter iso = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
         String auction = postJson("/api/v1/admin/auctions", adminA, "{\"vehicleId\":" + vehicleId
-                + ",\"startingPrice\":100000,\"minBidStep\":1000"
+                + ",\"startingPrice\":100000"
                 + ",\"startTime\":\"" + now.plusMinutes(1).format(iso) + "\",\"endTime\":\"" + now.plusDays(3).format(iso)
                 + "\",\"mainPhotoUrl\":\"https://media.example/e2e.jpg\"}", 201);
         Long auctionId = id(auction, "$.id");

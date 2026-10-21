@@ -36,7 +36,7 @@ public class JpaAuctionEntity {
     @Column(name = "buy_now_price", precision = 10, scale = 2)
     private BigDecimal buyNowPrice;
 
-    @Column(name = "min_bid_step", nullable = false, precision = 10, scale = 2)
+    @Column(name = "min_bid_step", nullable = false, precision = 11, scale = 3)   // AUCTION-01 / V61
     private BigDecimal minBidStep;
 
     @Column(name = "required_deposit_amount", precision = 10, scale = 2)

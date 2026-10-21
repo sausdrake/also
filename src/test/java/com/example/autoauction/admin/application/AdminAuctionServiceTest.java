@@ -23,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -106,7 +107,6 @@ class AdminAuctionServiceTest {
                 new BigDecimal("1000000"),
                 new BigDecimal("1200000"),
                 new BigDecimal("1500000"),
-                new BigDecimal("10000"),
                 startTime,
                 endTime, null, null
         );
@@ -311,7 +311,6 @@ class AdminAuctionServiceTest {
             // given
             AuctionCreateRequest invalidRequest = new AuctionCreateRequest(
                     1L, startingPrice, reservePrice, buyNowPrice,
-                    new BigDecimal("10000"),
                     OffsetDateTime.now().plusDays(1),
                     OffsetDateTime.now().plusDays(7), null, null
             );
@@ -343,68 +342,57 @@ class AdminAuctionServiceTest {
             );
         }
 
-        @ParameterizedTest
-        @MethodSource("invalidStepProvider")
-        @DisplayName("Создание аукциона с невалидным шагом ставки")
-        void createAuction_WithInvalidStep_ThrowsException(BigDecimal minBidStep, String expectedMessage) {
-            // given
-            AuctionCreateRequest invalidRequest = new AuctionCreateRequest(
-                    1L, new BigDecimal("1000000"), new BigDecimal("1200000"),
-                    new BigDecimal("1500000"), minBidStep,
+        @ParameterizedTest(name = "startingPrice {0} -> stored step {1}")
+        @CsvSource({
+                "100000, 1000.000",
+                "123456, 1234.560",
+                "1234567, 12345.670",
+                "123.46, 1.235",           // 1.2346 -> .xxx6 rounds up
+                "123.45, 1.235",           // 1.2345 -> .xxx5 half-up
+                "123.44, 1.234",           // 1.2344 -> .xxx4 rounds down
+                "999999.99, 10000.000",    // 9999.9999 -> carries over
+                "1000000, 10000.000",
+                "0.05, 0.001",             // 0.0005 boundary -> half-up
+                "99999999.99, 1000000.000" // technical capacity of the price column
+        })
+        @DisplayName("AUCTION-01: шаг ставки не вводится - сервер сохраняет ROUND(стартовая цена x 0.01, 3)")
+        void createAuction_storesDerivedBidStep(String startingPrice, String expectedStep) {
+            AuctionCreateRequest request = new AuctionCreateRequest(
+                    1L, new BigDecimal(startingPrice), null, null,
                     OffsetDateTime.now().plusDays(1),
                     OffsetDateTime.now().plusDays(7), null, null
             );
-
-            // Мокаем ВСЕ вызовы, которые происходят до validateBusinessRules
-            doNothing().when(auctionValidator).validateBasicRequest(invalidRequest);
+            doNothing().when(auctionValidator).validateBasicRequest(any());
+            doNothing().when(auctionValidator).validateBusinessRules(any(), any());
             when(vehicleService.getVehicleDetails(1L)).thenReturn(approvedVehicle);
+            when(auctionRepository.existsByVehicleIdAndStatusIn(eq(1L), anyList())).thenReturn(false);
+            when(policyVersionService.getCurrentPublished()).thenReturn(currentPolicy);
+            when(auctionRepository.save(any(Auction.class))).thenReturn(auction);
 
-            // Мокаем валидатор, чтобы он выбрасывал исключение
-            doThrow(new IllegalArgumentException(expectedMessage))
-                    .when(auctionValidator).validateBusinessRules(eq(invalidRequest), any());
+            adminAuctionService.createAuction(request, adminId);
 
-            // when & then
-            Exception exception = assertThrows(IllegalArgumentException.class, () ->
-                    adminAuctionService.createAuction(invalidRequest, adminId)
-            );
-            assertTrue(exception.getMessage().contains(expectedMessage));
-            verify(auctionRepository, never()).save(any(Auction.class));
+            ArgumentCaptor<Auction> saved = ArgumentCaptor.forClass(Auction.class);
+            verify(auctionRepository).save(saved.capture());
+            assertEquals(new BigDecimal(expectedStep), saved.getValue().getMinBidStep());   // value and scale 3
         }
 
-        static Stream<Arguments> invalidStepProvider() {
-            return Stream.of(
-                    Arguments.of(new BigDecimal("0"), "Шаг ставки должен быть больше 0"),
-                    Arguments.of(new BigDecimal("-100"), "Шаг ставки должен быть больше 0"),
-                    Arguments.of(new BigDecimal("5000"), "Шаг ставки не может быть меньше 1% от стартовой цены")
+        @Test
+        @DisplayName("AUCTION-01: цена, шаг которой округляется до 0, не создаёт аукцион")
+        void createAuction_stepRoundingToZero_refusedBeforeSave() {
+            AuctionCreateRequest request = new AuctionCreateRequest(
+                    1L, new BigDecimal("0.04"), null, null,
+                    OffsetDateTime.now().plusDays(1),
+                    OffsetDateTime.now().plusDays(7), null, null
             );
-        }
-
-        @ParameterizedTest
-        @MethodSource("invalidTimeProvider")
-        @DisplayName("Создание аукциона с невалидным временем")
-        void createAuction_WithInvalidTime_ThrowsException(OffsetDateTime startTime,
-                                                           OffsetDateTime endTime,
-                                                           String expectedMessage) {
-            // given
-            AuctionCreateRequest invalidRequest = new AuctionCreateRequest(
-                    1L, new BigDecimal("1000000"), new BigDecimal("1200000"),
-                    new BigDecimal("1500000"), new BigDecimal("10000"),
-                    startTime, endTime, null, null
-            );
-
-            // Мокаем ВСЕ вызовы, которые происходят до validateBusinessRules
-            doNothing().when(auctionValidator).validateBasicRequest(invalidRequest);
+            doNothing().when(auctionValidator).validateBasicRequest(any());
+            doNothing().when(auctionValidator).validateBusinessRules(any(), any());
             when(vehicleService.getVehicleDetails(1L)).thenReturn(approvedVehicle);
+            lenient().when(auctionRepository.existsByVehicleIdAndStatusIn(eq(1L), anyList())).thenReturn(false);
+            lenient().when(policyVersionService.getCurrentPublished()).thenReturn(currentPolicy);
 
-            // Мокаем валидатор, чтобы он выбрасывал исключение
-            doThrow(new IllegalArgumentException(expectedMessage))
-                    .when(auctionValidator).validateBusinessRules(eq(invalidRequest), any());
-
-            // when & then
-            Exception exception = assertThrows(IllegalArgumentException.class, () ->
-                    adminAuctionService.createAuction(invalidRequest, adminId)
-            );
-            assertTrue(exception.getMessage().contains(expectedMessage));
+            IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                    () -> adminAuctionService.createAuction(request, adminId));
+            assertTrue(e.getMessage().contains("округляется до нуля"));
             verify(auctionRepository, never()).save(any(Auction.class));
         }
 
@@ -425,7 +413,7 @@ class AdminAuctionServiceTest {
             // given
             AuctionCreateRequest nullVehicleRequest = new AuctionCreateRequest(
                     null, new BigDecimal("1000000"), new BigDecimal("1200000"),
-                    new BigDecimal("1500000"), new BigDecimal("10000"),
+                    new BigDecimal("1500000"),
                     OffsetDateTime.now().plusDays(1),
                     OffsetDateTime.now().plusDays(7), null, null
             );
@@ -829,7 +817,7 @@ class AdminAuctionServiceTest {
             OffsetDateTime pastTime = OffsetDateTime.now().minusHours(2);
             AuctionCreateRequest request = new AuctionCreateRequest(
                     1L, new BigDecimal("1000000"), new BigDecimal("1200000"),
-                    new BigDecimal("1500000"), new BigDecimal("10000"),
+                    new BigDecimal("1500000"),
                     pastTime, pastTime.plusDays(7), null, null
             );
 
@@ -854,7 +842,7 @@ class AdminAuctionServiceTest {
             OffsetDateTime endTime = startTime.minusHours(1);
             AuctionCreateRequest request = new AuctionCreateRequest(
                     1L, new BigDecimal("1000000"), new BigDecimal("1200000"),
-                    new BigDecimal("1500000"), new BigDecimal("10000"),
+                    new BigDecimal("1500000"),
                     startTime, endTime, null, null
             );
 
@@ -920,10 +908,9 @@ class AdminAuctionServiceTest {
         @DisplayName("Создание аукциона с минимальной стартовой ценой")
         void createAuction_WithMinimumStartingPrice_Success() {
             // given
-            BigDecimal minPrice = new BigDecimal("0.01");
+            BigDecimal minPrice = new BigDecimal("0.05");   // AUCTION-01: smallest price whose 1% step is not 0
             AuctionCreateRequest request = new AuctionCreateRequest(
                     1L, minPrice, null, null,
-                    new BigDecimal("10000"),
                     OffsetDateTime.now().plusDays(1),
                     OffsetDateTime.now().plusDays(7), null, null
             );
@@ -952,7 +939,6 @@ class AdminAuctionServiceTest {
                     new BigDecimal("1000000"),
                     new BigDecimal("1000000"), // равна стартовой
                     null,
-                    new BigDecimal("10000"),
                     OffsetDateTime.now().plusDays(1),
                     OffsetDateTime.now().plusDays(7), null, null
             );
@@ -976,10 +962,8 @@ class AdminAuctionServiceTest {
         @DisplayName("Создание аукциона с минимальным шагом ставки")
         void createAuction_WithMinimumBidStep_Success() {
             // given
-            BigDecimal minBidStep = new BigDecimal("10000"); // 1% от 1,000,000
             AuctionCreateRequest request = new AuctionCreateRequest(
                     1L, new BigDecimal("1000000"), null, null,
-                    minBidStep,
                     OffsetDateTime.now().plusDays(1),
                     OffsetDateTime.now().plusDays(7), null, null
             );
@@ -1008,7 +992,6 @@ class AdminAuctionServiceTest {
 
             AuctionCreateRequest request = new AuctionCreateRequest(
                     1L, new BigDecimal("1000000"), null, null,
-                    new BigDecimal("10000"),
                     startTime, endTime, null, null
             );
 
@@ -1036,7 +1019,6 @@ class AdminAuctionServiceTest {
 
             AuctionCreateRequest request = new AuctionCreateRequest(
                     1L, new BigDecimal("1000000"), null, null,
-                    new BigDecimal("10000"),
                     startTime, endTime, null, null
             );
 
@@ -1137,7 +1119,6 @@ class AdminAuctionServiceTest {
             // given: startingPrice=100,000, sellerReserve=99,000, commission=2% -> buyerReserve=100,980
             AuctionCreateRequest request = new AuctionCreateRequest(
                     1L, new BigDecimal("100000"), new BigDecimal("99000"), null,
-                    new BigDecimal("1000"),
                     OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(7), null, null
             );
             PolicyVersion policy = policyAt(new BigDecimal("0.02"));
@@ -1163,7 +1144,6 @@ class AdminAuctionServiceTest {
             // given: startingPrice=100,000, sellerBuyNow=99,000, commission=2% -> buyerBuyNow=100,980
             AuctionCreateRequest request = new AuctionCreateRequest(
                     1L, new BigDecimal("100000"), null, new BigDecimal("99000"),
-                    new BigDecimal("1000"),
                     OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(7), null, null
             );
             PolicyVersion policy = policyAt(new BigDecimal("0.02"));
@@ -1189,7 +1169,6 @@ class AdminAuctionServiceTest {
             // given: startingPrice=100,000, sellerReserve=90,000, commission=2% -> buyerReserve=91,800
             AuctionCreateRequest request = new AuctionCreateRequest(
                     1L, new BigDecimal("100000"), new BigDecimal("90000"), null,
-                    new BigDecimal("1000"),
                     OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(7), null, null
             );
             PolicyVersion policy = policyAt(new BigDecimal("0.02"));
@@ -1213,7 +1192,6 @@ class AdminAuctionServiceTest {
             // given: startingPrice=100,000, sellerBuyNow=95,000, commission=2% -> buyerBuyNow=96,900
             AuctionCreateRequest request = new AuctionCreateRequest(
                     1L, new BigDecimal("100000"), null, new BigDecimal("95000"),
-                    new BigDecimal("1000"),
                     OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(7), null, null
             );
             PolicyVersion policy = policyAt(new BigDecimal("0.02"));
