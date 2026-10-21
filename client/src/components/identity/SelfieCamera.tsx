@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { CAMERA_ERROR_MESSAGES, cameraErrorKind, cameraUnavailableKind } from './cameraErrors';
 
 type CameraState = 'idle' | 'starting' | 'live' | 'captured' | 'error';
 
@@ -40,9 +41,11 @@ export function SelfieCamera({ onCapture, disabled = false }: {
 
   const startCamera = async () => {
     setError(null);
-    if (!navigator.mediaDevices?.getUserMedia) {
+    // CAMERA-01: an insecure page (http:// on a LAN address) hides the camera API - say so, not "no camera"
+    const unavailable = cameraUnavailableKind(window);
+    if (unavailable) {
       setState('error');
-      setError('Камера недоступна в этом браузере. Для подтверждения личности нужно сделать селфи камерой устройства.');
+      setError(CAMERA_ERROR_MESSAGES[unavailable]);
       return;
     }
     setState('starting');
@@ -54,10 +57,10 @@ export function SelfieCamera({ onCapture, disabled = false }: {
         await videoRef.current.play().catch(() => undefined);
       }
       setState('live');
-    } catch {
+    } catch (e) {
       stopCamera();
       setState('error');
-      setError('Нет доступа к камере. Разрешите доступ к камере в браузере и попробуйте снова.');
+      setError(CAMERA_ERROR_MESSAGES[cameraErrorKind(e)]);
     }
   };
 

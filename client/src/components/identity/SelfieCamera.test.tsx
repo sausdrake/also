@@ -76,7 +76,7 @@ describe('SelfieCamera (MVP-004 live selfie)', () => {
 
     await act(async () => { fireEvent.click(screen.getByText('Включить камеру')); });
 
-    expect(await screen.findByText(/Нет доступа к камере/)).toBeInTheDocument();
+    expect(await screen.findByText(/Доступ к камере запрещён/)).toBeInTheDocument();
     expect(onCapture).not.toHaveBeenCalled();
     expect(container.querySelector('input[type="file"]')).toBeNull();
   });
@@ -88,7 +88,56 @@ describe('SelfieCamera (MVP-004 live selfie)', () => {
 
     fireEvent.click(screen.getByText('Включить камеру'));
 
-    await waitFor(() => expect(screen.getByText(/Камера недоступна/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Этот браузер не даёт доступа к камере/)).toBeInTheDocument());
     expect(onCapture).not.toHaveBeenCalled();
+  });
+
+  // CAMERA-01: the reason shown is the real one
+  describe('CAMERA-01: the real reason the camera did not start', () => {
+    afterEach(() => { Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true }); });
+
+    it('insecure page (http:// on a LAN address): asks for https, never calls the camera, never says "no camera in this browser"', async () => {
+      Object.defineProperty(window, 'isSecureContext', { value: false, configurable: true });
+      const getUserMedia = vi.fn().mockResolvedValue(fakeStream);
+      setMediaDevices(getUserMedia);
+      render(<SelfieCamera onCapture={vi.fn()} />);
+
+      fireEvent.click(screen.getByText('Включить камеру'));
+
+      expect(await screen.findByText(/защищённой странице \(адрес начинается с https:\/\/\)/)).toBeInTheDocument();
+      expect(screen.queryByText(/браузер не даёт доступа/)).toBeNull();
+      expect(getUserMedia).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['NotAllowedError', /Доступ к камере запрещён/],
+      ['NotFoundError', /Камера не найдена/],
+      ['OverconstrainedError', /Камера не найдена/],
+      ['NotReadableError', /Камера занята другим приложением/],
+      ['TypeError', /Не удалось включить камеру/],
+    ])('%s -> %s, and the camera can be retried', async (name, text) => {
+      setMediaDevices(vi.fn().mockRejectedValue(new DOMException('x', name)));
+      render(<SelfieCamera onCapture={vi.fn()} />);
+
+      await act(async () => { fireEvent.click(screen.getByText('Включить камеру')); });
+
+      expect(await screen.findByText(text)).toBeInTheDocument();
+      expect(screen.getByText('Включить камеру')).toBeInTheDocument();
+    });
+
+    it('a stream that starts after an earlier failure clears the error and goes live', async () => {
+      const getUserMedia = vi.fn()
+        .mockRejectedValueOnce(new DOMException('busy', 'NotReadableError'))
+        .mockResolvedValue(fakeStream);
+      setMediaDevices(getUserMedia);
+      render(<SelfieCamera onCapture={vi.fn()} />);
+
+      await act(async () => { fireEvent.click(screen.getByText('Включить камеру')); });
+      expect(await screen.findByText(/Камера занята/)).toBeInTheDocument();
+      await act(async () => { fireEvent.click(screen.getByText('Включить камеру')); });
+
+      expect(await screen.findByText('Сделать снимок')).toBeInTheDocument();
+      expect(screen.queryByText(/Камера занята/)).toBeNull();
+    });
   });
 });
