@@ -75,6 +75,12 @@ Not in place:
 
 None of these can be added without a choice the product owner has to make: a liveness / document-verification
 vendor (cost, data processing and storage of biometric data, the country where data is processed) or an
-in-house approach with its own accuracy targets. **Open decision:** either accept the administrator's manual review
-as the MVP anti-spoofing control, or choose a vendor. Until it is decided, the administrator's review is the only
-check that catches a spoofed selfie or document.
+in-house approach with its own accuracy targets.
+
+**Decision (PO, MVP certification, 2026-10-23):** for the MVP the security boundary is camera-only capture +
+one-time capture slot + JPEG validation + manual administrator verification. No vendor is connected. This is **not**
+liveness detection and must not be described as such.
+
+Residual risk accepted for the MVP: a photo / screen / virtual camera shown to the capture, a forged or edited
+document, and a selfie of a different person than the document holder pass the technical checks; only the
+administrator's review can catch them. Revisit (vendor or in-house liveness) before scaling beyond manual review.
