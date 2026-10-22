@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import api from '../../api/client';
+import { violationLabel } from '../../domain/violation';
 import { formatDateTime } from '../../utils/formatDate';
 import { DraftEditor, type PolicyDetail } from './policy/DraftEditor';
 
@@ -177,8 +178,11 @@ export function PolicyPage() {
                 <div className="border border-gray-100 rounded-xl divide-y divide-gray-50">
                   {current.violations.map((v) => (
                     <div key={v.violationDefinitionId} className="px-4 py-2 flex justify-between text-xs">
-                      <span className="text-gray-600">{v.code ?? `#${v.violationDefinitionId}`}</span>
-                      <span className="text-gray-900 font-medium">
+                      <span className="text-gray-600 min-w-0 break-words pr-3">
+                        {violationLabel(v.code) ?? v.code ?? `#${v.violationDefinitionId}`}
+                        {violationLabel(v.code) && <span className="block font-mono text-[10px] text-gray-400 break-all">{v.code}</span>}
+                      </span>
+                      <span className="text-gray-900 font-medium shrink-0">
                         {v.penaltyType === 'PERCENTAGE' ? `${v.penaltyValue}%` : `${v.penaltyValue}`}
                       </span>
                     </div>
@@ -237,8 +241,11 @@ export function PolicyPage() {
               <div className="mt-2 border border-gray-100 rounded-xl divide-y divide-gray-50">
                 {readOnly.violations.map((v) => (
                   <div key={v.violationDefinitionId} className="px-4 py-2 flex justify-between text-xs">
-                    <span className="text-gray-600">{v.code ?? `#${v.violationDefinitionId}`}</span>
-                    <span className="text-gray-900 font-medium">
+                    <span className="text-gray-600 min-w-0 break-words pr-3">
+                      {violationLabel(v.code) ?? v.code ?? `#${v.violationDefinitionId}`}
+                      {violationLabel(v.code) && <span className="block font-mono text-[10px] text-gray-400 break-all">{v.code}</span>}
+                    </span>
+                    <span className="text-gray-900 font-medium shrink-0">
                       {v.penaltyType === 'PERCENTAGE' ? `${v.penaltyValue}%` : `${v.penaltyValue}`}
                     </span>
                   </div>

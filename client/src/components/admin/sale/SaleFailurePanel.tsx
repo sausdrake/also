@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../../../api/client';
+import { violationLabel } from '../../../domain/violation';
 import type { SaleStatus } from '../../../pages/admin/AdminSalePage';
 
 interface Props {
@@ -105,8 +106,8 @@ export function SaleFailurePanel({ auctionId, status, onDone, notify }: Props) {
                     onChange={() => toggleViolation(v.id)} />
                   <span>
                     {/* FE-UX-01: the description is what the admin reads; the code stays as a reference */}
-                    <span className="text-gray-800">{v.description || v.code}</span>
-                    {v.description && <span className="ml-1 font-mono text-gray-400">{v.code}</span>}
+                    <span className="text-gray-800">{violationLabel(v.code) ?? (v.description || v.code)}</span>
+                    {(violationLabel(v.code) || v.description) && <span className="ml-1 font-mono text-gray-400">{v.code}</span>}
                   </span>
                 </label>
               ))}

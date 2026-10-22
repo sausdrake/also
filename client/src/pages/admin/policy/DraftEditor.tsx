@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import api from '../../../api/client';
+import { violationLabel } from '../../../domain/violation';
 
 type PenaltyType = 'PERCENTAGE' | 'FIXED_AMOUNT';
 
@@ -254,12 +255,15 @@ export function DraftEditor({
           return (
             <div key={d.id} className="p-5">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm font-semibold text-gray-800">{d.code}</span>
+                <span className="text-sm font-semibold text-gray-800">{violationLabel(d.code) ?? d.code}</span>
                 {!configured && (
                   <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">не настроено</span>
                 )}
               </div>
-              <p className="text-xs text-gray-400 mb-3">{d.description}</p>
+              <p className="text-xs text-gray-400 mb-3">
+                {violationLabel(d.code) && <span className="font-mono break-all">{d.code} · </span>}
+                {d.description}
+              </p>
               <div className="flex gap-3 items-center">
                 <select
                   value={row?.penaltyType ?? 'PERCENTAGE'}
