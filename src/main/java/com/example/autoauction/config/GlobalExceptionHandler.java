@@ -374,6 +374,14 @@ public class GlobalExceptionHandler {
         return clientError(HttpStatus.PAYLOAD_TOO_LARGE, "Файл слишком большой", "Файл слишком большой: максимум 10 МБ");
     }
 
+    // A multipart endpoint called without a multipart body (no file part) - 400, not 500. The more specific
+    // MaxUploadSizeExceededException handler above still answers 413.
+    @ExceptionHandler(org.springframework.web.multipart.MultipartException.class)
+    public ResponseEntity<Map<String, Object>> handleMultipart(org.springframework.web.multipart.MultipartException e) {
+        log.warn("Malformed multipart request: {}", e.getClass().getSimpleName());
+        return clientError(HttpStatus.BAD_REQUEST, "Некорректный запрос", "Ожидается загрузка файла (multipart/form-data)");
+    }
+
     // ERR-01: wrong Content-Type - 415, not 500.
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     public ResponseEntity<Map<String, Object>> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException e) {

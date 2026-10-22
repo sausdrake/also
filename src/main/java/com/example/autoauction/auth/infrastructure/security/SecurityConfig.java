@@ -88,6 +88,10 @@ public class SecurityConfig {
                                 new AntPathRequestMatcher("/uploads/**")
                         ).permitAll()
 
+                        // SEC-UPLOAD-01: the public-media upload is staff-only - enforced here as well, before the request
+                        // body is parsed (@PreAuthorize alone ran after multipart resolution: a non-multipart call was a 500)
+                        .requestMatchers(new AntPathRequestMatcher("/api/media/upload")).hasAnyRole("ADMIN", "DIAGNOSTIC")
+
                         // Админ (legacy + v1)
                         .requestMatchers(new AntPathRequestMatcher("/api/admin/**")).hasRole("ADMIN")
                         .requestMatchers(new AntPathRequestMatcher("/api/v1/admin/**")).hasRole("ADMIN")
