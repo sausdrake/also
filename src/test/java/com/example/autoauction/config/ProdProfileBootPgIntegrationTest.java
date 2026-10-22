@@ -65,4 +65,15 @@ class ProdProfileBootPgIntegrationTest {
         assertThat(mockMvc.perform(get("/swagger-ui.html")).andReturn().getResponse().getStatus()).isNotEqualTo(200);
         assertThat(context.getEnvironment().getProperty("logging.level.com.example.autoauction.auth")).isEqualTo("INFO");
     }
+
+    @Test
+    void prodProfile_sendsDenyAllCsp_andShutsDownGracefully() throws Exception {
+        var response = mockMvc.perform(get("/api/health")).andReturn().getResponse();
+        assertThat(response.getHeader("Content-Security-Policy"))
+                .contains("default-src 'none'").contains("frame-ancestors 'none'");
+        assertThat(response.getHeader("X-Content-Type-Options")).isEqualTo("nosniff");
+        assertThat(response.getHeader("X-Frame-Options")).isEqualTo("DENY");
+        assertThat(context.getBean(org.springframework.boot.autoconfigure.web.ServerProperties.class).getShutdown())
+                .isEqualTo(org.springframework.boot.web.server.Shutdown.GRACEFUL);
+    }
 }

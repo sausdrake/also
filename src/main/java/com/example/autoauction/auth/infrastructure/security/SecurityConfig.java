@@ -38,6 +38,14 @@ public class SecurityConfig {
     @org.springframework.beans.factory.annotation.Value("${allowed.origins:http://localhost:5173}")
     private String allowedOrigins;
 
+    /**
+     * PROD-SEC-01: Content-Security-Policy for every API response. Empty (no header) by default, because the
+     * development Swagger UI is an HTML page with scripts; application-prod.properties sets a deny-all policy
+     * (the API serves JSON and images only - Swagger is disabled there).
+     */
+    @org.springframework.beans.factory.annotation.Value("${security.content-security-policy:}")
+    private String contentSecurityPolicy;
+
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthFilter,
             UserDetailsService userDetailsService,
@@ -56,6 +64,11 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
+                .headers(headers -> {
+                    if (!contentSecurityPolicy.isBlank()) {
+                        headers.contentSecurityPolicy(csp -> csp.policyDirectives(contentSecurityPolicy));
+                    }
+                })
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler)
