@@ -57,6 +57,11 @@ supported by this backend). No bot token is needed for sign-in.
 
 ## Recovery
 
+An account created through Telegram has no password. Its Profile does not offer "Сменить пароль"
+(`GET /api/v1/account/password` → `{"passwordSet": false}`, nothing else), and a password change on it is refused with
+409 "нет пароля" instead of "wrong current password" (AUTH-TG-UX-01). Setting a first password is not offered: it needs
+its own secure design (P4).
+
 There is no self-service recovery when the user loses Telegram: no verified recovery factor exists yet (open product
 decision P4). Interim: an administrator can set a temporary password for the account (existing admin password reset,
 AUTH-01) after checking the person — the account's username is shown in its Profile.

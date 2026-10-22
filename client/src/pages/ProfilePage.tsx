@@ -852,6 +852,16 @@ function WatchedTab() {
 function ProfileTab() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+  // AUTH-TG-UX-01: a Telegram-only account has no password to change. Unknown (request failed) keeps the
+  // button - the backend refuses a passwordless change with a plain reason anyway.
+  const [passwordSet, setPasswordSet] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/account/password')
+      .then(r => { if (!cancelled && typeof r.data?.passwordSet === 'boolean') setPasswordSet(r.data.passwordSet); })
+      .catch(() => { /* unknown: keep the default */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -880,10 +890,14 @@ function ProfileTab() {
           </div>
         </div>
       </div>
-      <button onClick={() => navigate('/change-password')}
-        className="mt-6 w-full bg-gray-50 text-gray-700 border border-gray-200 py-2 rounded-lg hover:bg-gray-100">
-        Сменить пароль
-      </button>
+      {passwordSet === false ? (
+        <p className="mt-6 text-sm text-gray-500">Пароль не задан — вход выполняется через Telegram.</p>
+      ) : (
+        <button onClick={() => navigate('/change-password')}
+          className="mt-6 w-full bg-gray-50 text-gray-700 border border-gray-200 py-2 rounded-lg hover:bg-gray-100">
+          Сменить пароль
+        </button>
+      )}
       <button onClick={handleLogout}
         className="mt-3 w-full bg-red-50 text-red-600 border border-red-200 py-2 rounded-lg hover:bg-red-100">
         Выйти

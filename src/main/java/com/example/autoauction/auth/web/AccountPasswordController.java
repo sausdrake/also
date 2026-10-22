@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,6 +28,15 @@ public class AccountPasswordController {
     }
 
     public record ChangePasswordRequest(String currentPassword, String newPassword) {}
+
+    /** AUTH-TG-UX-01: only whether a password exists - never anything about it. */
+    public record PasswordStatus(boolean passwordSet) {}
+
+    @GetMapping("/password")
+    @Operation(summary = "Есть ли у учётной записи пароль (у входящих только через Telegram его нет)")
+    public PasswordStatus passwordStatus(@Parameter(hidden = true) @CurrentUser UserPrincipal currentUser) {
+        return new PasswordStatus(passwordService.hasOwnPassword(currentUser.getUserId()));
+    }
 
     @PostMapping("/password")
     @Operation(summary = "Сменить свой пароль (после смены нужно войти заново)")

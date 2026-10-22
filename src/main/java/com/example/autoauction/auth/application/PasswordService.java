@@ -88,6 +88,18 @@ public class PasswordService {
         return temporaryPassword;
     }
 
+    /** AUTH-TG-UX-01: whether the account has a password at all (Telegram-only accounts do not). */
+    @Transactional(readOnly = true)
+    public boolean hasOwnPassword(Long userId) {
+        return userRepository.findById(userId).map(PasswordService::hasPassword)
+                .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден: " + userId));
+    }
+
+    private static boolean hasPassword(User user) {
+        String hash = user.getPasswordHash();
+        return hash != null && !hash.isBlank() && !ExternalIdentityResolver.NO_PASSWORD.equals(hash);
+    }
+
     /**
      * The user sets a new password, proving the current one. Clears the change requirement and ends
      * every session (all refresh tokens revoked): the user signs in again with the new password.
@@ -96,6 +108,11 @@ public class PasswordService {
     public void changeOwnPassword(Long userId, String currentPassword, String newPassword) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден: " + userId));
+        if (!hasPassword(user)) {
+            // AUTH-TG-UX-01: a Telegram-only account has no password to prove; setting a first one needs its own
+            // secure design (open product decision P4), so it is refused plainly instead of "wrong password".
+            throw new IllegalStateException("У этой учётной записи нет пароля: вход выполняется через Telegram");
+        }
         if (currentPassword == null || !passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
             throw new IllegalArgumentException("Текущий пароль указан неверно");
         }
