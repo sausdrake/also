@@ -22,12 +22,13 @@ public class LotSubscriptionService {
     private final AuctionRepository auctionRepository;
 
     public void subscribe(Long userId, Long auctionId) {
-        try {
-            subscriptionRepository.subscribe(userId, auctionId);
-            log.debug("User {} subscribed to auction {}", userId, auctionId);
-        } catch (Exception e) {
-            log.warn("Subscribe failed for user {} auction {}: {}", userId, auctionId, e.getMessage());
+        // A missing auction is a 404. The former catch-all swallowed the foreign-key failure inside this
+        // transaction, which then could only end in UnexpectedRollbackException - a 500 for every such call.
+        if (auctionRepository.findById(auctionId).isEmpty()) {
+            throw new IllegalArgumentException("Аукцион с ID " + auctionId + " не найден");
         }
+        subscriptionRepository.subscribe(userId, auctionId);
+        log.debug("User {} subscribed to auction {}", userId, auctionId);
     }
 
     public void unsubscribe(Long userId, Long auctionId) {
