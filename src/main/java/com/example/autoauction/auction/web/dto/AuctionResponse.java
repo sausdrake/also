@@ -32,7 +32,8 @@ public record AuctionResponse(
         @Schema(description = "Цена мгновенной покупки", example = "1500000")
         BigDecimal buyNowPrice,
 
-        @Schema(description = "Минимальный шаг ставки", example = "10000")
+        @Schema(description = "Минимальный шаг ставки (BD-02): ROUND(стартовая цена x 0.01, 3), half-up; 3 знака после запятой. " +
+                "Задаётся сервером при создании, не вводится", example = "10000.000")
         BigDecimal minBidStep,
 
         @Schema(description = "Время начала", example = "2026-03-10T10:00:00+07:00")
@@ -74,8 +75,9 @@ public record AuctionResponse(
         @Schema(description = "Количество продлений аукциона")
         int extensionCount,
 
-        @Schema(description = "Требуемая фиксированная сумма депозита для участия в этом аукционе " +
-                "(задаётся администратором индивидуально для лота); null, если ещё не настроена", example = "10000")
+        @Schema(description = "Депозит для участия в этом аукционе (BD-01): снимок единой настройки " +
+                "auction_participation_deposit_amount на момент создания аукциона; её изменение не затрагивает " +
+                "созданные аукционы. null только у аукционов, созданных до DEPOSIT-01", example = "10000.00")
         BigDecimal requiredDepositAmount,
 
         @Schema(description = "Платёжный дедлайн (актуален только для WAITING_FOR_PAYMENT)")

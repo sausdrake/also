@@ -20,7 +20,9 @@ public record AuctionCreateRequest(
         @NotNull(message = "ID автомобиля обязателен")
         Long vehicleId,
 
-        @Schema(description = "Стартовая цена", example = "1000000")
+        @Schema(description = "Стартовая цена, сом с тыйынами. Шаг ставки (1%, BD-02) и депозит для участия (BD-01) " +
+                "задаёт сервер - в запросе их нет. Шаг 1% должен быть > 0 (цена от 0.05). Бизнес-максимума нет " +
+                "(NO BUSINESS MAXIMUM DEFINED, BD-05): 99999999.99 - только ёмкость столбца", example = "1000000")
         @NotNull(message = "Стартовая цена обязательна")
         @DecimalMin(value = "0.01", message = "Стартовая цена должна быть больше 0")
         @Digits(integer = 8, fraction = 2, message = "Стартовая цена: не больше 99999999.99 и не больше двух знаков после запятой")
