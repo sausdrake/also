@@ -44,7 +44,27 @@ SEC-09 seller cannot bid on their own car, SEC-11 database port not public, ERR-
 
 - HTTPS, HSTS and security headers on the real server (SEC-05, INF-04/05).
 - A test against the running stand (penetration test, E2E-01).
-- SEC-08: the public repository and its secrets - the owner's action.
+- SEC-08: the public repository and its secrets - the owner's action (see SEC-08B below).
+
+## SEC-08B - secrets in the git history (2026-10-22)
+
+Every blob ever reachable in this repository (4254 blobs, 249 commits, including the archives `src.zip` /
+`client.zip`) was scanned for credentials; values were compared in memory only - nothing was printed.
+
+| Credential | In history | Status |
+|---|---|---|
+| Database password of the early project (`.env`, `docker-compose.yml`, `application.properties`, `src.zip`) | yes | **Rotated.** The current password differs; the old one is rejected by the dev PostgreSQL (checked by a login attempt) |
+| `jwt.secret` of the early project | yes - the well-known tutorial example key | **Replaced.** The current `JWT_SECRET` is a different, 88-character value |
+| A JWT access token pasted into `task.txt` | yes | Expired 229 days ago and not signed by the current key - unusable |
+| Current `JWT_SECRET`, `DB_PASSWORD`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, Telegram client secret | no | Never committed |
+| `ALSO_ADMIN_PASSWORD` in `docs/ops/admin-bootstrap.md` | current tree | A placeholder, not a real password |
+
+Conclusion: no live credential is in the history, so rewriting it is **not needed for security**. Purging the
+early commits from the public repository remains optional hygiene and the owner's decision (it rewrites
+public history). Production must use freshly generated secrets - never a value from development.
+
+Owner action (development machine, not production): the local PostgreSQL listens on all interfaces and the
+development database password is short - restrict `listen_addresses` to `localhost` or set a strong password.
 
 ## Sign-off
 
