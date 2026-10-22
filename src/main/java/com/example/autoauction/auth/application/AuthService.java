@@ -249,7 +249,7 @@ public class AuthService {
         // 1. Валидация входных данных
         if (request == null || request.refreshToken() == null || request.refreshToken().trim().isEmpty()) {
             log.warn("Invalid refresh token request - token is empty");
-            throw new RuntimeException("Refresh token is required");
+            throw new IllegalArgumentException("Refresh token is required");
         }
 
         String tokenKey = request.refreshToken().intern();
@@ -259,14 +259,15 @@ public class AuthService {
             RefreshToken refreshToken = refreshTokenRepository.findByToken(request.refreshToken())
                     .orElseThrow(() -> {
                         log.warn("Invalid refresh token provided");
-                        return new RuntimeException("Invalid refresh token");
+                        return new BadCredentialsException("Invalid refresh token");
                     });
 
             // 3. Проверка валидности токена
             if (!refreshToken.isValid()) {
                 log.warn("Refresh token is expired or revoked for user: {}",
                         refreshToken.getUser().getUsername());
-                throw new RuntimeException("Refresh token is expired or revoked");
+                // SEC-01: a rejected refresh token is an authentication failure (401), never a server error (500)
+                throw new BadCredentialsException("Refresh token is expired or revoked");
             }
 
             User user = refreshToken.getUser();
@@ -299,7 +300,7 @@ public class AuthService {
 
         if (request == null || request.refreshToken() == null || request.refreshToken().trim().isEmpty()) {
             log.warn("Invalid logout request - refresh token is empty");
-            throw new RuntimeException("Refresh token is required");
+            throw new IllegalArgumentException("Refresh token is required");
         }
 
         String tokenKey = request.refreshToken().intern();
@@ -308,7 +309,7 @@ public class AuthService {
             RefreshToken refreshToken = refreshTokenRepository.findByToken(request.refreshToken())
                     .orElseThrow(() -> {
                         log.warn("Invalid refresh token provided during logout");
-                        return new RuntimeException("Invalid refresh token");
+                        return new BadCredentialsException("Invalid refresh token");
                     });
 
             // Если токен уже отозван — логируем и выходим без ошибки (idempotent logout)
