@@ -29,16 +29,17 @@ public class SystemSettingsService {
      */
     static final BigDecimal PARTICIPATION_DEPOSIT_CAPACITY = new BigDecimal("99999999.99");
 
+    /**
+     * AUC-CFG-01: only settings something reads. deposit_percent, default_bid_step_percent (the participation
+     * deposit and the bid step are BD-01 / BD-02 rules, not percent settings), commission_percent /
+     * platform_fee_percent (commission lives in PolicyVersion) and completed_auction_visibility_hours have no reader:
+     * writing them changed nothing, so they are refused. Their stored rows stay (no destructive migration).
+     */
     public static final Set<String> ALLOWED_KEYS = Set.of(
             PARTICIPATION_DEPOSIT_KEY,
-            "deposit_percent",
-            "platform_fee_percent",
-            "commission_percent",
-            "default_bid_step_percent",
             "diagnostic_deposit_amount",
             "diagnostic_fee_amount",
-            "auction_confirm_hours",
-            "completed_auction_visibility_hours"
+            "auction_confirm_hours"
     );
 
     private final JdbcTemplate jdbc;

@@ -189,11 +189,11 @@ class SystemSettingsServiceTest {
         @Test
         @DisplayName("Обновляет существующее значение через UPDATE")
         void set_UpdatesExistingKey() {
-            when(jdbc.update(contains("UPDATE"), anyString(), eq("deposit_percent"))).thenReturn(1);
+            when(jdbc.update(contains("UPDATE"), anyString(), eq("auction_confirm_hours"))).thenReturn(1);
 
-            service.set("deposit_percent", "2");
+            service.set("auction_confirm_hours", "48");
 
-            verify(jdbc).update(contains("UPDATE"), eq("2"), eq("deposit_percent"));
+            verify(jdbc).update(contains("UPDATE"), eq("48"), eq("auction_confirm_hours"));
         }
 
         @Test
@@ -201,9 +201,9 @@ class SystemSettingsServiceTest {
         void set_InsertsAllowedKey() {
             when(jdbc.update(contains("UPDATE"), anyString(), anyString())).thenReturn(0);
 
-            service.set("deposit_percent", "2");
+            service.set("auction_confirm_hours", "48");
 
-            verify(jdbc).update(contains("INSERT"), eq("deposit_percent"), eq("2"));
+            verify(jdbc).update(contains("INSERT"), eq("auction_confirm_hours"), eq("48"));
         }
     }
 
@@ -216,7 +216,7 @@ class SystemSettingsServiceTest {
         void setAll_UpdatesAllowedKeys() {
             when(jdbc.update(contains("UPDATE"), anyString(), anyString())).thenReturn(1);
 
-            service.setAll(Map.of("deposit_percent", "2", "platform_fee_percent", "5"));
+            service.setAll(Map.of("auction_confirm_hours", "48", "diagnostic_deposit_amount", "10000"));
 
             verify(jdbc, times(2)).update(contains("UPDATE"), anyString(), anyString());
         }
@@ -225,7 +225,7 @@ class SystemSettingsServiceTest {
         @DisplayName("Отклоняет setAll с хотя бы одним недопустимым ключом — fail-fast")
         void setAll_WithOneInvalidKey_RejectsAll() {
             Map<String, String> mixed = new java.util.LinkedHashMap<>();
-            mixed.put("deposit_percent", "2");
+            mixed.put("auction_confirm_hours", "48");
             mixed.put("evil_key", "DROP TABLE users");
 
             assertThatThrownBy(() -> service.setAll(mixed))
@@ -233,6 +233,15 @@ class SystemSettingsServiceTest {
                     .hasMessageContaining("evil_key");
 
             // Ничего не должно быть записано — ни один UPDATE/INSERT
+            verify(jdbc, never()).update(anyString(), anyString(), anyString());
+        }
+
+        @org.junit.jupiter.params.ParameterizedTest
+        @org.junit.jupiter.params.provider.ValueSource(strings = {"deposit_percent", "default_bid_step_percent",
+                "commission_percent", "platform_fee_percent", "completed_auction_visibility_hours"})
+        @DisplayName("AUC-CFG-01: settings nothing reads are refused - writing them changed nothing")
+        void inertKeys_Refused(String key) {
+            assertThatThrownBy(() -> service.set(key, "1")).isInstanceOf(IllegalArgumentException.class);
             verify(jdbc, never()).update(anyString(), anyString(), anyString());
         }
     }
