@@ -25,6 +25,7 @@ import { AdminVehiclesNeedsRediagnosticPage } from './admin/AdminVehiclesNeedsRe
 import { depositTxTypeLabel } from '../utils/depositTransactionLabels';
 import { RejectReportModal } from '../components/admin/diagnostic/RejectReportModal';
 import { SellerViolationResolutionPanel, type ViolationResolution } from '../components/admin/diagnostic/SellerViolationResolutionPanel';
+import { isAnswerFilled, savedExtraPhotos, savedExtraRating } from '../domain/inspectionItem';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
@@ -45,7 +46,7 @@ interface Auction {
   winnerId?: number; winningBid?: number;
 }
 
-interface DiagItem  { id: number; title: string; fieldType: string; isRequired?: boolean; hasVideo?: boolean; }
+interface DiagItem  { id: number; title: string; fieldType: string; isRequired?: boolean; hasVideo?: boolean; hasRating?: boolean; hasPhoto?: boolean; }
 interface DiagGroup { id: number; name: string; items: DiagItem[]; }
 interface DiagAnswer { inspectionItemId: number; rating: number | null; comment: string; photoUrls: string[]; skipped?: boolean; }
 
@@ -857,15 +858,31 @@ function AdminDiagAccordion({ requestId, template, answers }: {
     const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s;
   });
 
-  const isFilled = (item: DiagItem, ans?: DiagAnswer): boolean => {
-    if (!ans) return false;
-    if (item.fieldType === 'NUMBER') return ans.rating != null && ans.rating > 0;
-    if (item.fieldType === 'PHOTO') return (ans.photoUrls?.length ?? 0) > 0;
-    if (item.fieldType === 'CHECKBOX') return ans.comment === 'true' || ans.comment === 'false';
-    return (ans.comment?.trim().length ?? 0) > 0;
+  // DIAG-02: the same rule as the backend completion gate.
+  const isFilled = (item: DiagItem, ans?: DiagAnswer): boolean => isAnswerFilled(item, ans);
+
+  // DIAG-02: a rating / photos saved next to the main answer (seeded TEXT items with hasRating / hasPhoto).
+  const renderVal = (item: DiagItem, ans?: DiagAnswer) => {
+    const rating = savedExtraRating(item, ans);
+    const photos = savedExtraPhotos(item, ans);
+    return (
+      <div className="space-y-1">
+        {renderMain(item, ans)}
+        {rating != null && <p className="text-xs text-gray-600">Оценка: {rating}/5</p>}
+        {photos.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {photos.map((url, i) => (
+              <button key={i} type="button" onClick={() => setLightbox({ urls: photos, index: i })}>
+                <img src={url} alt="" className="w-20 h-20 object-cover rounded-lg border hover:opacity-80 transition-opacity cursor-pointer" />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
   };
 
-  const renderVal = (item: DiagItem, ans?: DiagAnswer) => {
+  const renderMain = (item: DiagItem, ans?: DiagAnswer) => {
     if (ans?.skipped) return <span className="text-sm text-gray-400 italic">Пропущен диагностом</span>;
     if (!ans || !isFilled(item, ans)) {
       return <span className="text-sm text-gray-300 italic">Не заполнено</span>;

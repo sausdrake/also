@@ -11,6 +11,7 @@ import { apiErrorMessage, parseApiError } from '../api/errors';
 import { KycRequiredNotice } from '../components/identity/KycRequiredNotice';
 import { TrustedStatusRequiredNotice } from '../components/identity/TrustedStatusRequiredNotice';
 import { MONEY_CAPACITY, moneyInputError, toMoney } from '../domain/money';
+import { isAnswerFilled, savedExtraPhotos, savedExtraRating } from '../domain/inspectionItem';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
@@ -54,7 +55,7 @@ interface VehicleDetail {
   description?: string;
 }
 
-interface DiagItem   { id: number; title: string; fieldType: string; description?: string; }
+interface DiagItem   { id: number; title: string; fieldType: string; description?: string; hasRating?: boolean; hasPhoto?: boolean; }
 interface DiagGroup  { id: number; name: string; items: DiagItem[]; }
 interface DiagAnswer { inspectionItemId: number; rating: number | null; comment: string; photoUrls: string[]; skipped?: boolean; }
 interface DiagReport {
@@ -105,7 +106,28 @@ function DiagSection({ group, answers }: { group: DiagGroup; answers: DiagAnswer
   const [lightbox, setLightbox] = useState<{ urls: string[]; index: number } | null>(null);
   const ansMap = Object.fromEntries(answers.map(a => [a.inspectionItemId, a]));
 
+  // DIAG-02: a rating / photos saved next to the main answer (seeded TEXT items with hasRating / hasPhoto).
   const renderVal = (item: DiagItem, ans?: DiagAnswer) => {
+    const rating = savedExtraRating(item, ans);
+    const photos = savedExtraPhotos(item, ans);
+    return (
+      <div className="space-y-1">
+        {renderMain(item, ans)}
+        {rating != null && <p className="text-xs text-gray-600">Оценка: {rating}/5</p>}
+        {photos.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-1">
+            {photos.map((url, i) => (
+              <button key={i} type="button" onClick={() => setLightbox({ urls: photos, index: i })} className="shrink-0">
+                <img src={url} alt="" className="w-24 h-24 object-cover rounded-xl border hover:opacity-80 transition-opacity cursor-pointer" />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderMain = (item: DiagItem, ans?: DiagAnswer) => {
     if (ans?.skipped) return <span className="text-gray-400 text-sm italic">Пропущен диагностом</span>;
     if (!ans) return <span className="text-gray-300 text-sm">Не заполнено</span>;
 
@@ -152,14 +174,8 @@ function DiagSection({ group, answers }: { group: DiagGroup; answers: DiagAnswer
     }
   };
 
-  const filled = group.items.filter(i => {
-    const a = ansMap[i.id];
-    if (!a) return false;
-    if (i.fieldType === 'NUMBER') return a.rating != null;
-    if (i.fieldType === 'PHOTO') return (a.photoUrls?.length ?? 0) > 0;
-    if (i.fieldType === 'CHECKBOX') return a.comment === 'true' || a.comment === 'false';
-    return (a.comment?.trim().length ?? 0) > 0;
-  }).length;
+  // DIAG-02: the same rule as the backend completion gate.
+  const filled = group.items.filter(i => isAnswerFilled(i, ansMap[i.id])).length;
 
   return (
     <div className="border border-gray-100 rounded-2xl overflow-hidden">
@@ -183,12 +199,7 @@ function DiagSection({ group, answers }: { group: DiagGroup; answers: DiagAnswer
         <div className="divide-y divide-gray-50">
           {group.items.map(item => {
             const ans = ansMap[item.id];
-            const isFilled = ans && (
-              item.fieldType === 'NUMBER' ? ans.rating != null :
-              item.fieldType === 'PHOTO' ? (ans.photoUrls?.length ?? 0) > 0 :
-              item.fieldType === 'CHECKBOX' ? (ans.comment === 'true' || ans.comment === 'false') :
-              (ans.comment?.trim().length ?? 0) > 0
-            );
+            const isFilled = isAnswerFilled(item, ans);
             return (
               <div key={item.id} className="px-5 py-3">
                 <div className="flex items-start gap-2 mb-1">

@@ -15,6 +15,9 @@ import type { DiagnosticRequestStatus } from '../domain/diagnosticRequest';
 import {
   DIAGNOSTIC_STATUS_LABELS, diagnosticianCanEdit, needsTemplate, parseDiagnosticRequestStatus,
 } from '../domain/diagnosticRequest';
+import {
+  RATING_LABELS, hasExtraPhotos, hasExtraRating, isAnswerFilled, primaryFieldType, savedExtraPhotos, savedExtraRating,
+} from '../domain/inspectionItem';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
 
@@ -154,39 +157,80 @@ function PhotoCapture({ ans, onChange, hasError }: {
 
 // ─── FieldInput ───────────────────────────────────────────────────────────────
 
+function ReadOnlyPhotos({ urls }: { urls: string[] }) {
+  if (urls.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-2 mt-1">
+      {urls.map((url, i) => (
+        <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+          <img src={url} alt="" className="w-16 h-16 object-cover rounded border" />
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function RatingInput({ value, onChange, optional }: {
+  value: number | null;
+  onChange: (value: number | null) => void;
+  optional?: boolean;
+}) {
+  return (
+    <div>
+      <p className="text-xs text-gray-500 mb-1">{optional ? 'Оценка (1–5, необязательно)' : 'Оценка (1–5)'}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {[1, 2, 3, 4, 5].map(star => (
+          <button key={star} type="button"
+            aria-label={`Оценка ${star}`} aria-pressed={value != null && value >= star}
+            onClick={() => onChange(value === star ? null : star)}
+            className={`w-11 h-11 rounded-lg text-sm font-semibold transition-colors ${
+              value != null && value >= star
+                ? 'bg-yellow-400 text-white' : 'bg-gray-100 text-gray-500 hover:bg-yellow-100'
+            }`}>{star}</button>
+        ))}
+        {value ? <span className="self-center text-xs text-gray-400 ml-1">{RATING_LABELS[value]}</span> : null}
+      </div>
+    </div>
+  );
+}
+
+/** DIAG-02: the main answer follows the field type; hasRating / hasPhoto add an optional rating / photos. */
 function FieldInput({ item, ans, onChange, hasError }: {
   item: Item;
   ans: Answer;
   onChange: (field: keyof Answer, value: any) => void;
   hasError: boolean;
 }) {
-  const ft = item.fieldType || (item.hasRating ? 'NUMBER' : item.hasPhoto ? 'PHOTO' : 'TEXTAREA');
+  return (
+    <div className="space-y-3">
+      <MainInput item={item} ans={ans} onChange={onChange} hasError={hasError} />
+      {hasExtraRating(item) && (
+        <RatingInput optional value={ans.rating} onChange={v => onChange('rating', v)} />
+      )}
+      {hasExtraPhotos(item) && (
+        <div>
+          <p className="text-xs text-gray-500 mb-1">Фото (необязательно)</p>
+          <PhotoCapture ans={ans} onChange={onChange} hasError={false} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MainInput({ item, ans, onChange, hasError }: {
+  item: Item;
+  ans: Answer;
+  onChange: (field: keyof Answer, value: any) => void;
+  hasError: boolean;
+}) {
+  const ft = primaryFieldType(item);
   const options = ft === 'SELECT' && item.description
     ? item.description.split('\n').filter(o => o.trim())
     : [];
 
   switch (ft) {
     case 'NUMBER':
-      return (
-        <div>
-          <p className="text-xs text-gray-500 mb-1">Оценка (1–5)</p>
-          <div className="flex gap-1.5">
-            {[1, 2, 3, 4, 5].map(star => (
-              <button key={star} type="button"
-                onClick={() => onChange('rating', ans.rating === star ? null : star)}
-                className={`w-9 h-9 rounded-lg text-sm font-semibold transition-colors ${
-                  ans.rating != null && ans.rating >= star
-                    ? 'bg-yellow-400 text-white' : 'bg-gray-100 text-gray-500 hover:bg-yellow-100'
-                }`}>{star}</button>
-            ))}
-            {ans.rating && (
-              <span className="self-center text-xs text-gray-400 ml-1">
-                {['', 'Плохо', 'Удовлетворительно', 'Нормально', 'Хорошо', 'Отлично'][ans.rating]}
-              </span>
-            )}
-          </div>
-        </div>
-      );
+      return <RatingInput value={ans.rating} onChange={v => onChange('rating', v)} />;
     case 'CHECKBOX':
       return (
         <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -313,16 +357,7 @@ function ReportForm({ request, onDone }: { request: DiagRequest; onDone: () => v
     const errors = new Set<number>();
     for (const group of template.groups) {
       for (const item of group.items) {
-        if (item.isRequired) {
-          const ans = answers[item.id];
-          const ft = item.fieldType || 'TEXTAREA';
-          let filled = false;
-          if (ft === 'NUMBER') filled = ans?.rating != null && ans.rating > 0;
-          else if (ft === 'PHOTO') filled = (ans?.photoUrls?.length ?? 0) > 0;
-          else if (ft === 'CHECKBOX') filled = ans?.comment === 'true' || ans?.comment === 'false';
-          else filled = (ans?.comment?.trim().length ?? 0) > 0;
-          if (!filled) errors.add(item.id);
-        }
+        if (item.isRequired && !isAnswerFilled(item, answers[item.id])) errors.add(item.id);
       }
     }
     setValidationErrors(errors);
@@ -391,14 +426,8 @@ function ReportForm({ request, onDone }: { request: DiagRequest; onDone: () => v
   const editable = diagnosticianCanEdit({ status, templateId: template?.id ?? null });
 
   const totalRequired = groups.flatMap(g => g.items).filter(i => i.isRequired).length;
-  const filledRequired = groups.flatMap(g => g.items).filter(i => {
-    if (!i.isRequired) return false;
-    const ans = answers[i.id];
-    const ft = i.fieldType || 'TEXTAREA';
-    if (ft === 'NUMBER') return ans?.rating != null && ans.rating > 0;
-    if (ft === 'PHOTO') return (ans?.photoUrls?.length ?? 0) > 0;
-    return (ans?.comment?.trim().length ?? 0) > 0;
-  }).length;
+  const filledRequired = groups.flatMap(g => g.items)
+    .filter(i => i.isRequired && isAnswerFilled(i, answers[i.id])).length;
   const progress = totalRequired > 0 ? Math.round((filledRequired / totalRequired) * 100) : 100;
 
   // HYBRID submit UX: advisory only, never blocks the submit button (unlike
@@ -505,13 +534,13 @@ function ReportForm({ request, onDone }: { request: DiagRequest; onDone: () => v
                 const hasError = validationErrors.has(item.id);
                 return (
                   <div key={item.id} className={`p-4 space-y-2 ${hasError ? 'bg-red-50' : ''}`}>
-                    {(item.fieldType || 'TEXTAREA') !== 'CHECKBOX' && (
+                    {primaryFieldType(item) !== 'CHECKBOX' && (
                       <div>
                         <p className="font-medium text-sm">
                           {item.title}
                           {item.isRequired && <span className="text-red-500 ml-1">*</span>}
                         </p>
-                        {item.description && (item.fieldType || 'TEXTAREA') !== 'SELECT' && (
+                        {item.description && primaryFieldType(item) !== 'SELECT' && (
                           <p className="text-xs text-gray-400 mt-0.5">{item.description}</p>
                         )}
                       </div>
@@ -539,17 +568,10 @@ function ReportForm({ request, onDone }: { request: DiagRequest; onDone: () => v
                       <div className="text-sm text-gray-500 italic bg-gray-50 rounded-lg px-3 py-2 border">Пропущен</div>
                     ) : (
                       <div className="text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2 border">
-                        {item.fieldType === 'NUMBER' && ans.rating ? `Оценка: ${ans.rating}/5` : null}
-                        {item.fieldType === 'PHOTO' && (ans.photoUrls?.length ?? 0) > 0 ? (
-                          <div className="flex flex-wrap gap-2">
-                            {ans.photoUrls.map((url, i) => (
-                              <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                                <img src={url} alt="" className="w-16 h-16 object-cover rounded border" />
-                              </a>
-                            ))}
-                          </div>
-                        ) : null}
-                        {(!item.fieldType || ['TEXT', 'TEXTAREA', 'SELECT', 'CHECKBOX'].includes(item.fieldType)) && (ans.comment || '—')}
+                        {primaryFieldType(item) === 'NUMBER' && ans.rating ? `Оценка: ${ans.rating}/5` : null}
+                        {['TEXT', 'TEXTAREA', 'SELECT', 'CHECKBOX'].includes(primaryFieldType(item)) && (ans.comment || '—')}
+                        {savedExtraRating(item, ans) != null && <div>Оценка: {savedExtraRating(item, ans)}/5</div>}
+                        <ReadOnlyPhotos urls={primaryFieldType(item) === 'PHOTO' ? ans.photoUrls ?? [] : savedExtraPhotos(item, ans)} />
                       </div>
                     )}
                     {hasError && <p className="text-xs text-red-500">Обязательное поле</p>}
