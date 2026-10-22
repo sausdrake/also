@@ -211,6 +211,38 @@ class MediaReconciliationServiceIntegrationTest {
     }
 
     @Test
+    @DisplayName("MEDIA-PROD-02: a FAILED upload's object is removed from storage, the FAILED row is kept")
+    void failedUpload_ObjectRemovedRowKept() {
+        RequestAndItem ctx = createRequestAndItem();
+        DiagnosticMedia media = createPendingMedia(ctx);
+        storageClient.simulateUpload(media.getStorageKey(), VALID_JPEG, "image/jpeg");
+        mediaRepository.markFailed(media.getId());   // e.g. finalize refused it as oversized
+        assertThat(storageClient.hasObject(media.getStorageKey())).isTrue();
+
+        reconciliationService.reconcile();
+        reconciliationService.reconcile();           // idempotent once the object is gone
+
+        assertThat(storageClient.hasObject(media.getStorageKey())).isFalse();
+        assertThat(mediaRepository.findById(media.getId()).orElseThrow().getUploadStatus()).isEqualTo(UploadStatus.FAILED);
+    }
+
+    @Test
+    @DisplayName("MEDIA-PROD-02: a READY video whose processing FAILED keeps its object (admin retry needs it)")
+    void processingFailedVideo_ObjectKept() {
+        RequestAndItem ctx = createRequestAndItem();
+        DiagnosticMedia media = createReadyVideo(ctx);
+        mediaRepository.claimForProcessing(media.getId());
+        mediaRepository.markProcessingFailed(media.getId());
+
+        reconciliationService.reconcile();
+
+        assertThat(storageClient.hasObject(media.getStorageKey())).isTrue();
+        DiagnosticMedia after = mediaRepository.findById(media.getId()).orElseThrow();
+        assertThat(after.getUploadStatus()).isEqualTo(UploadStatus.READY);
+        assertThat(after.getProcessingStatus()).isEqualTo(ProcessingStatus.FAILED);
+    }
+
+    @Test
     @DisplayName("L: DELETED запись -> объект удаляется из хранилища, DB-статус сохраняется")
     void deletedMedia_ObjectRemovedFromStorage() {
         RequestAndItem ctx = createRequestAndItem();

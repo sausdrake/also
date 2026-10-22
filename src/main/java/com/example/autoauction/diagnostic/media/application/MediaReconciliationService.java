@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -112,9 +113,18 @@ public class MediaReconciliationService {
      * object needs the exact same best-effort cleanup as the canonical
      * video object. Purely additive to this existing case; no new
      * reconciliation subsystem, no bucket listing.
+     *
+     * MEDIA-PROD-02: uploadStatus=FAILED rows (refused at finalize / by the
+     * reconciler: oversized, empty, unrecognized or wrong-type content) get the
+     * same object removal. FAILED is terminal and never readable (every read
+     * path requires READY; the admin retry needs uploadStatus READY), so the
+     * object is garbage - without this an oversized PUT (the presigned URL
+     * does not sign the length) stayed in the bucket forever. A READY row whose
+     * video processing FAILED is not touched (admin retry still needs it).
      */
     private void reconcileDeletedObjects() {
-        List<DiagnosticMedia> deleted = mediaRepository.findByUploadStatus(UploadStatus.DELETED);
+        List<DiagnosticMedia> deleted = new ArrayList<>(mediaRepository.findByUploadStatus(UploadStatus.DELETED));
+        deleted.addAll(mediaRepository.findByUploadStatus(UploadStatus.FAILED));
         for (DiagnosticMedia media : deleted) {
             try {
                 storageClient.deleteObject(media.getStorageKey());

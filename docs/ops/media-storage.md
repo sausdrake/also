@@ -21,15 +21,16 @@ Two stores:
 
 - KYC: abandoned capture slots older than 24 h - object, then row (hourly, KYC-SLOT-01).
 - Diagnostic media (every 5 min): PENDING_UPLOAD rows without an object expire after 60 min; DELETED rows' objects
-  (main, thumbnail) are removed; orphan thumbnails and stale PROCESSING rows are handled by VideoProcessingService.
+  (main, thumbnail) are removed, and so are the objects of FAILED uploads (MEDIA-PROD-02; a READY video whose
+  processing failed keeps its object for the admin retry); orphan thumbnails and stale PROCESSING rows are handled by VideoProcessingService.
 
 ## Open before production (owner / later tasks)
 
 1. Bucket configuration is not in the repository: confirm the bucket is private (no public r2.dev URL / custom domain),
    set CORS for the site origin (PUT with `Content-Type`, GET), and add a lifecycle rule as a safety net.
-2. FAILED diagnostic uploads (oversized, wrong content) keep their object in R2 - no cleanup yet.
-3. The presigned PUT does not sign the content length: the 200 MB cap is checked after upload (HEAD); oversized objects
-   stay until item 2 exists.
+2. ~~FAILED diagnostic uploads keep their object in R2~~ - fixed in MEDIA-PROD-02: the 5-minute sweep removes them.
+3. The presigned PUT does not sign the content length: the 200 MB cap is checked after upload (HEAD); an oversized
+   object is FAILED and removed by the sweep (MEDIA-PROD-02), so it costs storage for minutes, not forever.
 4. Media of an APPROVED report are public by sequential id (the report itself is public); unlisted media of such a report
    are reachable by enumeration. Decide whether approved reports are fully public (product decision).
 5. `/uploads` lives on one disk: single instance only (docs/ops/single-instance.md); include the `media_uploads` volume
