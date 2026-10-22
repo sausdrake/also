@@ -63,6 +63,14 @@ Conclusion: no live credential is in the history, so rewriting it is **not neede
 early commits from the public repository remains optional hygiene and the owner's decision (it rewrites
 public history). Production must use freshly generated secrets - never a value from development.
 
+Status (re-checked 2026-10-23, MVP certification; the 16 commits since the scan add no credential - the only
+literal password is the isolated-test fixture in `MediaUploadSizeLimitHttpIntegrationTest`):
+
+| Item | Status |
+|---|---|
+| CURRENT CREDENTIAL RISK | **CLOSED** - every credential that was ever committed is rotated or replaced; current secrets were never committed |
+| HISTORICAL EXPOSURE | **DOCUMENTED, NOT REMOVED** - the old values are still in the history (and were in the public repository). Rotation does not remove them; removal needs a history rewrite, which is not done without the owner's explicit approval |
+
 Owner action (development machine, not production): the local PostgreSQL listens on all interfaces and the
 development database password is short - restrict `listen_addresses` to `localhost` or set a strong password.
 
