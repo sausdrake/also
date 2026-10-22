@@ -1,5 +1,5 @@
 import fs from 'node:fs'
-import { defineConfig, type ProxyOptions } from 'vite'
+import { defineConfig, loadEnv, type ProxyOptions } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // CAMERA-01: optional HTTPS for opening the dev server from a phone on the LAN. Browsers expose the camera
@@ -25,12 +25,19 @@ const toBackend = (ws = false): ProxyOptions => ({
   },
 })
 
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    host: '0.0.0.0',
-    port: 5173,
-    https,
-    proxy: https ? { '/api': toBackend(), '/uploads': toBackend(), '/ws-auction': toBackend(true) } : undefined,
-  },
+// PROD-FE-01: every API client falls back to http://localhost:8081 when VITE_API_URL is unset - fine for `vite`,
+// wrong for a deployable bundle. A build without VITE_API_URL (environment or .env.production / .env.local) fails.
+export default defineConfig(({ command, mode }) => {
+  if (command === 'build' && !loadEnv(mode, process.cwd(), 'VITE_').VITE_API_URL) {
+    throw new Error('VITE_API_URL must be set for a build (the API origin the bundle calls)')
+  }
+  return {
+    plugins: [react()],
+    server: {
+      host: '0.0.0.0',
+      port: 5173,
+      https,
+      proxy: https ? { '/api': toBackend(), '/uploads': toBackend(), '/ws-auction': toBackend(true) } : undefined,
+    },
+  }
 })
