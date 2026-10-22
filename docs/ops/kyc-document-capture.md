@@ -49,5 +49,32 @@ side cannot be submitted or approved; a pending one submitted before this change
 
 The browser uploads straight to storage, so the server cannot prove a photo came from a camera. Camera-only
 capture, single-use per-side slots and the validity window make re-using an existing file harder; they do not
-detect a photo of a screen or an edited printout. Anti-spoofing (liveness, document authenticity) is backlog item
-KYC-ANTI-SPOOF-01.
+detect a photo of a screen or an edited printout.
+
+## Anti-spoofing audit (KYC-ANTI-SPOOF-01, 2026-10-22)
+
+In place:
+
+| Control | Where | Stops |
+|---|---|---|
+| Camera-only capture, no file picker | frontend | casual upload of an existing file (not a security boundary) |
+| One slot per side, per document type, per user | `IdentityCaptureVerifier` | re-using another user's or another step's image |
+| Single use (consumed atomically) | `IdentityCaptureVerifier` | replaying a capture into a second submission |
+| 15-minute validity | `IdentityCaptureVerifier` | submitting an image prepared long before |
+| JPEG in slot and in storage | `IdentityCaptureVerifier` | other file types |
+| Slot rate limit (30 / hour / user), abandoned slots removed after 24 h | KYC-SLOT-01 | bulk slot minting, stale images in storage |
+| Manual review of selfie + document by an administrator | admin KYC queue | the final decision (PO KYC policy) |
+
+Not in place:
+
+- liveness detection (a photo or a video of a face shown to the camera, a virtual camera, a deepfake);
+- face match between the selfie and the document photo;
+- document authenticity (printout, screen photo, edited image), MRZ / barcode reading, cross-check of the entered
+  document number against the image;
+- proof that an image came from the device camera (the browser uploads to storage directly, so it cannot be proven).
+
+None of these can be added without a choice the product owner has to make: a liveness / document-verification
+vendor (cost, data processing and storage of biometric data, the country where data is processed) or an
+in-house approach with its own accuracy targets. **Open decision:** either accept the administrator's manual review
+as the MVP anti-spoofing control, or choose a vendor. Until it is decided, the administrator's review is the only
+check that catches a spoofed selfie or document.
