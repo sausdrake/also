@@ -64,6 +64,8 @@ describe('FE-KYC-01: lot page gate guidance', () => {
     await bid();
     const notice = await screen.findByText('Чтобы делать ставки, подтвердите личность.');
     expect(notice.closest('[role=alert]')).toHaveTextContent('Пройдите верификацию личности');
+    // UX-KYC-01: trading also needs the trusted status - stated as a rule, never as the user's status
+    expect(notice.closest('[role=alert]')).toHaveTextContent('статус доверенного пользователя — его выдаёт администратор отдельно');
     fireEvent.click(screen.getByRole('link', { name: 'Пройти подтверждение личности' }));
     expect(await screen.findByText('IDENTITY TAB')).toBeInTheDocument();
   });
@@ -72,7 +74,8 @@ describe('FE-KYC-01: lot page gate guidance', () => {
     axiosPost.mockRejectedValue(KYC);
     await renderLot('CREATED', { buyNowPrice: 2000000 });
     fireEvent.click(screen.getByRole('button', { name: /Купить сейчас/ }));
-    expect(await screen.findByText('Чтобы купить по цене Buy Now, подтвердите личность.')).toBeInTheDocument();
+    expect((await screen.findByText('Чтобы купить по цене Buy Now, подтвердите личность.')).closest('[role=alert]'))
+      .toHaveTextContent('статус доверенного пользователя — его выдаёт администратор отдельно');
     expect(screen.getByRole('link', { name: 'Пройти подтверждение личности' })).toHaveAttribute('href', '/profile/identity');
   });
 

@@ -806,7 +806,7 @@ export const AuctionPage = () => {
 
               <AuctionTimer startTime={auction.startTime} endTime={auction.endTime} status={auction.status} extended={wasExtended} />
 
-              {kycRefusal && <KycRequiredNotice action={kycRefusal.action} message={kycRefusal.message} />}
+              {kycRefusal && <KycRequiredNotice action={kycRefusal.action} message={kycRefusal.message} tradingNote />}
               {trustRefusal && <TrustedStatusRequiredNotice action={trustRefusal.action} />}
 
               {/* Flash message */}

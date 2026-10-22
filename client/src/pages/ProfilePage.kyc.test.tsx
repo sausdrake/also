@@ -57,6 +57,7 @@ describe('FE-KYC-01: diagnostic request', () => {
     renderProfile('/profile/requests');
     await submitRequest();
     expect(await screen.findByText('Чтобы подать заявку на диагностику, подтвердите личность.')).toBeInTheDocument();
+    expect(screen.queryByText(/доверенного/)).toBeNull();
     expect(screen.getByRole('link', { name: 'Пройти подтверждение личности' })).toHaveAttribute('href', '/profile/identity');
   });
 
@@ -84,6 +85,8 @@ describe('FE-KYC-01: withdrawal', () => {
     renderProfile('/profile');
     await submitWithdrawal();
     expect(await screen.findByText('Чтобы вывести средства, подтвердите личность.')).toBeInTheDocument();
+    // UX-KYC-01: a withdrawal needs KYC only - no word about the trusted status
+    expect(screen.queryByText(/доверенного/)).toBeNull();
     expect(screen.getByRole('link', { name: 'Пройти подтверждение личности' })).toHaveAttribute('href', '/profile/identity');
   });
 
