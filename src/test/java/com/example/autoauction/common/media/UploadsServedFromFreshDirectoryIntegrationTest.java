@@ -46,7 +46,7 @@ class UploadsServedFromFreshDirectoryIntegrationTest {
     void uploadedFile_isServed() throws Exception {
         String body = mockMvc.perform(multipart("/api/media/upload")
                         .file(new MockMultipartFile("file", "f.jpg", "image/jpeg", JPEG))
-                        .with(SecurityMockMvcRequestPostProcessors.user(TestUserPrincipal.createWithRoles(9501L, "media04", "USER"))))
+                        .with(SecurityMockMvcRequestPostProcessors.user(TestUserPrincipal.createWithRoles(9501L, "media04", "DIAGNOSTIC"))))
                 .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
         String url = JsonPath.read(body, "$.publicUrl");
 

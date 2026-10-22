@@ -41,7 +41,7 @@ class MediaUploadContentValidationIntegrationTest {
     private MvcResult upload(byte[] bytes, String contentType) throws Exception {
         return mockMvc.perform(multipart("/api/media/upload")
                         .file(new MockMultipartFile("file", "f.bin", contentType, bytes))
-                        .with(SecurityMockMvcRequestPostProcessors.user(TestUserPrincipal.createWithRoles(9401L, "sec04", "USER"))))
+                        .with(SecurityMockMvcRequestPostProcessors.user(TestUserPrincipal.createWithRoles(9401L, "sec04", "DIAGNOSTIC"))))
                 .andReturn();
     }
 
@@ -49,6 +49,21 @@ class MediaUploadContentValidationIntegrationTest {
         Path dir = Path.of("target/sec04-uploads");
         if (!Files.exists(dir)) return 0;
         try (var s = Files.list(dir)) { return s.count(); }
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("SEC-UPLOAD-01: with the real security configuration an ordinary user gets 403 and nothing is stored")
+    void ordinaryUser_forbidden_realSecurityConfig() throws Exception {
+        long before = storedFiles();
+        int status = mockMvc.perform(multipart("/api/media/upload")
+                        .file(new MockMultipartFile("file", "f.jpg", "image/jpeg", JPEG))
+                        .with(SecurityMockMvcRequestPostProcessors.user(TestUserPrincipal.createWithRoles(9402L, "plainuser", "USER"))))
+                .andReturn().getResponse().getStatus();
+        assertThat(status).isEqualTo(403);
+        assertThat(storedFiles()).isEqualTo(before);
+        int anonymous = mockMvc.perform(multipart("/api/media/upload").file(new MockMultipartFile("file", "f.jpg", "image/jpeg", JPEG)))
+                .andReturn().getResponse().getStatus();
+        assertThat(anonymous).isEqualTo(401);
     }
 
     @Test

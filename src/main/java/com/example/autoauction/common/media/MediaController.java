@@ -43,7 +43,12 @@ public class MediaController {
     /**
      * Загрузка файла напрямую (MVP).
      * В production заменить на presigned URL через S3/Cloudinary.
+     *
+     * <p>SEC-UPLOAD-01: only staff upload here - the administrator (auction photos) and the diagnostician
+     * (inspection photos). Files are served publicly from /uploads, so an ordinary user must not be able to
+     * host content on the platform domain; KYC images never come this way (private identity capture slots).
      */
+    @PreAuthorize("hasAnyRole('ADMIN', 'DIAGNOSTIC')")
     @PostMapping("/upload")
     public ResponseEntity<Map<String, String>> upload(
             @RequestParam("file") MultipartFile file,

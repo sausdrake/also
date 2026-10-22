@@ -40,9 +40,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(controllers = MediaController.class,
         properties = "media.upload.dir=target/media-controller-test-uploads")
-@Import(TestSecurityConfig.class)
+@Import({TestSecurityConfig.class, MediaControllerTest.MethodSecurity.class})
 @DisplayName("Тесты контроллера медиа — расширение (C-3) и авторизация удаления (H-7)")
 class MediaControllerTest {
+
+    /** The application enables method security (SecurityConfig); this web slice must too, or @PreAuthorize is inert. */
+    @org.springframework.boot.test.context.TestConfiguration
+    @org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
+    static class MethodSecurity {
+    }
 
     /** SEC-04: uploads must carry the signature of their declared type; the payload after it is irrelevant here. */
     static byte[] bodyFor(String contentType) {
@@ -221,7 +227,7 @@ class MediaControllerTest {
     // ==================== H-7: UPLOAD RECORDS UPLOADER ====================
 
     @Test
-    @WithMockCustomUser(userId = 7L, roles = {"USER"})
+    @WithMockCustomUser(userId = 7L, roles = {"DIAGNOSTIC"})
     @DisplayName("H-7: загрузка фиксирует MediaAsset с ID текущего пользователя")
     void upload_recordsMediaAssetWithCurrentUserId() throws Exception {
         MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", bodyFor("image/png"));
@@ -233,7 +239,7 @@ class MediaControllerTest {
     }
 
     @Test
-    @WithMockCustomUser(userId = 7L, roles = {"USER"})
+    @WithMockCustomUser(userId = 7L, roles = {"DIAGNOSTIC"})
     @DisplayName("H-7: сбой сохранения MediaAsset -> загрузка НЕ возвращает 200")
     void upload_recordUploadFails_doesNotReturn200() throws Exception {
         doThrow(new RuntimeException("db connection refused: password=SuperSecret123"))
@@ -246,7 +252,7 @@ class MediaControllerTest {
     }
 
     @Test
-    @WithMockCustomUser(userId = 7L, roles = {"USER"})
+    @WithMockCustomUser(userId = 7L, roles = {"DIAGNOSTIC"})
     @DisplayName("H-7: сбой сохранения MediaAsset -> клиенту не передаются детали исключения")
     void upload_recordUploadFails_doesNotLeakExceptionDetails() throws Exception {
         doThrow(new RuntimeException("db connection refused: password=SuperSecret123"))
@@ -260,7 +266,7 @@ class MediaControllerTest {
     }
 
     @Test
-    @WithMockCustomUser(userId = 7L, roles = {"USER"})
+    @WithMockCustomUser(userId = 7L, roles = {"DIAGNOSTIC"})
     @DisplayName("H-7: клиентский параметр uploaderId игнорируется — используется только принципал")
     void upload_clientSuppliedUploaderIdIgnored() throws Exception {
         MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", bodyFor("image/png"));
@@ -272,6 +278,66 @@ class MediaControllerTest {
 
         verify(mediaAssetService).recordUpload(anyString(), eq(7L));
         verify(mediaAssetService, never()).recordUpload(anyString(), eq(999L));
+    }
+
+    // ==================== SEC-UPLOAD-01: WHO MAY UPLOAD ====================
+
+    @Test
+    @WithMockCustomUser(userId = 7L, roles = {"USER"})
+    @DisplayName("SEC-UPLOAD-01: an ordinary user cannot upload (403) - nothing written, nothing recorded")
+    void upload_byOrdinaryUser_forbidden() throws Exception {
+        long before = filesInUploadDir();
+        MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", bodyFor("image/png"));
+
+        mockMvc.perform(multipart("/api/media/upload").file(file))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(mediaAssetService);
+        assertThat(filesInUploadDir()).isEqualTo(before);
+    }
+
+    @Test
+    @WithMockCustomUser(userId = 7L, roles = {"USER"})
+    @DisplayName("SEC-UPLOAD-01: a forged role parameter or header does not help an ordinary user")
+    void upload_byOrdinaryUser_withForgedRoleInput_forbidden() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", bodyFor("image/png"));
+
+        mockMvc.perform(multipart("/api/media/upload").file(file).param("role", "ADMIN").header("X-Role", "ROLE_ADMIN"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(mediaAssetService);
+    }
+
+    @Test
+    @WithMockCustomUser(userId = 55L, roles = {"DIAGNOSTIC"})
+    @DisplayName("SEC-UPLOAD-01: a diagnostician may upload")
+    void upload_byDiagnostic_allowed() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "photo.jpg", "image/jpeg", bodyFor("image/jpeg"));
+
+        mockMvc.perform(multipart("/api/media/upload").file(file))
+                .andExpect(status().isOk());
+
+        verify(mediaAssetService).recordUpload(anyString(), eq(55L));
+    }
+
+    @Test
+    @WithMockCustomUser(userId = 1L, roles = {"ADMIN"})
+    @DisplayName("SEC-UPLOAD-01: an administrator may upload")
+    void upload_byAdmin_allowed() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "photo.jpg", "image/jpeg", bodyFor("image/jpeg"));
+
+        mockMvc.perform(multipart("/api/media/upload").file(file))
+                .andExpect(status().isOk());
+
+        verify(mediaAssetService).recordUpload(anyString(), eq(1L));
+    }
+
+    private long filesInUploadDir() throws java.io.IOException {
+        Path dir = Paths.get(uploadDir);
+        if (!java.nio.file.Files.exists(dir)) return 0;
+        try (var files = java.nio.file.Files.list(dir)) {
+            return files.count();
+        }
     }
 
     // ==================== H-7: DELETE AUTHORIZATION ====================
@@ -324,8 +390,9 @@ class MediaControllerTest {
     @Test
     @DisplayName("H-7: неаутентифицированное удаление отклоняется")
     void delete_unauthenticated_rejected() throws Exception {
-        mockMvc.perform(delete("/api/media").param("url", baseUrl + "/abc.png"))
-                .andExpect(status().isUnauthorized());
+        // this slice has no authentication entry point (403); the real 401 is asserted in MediaUploadContentValidationIntegrationTest
+        int status = mockMvc.perform(delete("/api/media").param("url", baseUrl + "/abc.png")).andReturn().getResponse().getStatus();
+        assertThat(status).isIn(401, 403);
 
         verifyNoInteractions(mediaAssetService);
     }
@@ -335,8 +402,9 @@ class MediaControllerTest {
     void upload_unauthenticated_rejected() throws Exception {
         MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", bodyFor("image/png"));
 
-        mockMvc.perform(multipart("/api/media/upload").file(file))
-                .andExpect(status().isUnauthorized());
+        // this slice has no authentication entry point (403); the real 401 is asserted in MediaUploadContentValidationIntegrationTest
+        int status = mockMvc.perform(multipart("/api/media/upload").file(file)).andReturn().getResponse().getStatus();
+        assertThat(status).isIn(401, 403);
 
         verifyNoInteractions(mediaAssetService);
     }
