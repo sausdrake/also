@@ -21,6 +21,9 @@ public class TelegramAuthException extends RuntimeException {
                 "Не удалось проверить ответ Telegram. Начните вход заново."),
         PROVIDER_UNAVAILABLE(HttpStatus.BAD_GATEWAY, "TELEGRAM_UNAVAILABLE",
                 "Telegram сейчас не отвечает. Попробуйте позже."),
+        /** AUTH-TG-ERR-01: Telegram answered with an OAuth error other than invalid_grant (our client / request). */
+        PROVIDER_REJECTED(HttpStatus.BAD_GATEWAY, "TELEGRAM_REJECTED",
+                "Telegram отклонил запрос входа. Попробуйте позже или войдите по логину и паролю."),
         IDENTITY_CONFLICT(HttpStatus.CONFLICT, "TELEGRAM_IDENTITY_CONFLICT",
                 "Этот Telegram уже привязан к другому аккаунту AlSo или к аккаунту уже привязан другой Telegram."),
         LOGIN_NOT_ALLOWED(HttpStatus.FORBIDDEN, "TELEGRAM_LOGIN_NOT_ALLOWED",

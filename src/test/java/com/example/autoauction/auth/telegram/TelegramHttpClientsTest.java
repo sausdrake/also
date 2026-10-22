@@ -145,6 +145,47 @@ class TelegramHttpClientsTest {
     }
 
     @Test
+    @DisplayName("AUTH-TG-ERR-01: HTTP 200 {error}: invalid_grant -> retry, other codes -> rejected; only the safe code is logged")
+    void oauthErrorsWithHttp200() {
+        ch.qos.logback.classic.Logger logger =
+                (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(HttpTelegramTokenClient.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> logs = new ch.qos.logback.core.read.ListAppender<>();
+        logs.start();
+        logger.addAppender(logs);
+        try {
+            HttpTelegramTokenClient client = new HttpTelegramTokenClient(properties());
+            tokenStatus = 200;
+            tokenBody = "{\"error\":\"invalid_client\",\"error_description\":\"client secret mismatch detail\"}";
+            assertThatThrownBy(() -> client.exchangeCode("c", "v")).isInstanceOf(TelegramAuthException.class)
+                    .hasMessageNotContaining("mismatch detail")
+                    .extracting(e -> ((TelegramAuthException) e).getReason()).isEqualTo(TelegramAuthException.Reason.PROVIDER_REJECTED);
+            tokenBody = "{\"error\":\"invalid_grant\",\"error_description\":\"code expired detail\"}";
+            assertThatThrownBy(() -> client.exchangeCode("c", "v")).isInstanceOf(TelegramAuthException.class)
+                    .extracting(e -> ((TelegramAuthException) e).getReason()).isEqualTo(TelegramAuthException.Reason.INVALID_CODE);
+            tokenBody = "{\"error\":\"Weird <b>error</b> text\",\"id_token\":\"header.payload.sig\"}";
+            assertThatThrownBy(() -> client.exchangeCode("c", "v")).isInstanceOf(TelegramAuthException.class)
+                    .extracting(e -> ((TelegramAuthException) e).getReason()).isEqualTo(TelegramAuthException.Reason.PROVIDER_REJECTED);
+            tokenBody = "<html>not json</html>";
+            assertThatThrownBy(() -> client.exchangeCode("c", "v")).isInstanceOf(TelegramAuthException.class)
+                    .extracting(e -> ((TelegramAuthException) e).getReason()).isEqualTo(TelegramAuthException.Reason.INVALID_TOKEN);
+            tokenStatus = 401;
+            tokenBody = "{\"error\":\"invalid_client\"}";
+            assertThatThrownBy(() -> client.exchangeCode("c", "v")).isInstanceOf(TelegramAuthException.class)
+                    .extracting(e -> ((TelegramAuthException) e).getReason()).isEqualTo(TelegramAuthException.Reason.PROVIDER_REJECTED);
+
+            String logged = logs.list.stream().map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+                    .collect(java.util.stream.Collectors.joining("\n"));
+            assertThat(logged).contains("OAuth error invalid_client", "OAuth error invalid_grant", "OAuth error <non-standard>");
+            assertThat(logged).doesNotContain("detail", "Weird", "<b>", "s3cr3t", "header.payload.sig", "code_verifier");
+        } finally {
+            logger.detachAppender(logs);
+        }
+        // the user can tell "Telegram refused" from "the answer could not be checked"
+        assertThat(TelegramAuthException.Reason.PROVIDER_REJECTED.message())
+                .isNotEqualTo(TelegramAuthException.Reason.INVALID_TOKEN.message()).contains("Telegram отклонил");
+    }
+
+    @Test
     @DisplayName("properties: unconfigured without client id / secret / redirect; toString never shows the secret")
     void configuration() {
         assertThat(new TelegramOidcProperties("", "s", "r", "i", "a", "t", "j").isConfigured()).isFalse();

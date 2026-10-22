@@ -24,6 +24,12 @@ OpenID Connect Authorization Code flow with PKCE (S256), exactly as documented a
 
 The browser never sees the client secret, the ID token or the Telegram id, and never chooses the account.
 
+Token endpoint errors (AUTH-TG-ERR-01): Telegram also answers OAuth errors with HTTP 200 `{"error": ...}`.
+`invalid_grant` (code used, expired or not matching the verifier) → `TELEGRAM_INVALID_CODE`, the user starts again;
+any other OAuth error (`invalid_client`, …: our client or request is refused) → `TELEGRAM_REJECTED` (502); a response
+with neither an error nor an `id_token` → `TELEGRAM_INVALID_TOKEN`. The log carries the HTTP status and the OAuth
+error code only when it looks like a standard code (`[a-z_]{1,40}`), never `error_description`.
+
 ## Configuration (environment only — never commit values)
 
 | Variable | Meaning |

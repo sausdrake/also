@@ -58,11 +58,17 @@ public class HttpTelegramTokenClient implements TelegramTokenClient {
                             .POST(HttpRequest.BodyPublishers.ofString(body))
                             .build(),
                     HttpResponse.BodyHandlers.ofString());
+            JsonNode json = readJson(response.body());
+            // AUTH-TG-ERR-01: Telegram also reports OAuth errors as HTTP 200 {"error": ...}
+            if (json.hasNonNull("error")) {
+                String error = json.path("error").asText("");
+                log.warn("Telegram token exchange refused: HTTP {}, OAuth error {}", response.statusCode(), safeErrorCode(error));
+                throw new TelegramAuthException(rejection(error));
+            }
             if (response.statusCode() != 200) {
                 log.warn("Telegram token exchange refused: HTTP {}", response.statusCode());
                 throw new TelegramAuthException(TelegramAuthException.Reason.INVALID_CODE);
             }
-            JsonNode json = objectMapper.readTree(response.body());
             String idToken = json.path("id_token").asText("");
             if (idToken.isEmpty()) {
                 throw new TelegramAuthException(TelegramAuthException.Reason.INVALID_TOKEN);
@@ -77,5 +83,31 @@ public class HttpTelegramTokenClient implements TelegramTokenClient {
             log.warn("Telegram token exchange failed: {}", e.getClass().getSimpleName());
             throw new TelegramAuthException(TelegramAuthException.Reason.PROVIDER_UNAVAILABLE);
         }
+    }
+
+    /** A body that is not JSON (an HTML error page, an empty body) carries no OAuth error and no token. */
+    private JsonNode readJson(String body) {
+        try {
+            JsonNode json = objectMapper.readTree(body == null ? "" : body);
+            return json == null ? objectMapper.missingNode() : json;
+        } catch (Exception e) {
+            return objectMapper.missingNode();
+        }
+    }
+
+    /**
+     * AUTH-TG-ERR-01: invalid_grant is this sign-in failing (code used, expired or not matching the verifier) - the
+     * user starts again. Any other OAuth error means Telegram refuses our client or request (configuration), which
+     * a retry does not fix.
+     */
+    static TelegramAuthException.Reason rejection(String error) {
+        return "invalid_grant".equals(error)
+                ? TelegramAuthException.Reason.INVALID_CODE
+                : TelegramAuthException.Reason.PROVIDER_REJECTED;
+    }
+
+    /** Only a short standard-looking OAuth code is logged - never error_description or anything free-form. */
+    static String safeErrorCode(String error) {
+        return error != null && error.matches("[a-z_]{1,40}") ? error : "<non-standard>";
     }
 }
