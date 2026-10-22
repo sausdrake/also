@@ -11,7 +11,7 @@ import { labelOf } from '../domain/parse';
 import { AUCTION_STATUSES as AUCTION_STATUS_VALUES, AUCTION_STATUS_LABELS, type AuctionStatus } from '../domain/auction';
 import { BrandLogo } from '../components/brand/BrandLogo';
 import { ReportItemMedia } from '../components/admin/diagnostic/ReportItemMedia';
-import { formatDateTime, formatDate } from '../utils/formatDate';
+import { formatDateTime, formatDate, parseDate } from '../utils/formatDate';
 import { MONEY_CAPACITY, formatSom, moneyInputError, toMoney } from '../domain/money';
 import { useAuthStore } from '../store/authStore';
 import { PhotoLightbox } from '../components/PhotoLightbox';
@@ -505,7 +505,7 @@ function RecentActivity() {
       status: REPORT_BACKEND_TO_UI[r.status] || r.status,
       time: r.createdAt,
     })),
-  ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 8);
+  ].sort((a, b) => (parseDate(b.time)?.getTime() ?? 0) - (parseDate(a.time)?.getTime() ?? 0)).slice(0, 8);
 
   if (events.length === 0) {
     return <div className="text-center text-gray-400 py-8 text-sm">Нет данных</div>;

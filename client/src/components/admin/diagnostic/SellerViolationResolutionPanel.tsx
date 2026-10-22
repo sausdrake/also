@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../../../api/client';
+import { formatDateTime } from '../../../utils/formatDate';
 
 interface ViolationDefinition {
   id: number;
@@ -71,7 +72,7 @@ export function SellerViolationResolutionPanel({ requestId, commitmentStatus, vi
           <p>Начислено (до ограничения): {violationResolution.rawPenaltyAmount} сом</p>
           <p>Применено (с учётом лимита): {violationResolution.appliedPenaltyAmount} сом</p>
           <p>Возврат продавцу: {violationResolution.refundAmount} сом</p>
-          <p>Разрешено: {new Date(violationResolution.resolvedAt).toLocaleString('ru')}</p>
+          <p>Разрешено: {formatDateTime(violationResolution.resolvedAt)}</p>
         </div>
       </div>
     );

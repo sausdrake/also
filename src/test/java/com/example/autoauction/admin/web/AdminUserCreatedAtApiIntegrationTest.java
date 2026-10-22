@@ -94,12 +94,9 @@ class AdminUserCreatedAtApiIntegrationTest {
     }
 
     private static OffsetDateTime toOffsetDateTime(Object value) {
-        // The REST ObjectMapper (WebSocketConfig bean) writes OffsetDateTime as epoch seconds, the
-        // same shape every other date of this API has; the client's parseDate reads it.
-        assertThat(value).as("createdAt in the admin user JSON").isInstanceOf(Number.class);
-        java.math.BigDecimal seconds = new java.math.BigDecimal(value.toString());
-        return java.time.Instant.ofEpochSecond(seconds.longValue(),
-                seconds.remainder(java.math.BigDecimal.ONE).movePointRight(9).longValue()).atOffset(ZoneOffset.UTC);
+        // API-DATE-01: dates are ISO-8601 strings (spring.jackson.*), as the client's types declare.
+        assertThat(value).as("createdAt in the admin user JSON").isInstanceOf(String.class);
+        return OffsetDateTime.parse((String) value);
     }
 
     @Test

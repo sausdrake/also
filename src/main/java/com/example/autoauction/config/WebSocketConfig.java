@@ -4,8 +4,6 @@ import org.springframework.beans.factory.annotation.Value;
 import java.util.Arrays;
 import com.example.autoauction.auth.infrastructure.security.StompAuthChannelInterceptor;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.converter.DefaultContentTypeResolver;
 import org.springframework.messaging.converter.MappingJackson2MessageConverter;
@@ -26,10 +24,17 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private final StompAuthChannelInterceptor stompAuthChannelInterceptor;
     /** SEC-03: the same origins as CORS (allowed.origins) - never "*". */
     private final String[] allowedOrigins;
+    /**
+     * API-DATE-01: Spring Boot's mapper (spring.jackson.*), the same one REST uses - dates are ISO-8601 strings
+     * on both channels. A plain {@code @Bean ObjectMapper} here used to replace it for the whole API.
+     */
+    private final ObjectMapper objectMapper;
 
     public WebSocketConfig(StompAuthChannelInterceptor stompAuthChannelInterceptor,
-                           @Value("${allowed.origins}") String allowedOrigins) {
+                           @Value("${allowed.origins}") String allowedOrigins,
+                           ObjectMapper objectMapper) {
         this.stompAuthChannelInterceptor = stompAuthChannelInterceptor;
+        this.objectMapper = objectMapper;
         this.allowedOrigins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim).filter(o -> !o.isEmpty()).toArray(String[]::new);
     }
@@ -64,17 +69,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         resolver.setDefaultMimeType(MimeTypeUtils.APPLICATION_JSON);
 
         MappingJackson2MessageConverter converter = new MappingJackson2MessageConverter();
-        converter.setObjectMapper(objectMapper());
+        converter.setObjectMapper(objectMapper);
         converter.setContentTypeResolver(resolver);
 
         messageConverters.add(converter);
         return false;
-    }
-
-    @Bean
-    public ObjectMapper objectMapper() {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.registerModule(new JavaTimeModule());
-        return mapper;
     }
 }

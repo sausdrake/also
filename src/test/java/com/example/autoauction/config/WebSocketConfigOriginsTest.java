@@ -34,7 +34,8 @@ class WebSocketConfigOriginsTest {
         when(rawEndpoint.setAllowedOrigins(any(String[].class))).thenReturn(rawEndpoint);
         when(sockJsEndpoint.withSockJS()).thenReturn(mock(SockJsServiceRegistration.class));
 
-        new WebSocketConfig(mock(StompAuthChannelInterceptor.class), "https://a.example, https://b.example ,")
+        new WebSocketConfig(mock(StompAuthChannelInterceptor.class), "https://a.example, https://b.example ,",
+                new com.fasterxml.jackson.databind.ObjectMapper())
                 .registerStompEndpoints(registry);
 
         for (StompWebSocketEndpointRegistration endpoint : new StompWebSocketEndpointRegistration[]{sockJsEndpoint, rawEndpoint}) {
