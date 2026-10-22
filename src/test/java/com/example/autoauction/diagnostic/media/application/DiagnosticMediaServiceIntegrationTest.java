@@ -634,6 +634,27 @@ class DiagnosticMediaServiceIntegrationTest {
         }
 
         @Test
+        @DisplayName("MEDIA-PROD-01: the public report serves only a processed video - never PENDING / PROCESSING / FAILED")
+        void publicReport_OnlyProcessedVideo() {
+            Setup s = setUpStandard(false, true);
+            Long pending = videoMedia(s, ProcessingStatus.PENDING, null);
+            Long processing = videoMedia(s, ProcessingStatus.PROCESSING, null);
+            Long failed = videoMedia(s, ProcessingStatus.FAILED, null);
+            Long ready = videoMedia(s, ProcessingStatus.READY, thumbnailKey(s.requestId()));
+            DiagnosticRequest request = requestRepository.findById(s.requestId()).orElseThrow();
+            request.setStatus(DiagnosticRequest.DiagnosticRequestStatus.APPROVED);
+            requestRepository.save(request);
+
+            for (Long id : List.of(pending, processing, failed)) {
+                assertThatThrownBy(() -> mediaService.getReadUrlForApprovedReport(id)).as("media %s", id)
+                        .isInstanceOf(IllegalStateException.class);
+            }
+            assertThat(mediaService.getReadUrlForApprovedReport(ready).url()).isNotBlank();
+            // the assigned diagnostician / admin still reach a failed video (to see why it failed)
+            assertThat(mediaService.getReadUrl(failed, s.diagnosticId(), false).url()).isNotBlank();
+        }
+
+        @Test
         @DisplayName("Владелец, назначенный диагност и админ получают ссылку на превью")
         void ownerDiagnosticianAdmin_Succeed() {
             Setup s = setUpStandard(false, true);

@@ -83,6 +83,12 @@ public class MediaReconciliationService {
                 log.warn("MEDIA-3.2 reconciliation: media {} failed - content not recognized", media.getId());
                 continue;
             }
+            // MEDIA-PROD-01: the same type check as finalize - a PHOTO row never becomes READY holding a video
+            if (!DiagnosticMediaService.contentMatchesType(media.getMediaType(), detectedMimeType)) {
+                mediaRepository.markFailed(media.getId());
+                log.warn("MEDIA-3.2 reconciliation: media {} failed - content does not match its media type", media.getId());
+                continue;
+            }
 
             boolean promoted = mediaRepository.finalizeReady(media.getId(), detectedMimeType, sizeBytes);
             if (promoted) {

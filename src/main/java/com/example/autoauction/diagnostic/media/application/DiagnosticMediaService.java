@@ -50,6 +50,11 @@ public class DiagnosticMediaService {
     private static final Set<String> PHOTO_MIME_TYPES = Set.of("image/jpeg", "image/png");
     private static final Set<String> VIDEO_MIME_TYPES = Set.of("video/mp4", "video/webm");
 
+    /** MEDIA-PROD-01: the detected content type a PHOTO / VIDEO row may hold (finalize and the reconciler). */
+    static boolean contentMatchesType(MediaType mediaType, String detectedMimeType) {
+        return (mediaType == MediaType.PHOTO ? PHOTO_MIME_TYPES : VIDEO_MIME_TYPES).contains(detectedMimeType);
+    }
+
     private final DiagnosticMediaRepository mediaRepository;
     private final DiagnosticRequestRepository requestRepository;
     private final InspectionTemplateRepository templateRepository;
@@ -213,7 +218,15 @@ public class DiagnosticMediaService {
 
     /** Public (unauthenticated) access - the request MUST be APPROVED. Called only from PublicReportController. */
     public MediaReadUrlResponse getReadUrlForApprovedReport(Long mediaId) {
-        return signedReadUrl(loadApprovedReportMedia(mediaId));
+        DiagnosticMedia media = loadApprovedReportMedia(mediaId);
+        // MEDIA-PROD-01: the public report never serves a video that is still being processed or was rejected by
+        // the ffprobe checks (duration / size) - only finished ones; photos need no processing. (The thumbnail
+        // endpoint keeps its own contract: no thumbnail yet -> 409.)
+        ProcessingStatus processing = media.getProcessingStatus();
+        if (processing != ProcessingStatus.READY && processing != ProcessingStatus.NOT_REQUIRED) {
+            throw new IllegalStateException("Медиафайл недоступен для чтения: обработка " + processing);
+        }
+        return signedReadUrl(media);
     }
 
     /**

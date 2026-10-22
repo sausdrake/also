@@ -367,6 +367,13 @@ public class GlobalExceptionHandler {
                 "Тело запроса не удалось прочитать: проверьте формат JSON, имена и значения полей");
     }
 
+    // MEDIA-PROD-01: a multipart file over spring.servlet.multipart.max-file-size - 413, not 500.
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleMaxUploadSize(org.springframework.web.multipart.MaxUploadSizeExceededException e) {
+        log.warn("Upload too large: {}", e.getMaxUploadSize());
+        return clientError(HttpStatus.PAYLOAD_TOO_LARGE, "Файл слишком большой", "Файл слишком большой: максимум 10 МБ");
+    }
+
     // ERR-01: wrong Content-Type - 415, not 500.
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     public ResponseEntity<Map<String, Object>> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException e) {

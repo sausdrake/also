@@ -197,6 +197,20 @@ class MediaReconciliationServiceIntegrationTest {
     }
 
     @Test
+    @DisplayName("MEDIA-PROD-01: a PHOTO row whose object is a video is never promoted - FAILED, like finalize")
+    void pendingPhotoHoldingVideo_Failed() {
+        RequestAndItem ctx = createRequestAndItem();
+        DiagnosticMedia media = createPendingMedia(ctx);
+        byte[] mp4 = {0x00, 0x00, 0x00, 0x18, 'f', 't', 'y', 'p', 'i', 's', 'o', 'm', 0x00, 0x00, 0x02, 0x00};
+        storageClient.simulateUpload(media.getStorageKey(), mp4, "image/jpeg");
+        ageMediaCreatedAt(media.getId(), OffsetDateTime.now().minusHours(2));
+
+        reconciliationService.reconcile();
+
+        assertThat(mediaRepository.findById(media.getId()).orElseThrow().getUploadStatus()).isEqualTo(UploadStatus.FAILED);
+    }
+
+    @Test
     @DisplayName("L: DELETED запись -> объект удаляется из хранилища, DB-статус сохраняется")
     void deletedMedia_ObjectRemovedFromStorage() {
         RequestAndItem ctx = createRequestAndItem();
