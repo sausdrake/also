@@ -4,6 +4,7 @@ import com.example.autoauction.diagnostic.media.domain.port.VideoProcessor;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
@@ -37,12 +38,15 @@ import java.util.concurrent.TimeUnit;
 @Profile("!test")
 public class FfmpegVideoProcessor implements VideoProcessor {
 
-    // Explicit, server-controlled executable paths - matches the confirmed
-    // Alpine `ffmpeg` community package layout (Phase 10 installs it there).
-    // Not @Value-configurable in this phase: adding new processing config
-    // belongs to Phase 10 (Docker/application.properties), not this adapter.
-    private static final String FFPROBE_PATH = "/usr/bin/ffprobe";
-    private static final String FFMPEG_PATH = "/usr/bin/ffmpeg";
+    // Explicit, server-controlled executable paths - default to the confirmed
+    // Alpine `ffmpeg` community package layout (the Dockerfile installs it there).
+    // MEDIA-PROD-04: overridable for a host without /usr/bin (an isolated end-to-end
+    // run on Windows); still absolute paths from server configuration, never user input.
+    static final String DEFAULT_FFPROBE_PATH = "/usr/bin/ffprobe";
+    static final String DEFAULT_FFMPEG_PATH = "/usr/bin/ffmpeg";
+
+    private final String ffprobePath;
+    private final String ffmpegPath;
 
     private static final Duration FFPROBE_TIMEOUT = Duration.ofSeconds(30);
     private static final Duration FFMPEG_TIMEOUT = Duration.ofSeconds(60);
@@ -55,6 +59,12 @@ public class FfmpegVideoProcessor implements VideoProcessor {
     private static final int MAX_STDERR_CAPTURE_BYTES = 4_096;     // logging only, never parsed
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    public FfmpegVideoProcessor(@Value("${diagnostic.media.processing.ffprobe-path:" + DEFAULT_FFPROBE_PATH + "}") String ffprobePath,
+                                @Value("${diagnostic.media.processing.ffmpeg-path:" + DEFAULT_FFMPEG_PATH + "}") String ffmpegPath) {
+        this.ffprobePath = ffprobePath;
+        this.ffmpegPath = ffmpegPath;
+    }
 
     @Override
     public ProcessingResult process(Path videoFile, ProcessingLimits limits) {
@@ -89,7 +99,7 @@ public class FfmpegVideoProcessor implements VideoProcessor {
     private record VideoMetadata(int durationSeconds, int width, int height) {}
 
     private VideoMetadata extractMetadata(Path videoFile, ProcessingLimits limits) {
-        List<String> command = List.of(FFPROBE_PATH,
+        List<String> command = List.of(ffprobePath,
                 "-v", "quiet",
                 "-print_format", "json",
                 "-show_format",
@@ -185,7 +195,7 @@ public class FfmpegVideoProcessor implements VideoProcessor {
         String scaleFilter = "scale=w=min(iw\\,%d):h=min(ih\\,%d):force_original_aspect_ratio=decrease"
                 .formatted(limits.thumbnailMaxWidth(), limits.thumbnailMaxHeight());
 
-        List<String> command = List.of(FFMPEG_PATH,
+        List<String> command = List.of(ffmpegPath,
                 "-y",
                 "-v", "quiet",
                 "-i", videoFile.toString(),

@@ -37,8 +37,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("MEDIA-3.4: FfmpegVideoProcessor")
 class FfmpegVideoProcessorTest {
 
-    private static final String FFMPEG_PATH = "/usr/bin/ffmpeg";
-    private static final String FFPROBE_PATH = "/usr/bin/ffprobe";
+    // MEDIA-PROD-04: the container layout by default; ALSO_FFMPEG_DIR points at another install (e.g. on Windows)
+    private static final String FFMPEG_DIR = System.getenv("ALSO_FFMPEG_DIR");
+    private static final String FFMPEG_PATH = FFMPEG_DIR == null ? "/usr/bin/ffmpeg" : Path.of(FFMPEG_DIR, "ffmpeg.exe").toString();
+    private static final String FFPROBE_PATH = FFMPEG_DIR == null ? "/usr/bin/ffprobe" : Path.of(FFMPEG_DIR, "ffprobe.exe").toString();
 
     private static void assumeFfmpegAvailable() {
         Assumptions.assumeTrue(Files.isExecutable(Path.of(FFMPEG_PATH)), "ffmpeg is not available in this environment");
@@ -49,7 +51,7 @@ class FfmpegVideoProcessorTest {
     private Path generateRealTestVideo(Path dir, int durationSeconds, int width, int height) throws IOException, InterruptedException {
         Path output = dir.resolve("real-input.mp4");
         List<String> command = List.of(FFMPEG_PATH, "-y", "-v", "quiet",
-                "-f", "lavfi", "-i", "color=c=blue:s=" + width + "x" + height + ":d=" + durationSeconds,
+                "-f", "lavfi", "-i", "color=c=blue:s=" + width + "x" + height + ":d=" + durationSeconds + ":r=5", // 5 fps x (d*5) frames = d seconds
                 "-frames:v", String.valueOf(durationSeconds * 5),
                 output.toString());
         Process process = new ProcessBuilder(command).start();
@@ -65,7 +67,7 @@ class FfmpegVideoProcessorTest {
     private Path generateRealTestWebm(Path dir, int durationSeconds, int width, int height) throws IOException, InterruptedException {
         Path output = dir.resolve("real-input.webm");
         List<String> command = List.of(FFMPEG_PATH, "-y", "-v", "quiet",
-                "-f", "lavfi", "-i", "color=c=blue:s=" + width + "x" + height + ":d=" + durationSeconds,
+                "-f", "lavfi", "-i", "color=c=blue:s=" + width + "x" + height + ":d=" + durationSeconds + ":r=5", // 5 fps x (d*5) frames = d seconds
                 "-frames:v", String.valueOf(durationSeconds * 5),
                 output.toString());
         Process process = new ProcessBuilder(command).start();
@@ -86,7 +88,7 @@ class FfmpegVideoProcessorTest {
     @Test
     @DisplayName("null videoFile -> IllegalArgumentException до запуска subprocess")
     void nullVideoFile_RejectedBeforeAnySubprocess() {
-        FfmpegVideoProcessor processor = new FfmpegVideoProcessor();
+        FfmpegVideoProcessor processor = new FfmpegVideoProcessor(FFPROBE_PATH, FFMPEG_PATH);
         assertThatThrownBy(() -> processor.process(null, generousLimits()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
@@ -94,7 +96,7 @@ class FfmpegVideoProcessorTest {
     @Test
     @DisplayName("Несуществующий файл -> IllegalArgumentException")
     void nonExistentFile_Rejected() {
-        FfmpegVideoProcessor processor = new FfmpegVideoProcessor();
+        FfmpegVideoProcessor processor = new FfmpegVideoProcessor(FFPROBE_PATH, FFMPEG_PATH);
         Path missing = Path.of(System.getProperty("java.io.tmpdir"), "definitely-does-not-exist-" + System.nanoTime() + ".mp4");
         assertThatThrownBy(() -> processor.process(missing, generousLimits()))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -103,7 +105,7 @@ class FfmpegVideoProcessorTest {
     @Test
     @DisplayName("Директория вместо файла -> IllegalArgumentException")
     void directoryInsteadOfFile_Rejected() throws IOException {
-        FfmpegVideoProcessor processor = new FfmpegVideoProcessor();
+        FfmpegVideoProcessor processor = new FfmpegVideoProcessor(FFPROBE_PATH, FFMPEG_PATH);
         Path dir = Files.createTempDirectory("ffmpeg-test-dir-");
         assertThatThrownBy(() -> processor.process(dir, generousLimits()))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -117,7 +119,7 @@ class FfmpegVideoProcessorTest {
         assumeFfmpegAvailable();
         Path dir = Files.createTempDirectory("ffmpeg-test-valid-");
         Path video = generateRealTestVideo(dir, 2, 320, 240);
-        FfmpegVideoProcessor processor = new FfmpegVideoProcessor();
+        FfmpegVideoProcessor processor = new FfmpegVideoProcessor(FFPROBE_PATH, FFMPEG_PATH);
 
         VideoProcessor.ProcessingResult result = processor.process(video, generousLimits());
 
@@ -136,7 +138,7 @@ class FfmpegVideoProcessorTest {
         Path dir = Files.createTempDirectory("ffmpeg-test-malformed-");
         Path garbage = dir.resolve("garbage.mp4");
         Files.write(garbage, "this is not a video file, just plain text bytes".getBytes(StandardCharsets.UTF_8));
-        FfmpegVideoProcessor processor = new FfmpegVideoProcessor();
+        FfmpegVideoProcessor processor = new FfmpegVideoProcessor(FFPROBE_PATH, FFMPEG_PATH);
 
         assertThatThrownBy(() -> processor.process(garbage, generousLimits()))
                 .isInstanceOf(IllegalStateException.class);
@@ -153,7 +155,7 @@ class FfmpegVideoProcessorTest {
         assumeFfmpegAvailable();
         Path dir = Files.createTempDirectory("ffmpeg-test-duration-limit-");
         Path video = generateRealTestVideo(dir, 2, 320, 240);
-        FfmpegVideoProcessor processor = new FfmpegVideoProcessor();
+        FfmpegVideoProcessor processor = new FfmpegVideoProcessor(FFPROBE_PATH, FFMPEG_PATH);
         VideoProcessor.ProcessingLimits tooStrict = new VideoProcessor.ProcessingLimits(1, 1920, 1080, 320, 240);
 
         assertThatThrownBy(() -> processor.process(video, tooStrict))
@@ -171,7 +173,7 @@ class FfmpegVideoProcessorTest {
         assumeFfmpegAvailable();
         Path dir = Files.createTempDirectory("ffmpeg-test-width-limit-");
         Path video = generateRealTestVideo(dir, 2, 320, 240);
-        FfmpegVideoProcessor processor = new FfmpegVideoProcessor();
+        FfmpegVideoProcessor processor = new FfmpegVideoProcessor(FFPROBE_PATH, FFMPEG_PATH);
         VideoProcessor.ProcessingLimits tooStrict = new VideoProcessor.ProcessingLimits(120, 100, 1080, 320, 240);
 
         assertThatThrownBy(() -> processor.process(video, tooStrict))
@@ -191,7 +193,7 @@ class FfmpegVideoProcessorTest {
         assumeFfmpegAvailable();
         Path dir = Files.createTempDirectory("ffmpeg-test-webm-valid-");
         Path video = generateRealTestWebm(dir, 2, 320, 240);
-        FfmpegVideoProcessor processor = new FfmpegVideoProcessor();
+        FfmpegVideoProcessor processor = new FfmpegVideoProcessor(FFPROBE_PATH, FFMPEG_PATH);
 
         VideoProcessor.ProcessingResult result = processor.process(video, generousLimits());
 
@@ -208,7 +210,7 @@ class FfmpegVideoProcessorTest {
         assumeFfmpegAvailable();
         Path dir = Files.createTempDirectory("ffmpeg-test-webm-duration-limit-");
         Path video = generateRealTestWebm(dir, 2, 320, 240);
-        FfmpegVideoProcessor processor = new FfmpegVideoProcessor();
+        FfmpegVideoProcessor processor = new FfmpegVideoProcessor(FFPROBE_PATH, FFMPEG_PATH);
         VideoProcessor.ProcessingLimits tooStrict = new VideoProcessor.ProcessingLimits(1, 1920, 1080, 320, 240);
 
         assertThatThrownBy(() -> processor.process(video, tooStrict))
@@ -226,7 +228,7 @@ class FfmpegVideoProcessorTest {
         assumeFfmpegAvailable();
         Path dir = Files.createTempDirectory("ffmpeg-test-webm-width-limit-");
         Path video = generateRealTestWebm(dir, 2, 320, 240);
-        FfmpegVideoProcessor processor = new FfmpegVideoProcessor();
+        FfmpegVideoProcessor processor = new FfmpegVideoProcessor(FFPROBE_PATH, FFMPEG_PATH);
         VideoProcessor.ProcessingLimits tooStrict = new VideoProcessor.ProcessingLimits(120, 100, 1080, 320, 240);
 
         assertThatThrownBy(() -> processor.process(video, tooStrict))
@@ -256,7 +258,7 @@ class FfmpegVideoProcessorTest {
             payload[i] = (byte) 0xFF; // arbitrary non-EBML garbage after the header
         }
         Files.write(malformed, payload);
-        FfmpegVideoProcessor processor = new FfmpegVideoProcessor();
+        FfmpegVideoProcessor processor = new FfmpegVideoProcessor(FFPROBE_PATH, FFMPEG_PATH);
 
         assertThatThrownBy(() -> processor.process(malformed, generousLimits()))
                 .isInstanceOf(IllegalStateException.class);
