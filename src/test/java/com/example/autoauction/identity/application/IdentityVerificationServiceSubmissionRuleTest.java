@@ -60,7 +60,7 @@ class IdentityVerificationServiceSubmissionRuleTest {
         storageClient.simulateUpload(BACK_KEY, new byte[]{7, 8, 9}, "image/jpeg");
         Clock clock = IdentityCaptures.CLOCK;
         service = new IdentityVerificationService(identityVerificationRepository, historyRepository, documentRepository, storageClient,
-                new IdentityCaptureVerifier(documentRepository, storageClient), clock);
+                new IdentityCaptureVerifier(documentRepository, storageClient), new IdentityCaptureRateLimiter(), clock);
         lenient().when(documentRepository.markConsumed(any(), any())).thenReturn(true);
         IdentityDocument ownDoc = IdentityCaptures.front(10L, KEY, USER_ID);
         lenient().when(documentRepository.findByStorageKey(BACK_KEY)).thenReturn(Optional.of(IdentityCaptures.back(12L, BACK_KEY, USER_ID)));

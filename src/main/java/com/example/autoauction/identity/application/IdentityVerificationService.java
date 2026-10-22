@@ -12,6 +12,7 @@ import com.example.autoauction.identity.domain.IdentityVerificationStatus;
 import com.example.autoauction.identity.domain.port.IdentityDocumentRepository;
 import com.example.autoauction.identity.domain.port.IdentityVerificationHistoryRepository;
 import com.example.autoauction.identity.domain.port.IdentityVerificationRepository;
+import com.example.autoauction.auction.application.RateLimitException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,6 +50,7 @@ public class IdentityVerificationService {
     private final IdentityDocumentRepository documentRepository;
     private final StorageClient storageClient;
     private final IdentityCaptureVerifier captureVerifier;
+    private final IdentityCaptureRateLimiter captureRateLimiter;
     private final Clock clock;
 
     public IdentityVerificationService(IdentityVerificationRepository identityVerificationRepository,
@@ -56,12 +58,14 @@ public class IdentityVerificationService {
                                         IdentityDocumentRepository documentRepository,
                                         StorageClient storageClient,
                                         IdentityCaptureVerifier captureVerifier,
+                                        IdentityCaptureRateLimiter captureRateLimiter,
                                         Clock clock) {
         this.identityVerificationRepository = identityVerificationRepository;
         this.historyRepository = historyRepository;
         this.documentRepository = documentRepository;
         this.storageClient = storageClient;
         this.captureVerifier = captureVerifier;
+        this.captureRateLimiter = captureRateLimiter;
         this.clock = clock;
     }
 
@@ -82,6 +86,10 @@ public class IdentityVerificationService {
         Objects.requireNonNull(userId, "userId не может быть null");
         if (!IdentityCaptureVerifier.CAPTURE_CONTENT_TYPE.equals(contentType)) {
             throw new IllegalArgumentException("Документы и селфи принимаются только как снимок камеры (image/jpeg)");
+        }
+        // KYC-SLOT-01: a slot is a row + a presigned URL - no bulk minting
+        if (!captureRateLimiter.tryAcquire(userId)) {
+            throw new RateLimitException("Слишком много снимков за час. Попробуйте позже.");
         }
         String storageKey = STORAGE_KEY_PREFIX + UUID.randomUUID();
         IdentityDocument document = IdentityDocument.captureSlot(storageKey, userId, side, documentType, contentType, now());

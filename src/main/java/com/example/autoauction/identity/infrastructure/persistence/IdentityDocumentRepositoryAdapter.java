@@ -43,4 +43,17 @@ public class IdentityDocumentRepositoryAdapter implements IdentityDocumentReposi
     public boolean markConsumed(Long id, OffsetDateTime at) {
         return jpaRepository.markConsumed(id, at) == 1;
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.List<IdentityDocument> findAbandonedCaptures(OffsetDateTime before, int limit) {
+        return jpaRepository.findAbandonedCaptures(before, limit)
+                .stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    @Transactional
+    public boolean deleteAbandonedCapture(Long id, OffsetDateTime before) {
+        return jpaRepository.deleteAbandonedCapture(id, before) == 1;
+    }
 }

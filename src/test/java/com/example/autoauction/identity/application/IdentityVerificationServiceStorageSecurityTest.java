@@ -58,7 +58,7 @@ class IdentityVerificationServiceStorageSecurityTest {
         storageClient = new FakeStorageClient();
         Clock clock = IdentityCaptures.CLOCK;
         service = new IdentityVerificationService(identityVerificationRepository, historyRepository, documentRepository, storageClient,
-                new IdentityCaptureVerifier(documentRepository, storageClient), clock);
+                new IdentityCaptureVerifier(documentRepository, storageClient), new IdentityCaptureRateLimiter(), clock);
         lenient().when(documentRepository.markConsumed(any(), any())).thenReturn(true);
         lenient().when(identityVerificationRepository.findByUserIdWithLock(any())).thenReturn(Optional.empty());
         // MVP-004: every submission also carries the user's own, uploaded live selfie.

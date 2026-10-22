@@ -18,4 +18,10 @@ public interface IdentityDocumentRepository {
      * caller must then refuse the submission (replay / concurrent double submit).
      */
     boolean markConsumed(Long id, OffsetDateTime at);
+
+    /** KYC-SLOT-01: unsubmitted capture slots (a capture side, never consumed) created before {@code before}. */
+    java.util.List<IdentityDocument> findAbandonedCaptures(OffsetDateTime before, int limit);
+
+    /** KYC-SLOT-01: deletes the row only while it is still an unsubmitted capture created before {@code before}. */
+    boolean deleteAbandonedCapture(Long id, OffsetDateTime before);
 }
