@@ -38,3 +38,32 @@ Two stores:
 6. The R2 endpoint is fixed to `https://<account>.r2.cloudflarestorage.com` (no jurisdiction-specific endpoint).
 7. A real end-to-end run against R2 (KYC capture -> admin review; diagnostic video -> buyer report) needs a test bucket or
    the PO's go-ahead to write synthetic objects to `also-dev` (BLK-04).
+
+## Bucket state observed (2026-10-23, read-only S3 API probe, nothing written)
+
+| Check | Result |
+|---|---|
+| Buckets visible to the configured key | one: `also-dev` (no separate test or production bucket) |
+| Objects in `also-dev` | 0 |
+| Anonymous access to the S3 endpoint | refused |
+| Public `r2.dev` URL / custom domain | not visible through the S3 API - check in the Cloudflare dashboard |
+| Lifecycle | only Cloudflare's default "abort incomplete multipart uploads after 7 days" |
+| **CORS** | **none** - a preflight for `PUT` is refused (403) from any origin |
+
+**Blocker:** the browser uploads KYC captures and diagnostic media straight to the presigned URL (`axios.put` with
+`Content-Type: image/jpeg` / `video/mp4`), which needs a CORS preflight. Without a CORS rule every such upload fails in
+the browser. The owner must add a rule to each bucket the site uses, for example (origins = the real site origin(s)
+only, never `*`):
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://<site origin>"],
+    "AllowedMethods": ["PUT", "GET"],
+    "AllowedHeaders": ["content-type"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+Production should use its own bucket (not `also-dev`) with the same rule, no public access, and its own keys.
