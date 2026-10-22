@@ -35,7 +35,8 @@ Two stores:
    are reachable by enumeration. Decide whether approved reports are fully public (product decision).
 5. `/uploads` lives on one disk: single instance only (docs/ops/single-instance.md); include the `media_uploads` volume
    in backups (PROD-BACKUP-01).
-6. The R2 endpoint is fixed to `https://<account>.r2.cloudflarestorage.com` (no jurisdiction-specific endpoint).
+6. ~~The R2 endpoint is fixed~~ - `R2_ENDPOINT` (optional, MEDIA-PROD-03) sets an explicit endpoint, e.g. a jurisdiction
+   endpoint `https://<account>.eu.r2.cloudflarestorage.com`, addressed path-style; empty = the default account endpoint.
 7. A real end-to-end run against R2 (KYC capture -> admin review; diagnostic video -> buyer report) needs a test bucket or
    the PO's go-ahead to write synthetic objects to `also-dev` (BLK-04).
 

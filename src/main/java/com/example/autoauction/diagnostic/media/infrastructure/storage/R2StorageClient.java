@@ -12,6 +12,7 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
@@ -56,9 +57,13 @@ public class R2StorageClient implements StorageClient {
             @Value("${r2.account-id}") String accountId,
             @Value("${r2.bucket}") String bucket,
             @Value("${r2.access-key-id}") String accessKeyId,
-            @Value("${r2.secret-access-key}") String secretAccessKey) {
+            @Value("${r2.secret-access-key}") String secretAccessKey,
+            @Value("${r2.endpoint:}") String endpointOverride) {
         this.bucket = bucket;
-        URI endpoint = URI.create("https://" + accountId + ".r2.cloudflarestorage.com");
+        URI endpoint = endpoint(accountId, endpointOverride);
+        // MEDIA-PROD-03: an explicit endpoint (an R2 jurisdiction endpoint, or an S3-compatible server for an
+        // isolated end-to-end run) is addressed path-style - its host carries no bucket sub-domain
+        boolean pathStyle = endpointOverride != null && !endpointOverride.isBlank();
         AwsBasicCredentials credentials = AwsBasicCredentials.create(accessKeyId, secretAccessKey);
         StaticCredentialsProvider credentialsProvider = StaticCredentialsProvider.create(credentials);
 
@@ -66,13 +71,23 @@ public class R2StorageClient implements StorageClient {
                 .endpointOverride(endpoint)
                 .region(Region.of("auto"))
                 .credentialsProvider(credentialsProvider)
+                .forcePathStyle(pathStyle)
                 .build();
         this.presigner = S3Presigner.builder()
                 .endpointOverride(endpoint)
                 .region(Region.of("auto"))
                 .credentialsProvider(credentialsProvider)
+                .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(pathStyle).build())
                 .build();
         log.info("R2StorageClient initialized (bucket={})", bucket);
+    }
+
+    /** {@code R2_ENDPOINT} when set, otherwise Cloudflare's default account endpoint. */
+    static URI endpoint(String accountId, String endpointOverride) {
+        if (endpointOverride != null && !endpointOverride.isBlank()) {
+            return URI.create(endpointOverride.trim());
+        }
+        return URI.create("https://" + accountId + ".r2.cloudflarestorage.com");
     }
 
     @Override
