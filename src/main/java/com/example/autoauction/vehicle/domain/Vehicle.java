@@ -183,6 +183,20 @@ public class Vehicle {
     }
 
     /**
+     * AUC-NOSALE-01 (approved policy): an auction of this vehicle ended without a sale - EXPIRED,
+     * or CANCELLED (from CREATED, while the vehicle is still APPROVED, or from ACTIVE, while it
+     * is IN_AUCTION). The vehicle needs a fresh diagnostic cycle before it can be auctioned
+     * again. Any other status means the vehicle was not on this auction - fail closed.
+     */
+    public void markNeedsRediagnosticAfterNoSale() {
+        if (this.status != VehicleStatus.IN_AUCTION && this.status != VehicleStatus.APPROVED) {
+            throw new IllegalStateException("Only IN_AUCTION or APPROVED can require re-diagnostic after an auction without a sale");
+        }
+        this.status = VehicleStatus.NEEDS_REDIAGNOSTIC;
+        this.updatedAt = OffsetDateTime.now();
+    }
+
+    /**
      * MVP-005: the re-diagnostic report was approved - the SAME vehicle becomes auctionable again
      * and its current diagnostic pointer moves to the new request (the latest approved report),
      * so a new auction binds the new request's commitment. Earlier requests stay reachable

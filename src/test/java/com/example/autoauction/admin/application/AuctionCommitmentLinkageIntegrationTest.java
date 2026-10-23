@@ -245,16 +245,22 @@ class AuctionCommitmentLinkageIntegrationTest {
         Auction persistedFirst = auctionRepository.findById(firstAuction.id()).orElseThrow();
         assertThat(persistedFirst.getSellerDiagnosticCommitmentId()).isEqualTo(setup.commitmentId());
 
-        // Cancel the first auction so checkExistingAuctions' forbidden-status guard no longer
-        // blocks a second attempt on this vehicle (CANCELLED is deliberately not forbidden,
-        // matching Slice 1a's own re-auction contract) - isolating the assertion to
-        // AuctionCommitmentResolver's own "already linked" rejection specifically, not the
-        // unrelated existing-auction guard. Vehicle's diagnosticRequestId pointer is unchanged
-        // (no re-diagnostic workflow exists) and still points at the same commitment - which
-        // stays permanently consumed even though the auction that consumed it was cancelled.
+        // AUC-NOSALE-01: the cancellation returns the guarantee (commitment FINALIZED as A) and
+        // sends the vehicle to re-diagnostic, so a second auction is refused at the vehicle-status
+        // guard already.
         adminAuctionService.cancelAuction(firstAuction.id(), 999L);
         publishPolicyVersion();
 
+        assertThrows(IllegalArgumentException.class, () ->
+                adminAuctionService.createAuction(requestFor(setup.vehicleId()), 999L));
+        assertThat(sellerDiagnosticCommitmentRepository.findById(setup.commitmentId()).orElseThrow().getStatus())
+                .isEqualTo(CommitmentStatus.FINALIZED);
+
+        // Even if the vehicle were APPROVED again on its OLD diagnostic pointer, the consumed
+        // commitment is never reused - AuctionCommitmentResolver's own rejection.
+        Vehicle vehicle = vehicleRepository.findById(setup.vehicleId()).orElseThrow();
+        vehicle.setStatus(com.example.autoauction.vehicle.domain.VehicleStatus.APPROVED);
+        vehicleRepository.save(vehicle);
         assertThrows(IllegalStateException.class, () ->
                 adminAuctionService.createAuction(requestFor(setup.vehicleId()), 999L));
 

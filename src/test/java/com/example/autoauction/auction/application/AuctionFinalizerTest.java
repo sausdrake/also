@@ -83,6 +83,9 @@ class AuctionFinalizerTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private AuctionNoSaleResolutionOrchestrator noSaleResolutionOrchestrator;
+
     @InjectMocks
     private AuctionFinalizer auctionFinalizer;
 
@@ -147,6 +150,8 @@ class AuctionFinalizerTest {
             verify(depositService, times(2)).unfreezeForAuction(anyLong(), eq(auctionId));
             verify(participantRepository, times(1)).clearParticipants(auctionId);
             verify(auctionRepository, times(1)).save(activeAuction);
+            // AUC-NOSALE-01: EXPIRED returns the seller's guarantee and frees the vehicle - once
+            verify(noSaleResolutionOrchestrator, times(1)).resolve(activeAuction, List.of(), null);
 
             // MVP-003: side effects are deferred via an AFTER_COMMIT event, never called
             // directly. No winner - winnerId/winningBid must be null, and participantIds must
@@ -206,6 +211,8 @@ class AuctionFinalizerTest {
             verify(depositService, times(1)).unfreezeForAuction(loserId, auctionId);
             verify(participantRepository, times(1)).clearParticipants(auctionId);
             verify(auctionRepository, times(1)).save(activeAuction);
+            // AUC-NOSALE-01: guarantee + vehicle consequences exactly once, no violations
+            verify(noSaleResolutionOrchestrator, times(1)).resolve(activeAuction, List.of(), null);
 
             // MVP-004: side effects are deferred via an AFTER_COMMIT event, never called
             // directly. participantIds must still carry the original participant list even
@@ -250,6 +257,8 @@ class AuctionFinalizerTest {
             verifyNoInteractions(depositService);
             // MVP-004: the early-return guard must publish zero side-effect events.
             verifyNoInteractions(eventPublisher);
+            // AUC-NOSALE-01: a repeated cancellation never releases the guarantee a second time
+            verifyNoInteractions(noSaleResolutionOrchestrator);
         }
     }
 

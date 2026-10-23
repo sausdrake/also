@@ -9,5 +9,7 @@ package com.example.autoauction.diagnostic.commitment.domain;
  */
 public enum TriggerSource {
     SALE_FAILED_C,
-    DIAGNOSTIC_REJECTION
+    DIAGNOSTIC_REJECTION,
+    /** AUC-NOSALE-01: an auction cancelled because of a confirmed seller violation (auction id required). */
+    AUCTION_CANCELLED_C
 }

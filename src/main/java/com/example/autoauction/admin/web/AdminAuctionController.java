@@ -2,6 +2,7 @@
 package com.example.autoauction.admin.web;
 
 import com.example.autoauction.admin.application.AdminAuctionService;
+import com.example.autoauction.admin.web.dto.CancelAuctionRequest;
 import com.example.autoauction.auth.domain.UserPrincipal;
 import com.example.autoauction.auth.infrastructure.security.CurrentUser;
 import com.example.autoauction.auction.domain.BidStepPolicy;
@@ -121,14 +122,30 @@ public class AdminAuctionController {
     public ResponseEntity<AuctionResponse> cancelAuction(
             @Parameter(description = "ID аукциона", required = true)
             @PathVariable Long id,
+            @Valid @RequestBody(required = false) CancelAuctionRequest request,
             @Parameter(hidden = true)
             @CurrentUser UserPrincipal currentUser
     ) {
         Long adminId = currentUser.getUserId();
-        log.info("Admin {} cancelling auction {}", adminId, id);
+        List<Long> violations = request == null || request.violationDefinitionIds() == null
+                ? List.of() : request.violationDefinitionIds();
+        log.info("Admin {} cancelling auction {} ({} seller violation(s))", adminId, id, violations.size());
 
-        AuctionResponse response = adminAuctionService.cancelAuction(id, adminId);
+        AuctionResponse response = adminAuctionService.cancelAuction(id, adminId, violations);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/resolve-no-sale")
+    @Operation(summary = "Вернуть гарантию продавца и отправить автомобиль на повторную диагностику по аукциону без продажи (EXPIRED/CANCELLED)")
+    public ResponseEntity<AuctionResponse> resolveNoSale(
+            @Parameter(description = "ID аукциона", required = true)
+            @PathVariable Long id,
+            @Parameter(hidden = true)
+            @CurrentUser UserPrincipal currentUser
+    ) {
+        Long adminId = currentUser.getUserId();
+        log.info("Admin {} resolving no-sale consequences of auction {}", adminId, id);
+        return ResponseEntity.ok(adminAuctionService.resolveNoSale(id, adminId));
     }
 
     @PostMapping("/{id}/complete")

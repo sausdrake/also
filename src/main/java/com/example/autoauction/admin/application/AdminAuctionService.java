@@ -390,6 +390,15 @@ public class AdminAuctionService {
 
     @Transactional
     public AuctionResponse cancelAuction(Long id, Long adminId) {
+        return cancelAuction(id, adminId, List.of());
+    }
+
+    /**
+     * AUC-NOSALE-01: {@code violationDefinitionIds} - confirmed seller violations that caused the
+     * cancellation (empty: no seller fault, the guarantee is returned in full).
+     */
+    @Transactional
+    public AuctionResponse cancelAuction(Long id, Long adminId, List<Long> violationDefinitionIds) {
         log.info("=== ОТМЕНА АУКЦИОНА ===");
         log.info("ID аукциона: {}, adminId: {}", id, adminId);
 
@@ -407,9 +416,20 @@ public class AdminAuctionService {
                             auction.getStatus()));
         }
 
-        auctionFinalizer.cancelAuction(auction);
+        auctionFinalizer.cancelAuction(auction, violationDefinitionIds == null ? List.of() : violationDefinitionIds, adminId);
         log.info("Аукцион отменен, новый статус: {}", auction.getStatus());
 
+        return AuctionResponse.fromDomain(auction, resolveCommissionRate(auction));
+    }
+
+    /**
+     * AUC-NOSALE-01 repair path: applies the no-sale consequences to an auction that became
+     * EXPIRED/CANCELLED before they existed (its guarantee still AWAITING_FINALIZATION). A repeat
+     * is a no-op - nothing is returned twice.
+     */
+    @Transactional
+    public AuctionResponse resolveNoSale(Long id, Long adminId) {
+        Auction auction = auctionFinalizer.resolveNoSaleById(id, adminId);
         return AuctionResponse.fromDomain(auction, resolveCommissionRate(auction));
     }
 

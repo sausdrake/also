@@ -17,7 +17,7 @@ interface VehicleResponse {
   updatedAt: string | null;
 }
 
-type RediagnosticReason = 'DIAGNOSTIC_ERROR' | 'SELLER_FAULT';
+type RediagnosticReason = 'DIAGNOSTIC_ERROR' | 'SELLER_FAULT' | 'NO_SALE';
 
 interface HistoryEntry {
   id: number;
@@ -32,16 +32,19 @@ interface HistoryEntry {
 const REASONS: { value: RediagnosticReason; label: string; hint: string }[] = [
   { value: 'DIAGNOSTIC_ERROR', label: 'Ошибка диагностики', hint: 'Стоимость оплачивает AlSo, продавец не платит и не штрафуется' },
   { value: 'SELLER_FAULT', label: 'Нарушение продавца', hint: 'Стоимость диагностики удерживается с депозита продавца' },
+  { value: 'NO_SALE', label: 'Аукцион без продажи', hint: 'Повторное выставление после аукциона «Истёк» или «Отменён»: обычная диагностика, сейчас ничего не удерживается' },
 ];
 
 const REASON_LABEL: Record<RediagnosticReason, string> = {
   DIAGNOSTIC_ERROR: 'ошибка диагностики',
   SELLER_FAULT: 'нарушение продавца',
+  NO_SALE: 'аукцион без продажи',
 };
 
 /**
  * Vehicles in VehicleStatus.NEEDS_REDIAGNOSTIC - reached when a failed sale is resolved as
- * PLATFORM_FAULT or as a seller violation (Outcome C). MVP-005: the admin orders the
+ * PLATFORM_FAULT or as a seller violation (Outcome C), or when an auction ends without a sale
+ * (EXPIRED / CANCELLED, AUC-NOSALE-01). MVP-005: the admin orders the
  * re-diagnostic here - a new diagnostic request for the same vehicle, with a mandatory reason
  * that must match the sale's recorded fault and decides who pays - and can read the vehicle's
  * whole diagnostic history (original request, reasons, re-diagnostics).
@@ -110,7 +113,8 @@ export function AdminVehiclesNeedsRediagnosticPage() {
       <div>
         <h2 className="text-xl font-bold text-gray-900">Требуют повторной диагностики</h2>
         <p className="text-sm text-gray-500 mt-0.5">
-          Автомобили, продажа которых завершилась исходом «Ошибка платформы» или «Нарушение продавца».
+          Автомобили, продажа которых завершилась исходом «Ошибка платформы» или «Нарушение продавца»,
+          и автомобили после аукциона без продажи («Истёк» или «Отменён»).
           Назначьте повторную диагностику: будет создана новая заявка для того же автомобиля, прежние отчёты сохраняются.
         </p>
       </div>

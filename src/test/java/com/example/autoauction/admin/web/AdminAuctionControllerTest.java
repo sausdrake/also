@@ -309,26 +309,26 @@ class AdminAuctionControllerTest {
         @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
         @DisplayName("Успешная отмена созданного аукциона")
         void cancelAuction_WhenCreated_ShouldReturnOk() throws Exception {
-            when(adminAuctionService.cancelAuction(1L, adminId)).thenReturn(cancelledAuctionResponse);
+            when(adminAuctionService.cancelAuction(1L, adminId, List.of())).thenReturn(cancelledAuctionResponse);
 
             mockMvc.perform(post("/api/v1/admin/auctions/1/cancel"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status").value("CANCELLED"));
 
-            verify(adminAuctionService, times(1)).cancelAuction(1L, adminId);
+            verify(adminAuctionService, times(1)).cancelAuction(1L, adminId, List.of());
         }
 
         @Test
         @WithMockCustomUser(userId = 1L, username = "admin", roles = {"ADMIN"})
         @DisplayName("Отмена уже завершенного аукциона - должно вернуть 409")
         void cancelAuction_WhenCompleted_ShouldReturnConflict() throws Exception {
-            when(adminAuctionService.cancelAuction(1L, adminId))
+            when(adminAuctionService.cancelAuction(1L, adminId, List.of()))
                     .thenThrow(new IllegalStateException("Невозможно отменить аукцион в статусе COMPLETED"));
 
             mockMvc.perform(post("/api/v1/admin/auctions/1/cancel"))
                     .andExpect(status().isConflict());
 
-            verify(adminAuctionService, times(1)).cancelAuction(1L, adminId);
+            verify(adminAuctionService, times(1)).cancelAuction(1L, adminId, List.of());
         }
     }
 

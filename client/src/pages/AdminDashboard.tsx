@@ -2256,6 +2256,16 @@ function AuctionsPage() {
     catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); }
   };
 
+  // AUC-NOSALE-01: for a lot that ended without a sale before the guarantee was released
+  // automatically - idempotent on the server, a repeat moves no money.
+  const resolveNoSale = async (id: number) => {
+    try {
+      await api.post(`/admin/auctions/${id}/resolve-no-sale`);
+      notify(`Аукцион #${id}: гарантия продавца разрешена, автомобиль направлен на повторную диагностику`);
+      loadAuctions();
+    } catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); }
+  };
+
   const cancelAuction = async () => {
     if (cancelTarget == null) return;
     try {
@@ -2388,7 +2398,7 @@ function AuctionsPage() {
     <div className="space-y-4">
       {cancelTarget != null && (
         <ConfirmModal
-          message={`Отменить аукцион #${cancelTarget}? Действие необратимо.`}
+          message={`Отменить аукцион #${cancelTarget}? Действие необратимо. Депозиты участников и гарантия продавца вернутся полностью, автомобиль уйдёт на повторную диагностику.`}
           onYes={cancelAuction} onNo={() => setCancelTarget(null)}
         />
       )}
@@ -2597,6 +2607,13 @@ function AuctionsPage() {
                           <button onClick={() => setCancelTarget(a.id)}
                             className="text-xs px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 font-medium whitespace-nowrap">
                             Отменить
+                          </button>
+                        )}
+                        {(a.status === 'EXPIRED' || a.status === 'CANCELLED') && (
+                          <button onClick={() => resolveNoSale(a.id)}
+                            title="Вернуть гарантию продавца, если она ещё заморожена, и направить автомобиль на повторную диагностику"
+                            className="text-xs px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 font-medium border border-amber-200 whitespace-nowrap">
+                            Гарантия продавца
                           </button>
                         )}
                         {a.status === 'COMPLETED' && a.winnerId && !releasedAuctions.has(a.id) && (

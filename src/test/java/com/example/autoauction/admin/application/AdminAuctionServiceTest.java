@@ -603,7 +603,7 @@ class AdminAuctionServiceTest {
         void cancelAuction_WhenCreated_ShouldSucceed() {
             // given
             when(auctionRepository.findByIdWithLock(1L)).thenReturn(Optional.of(auction));
-            when(auctionFinalizer.cancelAuction(any(Auction.class))).thenAnswer(inv -> {
+            when(auctionFinalizer.cancelAuction(any(Auction.class), eq(List.of()), eq(adminId))).thenAnswer(inv -> {
                 Auction a = inv.getArgument(0);
                 a.cancel();
                 return true;
@@ -615,7 +615,7 @@ class AdminAuctionServiceTest {
             // then
             assertEquals(AuctionStatus.CANCELLED, response.status());
             verify(auctionRepository, times(1)).findByIdWithLock(1L);
-            verify(auctionFinalizer, times(1)).cancelAuction(auction);
+            verify(auctionFinalizer, times(1)).cancelAuction(auction, List.of(), adminId);
         }
 
         @Test
@@ -624,7 +624,7 @@ class AdminAuctionServiceTest {
             // given
             auction.start();
             when(auctionRepository.findByIdWithLock(1L)).thenReturn(Optional.of(auction));
-            when(auctionFinalizer.cancelAuction(any(Auction.class))).thenAnswer(inv -> {
+            when(auctionFinalizer.cancelAuction(any(Auction.class), eq(List.of()), eq(adminId))).thenAnswer(inv -> {
                 Auction a = inv.getArgument(0);
                 a.cancel();
                 return true;
@@ -636,7 +636,7 @@ class AdminAuctionServiceTest {
             // then
             assertEquals(AuctionStatus.CANCELLED, response.status());
             verify(auctionRepository, times(1)).findByIdWithLock(1L);
-            verify(auctionFinalizer, times(1)).cancelAuction(auction);
+            verify(auctionFinalizer, times(1)).cancelAuction(auction, List.of(), adminId);
         }
 
         @Test
@@ -648,14 +648,14 @@ class AdminAuctionServiceTest {
             auction.start();
             auction.setTotalBids(3);
             when(auctionRepository.findByIdWithLock(1L)).thenReturn(Optional.of(auction));
-            when(auctionFinalizer.cancelAuction(auction)).thenReturn(true);
+            when(auctionFinalizer.cancelAuction(auction, List.of(), adminId)).thenReturn(true);
 
             // when
             adminAuctionService.cancelAuction(1L, adminId);
 
             // then: AdminAuctionService больше не отменяет и не сохраняет аукцион напрямую -
             // это делегировано AuctionFinalizer, которое отвечает за разморозку депозитов.
-            verify(auctionFinalizer, times(1)).cancelAuction(auction);
+            verify(auctionFinalizer, times(1)).cancelAuction(auction, List.of(), adminId);
             verify(auctionRepository, never()).save(any(Auction.class));
         }
 
@@ -672,7 +672,7 @@ class AdminAuctionServiceTest {
                     adminAuctionService.cancelAuction(1L, adminId)
             );
             verify(auctionRepository, never()).save(any(Auction.class));
-            verify(auctionFinalizer, never()).cancelAuction(any());
+            verify(auctionFinalizer, never()).cancelAuction(any(), any(), any());
         }
 
         @Test

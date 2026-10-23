@@ -45,6 +45,7 @@ public class AuctionFinalizer {
     private final StandardPaymentDeadlineCalculator standardPaymentDeadlineCalculator;
     private final PaymentDeadlineHistoryRepository paymentDeadlineHistoryRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final AuctionNoSaleResolutionOrchestrator noSaleResolutionOrchestrator;
 
     public AuctionFinalizer(AuctionRepository auctionRepository,
                             DepositService depositService,
@@ -59,7 +60,8 @@ public class AuctionFinalizer {
                             SettlementService settlementService,
                             StandardPaymentDeadlineCalculator standardPaymentDeadlineCalculator,
                             PaymentDeadlineHistoryRepository paymentDeadlineHistoryRepository,
-                            ApplicationEventPublisher eventPublisher) {
+                            ApplicationEventPublisher eventPublisher,
+                            AuctionNoSaleResolutionOrchestrator noSaleResolutionOrchestrator) {
         this.auctionRepository = auctionRepository;
         this.depositService = depositService;
         this.participantRepository = participantRepository;
@@ -74,6 +76,7 @@ public class AuctionFinalizer {
         this.standardPaymentDeadlineCalculator = standardPaymentDeadlineCalculator;
         this.paymentDeadlineHistoryRepository = paymentDeadlineHistoryRepository;
         this.eventPublisher = eventPublisher;
+        this.noSaleResolutionOrchestrator = noSaleResolutionOrchestrator;
     }
 
     /**
@@ -172,6 +175,12 @@ public class AuctionFinalizer {
 
         auctionRepository.save(auction);
         participantRepository.clearParticipants(auction.getId());
+
+        // AUC-NOSALE-01: no sale - the seller's guarantee is returned in full and the vehicle
+        // leaves IN_AUCTION for re-diagnostic, in this same transaction as the EXPIRED transition.
+        if (finalStatus == AuctionStatus.EXPIRED) {
+            noSaleResolutionOrchestrator.resolve(auction, List.of(), null);
+        }
 
         // Slice 1B: exactly one INITIAL history row, in this same transaction, only when a
         // deadline was actually assigned (i.e. finalStatus == WAITING_FOR_PAYMENT) - never for
@@ -312,6 +321,19 @@ public class AuctionFinalizer {
 
     @Transactional
     public boolean cancelAuction(Auction auction) {
+        return cancelAuction(auction, List.of(), null);
+    }
+
+    /**
+     * AUC-NOSALE-01: cancels {@code auction} and, in the same transaction, applies the no-sale
+     * consequences (see {@link AuctionNoSaleResolutionOrchestrator}): the vehicle goes to
+     * re-diagnostic and the seller's guarantee is returned - in full, or, when
+     * {@code violationDefinitionIds} names confirmed seller violations, minus the penalty the
+     * active policy sets for them. {@code resolvedBy} is the administrator (null for the
+     * scheduler's auto-cancellation, which never carries violations).
+     */
+    @Transactional
+    public boolean cancelAuction(Auction auction, List<Long> violationDefinitionIds, Long resolvedBy) {
         if (!auction.isCancellable()) {
             log.debug("Auction {} cannot be cancelled from status {}, skipping cancellation", auction.getId(), auction.getStatus());
             return false;
@@ -327,6 +349,7 @@ public class AuctionFinalizer {
         auction.cancel();
         auctionRepository.save(auction);
         participantRepository.clearParticipants(auction.getId());
+        noSaleResolutionOrchestrator.resolve(auction, violationDefinitionIds, resolvedBy);
 
         // Deferred to AFTER_COMMIT (see AuctionCancelledEventListener): a rolled-back
         // cancellation (e.g. a genuine optimistic-lock conflict on this method's own save())
@@ -336,6 +359,34 @@ public class AuctionFinalizer {
 
         log.info("Auction {} cancelled, {} participant(s) unfrozen", auction.getId(), participants.size());
         return true;
+    }
+
+    /**
+     * AUC-NOSALE-01 repair path for auctions that ended without a sale before the no-sale
+     * consequences existed: locks the auction, requires EXPIRED/CANCELLED and that it is still the
+     * vehicle's latest auction, then applies {@link AuctionNoSaleResolutionOrchestrator#repair}
+     * (full return of a still-frozen guarantee). Idempotent: a vehicle already in
+     * NEEDS_REDIAGNOSTIC and a commitment already FINALIZED (any outcome) are left untouched.
+     */
+    @Transactional
+    public Auction resolveNoSaleById(Long auctionId, Long resolvedBy) {
+        Auction auction = auctionRepository.findByIdWithLock(auctionId)
+                .orElseThrow(() -> new IllegalArgumentException("Аукцион с ID " + auctionId + " не найден"));
+        if (auction.getStatus() != AuctionStatus.EXPIRED && auction.getStatus() != AuctionStatus.CANCELLED) {
+            throw new IllegalStateException(String.format(
+                    "Возврат гарантии без продажи возможен только для аукционов EXPIRED или CANCELLED. Текущий статус: '%s'",
+                    auction.getStatus()));
+        }
+        boolean latest = auctionRepository.findFirstByVehicleIdOrderByCreatedAtDesc(auction.getVehicleId())
+                .map(a -> a.getId().equals(auction.getId()))
+                .orElse(false);
+        if (!latest) {
+            throw new IllegalStateException("У автомобиля " + auction.getVehicleId()
+                    + " уже есть более новый аукцион - аукцион " + auctionId + " не может менять его статус");
+        }
+        noSaleResolutionOrchestrator.repair(auction, resolvedBy);
+        log.info("Auction {} ({}) no-sale consequences applied by {}", auctionId, auction.getStatus(), resolvedBy);
+        return auction;
     }
 
     @Transactional

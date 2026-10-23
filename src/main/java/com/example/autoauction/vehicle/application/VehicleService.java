@@ -384,6 +384,23 @@ public class VehicleService {
         log.info("Vehicle {} marked NEEDS_REDIAGNOSTIC", vehicleId);
     }
 
+    /**
+     * AUC-NOSALE-01: see Vehicle.markNeedsRediagnosticAfterNoSale. Idempotent for the repair
+     * path: a vehicle already in NEEDS_REDIAGNOSTIC is left as it is and false is returned.
+     */
+    @Transactional
+    public boolean markNeedsRediagnosticAfterNoSale(Long vehicleId) {
+        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> new IllegalArgumentException("Автомобиль не найден: " + vehicleId));
+        if (vehicle.getStatus() == VehicleStatus.NEEDS_REDIAGNOSTIC) {
+            return false;
+        }
+        vehicle.markNeedsRediagnosticAfterNoSale();
+        vehicleRepository.save(vehicle);
+        log.info("Vehicle {} marked NEEDS_REDIAGNOSTIC after an auction without a sale", vehicleId);
+        return true;
+    }
+
     /** MVP-005: see Vehicle.completeRediagnostic. */
     @Transactional
     public void completeRediagnostic(Long vehicleId, Long newDiagnosticRequestId) {

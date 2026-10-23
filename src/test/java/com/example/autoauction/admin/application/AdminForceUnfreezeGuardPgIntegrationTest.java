@@ -16,6 +16,10 @@ import com.example.autoauction.user.domain.Role;
 import com.example.autoauction.user.domain.User;
 import com.example.autoauction.user.domain.port.RoleRepository;
 import com.example.autoauction.user.domain.port.UserRepository;
+import com.example.autoauction.vehicle.domain.Vehicle;
+import com.example.autoauction.vehicle.domain.VehicleStatus;
+import com.example.autoauction.vehicle.domain.VehicleType;
+import com.example.autoauction.vehicle.domain.port.VehicleRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
@@ -57,6 +61,7 @@ class AdminForceUnfreezeGuardPgIntegrationTest extends AbstractPostgresIntegrati
     @Autowired private UserRepository userRepository;
     @Autowired private RoleRepository roleRepository;
     @Autowired private MockMvc mockMvc;
+    @Autowired private VehicleRepository vehicleRepository;
 
     private Long user(boolean withDeposit) {
         Role role = roleRepository.findByName("ROLE_USER")
@@ -72,7 +77,12 @@ class AdminForceUnfreezeGuardPgIntegrationTest extends AbstractPostgresIntegrati
 
     private Long activeAuctionWithTwoBids(Long seller, Long a, Long b) {
         OffsetDateTime now = OffsetDateTime.now();
-        Auction auction = new Auction(1L, new BigDecimal("1000000"), null, null, new BigDecimal("10000"),
+        // AUC-NOSALE-01: a cancellation/expiry moves the real vehicle to re-diagnostic
+        Vehicle vehicle = new Vehicle("Toyota", "Camry", 2020, ("BAL" + System.nanoTime() + "0000000000").substring(0, 17),
+                VehicleType.SEDAN, 9L, "diag");
+        vehicle.setStatus(VehicleStatus.IN_AUCTION);
+        Long vehicleId = vehicleRepository.save(vehicle).getId();
+        Auction auction = new Auction(vehicleId, new BigDecimal("1000000"), null, null, new BigDecimal("10000"),
                 now.minusHours(1), now.plusDays(1), seller);
         auction.setRequiredDepositAmount(DEPOSIT);
         auction.start();

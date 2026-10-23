@@ -10,9 +10,14 @@ package com.example.autoauction.diagnostic.domain;
  *   <li>{@link #SELLER_FAULT} - seller violation (SaleResolution C): the seller pays the
  *       re-diagnostic fee. The penalty for that violation is the one already charged when the
  *       sale was resolved as C (SellerViolationResolutionEngine) - never charged again here.</li>
+ *   <li>{@link #NO_SALE} - AUC-NOSALE-01: the vehicle's last auction ended without a sale
+ *       (EXPIRED or CANCELLED) and its guarantee has already been resolved. The new cycle is an
+ *       ordinary diagnostic request of the seller: nothing is charged when it is ordered, its
+ *       commitment carries the configured diagnostic fee under the usual outcome rules.</li>
  * </ul>
  */
 public enum RediagnosticReason {
     DIAGNOSTIC_ERROR,
-    SELLER_FAULT
+    SELLER_FAULT,
+    NO_SALE
 }

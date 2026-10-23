@@ -88,9 +88,10 @@ public class SellerViolationResolution {
     }
 
     private static void validateTriggerAuctionConsistency(TriggerSource triggerSource, Long auctionId) {
-        boolean auctionRequired = triggerSource == TriggerSource.SALE_FAILED_C;
+        boolean auctionRequired = triggerSource == TriggerSource.SALE_FAILED_C
+                || triggerSource == TriggerSource.AUCTION_CANCELLED_C;
         if (auctionRequired && auctionId == null) {
-            throw new IllegalArgumentException("SALE_FAILED_C требует auctionId");
+            throw new IllegalArgumentException(triggerSource + " требует auctionId");
         }
         if (!auctionRequired && auctionId != null) {
             throw new IllegalArgumentException("DIAGNOSTIC_REJECTION не должен иметь auctionId");

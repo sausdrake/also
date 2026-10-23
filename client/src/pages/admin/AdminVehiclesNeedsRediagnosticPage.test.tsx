@@ -57,6 +57,15 @@ describe('AdminVehiclesNeedsRediagnosticPage (MVP-005)', () => {
     expect(await screen.findByText('Повторная диагностика назначена: заявка #12')).toBeInTheDocument();
   });
 
+  it('AUC-NOSALE-01: offers the no-sale reason for a vehicle whose auction ended without a sale', async () => {
+    const form = await openForm();
+    fireEvent.click(within(form).getByText('Аукцион без продажи'));
+    fireEvent.click(within(form).getByText('Назначить'));
+
+    await waitFor(() => expect(apiPost).toHaveBeenCalledWith('/admin/vehicles/7/rediagnostic',
+      { reason: 'NO_SALE', comment: null }));
+  });
+
   it('shows the server refusal (e.g. reason not matching the sale fault)', async () => {
     apiPost.mockRejectedValueOnce({ response: { data: { message: 'Причина SELLER_FAULT не соответствует решению по аукциону 3' } } });
     const form = await openForm();

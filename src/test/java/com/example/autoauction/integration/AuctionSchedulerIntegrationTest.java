@@ -11,6 +11,10 @@ import com.example.autoauction.user.domain.Role;
 import com.example.autoauction.user.domain.User;
 import com.example.autoauction.user.domain.port.RoleRepository;
 import com.example.autoauction.user.domain.port.UserRepository;
+import com.example.autoauction.vehicle.domain.Vehicle;
+import com.example.autoauction.vehicle.domain.VehicleStatus;
+import com.example.autoauction.vehicle.domain.VehicleType;
+import com.example.autoauction.vehicle.domain.port.VehicleRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,11 +50,15 @@ class AuctionSchedulerIntegrationTest {
     @Autowired
     private RoleRepository roleRepository;
 
+    @Autowired
+    private VehicleRepository vehicleRepository;
+
     @PersistenceContext
     private EntityManager entityManager;
 
     private Long sellerId;
     private Long expiredAuctionId;
+    private Long vehicleId;
 
     @BeforeEach
     @Transactional
@@ -64,8 +72,12 @@ class AuctionSchedulerIntegrationTest {
         OffsetDateTime startTime = OffsetDateTime.now().minusDays(2);
         OffsetDateTime endTime = OffsetDateTime.now().minusHours(1);
 
+        Vehicle vehicle = new Vehicle("Toyota", "Camry", 2020, "SCHED000000000001", VehicleType.SEDAN, 9L, "diag");
+        vehicle.setStatus(VehicleStatus.IN_AUCTION);
+        vehicleId = vehicleRepository.save(vehicle).getId();
+
         Auction expiredAuction = new Auction(
-                1L,
+                vehicleId,
                 new BigDecimal("1000000"),
                 new BigDecimal("1200000"),
                 new BigDecimal("1500000"),
@@ -98,5 +110,10 @@ class AuctionSchedulerIntegrationTest {
 
         // Аукцион должен быть завершён (без ставок - EXPIRED; со ставками - ожидает подтверждения продажи)
         assertThat(after.getStatus()).isIn(AuctionStatus.EXPIRED, AuctionStatus.WAITING_FOR_PAYMENT);
+        // AUC-NOSALE-01: a lot that expired without bids no longer leaves its vehicle IN_AUCTION
+        if (after.getStatus() == AuctionStatus.EXPIRED) {
+            assertThat(vehicleRepository.findById(vehicleId).orElseThrow().getStatus())
+                    .isEqualTo(VehicleStatus.NEEDS_REDIAGNOSTIC);
+        }
     }
 }

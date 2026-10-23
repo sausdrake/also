@@ -5,6 +5,8 @@ import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
 import com.example.autoauction.deposit.application.DepositService;
 import com.example.autoauction.diagnostic.commitment.application.SellerDiagnosticCommitmentService;
+import com.example.autoauction.diagnostic.commitment.domain.CommitmentStatus;
+import com.example.autoauction.diagnostic.commitment.domain.port.SellerDiagnosticCommitmentRepository;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest;
 import com.example.autoauction.diagnostic.domain.DiagnosticRequest.DiagnosticRequestStatus;
 import com.example.autoauction.diagnostic.domain.RediagnosticReason;
@@ -58,6 +60,7 @@ public class AdminRediagnosticService {
     private final SystemSettingsService systemSettingsService;
     private final VerifiedIdentityGate verifiedIdentityGate;
     private final NotificationService notificationService;
+    private final SellerDiagnosticCommitmentRepository commitmentRepository;
 
     public AdminRediagnosticService(VehicleRepository vehicleRepository,
                                     DiagnosticRequestRepository requestRepository,
@@ -67,7 +70,8 @@ public class AdminRediagnosticService {
                                     DepositService depositService,
                                     SystemSettingsService systemSettingsService,
                                     VerifiedIdentityGate verifiedIdentityGate,
-                                    NotificationService notificationService) {
+                                    NotificationService notificationService,
+                                    SellerDiagnosticCommitmentRepository commitmentRepository) {
         this.vehicleRepository = vehicleRepository;
         this.requestRepository = requestRepository;
         this.auctionRepository = auctionRepository;
@@ -77,6 +81,7 @@ public class AdminRediagnosticService {
         this.systemSettingsService = systemSettingsService;
         this.verifiedIdentityGate = verifiedIdentityGate;
         this.notificationService = notificationService;
+        this.commitmentRepository = commitmentRepository;
     }
 
     @Transactional
@@ -117,6 +122,12 @@ public class AdminRediagnosticService {
         BigDecimal sellerFee = reason == RediagnosticReason.SELLER_FAULT
                 ? systemSettingsService.getRequiredBigDecimal("diagnostic_fee_amount")
                 : BigDecimal.ZERO;
+        // AUC-NOSALE-01: after an auction without a sale the new cycle is an ordinary diagnostic
+        // request - its commitment carries the configured fee (charged only by the usual outcome
+        // rules), nothing is charged now.
+        BigDecimal commitmentFee = reason == RediagnosticReason.NO_SALE
+                ? systemSettingsService.getRequiredBigDecimal("diagnostic_fee_amount")
+                : BigDecimal.ZERO;
         // Deposit guard before any write: the seller must cover the fee (if any) plus the usual
         // diagnostic guarantee freeze.
         BigDecimal available = depositService.getDepositByUserId(sellerId).availableBalance();
@@ -146,9 +157,9 @@ public class AdminRediagnosticService {
         DiagnosticRequest saved = requestRepository.save(next);
 
         depositService.chargeRediagnosticFee(sellerId, saved.getId(), sellerFee);
-        // Zero fee in both cases: AlSo pays (DIAGNOSTIC_ERROR) or the seller already paid above
-        // (SELLER_FAULT) - the commitment can therefore never charge the fee (again).
-        commitmentService.freezeCommitment(sellerId, saved.getId(), guarantee, BigDecimal.ZERO);
+        // Zero commitment fee for DIAGNOSTIC_ERROR (AlSo pays) and SELLER_FAULT (the seller already
+        // paid above) - the commitment can therefore never charge the fee (again). NO_SALE: see above.
+        commitmentService.freezeCommitment(sellerId, saved.getId(), guarantee, commitmentFee);
 
         notifySeller(saved, reason, sellerFee);
         log.info("Admin {} ordered re-diagnostic {} of vehicle {} (previous request {}, reason {}, seller fee {})",
@@ -170,6 +181,10 @@ public class AdminRediagnosticService {
      * applied (no penalty for PLATFORM_FAULT, penalty for C).
      */
     private void requireReasonMatchesSaleFault(Long vehicleId, RediagnosticReason reason) {
+        if (reason == RediagnosticReason.NO_SALE) {
+            requireLastAuctionEndedWithoutSale(vehicleId);
+            return;
+        }
         Auction failed = auctionRepository.findFirstByVehicleIdOrderByCreatedAtDesc(vehicleId)
                 .filter(a -> a.getStatus() == AuctionStatus.SALE_FAILED)
                 .orElseThrow(() -> new IllegalStateException(
@@ -184,8 +199,29 @@ public class AdminRediagnosticService {
         }
     }
 
+    /**
+     * AUC-NOSALE-01: NO_SALE requires that the vehicle's latest auction ended EXPIRED or CANCELLED
+     * and that its guarantee was already resolved - a still-open guarantee must be released first
+     * (resolve-no-sale), never left behind a new cycle.
+     */
+    private void requireLastAuctionEndedWithoutSale(Long vehicleId) {
+        Auction last = auctionRepository.findFirstByVehicleIdOrderByCreatedAtDesc(vehicleId)
+                .filter(a -> a.getStatus() == AuctionStatus.EXPIRED || a.getStatus() == AuctionStatus.CANCELLED)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Причина NO_SALE возможна только после аукциона без продажи (EXPIRED или CANCELLED) автомобиля " + vehicleId));
+        if (last.getSellerDiagnosticCommitmentId() != null) {
+            commitmentRepository.findById(last.getSellerDiagnosticCommitmentId())
+                    .filter(c -> c.getStatus() == CommitmentStatus.FINALIZED)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Гарантия продавца по аукциону " + last.getId() + " ещё не разрешена - сначала верните её"));
+        }
+    }
+
     private void notifySeller(DiagnosticRequest request, RediagnosticReason reason, BigDecimal sellerFee) {
-        String body = reason == RediagnosticReason.SELLER_FAULT
+        String body = reason == RediagnosticReason.NO_SALE
+                ? String.format("Назначена повторная диагностика автомобиля %s %s для повторного выставления "
+                        + "после аукциона без продажи.", request.getBrand(), request.getModel())
+                : reason == RediagnosticReason.SELLER_FAULT
                 ? String.format("Назначена повторная диагностика автомобиля %s %s по вине продавца. "
                         + "С депозита удержана стоимость диагностики: %s сом.", request.getBrand(), request.getModel(),
                         sellerFee.toPlainString())
