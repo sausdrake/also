@@ -144,6 +144,12 @@ abstract class ApiE2ESupport extends AbstractPostgresIntegrationTest {
     }
 
     protected void verifyIdentity(Actor user, Actor admin) throws Exception {
+        call(post("/api/v1/admin/identity/" + submitIdentity(user) + "/approve"), admin, 200);
+        assertThat((String) JsonPath.read(call(get("/api/v1/identity/me"), user, 200), "$.status")).isEqualTo("VERIFIED");
+    }
+
+    /** The KYC submission only (PENDING_REVIEW); returns its id. */
+    protected Long submitIdentity(Actor user) throws Exception {
         // KYC-CAPTURE-01: an ID card is photographed front and back, plus the live selfie - each its own camera slot
         String doc = capture(user, "{\"contentType\":\"image/jpeg\",\"side\":\"FRONT\",\"documentType\":\"NATIONAL_ID\"}", 1);
         String back = capture(user, "{\"contentType\":\"image/jpeg\",\"side\":\"BACK\",\"documentType\":\"NATIONAL_ID\"}", 2);
@@ -152,8 +158,7 @@ abstract class ApiE2ESupport extends AbstractPostgresIntegrationTest {
                 "{\"issuingCountry\":\"KG\",\"documentType\":\"NATIONAL_ID\",\"rawDocumentNumber\":\"E2E" + user.id() + run
                         + "\",\"documentStorageKey\":\"" + doc + "\",\"documentBackStorageKey\":\"" + back
                         + "\",\"selfieStorageKey\":\"" + selfie + "\"}", 200);
-        call(post("/api/v1/admin/identity/" + id(submission, "$.id") + "/approve"), admin, 200);
-        assertThat((String) JsonPath.read(call(get("/api/v1/identity/me"), user, 200), "$.status")).isEqualTo("VERIFIED");
+        return id(submission, "$.id");
     }
 
     protected String vin() {

@@ -227,7 +227,8 @@ public class Auction {
 
     public Long getId() { return id; }
     public Long getVehicleId() { return vehicleId; }
-    public String getVehicleInfo() { return vehicleInfo; }
+    /** VIN-AUTH-01: names stored before the fix contained "(VIN: …)" - it is never handed out. */
+    public String getVehicleInfo() { return com.example.autoauction.vehicle.domain.VinText.withoutVin(vehicleInfo); }
     public BigDecimal getStartingPrice() { return startingPrice; }
     public BigDecimal getCurrentPrice() { return currentPrice; }
     public BigDecimal getReservePrice() { return reservePrice; }

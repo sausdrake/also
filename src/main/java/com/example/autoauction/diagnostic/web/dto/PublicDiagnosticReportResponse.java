@@ -14,13 +14,15 @@ import java.util.List;
  * commitmentStatus, violationResolution, rejection or re-diagnostic data, and no createdBy,
  * timestamps or request ids inside the template and answers. {@link DiagnosticRequestResponse}
  * stays the authenticated, role-checked view. {@code id} is kept: clients follow the newest report
- * of a vehicle by it (re-diagnostic).
+ * of a vehicle by it (re-diagnostic). VIN-AUTH-01: {@code vin} is null unless the viewer may see it;
+ * {@code vinHidden} says it is withheld.
  */
 public record PublicDiagnosticReportResponse(
         Long id,
         String vin,
         PublicTemplate template,
-        List<PublicAnswer> existingAnswers
+        List<PublicAnswer> existingAnswers,
+        boolean vinHidden
 ) {
     public record PublicTemplate(String name, List<PublicGroup> groups) {}
 
@@ -31,10 +33,11 @@ public record PublicDiagnosticReportResponse(
     public record PublicAnswer(Long inspectionItemId, Integer rating, String comment, List<String> photoUrls,
                                boolean skipped) {}
 
-    public static PublicDiagnosticReportResponse from(DiagnosticRequestResponse r) {
-        return new PublicDiagnosticReportResponse(r.getId(), r.getVin(), template(r.getTemplate()),
+    public static PublicDiagnosticReportResponse from(DiagnosticRequestResponse r, boolean mayViewVin) {
+        return new PublicDiagnosticReportResponse(r.getId(), mayViewVin ? r.getVin() : null, template(r.getTemplate()),
                 r.getExistingAnswers() == null ? List.of()
-                        : r.getExistingAnswers().stream().map(PublicDiagnosticReportResponse::answer).toList());
+                        : r.getExistingAnswers().stream().map(PublicDiagnosticReportResponse::answer).toList(),
+                !mayViewVin && r.getVin() != null);
     }
 
     private static PublicTemplate template(InspectionTemplate t) {

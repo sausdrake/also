@@ -46,7 +46,9 @@ interface VehicleDetail {
   brand: string;
   model: string;
   year: number;
-  vin: string;
+  /** VIN-AUTH-01: null unless the viewer is a verified user or staff; vinHidden says it exists. */
+  vin: string | null;
+  vinHidden?: boolean;
   color?: string;
   mileage?: number;
   engineCapacity?: number;
@@ -59,10 +61,13 @@ interface DiagItem   { id: number; title: string; fieldType: string; description
 interface DiagGroup  { id: number; name: string; items: DiagItem[]; }
 interface DiagAnswer { inspectionItemId: number; rating: number | null; comment: string; photoUrls: string[]; skipped?: boolean; }
 interface DiagReport {
-  vin: string;
+  vin: string | null;
   template: { name: string; groups: DiagGroup[] };
   existingAnswers: DiagAnswer[];
 }
+
+/** VIN-AUTH-01: the server sends the VIN only to verified users and staff. */
+const VIN_HIDDEN_TEXT = 'VIN доступен после подтверждения личности';
 
 interface LiveBid {
   price: number;
@@ -300,13 +305,17 @@ export const AuctionPage = () => {
 
   useEffect(() => {
     if (!auction?.vehicleId) return;
-    axios.get(`${BASE_URL}/api/v1/public/vehicles/${auction.vehicleId}`)
+    // VIN-AUTH-01: the server shows the VIN only to a verified viewer, so the token goes along; if it is
+    // refused (e.g. expired), the public card is fetched anonymously instead of not at all.
+    const publicGet = (url: string) => axios.get(url, { headers: authHeaders() })
+      .catch(() => axios.get(url));
+    publicGet(`${BASE_URL}/api/v1/public/vehicles/${auction.vehicleId}`)
       .then(r => setVehicle(r.data))
       .catch(() => {});
-    axios.get(`${BASE_URL}/api/v1/public/reports/by-vehicle/${auction.vehicleId}`)
+    publicGet(`${BASE_URL}/api/v1/public/reports/by-vehicle/${auction.vehicleId}`)
       .then(r => setReport(r.data))
       .catch(() => {});
-  }, [auction?.vehicleId]);
+  }, [auction?.vehicleId, accessToken]);
 
   useEffect(() => {
     if (!isAuthenticated || !id) return;
@@ -556,9 +565,11 @@ export const AuctionPage = () => {
                   <h1 className="text-2xl font-bold text-gray-900">
                     {vehicle ? `${vehicle.brand} ${vehicle.model} ${vehicle.year}` : auction.vehicleInfo}
                   </h1>
-                  {vehicle?.vin && (
+                  {vehicle?.vin ? (
                     <p className="text-sm text-gray-400 mt-0.5 font-mono">VIN: {vehicle.vin}</p>
-                  )}
+                  ) : vehicle?.vinHidden ? (
+                    <p className="text-sm text-gray-400 mt-0.5">{VIN_HIDDEN_TEXT}</p>
+                  ) : null}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -636,7 +647,7 @@ export const AuctionPage = () => {
                       <div>
                         <p className="font-semibold text-green-800 text-sm">Независимая диагностика пройдена</p>
                         <p className="text-xs text-green-600 mt-0.5">
-                          Шаблон: {report.template?.name} · VIN: {report.vin}
+                          Шаблон: {report.template?.name}{report.vin ? ` · VIN: ${report.vin}` : ''}
                         </p>
                       </div>
                     </div>
@@ -799,7 +810,8 @@ export const AuctionPage = () => {
                 <h1 className="font-bold text-gray-900 leading-snug">
                   {vehicle ? `${vehicle.brand} ${vehicle.model} ${vehicle.year}` : auction.vehicleInfo}
                 </h1>
-                {vehicle?.vin && <p className="text-xs text-gray-400 mt-0.5 font-mono">VIN: {vehicle.vin}</p>}
+                {vehicle?.vin ? <p className="text-xs text-gray-400 mt-0.5 font-mono">VIN: {vehicle.vin}</p>
+                  : vehicle?.vinHidden ? <p className="text-xs text-gray-400 mt-0.5">{VIN_HIDDEN_TEXT}</p> : null}
               </div>
 
               <div className="text-center py-2">

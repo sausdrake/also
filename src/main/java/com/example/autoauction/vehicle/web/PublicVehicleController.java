@@ -1,5 +1,6 @@
 package com.example.autoauction.vehicle.web;
 
+import com.example.autoauction.identity.application.VinDisclosurePolicy;
 import com.example.autoauction.vehicle.domain.port.VehicleRepository;
 import com.example.autoauction.vehicle.web.dto.PublicVehicleResponse;
 import lombok.RequiredArgsConstructor;
@@ -14,11 +15,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class PublicVehicleController {
 
     private final VehicleRepository vehicleRepository;
+    private final VinDisclosurePolicy vinDisclosurePolicy;
 
     @GetMapping("/{id}")
     public PublicVehicleResponse getVehicle(@PathVariable Long id) {
+        boolean mayViewVin = vinDisclosurePolicy.currentViewerMaySeeVin();   // VIN-AUTH-01
         return vehicleRepository.findById(id)
-                .map(PublicVehicleResponse::from)   // SEC-12: public allowlist
+                .map(v -> PublicVehicleResponse.from(v, mayViewVin))   // SEC-12: public allowlist
                 .orElseThrow(() -> new IllegalArgumentException("Автомобиль не найден: " + id));
     }
 }

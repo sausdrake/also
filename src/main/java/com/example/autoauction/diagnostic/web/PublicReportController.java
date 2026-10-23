@@ -6,6 +6,7 @@ import com.example.autoauction.diagnostic.media.domain.DiagnosticMedia;
 import com.example.autoauction.diagnostic.media.web.dto.MediaReadUrlResponse;
 import com.example.autoauction.diagnostic.web.dto.DiagnosticRequestResponse;
 import com.example.autoauction.diagnostic.web.dto.PublicDiagnosticReportResponse;
+import com.example.autoauction.identity.application.VinDisclosurePolicy;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ public class PublicReportController {
 
     private final DiagnosticRequestService requestService;
     private final DiagnosticMediaService mediaService;
+    private final VinDisclosurePolicy vinDisclosurePolicy;
 
     @GetMapping("/{requestId}")
     @Operation(summary = "Просмотр одобренного диагностического отчёта")
@@ -31,14 +33,16 @@ public class PublicReportController {
         if (report.getStatus() == null || !report.getStatus().equals("APPROVED")) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(PublicDiagnosticReportResponse.from(report));   // SEC-12: public allowlist
+        return ResponseEntity.ok(PublicDiagnosticReportResponse.from(report,
+                vinDisclosurePolicy.currentViewerMaySeeVin()));   // SEC-12: public allowlist; VIN-AUTH-01
     }
 
     @GetMapping("/by-vehicle/{vehicleId}")
     @Operation(summary = "Получить одобренный отчёт по ID автомобиля")
     public ResponseEntity<PublicDiagnosticReportResponse> getReportByVehicle(@PathVariable Long vehicleId) {
         try {
-            return ResponseEntity.ok(PublicDiagnosticReportResponse.from(requestService.getApprovedReportForVehicle(vehicleId)));
+            return ResponseEntity.ok(PublicDiagnosticReportResponse.from(requestService.getApprovedReportForVehicle(vehicleId),
+                    vinDisclosurePolicy.currentViewerMaySeeVin()));
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }

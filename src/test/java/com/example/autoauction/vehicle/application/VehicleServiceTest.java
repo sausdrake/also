@@ -880,7 +880,9 @@ class VehicleServiceTest {
         @DisplayName("При обновлении updatedAt меняется (используем ArgumentCaptor)")
         void update_UpdatesTimestamp() {
             // given
-            // Сохраняем оригинальную временную метку
+            // Сохраняем оригинальную временную метку - заведомо в прошлом: два OffsetDateTime.now() подряд
+            // на Windows могут попасть в один тик часов, и тест падал случайно
+            draftVehicle.setUpdatedAt(OffsetDateTime.now().minusMinutes(1));
             OffsetDateTime originalUpdatedAt = draftVehicle.getUpdatedAt();
 
             // Создаём мок, который будет возвращать автомобиль с обновлённой временной меткой

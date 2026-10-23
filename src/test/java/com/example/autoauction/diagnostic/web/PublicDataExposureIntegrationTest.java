@@ -135,7 +135,8 @@ class PublicDataExposureIntegrationTest {
         return map.keySet();
     }
 
-    private static final Set<String> REPORT_KEYS = Set.of("id", "vin", "template", "existingAnswers");
+    // VIN-AUTH-01: vinHidden tells the page that a VIN exists but is withheld from this (anonymous) viewer
+    private static final Set<String> REPORT_KEYS = Set.of("id", "vin", "template", "existingAnswers", "vinHidden");
     private static final Set<String> TEMPLATE_KEYS = Set.of("name", "groups");
     private static final Set<String> GROUP_KEYS = Set.of("id", "name", "items");
     private static final Set<String> ITEM_KEYS = Set.of("id", "title", "fieldType", "description");
@@ -195,7 +196,8 @@ class PublicDataExposureIntegrationTest {
         Approved a = approvedReport();
         String json = anonymousGet("/api/v1/public/vehicles/" + a.vehicleId());
         assertThat(keys(json)).isEqualTo(Set.of("id", "brand", "model", "year", "vin", "color", "mileage",
-                "engineCapacity", "fuelType", "transmission", "description"));
+                "engineCapacity", "fuelType", "transmission", "description", "vinHidden"));
+        assertThat((Object) JsonPath.read(json, "$.vin")).as("VIN-AUTH-01: anonymous never gets the VIN").isNull();
         assertThat(json).doesNotContain("licensePlate", "adminId", "adminName", "diagnosticId", "diagnosticName",
                 "rejectionReason", "status", "createdAt", "submittedAt", "reviewedAt");
         assertThat((String) JsonPath.read(json, "$.brand")).isEqualTo("BMW");

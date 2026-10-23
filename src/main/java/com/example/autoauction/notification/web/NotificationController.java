@@ -4,6 +4,7 @@ import com.example.autoauction.auth.domain.UserPrincipal;
 import com.example.autoauction.auth.infrastructure.security.CurrentUser;
 import com.example.autoauction.notification.application.NotificationService;
 import com.example.autoauction.notification.domain.Notification;
+import com.example.autoauction.vehicle.domain.VinText;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +31,12 @@ public class NotificationController {
             @RequestParam(defaultValue = "20") int size) {
         Page<Notification> result = notificationService.getForUser(
                 currentUser.getUserId(), PageRequest.of(page, size));
+        // VIN-AUTH-01: texts written before the fix may name a lot as "… (VIN: …)" - removed on the way out,
+        // the stored history is not rewritten.
+        result.forEach(n -> {
+            n.setTitle(VinText.withoutVin(n.getTitle()));
+            n.setMessage(VinText.withoutVin(n.getMessage()));
+        });
         return ResponseEntity.ok(result);
     }
 

@@ -27,7 +27,7 @@ public class DiagnosticRequestRepositoryAdapter implements DiagnosticRequestRepo
         JpaDiagnosticRequestEntity entity = mapper.toEntity(request);
         JpaDiagnosticRequestEntity saved = jpaRepository.save(entity);
         log.info("Saved diagnostic request: id={}, userId={}, vin={}",
-                saved.getId(), saved.getUserId(), saved.getVin());
+                saved.getId(), saved.getUserId(), com.example.autoauction.vehicle.domain.VinText.mask(saved.getVin()));
         return mapper.toDomain(saved);
     }
 

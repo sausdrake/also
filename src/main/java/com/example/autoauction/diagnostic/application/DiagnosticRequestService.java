@@ -1,6 +1,7 @@
 package com.example.autoauction.diagnostic.application;
 
 import com.example.autoauction.admin.application.SystemSettingsService;
+import com.example.autoauction.vehicle.domain.VinText;
 import com.example.autoauction.diagnostic.commitment.application.SellerDiagnosticCommitmentService;
 import com.example.autoauction.diagnostic.commitment.domain.CommitmentStatus;
 import com.example.autoauction.diagnostic.commitment.domain.SellerViolationResolution;
@@ -69,7 +70,7 @@ public class DiagnosticRequestService {
      */
     @Transactional
     public DiagnosticRequestResponse createRequest(CreateDiagnosticRequest dto, Long userId) {
-        log.info("Creating diagnostic request for user: {}, vin: {}", userId, dto.getVin());
+        log.info("Creating diagnostic request for user: {}, vin: {}", userId, VinText.mask(dto.getVin()));
         // Проверка на существующую активную заявку. An existence query over ALL of the user's
         // requests - inspecting only an unordered first page could see an old APPROVED/REJECTED
         // row and miss the active one, letting a second active request (and a second deposit

@@ -208,7 +208,7 @@ public class AdminAuctionService {
         }
 
         log.debug("Автомобиль найден и одобрен: {} {} {} (VIN: {})",
-                vehicle.brand(), vehicle.model(), vehicle.year(), vehicle.vin());
+                vehicle.brand(), vehicle.model(), vehicle.year(), com.example.autoauction.vehicle.domain.VinText.mask(vehicle.vin()));
 
         return vehicle;
     }
@@ -226,8 +226,10 @@ public class AdminAuctionService {
                 adminId
         );
 
-        String vehicleInfo = String.format("%s %s %d (VIN: %s)",
-                vehicle.brand(), vehicle.model(), vehicle.year(), vehicle.vin());
+        // VIN-AUTH-01: the display name reaches the public catalogue, WebSocket events and
+        // notifications - it never carries the VIN.
+        String vehicleInfo = String.format("%s %s %d",
+                vehicle.brand(), vehicle.model(), vehicle.year());
         auction.setVehicleInfo(vehicleInfo);
 
         // X3-C: immutable snapshot, assigned exactly once, here - never re-derived later from

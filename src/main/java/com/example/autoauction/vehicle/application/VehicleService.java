@@ -2,6 +2,7 @@ package com.example.autoauction.vehicle.application;
 
 import com.example.autoauction.vehicle.domain.Vehicle;
 import com.example.autoauction.vehicle.domain.VehicleStatus;
+import com.example.autoauction.vehicle.domain.VinText;
 import com.example.autoauction.vehicle.domain.port.VehicleRepository;
 import com.example.autoauction.vehicle.web.dto.VehicleCreateRequest;
 import com.example.autoauction.vehicle.web.dto.VehicleUpdateRequest;
@@ -29,15 +30,15 @@ public class VehicleService {
     @Transactional
     public VehicleResponse createDraft(VehicleCreateRequest request, Long diagnosticId, String diagnosticName) {
         log.info("=== СОЗДАНИЕ ЧЕРНОВИКА АВТОМОБИЛЯ ===");
-        log.info("Диагностик: {} (ID: {}), VIN: {}", diagnosticName, diagnosticId, request.vin());
+        log.info("Диагностик: {} (ID: {}), VIN: {}", diagnosticName, diagnosticId, VinText.mask(request.vin()));
         log.debug("Детали запроса: brand={}, model={}, year={}, type={}",
                 request.brand(), request.model(), request.year(), request.type());
         Objects.requireNonNull(diagnosticId, "diagnosticId не может быть null");
         Objects.requireNonNull(diagnosticName, "diagnosticName не может быть null");
         // Проверяем уникальность VIN
-        log.debug("Проверка уникальности VIN: {}", request.vin());
+        log.debug("Проверка уникальности VIN: {}", VinText.mask(request.vin()));
         if (vehicleRepository.existsByVin(request.vin())) {
-            log.error("Автомобиль с VIN {} уже существует", request.vin());
+            log.error("Автомобиль с VIN {} уже существует", VinText.mask(request.vin()));
             throw new IllegalArgumentException("Автомобиль с таким VIN уже существует");
         }
         log.debug("VIN уникален");
@@ -430,10 +431,10 @@ public class VehicleService {
         // whichever diagnosticRequestId it already has (possibly stale), and AuctionCommitmentResolver
         // fails closed rather than silently re-deriving a newer one.
         if (vehicleRepository.existsByVin(vin)) {
-            log.warn("Vehicle with VIN {} already exists, skipping creation", vin);
+            log.warn("Vehicle with VIN {} already exists, skipping creation", VinText.mask(vin));
             return vehicleRepository.findByVin(vin)
                     .map(VehicleResponse::fromDomain)
-                    .orElseThrow(() -> new IllegalStateException("VIN conflict for: " + vin));
+                    .orElseThrow(() -> new IllegalStateException("VIN conflict for: " + VinText.mask(vin)));
         }
 
         Vehicle vehicle = new Vehicle(brand, model, year, vin,
@@ -449,7 +450,7 @@ public class VehicleService {
         vehicle.setDiagnosticRequestId(diagnosticRequestId);
 
         Vehicle saved = vehicleRepository.save(vehicle);
-        log.info("Vehicle created from diagnostic request {}: id={}, vin={}", diagnosticRequestId, saved.getId(), vin);
+        log.info("Vehicle created from diagnostic request {}: id={}, vin={}", diagnosticRequestId, saved.getId(), VinText.mask(vin));
         return VehicleResponse.fromDomain(saved);
     }
 
