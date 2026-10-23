@@ -47,6 +47,11 @@ Kyrgyz Republic (KR) or for the operational owner.
    biometric-like data (selfie), cross-border transfer (Cloudflare R2, Telegram), access and deletion requests.
 10. Telegram identity: may a Telegram account be the sole identity of a user who trades and withdraws money?
 11. Document storage: retention of auction records, sale confirmations, withdrawal evidence and admin decisions.
+12. Public diagnostic reports: an approved report (vehicle data, VIN, ratings, photos, video) is public on the lot
+    page. May it be published without the seller's separate consent, and must plates, faces or documents visible in
+    the photos be hidden? Who is liable to a buyer who relied on a public report for a car sold elsewhere?
+13. Withdrawals: may a payout go only to an account in the name of the verified user, and does paying out a balance
+    create any reporting or anti-money-laundering obligation for AlSo?
 
 ## Questions for an accountant / tax adviser
 
@@ -67,6 +72,30 @@ No tax rate or rule is assumed in the code.
 3. Support channel and dispute process for buyers and sellers.
 4. Incident response: who is called when `/api/health` is down, a backup fails or R2 errors appear.
 5. Retention and deletion of KYC images and logs in practice.
+
+## Owner sign-off checklist
+
+The gate closes only when every line below has a written answer from the named role (attach the document or its
+reference). Nothing here is ticked by the development team.
+
+| # | Topic | Role | Questions | Answer / document |
+|---|---|---|---|---|
+| L1 | Auction / platform model | Lawyer | 1 | |
+| L2 | Third-party diagnostics, report disclaimer | Lawyer | 3, 12 | |
+| L3 | Commission: customer and offer wording | Lawyer + accountant | 2; tax 1-3 | |
+| L4 | Deposits held on the balance | Lawyer + accountant | 4; tax 1, 4 | |
+| L5 | Withdrawals / payouts | Lawyer + operations | 6, 13; ops 1 | |
+| L6 | Penalties and withheld deposits | Lawyer + accountant | 5; tax 5 | |
+| L7 | KYC obligation and image retention | Lawyer + operations | 8; ops 2, 5 | |
+| L8 | Personal data, selfie (biometric-like), cross-border | Lawyer | 9, 10 | |
+| L9 | Document storage and retention | Lawyer + operations | 11; ops 5 | |
+| L10 | User agreement, offer, privacy policy texts | Lawyer | 7 | |
+| L11 | Acceptance logging (what to store, before which action) | Lawyer -> product owner | 7 | |
+| T1 | Tax treatment of every money flow, invoices | Accountant | tax 1-3, 6 | |
+| O1 | Four-eyes for top-ups / payouts, KYC review rules, support, incidents | Operations owner | ops 1-4 | |
+
+If L11 requires recorded acceptance, that is a new code task (an approved text version, timestamp and account per
+acceptance); it is not built on an assumption.
 
 ## What would close this gate
 
