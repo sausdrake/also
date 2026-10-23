@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import api from '../../api/client';
 import { formatDateTime } from '../../utils/formatDate';
+import { VEHICLE_STATUS_LABELS, type VehicleStatus } from '../../domain/vehicle';
+import { DIAGNOSTIC_STATUS_LABELS, type DiagnosticRequestStatus } from '../../domain/diagnosticRequest';
 
 interface VehicleResponse {
   id: number;
@@ -129,7 +131,7 @@ export function AdminVehiclesNeedsRediagnosticPage() {
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-medium text-gray-800">{v.brand} {v.model} ({v.year})</p>
                   <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
-                    {v.status}
+                    {VEHICLE_STATUS_LABELS[v.status as VehicleStatus] ?? v.status}
                   </span>
                 </div>
                 <p className="text-xs text-gray-500">
@@ -180,7 +182,7 @@ export function AdminVehiclesNeedsRediagnosticPage() {
                   <ol className="border-l-2 border-gray-200 pl-3 space-y-1" data-testid={`history-${v.id}`}>
                     {history.map(h => (
                       <li key={h.id} className="text-xs text-gray-600">
-                        <span className="font-medium">Заявка #{h.id}</span> · {h.status}
+                        <span className="font-medium">Заявка #{h.id}</span> · {DIAGNOSTIC_STATUS_LABELS.owner[h.status as DiagnosticRequestStatus] ?? h.status}
                         {h.createdAt && ` · ${formatDateTime(h.createdAt)}`}
                         {h.previousDiagnosticRequestId != null && h.rediagnosticReason && (
                           <span className="block text-amber-700">

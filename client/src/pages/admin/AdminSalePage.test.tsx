@@ -87,15 +87,15 @@ describe('AdminSalePage - stale cross-auction response fencing', () => {
 
     // Resolve the CURRENT request (B) first - this is what should end up on screen.
     requestB.resolve({ data: saleStatus({ auctionId: 2, auctionStatus: 'SOLD' }) });
-    await screen.findByText('SOLD');
+    await screen.findByText('Продан');
 
     // Prove the stale A response is still capable of mutating state by resolving it now, after B.
     requestA.resolve({ data: saleStatus({ auctionId: 1, auctionStatus: 'WAITING_FOR_PAYMENT' }) });
     await waitFor(() => expect(requestA.promise).resolves.toBeDefined());
 
     // The guard must have discarded the stale A response - B's status remains displayed.
-    expect(screen.getByText('SOLD')).toBeInTheDocument();
-    expect(screen.queryByText('WAITING_FOR_PAYMENT')).not.toBeInTheDocument();
+    expect(screen.getByText('Продан')).toBeInTheDocument();
+    expect(screen.queryByText('Ожидание оплаты покупателем')).not.toBeInTheDocument();
   });
 
   it('Scenario 2 - a stale refresh triggered by a mutation\'s onDone cannot overwrite a subsequently-viewed auction', async () => {
@@ -143,12 +143,12 @@ describe('AdminSalePage - stale cross-auction response fencing', () => {
     await waitFor(() => expect(apiGet).toHaveBeenCalledWith('/admin/sale/2'));
 
     requestB.resolve({ data: saleStatus({ auctionId: 2, auctionStatus: 'SOLD' }) });
-    await screen.findByText('SOLD');
+    await screen.findByText('Продан');
 
     staleRefetch.resolve({ data: saleStatus({ auctionId: 1, auctionStatus: 'WAITING_FOR_PAYMENT' }) });
     await waitFor(() => expect(staleRefetch.promise).resolves.toBeDefined());
 
-    expect(screen.getByText('SOLD')).toBeInTheDocument();
-    expect(screen.queryByText('WAITING_FOR_PAYMENT')).not.toBeInTheDocument();
+    expect(screen.getByText('Продан')).toBeInTheDocument();
+    expect(screen.queryByText('Ожидание оплаты покупателем')).not.toBeInTheDocument();
   });
 });

@@ -74,4 +74,18 @@ describe('AdminVehiclesNeedsRediagnosticPage (MVP-005)', () => {
     expect(await within(history).findByText(/Заявка #11/)).toBeInTheDocument();
     expect(within(history).getByText(/Повторная диагностика заявки #11: нарушение продавца — скрыл ДТП/)).toBeInTheDocument();
   });
+
+  it('shows the vehicle and request statuses as labels, never as raw enums', async () => {
+    render(<AdminVehiclesNeedsRediagnosticPage />);
+    expect(await screen.findByText('Требует повторной диагностики')).toBeInTheDocument();
+    expect(screen.queryByText('NEEDS_REDIAGNOSTIC')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('История диагностик'));
+    const history = await screen.findByTestId('history-7');
+    await within(history).findByText(/Заявка #11/);
+    const items = within(history).getAllByRole('listitem').map(li => li.textContent ?? '');
+    expect(items[0]).toContain('Заявка #11 · Одобрено');
+    expect(items[1]).toContain('Заявка #12 · На рассмотрении');
+    expect(items.join(' ')).not.toMatch(/APPROVED|PENDING/);
+  });
 });

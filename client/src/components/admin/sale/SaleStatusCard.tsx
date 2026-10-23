@@ -1,5 +1,6 @@
 import { formatDateTime } from '../../../utils/formatDate';
 import type { SaleStatus } from '../../../pages/admin/AdminSalePage';
+import { AUCTION_STATUS_LABELS, type AuctionStatus } from '../../../domain/auction';
 
 const STATUS_BADGE: Record<string, string> = {
   WAITING_FOR_PAYMENT: 'bg-amber-100 text-amber-700',
@@ -13,7 +14,7 @@ export function SaleStatusCard({ status }: { status: SaleStatus }) {
     <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 space-y-3">
       <div className="flex items-center justify-between">
         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_BADGE[status.auctionStatus] ?? 'bg-gray-100 text-gray-600'}`}>
-          {status.auctionStatus}
+          {AUCTION_STATUS_LABELS[status.auctionStatus as AuctionStatus] ?? status.auctionStatus}
         </span>
         {status.paymentDeadline && (
           <span className={`text-xs ${status.overdue ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
