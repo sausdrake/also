@@ -1,6 +1,8 @@
 // deposit/application/FreezeVsWithdrawConcurrencyPgIntegrationTest.java
 package com.example.autoauction.deposit.application;
 
+import com.example.autoauction.support.TestVehicles;
+import com.example.autoauction.vehicle.domain.port.VehicleRepository;
 import com.example.autoauction.auction.application.BidService;
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
@@ -66,6 +68,8 @@ import static org.mockito.Mockito.doAnswer;
 @DisplayName("D5-H: freezeForAuction vs withdraw — real-PostgreSQL concurrency proof")
 class FreezeVsWithdrawConcurrencyPgIntegrationTest extends AbstractPostgresIntegrationTest {
 
+    @Autowired private VehicleRepository vehicleRepository;
+
     @Autowired private BidService bidService;
     @Autowired private DepositService depositService;
     @Autowired private DepositRepository depositRepository;
@@ -103,7 +107,7 @@ class FreezeVsWithdrawConcurrencyPgIntegrationTest extends AbstractPostgresInteg
         OffsetDateTime now = OffsetDateTime.now();
         Long sellerId = 900_000L + (System.nanoTime() % 100_000L);
         Auction auction = new Auction(
-                Math.abs(System.nanoTime() % 1_000_000L),
+                TestVehicles.approved(vehicleRepository),
                 new BigDecimal("100000.00"), null, new BigDecimal("500000.00"),
                 new BigDecimal("1000.00"),
                 now.minusHours(1), now.plusDays(7),

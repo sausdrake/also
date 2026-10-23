@@ -407,6 +407,14 @@ public class AuctionFinalizer {
 
         log.info("Finalizing auction {} with Buy Now by user {}", auction.getId(), winnerId);
 
+        // BUYNOW-01: Buy Now happens before the start (CREATED), while the vehicle is still
+        // APPROVED. The sale that follows uses exactly the ordinary-win state machine
+        // (WAITING_FOR_PAYMENT -> SOLD / SALE_FAILED), whose Vehicle transitions all start from
+        // IN_AUCTION - so the vehicle enters IN_AUCTION here, atomically with this transition
+        // (same transaction; Vehicle.markInAuction fails closed unless APPROVED). Without it
+        // completeSale/resolveSaleFailure could never finish a Buy Now sale.
+        vehicleService.markInAuction(auction.getVehicleId());
+
         // Slice 1a: Buy Now no longer produces SOLD directly - it produces the same
         // payment-pending state as a normal auction win.
         auction.setStatus(AuctionStatus.WAITING_FOR_PAYMENT);
@@ -425,7 +433,9 @@ public class AuctionFinalizer {
         auctionRepository.save(auction);
         paymentDeadlineHistoryRepository.save(
                 PaymentDeadlineHistory.initial(auction.getId(), paymentDeadline, now()));
-        markWinnerSafely(winnerId, auction.getId());
+        // BUYNOW-01: same transaction as the buyer's freeze (see DepositService.markBuyNowWinner);
+        // never the swallowing markWinnerSafely - an unflagged freeze would strand the sale.
+        depositService.markBuyNowWinner(winnerId, auction.getId());
 
         List<Long> participants = participantRepository.getParticipants(auction.getId());
         for (Long participantId : participants) {

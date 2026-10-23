@@ -417,10 +417,13 @@ export const AuctionPage = () => {
       await axios.post(`${BASE_URL}/api/auctions/${id}/buy-now`, {}, { headers: authHeaders() });
       setKycRefusal(null);
       setTrustRefusal(null);
-      showMsg(`Поздравляем! Куплено за ${fmt(auction.buyNowPrice)} сом`, 'success');
+      showMsg(`Лот закреплён за вами по цене ${fmt(auction.buyNowPrice)} сом. Ожидается оплата: администратор свяжется с вами.`, 'success');
       fetchAuction();
     } catch (e) {
       const error = parseApiError(e, 'Ошибка при покупке');
+      // BUYNOW-01: a refusal usually means the screen is stale (already bought, already started) -
+      // reload the lot so the Buy Now button disappears instead of inviting another attempt.
+      fetchAuction();
       setKycRefusal(error.kind === 'kyc_required' ? { action: 'купить по цене Buy Now', message: error.message } : null);
       setTrustRefusal(error.kind === 'trusted_required' ? { action: 'купить по цене Buy Now' } : null);
       if (error.kind !== 'kyc_required' && error.kind !== 'trusted_required') showMsg(error.message, 'error');

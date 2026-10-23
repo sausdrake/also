@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -496,13 +497,35 @@ class DepositServiceTest {
         void markAsWinner_Success() {
             // given
             when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
-            doNothing().when(depositRepository).markFrozenAsWinner(depositId, auctionId);
+            when(depositRepository.markFrozenAsWinner(depositId, auctionId)).thenReturn(1);
 
             // when
             depositService.markAsWinner(userId, auctionId);
 
             // then
             verify(depositRepository, times(1)).markFrozenAsWinner(depositId, auctionId);
+        }
+
+        @Test
+        @DisplayName("BUYNOW-01: Buy Now winner flagged in the caller's transaction - exactly one freeze")
+        void markBuyNowWinner_FlagsTheFreeze() {
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
+            when(depositRepository.markFrozenAsWinner(depositId, auctionId)).thenReturn(1);
+
+            depositService.markBuyNowWinner(userId, auctionId);
+
+            verify(depositRepository, times(1)).markFrozenAsWinner(depositId, auctionId);
+        }
+
+        @Test
+        @DisplayName("BUYNOW-01: no freeze flagged -> fails closed (the Buy Now rolls back), never silently")
+        void markBuyNowWinner_NoFreeze_FailsClosed() {
+            when(depositRepository.findByUserId(userId)).thenReturn(Optional.of(depositWithBlocked));
+            when(depositRepository.markFrozenAsWinner(depositId, auctionId)).thenReturn(0);
+
+            assertThatThrownBy(() -> depositService.markBuyNowWinner(userId, auctionId))
+                    .isInstanceOf(IllegalStateException.class);
+            verifyNoInteractions(failedOperationService);
         }
 
         @Test

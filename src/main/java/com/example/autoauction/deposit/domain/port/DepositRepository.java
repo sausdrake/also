@@ -61,7 +61,8 @@ public interface DepositRepository {
     // НОВЫЕ МЕТОДЫ для работы с frozen deposits
     void freezeForAuction(Long depositId, Long auctionId, java.math.BigDecimal amount, FreezeReason reason);
     void unfreezeForAuction(Long depositId, Long auctionId);
-    void markFrozenAsWinner(Long depositId, Long auctionId);
+    /** @return the number of frozen rows flagged (0 when this deposit has no freeze for the auction) */
+    int markFrozenAsWinner(Long depositId, Long auctionId);
     List<FrozenDeposit> getFrozenDepositsByDepositId(Long depositId);
     List<FrozenDeposit> getFrozenDepositsByAuctionId(Long auctionId);
     boolean isFrozenForAuction(Long depositId, Long auctionId);

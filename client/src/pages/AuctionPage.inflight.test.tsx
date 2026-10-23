@@ -91,4 +91,22 @@ describe('FE-INFLIGHT-01: Buy Now', () => {
     expect(await screen.findByText('Аукцион уже завершён')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('button', { name: /Купить сейчас за/ })).toBeEnabled());
   });
+
+  it('BUYNOW-01: a refusal reloads the lot - bought by someone else, the stale Buy Now button disappears', async () => {
+    const post = pendingPost();
+    await renderLot('CREATED', { buyNowPrice: 2000000 });
+    axiosGet.mockImplementation((url: unknown) => String(url).includes('/api/public/auctions/1')
+      ? Promise.resolve({ data: lot('WAITING_FOR_PAYMENT', { buyNowPrice: 2000000 }) }) : Promise.resolve({ data: {} }));
+    fireEvent.click(screen.getByRole('button', { name: /Купить сейчас за/ }));
+    post.reject(httpError(409, 'Buy Now доступен только для аукционов в статусе CREATED. Текущий статус: WAITING_FOR_PAYMENT'));
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Купить сейчас за/ })).not.toBeInTheDocument());
+  });
+
+  it('BUYNOW-01: success says the lot is reserved and payment is awaited - not that it is paid', async () => {
+    const post = pendingPost();
+    await renderLot('CREATED', { buyNowPrice: 2000000 });
+    fireEvent.click(screen.getByRole('button', { name: /Купить сейчас за/ }));
+    post.resolve({ data: {} });
+    expect(await screen.findByText(/Ожидается оплата/)).toBeInTheDocument();
+  });
 });

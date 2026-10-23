@@ -580,7 +580,7 @@ class AuctionFinalizerTest {
             when(participantRepository.getParticipants(auctionId)).thenReturn(List.of(winnerId, loserId));
             // Исправлено: правильные параметры для мока
             doNothing().when(depositService).unfreezeForAuction(eq(loserId), eq(auctionId));
-            doNothing().when(depositService).markAsWinner(eq(winnerId), eq(auctionId));
+            doNothing().when(depositService).markBuyNowWinner(eq(winnerId), eq(auctionId));
             when(auctionRepository.save(any(Auction.class))).thenAnswer(inv -> inv.getArgument(0));
             doNothing().when(participantRepository).clearParticipants(auctionId);
             OffsetDateTime deadline = fixedTime.plusDays(1);
@@ -596,7 +596,10 @@ class AuctionFinalizerTest {
             assertThat(activeAuction.getWinningBid()).isEqualTo(buyNowAmount);
             assertThat(activeAuction.getPaymentDeadline()).isEqualTo(deadline);
 
-            verify(depositService, times(1)).markAsWinner(winnerId, auctionId);
+            verify(depositService, times(1)).markBuyNowWinner(winnerId, auctionId);
+            // BUYNOW-01: the vehicle enters IN_AUCTION with the Buy Now, so the sale can complete or fail
+            verify(vehicleService, times(1)).markInAuction(activeAuction.getVehicleId());
+            verify(depositService, never()).markAsWinner(anyLong(), anyLong());
             verify(depositService, times(1)).unfreezeForAuction(eq(loserId), eq(auctionId));
             verify(participantRepository, times(1)).clearParticipants(auctionId);
             verify(paymentDeadlineHistoryRepository, times(1)).save(argThat(h ->

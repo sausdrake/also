@@ -1,6 +1,8 @@
 // integration/AuctionFlowIntegrationTest.java
 package com.example.autoauction.integration;
 
+import com.example.autoauction.support.TestVehicles;
+import com.example.autoauction.vehicle.domain.port.VehicleRepository;
 import com.example.autoauction.auction.application.BidService;
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
@@ -35,6 +37,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @Transactional
 @DisplayName("Интеграционные тесты аукциона")
 class AuctionFlowIntegrationTest {
+
+    @Autowired
+
+    private VehicleRepository vehicleRepository;
+
 
     @Autowired
     private AuctionRepository auctionRepository;
@@ -168,7 +175,7 @@ class AuctionFlowIntegrationTest {
         // Создаём аукцион, который ещё не стартовал
         OffsetDateTime futureStart = OffsetDateTime.now().plusDays(1);
         Auction notStartedAuction = new Auction(
-                100L,
+                TestVehicles.approved(vehicleRepository),
                 new BigDecimal("1000000"),
                 new BigDecimal("1200000"),
                 new BigDecimal("1500000"),

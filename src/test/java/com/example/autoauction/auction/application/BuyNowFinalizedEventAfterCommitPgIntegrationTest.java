@@ -1,6 +1,8 @@
 // auction/application/BuyNowFinalizedEventAfterCommitPgIntegrationTest.java
 package com.example.autoauction.auction.application;
 
+import com.example.autoauction.support.TestVehicles;
+import com.example.autoauction.vehicle.domain.port.VehicleRepository;
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
@@ -58,6 +60,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 @DisplayName("MVP-002: BuyNowFinalizedEvent AFTER_COMMIT — exactly-once side effects, and a genuine rollback suppresses them")
 class BuyNowFinalizedEventAfterCommitPgIntegrationTest extends AbstractPostgresIntegrationTest {
 
+    @Autowired private VehicleRepository vehicleRepository;
+
     @Autowired private BidService bidService;
     @Autowired private DepositService depositService;
     @Autowired private AuctionRepository auctionRepository;
@@ -100,7 +104,7 @@ class BuyNowFinalizedEventAfterCommitPgIntegrationTest extends AbstractPostgresI
         OffsetDateTime now = OffsetDateTime.now();
         Long sellerId = newSeller();
         Auction auction = new Auction(
-                Math.abs(System.nanoTime() % 1_000_000L),
+                TestVehicles.approved(vehicleRepository),
                 STARTING_PRICE, null, BUY_NOW_PRICE, MIN_BID_STEP,
                 now.minusHours(1), now.plusDays(7),
                 sellerId);

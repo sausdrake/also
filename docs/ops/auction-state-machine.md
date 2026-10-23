@@ -64,3 +64,36 @@ the auction status (`auctions`), the violation decision and its per-violation pe
   charged when ordered, its commitment carries the configured fee under the usual outcomes).
 
 Tests: `NoSaleCycleE2EPgIntegrationTest` (PostgreSQL, API, concurrent admins, repair, re-list).
+
+## Buy Now (BUYNOW-01)
+
+Offered only while the auction is `CREATED` (before the start) and only when `buyNowPrice` is set.
+The buyer pays the buyer-facing price (seller's Buy Now price + the auction's policy commission);
+the seller's settlement is the seller's own Buy Now price.
+
+```
+CREATED ──Buy Now (verified, trusted, not the seller)──▶ WAITING_FOR_PAYMENT ──payment + handover + complete──▶ SOLD
+                                                              └──fail (B / BUYER_FAULT / PLATFORM_FAULT / C)──▶ SALE_FAILED
+```
+
+In one transaction under the auction row lock: the buyer's participation deposit is frozen and
+flagged as the winner's, the vehicle goes `APPROVED → IN_AUCTION`, the auction becomes
+`WAITING_FOR_PAYMENT` with `saleFinalizationMethod = BUY_NOW` and the initial payment deadline.
+From there it is exactly the ordinary sale: manual payment and handover evidence recorded by an
+admin (no bank integration, BANK-EPIC), completion releases the buyer's deposit and returns the
+seller's guarantee (A) and creates the settlement; a failure withholds the deposit once for the
+buyer's fault, otherwise releases it.
+
+* Concurrency: two buyers, or a buyer and a bid / start / cancel, serialise on the row lock; the
+  first wins, the others get 409 and nothing of theirs is frozen.
+* Repeated call / stale screen: any status other than `CREATED` is 409; the page reloads the lot
+  after a refusal so the button disappears.
+* Timeout: the sale shows `paymentDeadline` / `overdue`; the admin extends the deadline or resolves
+  the sale as failed (`BUYER_FAULT` withholds the deposit). Nothing happens automatically on
+  expiry — the same rule as for an ordinary win.
+* Fixed defects: the vehicle never entered `IN_AUCTION` (completion and failure both threw), and
+  the winner flag was set in a separate transaction that could not see the just-created freeze
+  (completion and failure: "winner freeze not found").
+
+Tests: `BuyNowCycleE2EPgIntegrationTest` (PostgreSQL, API: sold, concurrent buyers, buyer fault
+with two admins, platform fault after payment, gates).

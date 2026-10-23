@@ -1,5 +1,7 @@
 package com.example.autoauction.auction.application;
 
+import com.example.autoauction.support.TestVehicles;
+import com.example.autoauction.vehicle.domain.port.VehicleRepository;
 import com.example.autoauction.auction.domain.Auction;
 import com.example.autoauction.auction.domain.AuctionStatus;
 import com.example.autoauction.auction.domain.port.AuctionRepository;
@@ -36,6 +38,8 @@ import static org.mockito.Mockito.reset;
  */
 @DisplayName("Slice 1B: WAITING_FOR_PAYMENT + paymentDeadline + INITIAL history atomicity (real PostgreSQL rollback proof)")
 class PaymentDeadlineAtomicityPgIntegrationTest extends AbstractPostgresIntegrationTest {
+
+    @Autowired private VehicleRepository vehicleRepository;
 
     @Autowired private AuctionFinalizer auctionFinalizer;
     @Autowired private AuctionRepository auctionRepository;
@@ -130,7 +134,7 @@ class PaymentDeadlineAtomicityPgIntegrationTest extends AbstractPostgresIntegrat
     void finalizeWithBuyNow_HistorySaveFails_RollsBackAuctionUpdateToo() {
         Long winnerId = newRealWinnerId();
         OffsetDateTime now = OffsetDateTime.now();
-        Auction auction = new Auction(2L, new BigDecimal("1000000"), null, new BigDecimal("1500000"),
+        Auction auction = new Auction(TestVehicles.approved(vehicleRepository), new BigDecimal("1000000"), null, new BigDecimal("1500000"),
                 new BigDecimal("10000"), now.minusHours(2), now.plusHours(2), 10L);
         auction.setStatus(AuctionStatus.ACTIVE);
         Long auctionId = auctionRepository.save(auction).getId();

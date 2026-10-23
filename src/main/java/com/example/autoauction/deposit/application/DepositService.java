@@ -282,6 +282,24 @@ public class DepositService {
      * timeouts) remain possible and would carry the same risk. Isolating this in its own
      * transaction is the same fix for the same reason, not a blind copy.
      */
+    /**
+     * BUYNOW-01: flags the Buy Now buyer's freeze as the winner's, inside the CALLER's
+     * transaction (REQUIRED). Buy Now freezes the deposit in that same, still-uncommitted
+     * transaction, so {@link #markAsWinner}'s REQUIRES_NEW transaction cannot see the row and
+     * silently flags nothing - which left every Buy Now sale unable to complete or fail ("winner
+     * freeze not found"). Fails closed: no flagged row means the whole Buy Now rolls back.
+     */
+    @Transactional
+    public void markBuyNowWinner(Long userId, Long auctionId) {
+        Deposit deposit = depositRepository.findByUserId(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Депозит не найден для пользователя: " + userId));
+        if (depositRepository.markFrozenAsWinner(deposit.getId(), auctionId) != 1) {
+            throw new IllegalStateException("Заморозка покупателя для аукциона " + auctionId
+                    + " не найдена - покупка по цене Buy Now отменена");
+        }
+        log.info("User {} marked as Buy Now winner of auction {}", userId, auctionId);
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markAsWinner(Long userId, Long auctionId) {
         log.info("Marking user: {} as winner of auction: {}", userId, auctionId);

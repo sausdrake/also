@@ -154,9 +154,10 @@ public class JpaDepositRepositoryAdapter implements DepositRepository {
     }
 
     @Override
-    public void markFrozenAsWinner(Long depositId, Long auctionId) {
+    public int markFrozenAsWinner(Long depositId, Long auctionId) {
         int updated = frozenJpaRepository.markAsWinner(depositId, auctionId);
         log.debug("Marked deposit {} as winner for auction {} (rows updated: {})", depositId, auctionId, updated);
+        return updated;
     }
 
     @Override
