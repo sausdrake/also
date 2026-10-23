@@ -494,13 +494,16 @@ export const AuctionPage = () => {
                     alt=""
                     className="w-full h-full object-cover hover:opacity-95 transition-opacity cursor-zoom-in"
                   />
-                  <div className="absolute top-3 right-3">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                      isConnected ? 'bg-green-500/90 text-white' : 'bg-gray-500/70 text-white'
-                    }`}>
-                      {isConnected ? '● Live' : '○ Офлайн'}
-                    </span>
-                  </div>
+                  {/* the live-connection indicator belongs to a running lot only; a finished one has nothing live */}
+                  {!isCompleted && (
+                    <div className="absolute top-3 right-3">
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                        isConnected ? 'bg-green-500/90 text-white' : 'bg-gray-500/70 text-white'
+                      }`}>
+                        {isConnected ? '● Live' : '○ Офлайн'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </button>
               {photos.length > 1 && (

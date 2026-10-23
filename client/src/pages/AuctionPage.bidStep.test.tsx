@@ -110,3 +110,22 @@ describe('AUCTION-01: minimum next bid on the lot page', () => {
     expect(bidInput().value).toBe('125.93');
   });
 });
+
+describe('live-connection indicator', () => {
+  it('a running lot shows the live indicator', async () => {
+    current = lot({ mainPhotoUrl: 'http://media.test/lot.jpg' });
+    await renderLot();
+    expect(screen.getByText('● Live')).toBeInTheDocument();
+  });
+
+  it.each(['SOLD', 'WAITING_FOR_PAYMENT', 'EXPIRED', 'CANCELLED', 'SALE_FAILED'])('a %s lot does not claim to be live', async (status) => {
+    current = lot({ status, mainPhotoUrl: 'http://media.test/lot.jpg' });
+    axiosGet.mockImplementation((url: unknown) => String(url).includes('/api/public/auctions/1')
+      ? Promise.resolve({ data: current }) : Promise.resolve({ data: {} }));
+    const router = createMemoryRouter([{ path: '/auction/:id', element: <AuctionPage /> }], { initialEntries: ['/auction/1'] });
+    render(<RouterProvider router={router} />);
+    await screen.findAllByText(/BMW X5 2020/);
+    expect(screen.queryByText('● Live')).not.toBeInTheDocument();
+    expect(screen.queryByText('○ Офлайн')).not.toBeInTheDocument();
+  });
+});
