@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ACCEPTANCE_VERB, LEGAL_SLUGS, type LegalDocument } from '../domain/legal';
 import axios from 'axios';
 import { apiErrorMessage } from '../api/errors';
 import { TelegramLoginButton } from '../components/auth/TelegramLoginButton';
@@ -11,7 +12,17 @@ export const RegisterPage = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // LEGAL-DATA-01: the versions in force that must be accepted to register (none while nothing is in force)
+  const [requiredDocs, setRequiredDocs] = useState<LegalDocument[]>([]);
+  const [accepted, setAccepted] = useState<Record<number, boolean>>({});
   const navigate = useNavigate();
+
+  useEffect(() => {
+    Promise.resolve(axios.get<LegalDocument[]>(`${import.meta.env.VITE_API_URL || 'http://localhost:8081'}/api/v1/public/legal/documents`))
+      .then(r => setRequiredDocs((Array.isArray(r?.data) ? r.data : [])
+        .filter(d => d.acceptanceKind === 'ACCEPTANCE' || d.acceptanceKind === 'ACKNOWLEDGEMENT')))
+      .catch(() => setRequiredDocs([]));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,11 +41,18 @@ export const RegisterPage = () => {
       return;
     }
 
+    if (requiredDocs.some(d => !accepted[d.id])) {
+      setError('Отметьте документы платформы, чтобы зарегистрироваться');
+      setLoading(false);
+      return;
+    }
+
     try {
       await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:8081'}/api/auth/register`, {
         username,
         email,
-        password
+        password,
+        acceptedDocumentVersionIds: requiredDocs.map(d => d.id),
       });
       
       // После регистрации перенаправляем на логин
@@ -105,6 +123,22 @@ export const RegisterPage = () => {
               />
             </div>
           </div>
+
+          {requiredDocs.length > 0 && (
+            <div className="space-y-2">
+              {requiredDocs.map(d => (
+                <label key={d.id} className="flex items-start gap-2 text-sm text-gray-700">
+                  <input type="checkbox" className="mt-0.5" checked={!!accepted[d.id]}
+                    onChange={e => setAccepted(a => ({ ...a, [d.id]: e.target.checked }))} />
+                  <span>
+                    {ACCEPTANCE_VERB[d.acceptanceKind]}:{' '}
+                    <Link to={`/legal/${LEGAL_SLUGS[d.documentType]}`} target="_blank" className="text-blue-600 underline">{d.title}</Link>
+                    {' '}<span className="text-gray-400">(редакция {d.version})</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
 
           {error && (
             <div role="alert" className="text-red-500 text-sm text-center">{error}</div>

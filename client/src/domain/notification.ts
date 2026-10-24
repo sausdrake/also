@@ -9,6 +9,7 @@ export const NOTIFICATION_TYPES = [
   'AUCTION_ENDED', 'AUCTION_COMPLETED', 'AUCTION_CANCELLED',
   'DEPOSIT_FROZEN', 'DEPOSIT_UNFROZEN', 'DEPOSIT_RELEASED',
   'DIAG_ACCEPTED', 'DIAG_REPORT_SUBMITTED', 'DIAG_REPORT_APPROVED', 'DIAG_REPORT_REJECTED', 'DIAG_REDIAGNOSTIC_ORDERED',
+  'PRIVACY_REQUEST_ANSWERED',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -35,6 +36,7 @@ const CATEGORY: Record<NotificationType, NotificationCategory> = {
   DEPOSIT_FROZEN: 'DEPOSITS', DEPOSIT_UNFROZEN: 'DEPOSITS', DEPOSIT_RELEASED: 'DEPOSITS',
   DIAG_ACCEPTED: 'DIAGNOSTIC', DIAG_REPORT_SUBMITTED: 'DIAGNOSTIC', DIAG_REPORT_APPROVED: 'DIAGNOSTIC',
   DIAG_REPORT_REJECTED: 'DIAGNOSTIC', DIAG_REDIAGNOSTIC_ORDERED: 'DIAGNOSTIC',
+  PRIVACY_REQUEST_ANSWERED: 'SYSTEM',
 };
 
 export const notificationCategory = (n: Pick<UserNotification, 'type'>): NotificationCategory =>
@@ -60,7 +62,8 @@ export function notificationLink(n: Pick<UserNotification, 'type' | 'referenceId
       if (n.type === 'DIAG_REPORT_REJECTED') return '/diagnostic/reports';
       return '/profile/requests';
     default:
-      return null;
+      // PRIVACY-REQ-01: the answer is read in the profile's data tab
+      return n.type === 'PRIVACY_REQUEST_ANSWERED' ? '/profile/privacy' : null;
   }
 }
 

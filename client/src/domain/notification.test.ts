@@ -23,8 +23,16 @@ describe('FE-NOTIF-01: deep links follow the recipient fixed by the type', () =>
     for (const t of ['DEPOSIT_FROZEN', 'DEPOSIT_UNFROZEN', 'DEPOSIT_RELEASED']) expect(notificationLink(n(t, null, null))).toBe('/profile');
   });
 
-  it('every known type has a category other than SYSTEM', () => {
-    for (const t of NOTIFICATION_TYPES) expect(notificationCategory({ type: t })).not.toBe('SYSTEM');
+  it('every known type has a category other than SYSTEM (except the account-level privacy answer)', () => {
+    for (const t of NOTIFICATION_TYPES) {
+      if (t === 'PRIVACY_REQUEST_ANSWERED') continue;
+      expect(notificationCategory({ type: t })).not.toBe('SYSTEM');
+    }
+  });
+
+  it('PRIVACY-REQ-01: the answer to a data request is a system message leading to the profile data tab', () => {
+    expect(notificationCategory({ type: 'PRIVACY_REQUEST_ANSWERED' })).toBe('SYSTEM');
+    expect(notificationLink(n('PRIVACY_REQUEST_ANSWERED', 3, 'PRIVACY_REQUEST'))).toBe('/profile/privacy');
   });
 });
 

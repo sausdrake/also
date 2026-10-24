@@ -3,6 +3,9 @@ package com.example.autoauction.auth.web;
 import com.example.autoauction.auction.application.RateLimitException;
 import com.example.autoauction.auth.application.AuthRateLimitService;
 import com.example.autoauction.auth.application.AuthService;
+import com.example.autoauction.legal.application.LegalAcceptanceService;
+import com.example.autoauction.legal.domain.AcceptanceSource;
+import com.example.autoauction.user.domain.port.UserRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,10 +25,15 @@ public class AuthController {
 
     private final AuthService authService;
     private final AuthRateLimitService authRateLimitService;
+    private final LegalAcceptanceService legalAcceptanceService;
+    private final UserRepository userRepository;
 
-    public AuthController(AuthService authService, AuthRateLimitService authRateLimitService) {
+    public AuthController(AuthService authService, AuthRateLimitService authRateLimitService,
+                          LegalAcceptanceService legalAcceptanceService, UserRepository userRepository) {
         this.authService = authService;
         this.authRateLimitService = authRateLimitService;
+        this.legalAcceptanceService = legalAcceptanceService;
+        this.userRepository = userRepository;
     }
 
     @PostMapping("/register")
@@ -38,6 +46,9 @@ public class AuthController {
             throw new RateLimitException("Слишком много попыток регистрации. Попробуйте позже.");
         }
         log.info("Registration request for username: {}", request.username());
+        // LEGAL-DATA-01: every required document version in force must be ticked - checked before anything is
+        // written; while nothing is in force nothing is required.
+        legalAcceptanceService.requireAllRequiredIn(request.acceptedDocumentVersionIds());
         AuthService.AuthResponse response = authService.register(
                 new AuthService.RegisterRequest(
                         request.username(),
@@ -45,6 +56,13 @@ public class AuthController {
                         request.password()
                 )
         );
+        if (request.acceptedDocumentVersionIds() != null && !request.acceptedDocumentVersionIds().isEmpty()) {
+            // Recorded right after the account exists. Should this fail, the account is not lost: the next sign-in
+            // asks for the same acceptance (re-acceptance gate) before any protected operation.
+            userRepository.findByUsername(request.username()).ifPresent(u -> legalAcceptanceService.accept(
+                    u.getId(), request.acceptedDocumentVersionIds(), AcceptanceSource.REGISTRATION,
+                    httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent")));
+        }
         log.info("User registered successfully: {}", request.username());
         return ResponseEntity.ok(response);
     }
@@ -94,7 +112,9 @@ public class AuthController {
     public record RegisterRequest(
             @NotBlank @Size(min = 3, max = 50) String username,
             @NotBlank @Email String email,
-            @NotBlank @Size(min = 6, max = 255) String password
+            @NotBlank @Size(min = 6, max = 255) String password,
+            /** LEGAL-DATA-01: ids of the document versions in force the user ticked (optional). */
+            @Size(max = 20) java.util.List<Long> acceptedDocumentVersionIds
     ) {}
 
     public record LoginRequest(

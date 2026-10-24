@@ -8,6 +8,7 @@ import com.example.autoauction.auth.application.RegistrationConflictException;
 import com.example.autoauction.auth.application.TelegramAuthException;
 import com.example.autoauction.deposit.domain.InsufficientFundsException;
 import com.example.autoauction.identity.application.IdentityVerificationRequiredException;
+import com.example.autoauction.legal.application.LegalAcceptanceRequiredException;
 import com.example.autoauction.policy.application.PolicyConflictException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -217,6 +218,18 @@ public class GlobalExceptionHandler {
 
     // MVP-004: KYC gate refusal - 403 with a stable machine-readable code so clients can route
     // the user to identity verification instead of showing a generic "forbidden".
+    @ExceptionHandler(LegalAcceptanceRequiredException.class)
+    public ResponseEntity<Map<String, Object>> handleLegalAcceptanceRequired(LegalAcceptanceRequiredException e) {
+        log.warn("Legal acceptance required: {}", e.getCode());
+        Map<String, Object> error = new HashMap<>();
+        error.put("timestamp", java.time.LocalDateTime.now().toString());
+        error.put("status", HttpStatus.FORBIDDEN.value());
+        error.put("error", "Forbidden");
+        error.put("code", e.getCode());
+        error.put("message", e.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
+
     @ExceptionHandler(IdentityVerificationRequiredException.class)
     public ResponseEntity<Map<String, Object>> handleIdentityVerificationRequired(IdentityVerificationRequiredException e) {
         log.warn("Identity verification required: {}", e.getCode());

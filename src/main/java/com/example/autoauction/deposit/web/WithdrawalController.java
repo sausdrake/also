@@ -6,6 +6,7 @@ import com.example.autoauction.deposit.application.WithdrawalRequestService;
 import com.example.autoauction.deposit.web.dto.WithdrawRequest;
 import com.example.autoauction.deposit.web.dto.WithdrawalRequestResponse;
 import com.example.autoauction.identity.application.VerifiedIdentityGate;
+import com.example.autoauction.legal.application.LegalAcceptanceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,11 +32,14 @@ public class WithdrawalController {
 
     private final WithdrawalRequestService withdrawalRequestService;
     private final VerifiedIdentityGate verifiedIdentityGate;
+    private final LegalAcceptanceService legalAcceptanceService;
 
     public WithdrawalController(WithdrawalRequestService withdrawalRequestService,
-                                VerifiedIdentityGate verifiedIdentityGate) {
+                                VerifiedIdentityGate verifiedIdentityGate,
+                                LegalAcceptanceService legalAcceptanceService) {
         this.withdrawalRequestService = withdrawalRequestService;
         this.verifiedIdentityGate = verifiedIdentityGate;
+        this.legalAcceptanceService = legalAcceptanceService;
     }
 
     @PostMapping
@@ -44,6 +48,7 @@ public class WithdrawalController {
                                             @Parameter(hidden = true) @CurrentUser UserPrincipal currentUser) {
         Long userId = currentUser.getUserId();
         verifiedIdentityGate.requireVerified(userId);
+        legalAcceptanceService.requireCurrent(userId);   // LEGAL-DATA-01
         return WithdrawalRequestResponse.forOwner(
                 withdrawalRequestService.create(userId, request.amount(), request.idempotencyKey()));
     }

@@ -6,6 +6,7 @@ import com.example.autoauction.auction.web.dto.BidResponse;
 import com.example.autoauction.auth.domain.UserPrincipal;
 import com.example.autoauction.auth.infrastructure.security.CurrentUser;
 import com.example.autoauction.identity.application.VerifiedIdentityGate;
+import com.example.autoauction.legal.application.LegalAcceptanceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,8 +23,11 @@ public class BidController {
 
     private final BidService bidService;
     private final VerifiedIdentityGate verifiedIdentityGate;
+    private final LegalAcceptanceService legalAcceptanceService;
 
-    public BidController(BidService bidService, VerifiedIdentityGate verifiedIdentityGate) {
+    public BidController(BidService bidService, VerifiedIdentityGate verifiedIdentityGate,
+                         LegalAcceptanceService legalAcceptanceService) {
+        this.legalAcceptanceService = legalAcceptanceService;
         this.bidService = bidService;
         this.verifiedIdentityGate = verifiedIdentityGate;
     }
@@ -40,6 +44,7 @@ public class BidController {
         Long bidderId = currentUser.getUserId();
         log.info("User {} placing bid on auction {}", bidderId, auctionId);
         verifiedIdentityGate.requireVerified(bidderId);
+        legalAcceptanceService.requireCurrent(bidderId);   // LEGAL-DATA-01
 
         BidResponse response = bidService.placeBid(auctionId, request.amount(), bidderId);
         return ResponseEntity.ok(response);
@@ -56,6 +61,7 @@ public class BidController {
         Long buyerId = currentUser.getUserId();
         log.info("User {} buying auction {} via Buy Now", buyerId, auctionId);
         verifiedIdentityGate.requireVerified(buyerId);
+        legalAcceptanceService.requireCurrent(buyerId);   // LEGAL-DATA-01
 
         BidResponse response = bidService.buyNow(auctionId, buyerId);
         return ResponseEntity.ok(response);

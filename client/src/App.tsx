@@ -9,6 +9,9 @@ import { ForbiddenPage } from './pages/ForbiddenPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RouteBoundary } from './components/RouteBoundary';
+import { SiteFooter } from './components/layout/SiteFooter';
+import { LegalAcceptanceGate } from './components/legal/LegalAcceptanceGate';
+import { LegalDocumentPage } from './pages/LegalDocumentPage';
 
 // FE-04: the five feature areas load on first visit, each in its own chunk. The landing page, the
 // sign-in pages and the error pages stay in the initial bundle - they must work even when a chunk
@@ -45,6 +48,8 @@ function AppContent() {
           {/* Публичная лента */}
           <Route path="/" element={<HomePage />} />
           <Route path="/auction/:id" element={<AuctionPage />} />
+          {/* LEGAL-DATA-01: documents in force */}
+          <Route path="/legal/:slug" element={<LegalDocumentPage />} />
 
           {/* Защищённые маршруты */}
           <Route path="/change-password" element={
@@ -76,6 +81,8 @@ function AppContent() {
         </Routes>
         </RouteBoundary>
       </main>
+      {!hideHeader && <SiteFooter />}
+      {!hideHeader && <LegalAcceptanceGate />}
     </div>
   );
 }

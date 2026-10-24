@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { PrivacyTab } from './profile/PrivacyTab';
 import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import * as subscriptions from '../api/subscriptions';
@@ -916,6 +917,7 @@ const USER_TABS = [
   { path: 'requests', label: 'Заявки' },
   { path: 'watched', label: 'Отслеживаемые' },
   { path: 'identity', label: 'Подтверждение личности' },
+  { path: 'privacy', label: 'Документы и данные' },
   { path: 'settings', label: 'Профиль' },
 ];
 
@@ -965,6 +967,7 @@ export function ProfilePage() {
             <Route path="requests" element={<RequestsTab />} />
             <Route path="watched" element={<WatchedTab />} />
             <Route path="identity" element={<IdentityVerificationTab />} />
+            <Route path="privacy" element={<PrivacyTab />} />
             <Route path="settings" element={<ProfileTab />} />
           </>
         )}

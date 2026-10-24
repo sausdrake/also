@@ -47,6 +47,10 @@ class DiagnosticRequestAccessControlTest {
     @MockBean
     private com.example.autoauction.identity.application.VerifiedIdentityGate verifiedIdentityGate;
 
+    // LEGAL-DATA-01: the acceptance gate next to the KYC gate (not exercised by these GET tests)
+    @MockBean
+    private com.example.autoauction.legal.application.LegalAcceptanceService legalAcceptanceService;
+
     @MockBean
     private JwtService jwtService;
 

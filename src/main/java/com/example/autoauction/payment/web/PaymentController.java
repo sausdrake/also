@@ -3,6 +3,7 @@ package com.example.autoauction.payment.web;
 import com.example.autoauction.auth.domain.UserPrincipal;
 import com.example.autoauction.auth.infrastructure.security.CurrentUser;
 import com.example.autoauction.identity.application.VerifiedIdentityGate;
+import com.example.autoauction.legal.application.LegalAcceptanceService;
 import com.example.autoauction.payment.application.PaymentCreationOrchestrator;
 import com.example.autoauction.payment.application.PaymentCreationView;
 import com.example.autoauction.payment.web.dto.CreatePaymentRequest;
@@ -34,11 +35,14 @@ public class PaymentController {
 
     private final PaymentCreationOrchestrator paymentCreationOrchestrator;
     private final VerifiedIdentityGate verifiedIdentityGate;
+    private final LegalAcceptanceService legalAcceptanceService;
 
     public PaymentController(PaymentCreationOrchestrator paymentCreationOrchestrator,
-                             VerifiedIdentityGate verifiedIdentityGate) {
+                             VerifiedIdentityGate verifiedIdentityGate,
+                             LegalAcceptanceService legalAcceptanceService) {
         this.paymentCreationOrchestrator = paymentCreationOrchestrator;
         this.verifiedIdentityGate = verifiedIdentityGate;
+        this.legalAcceptanceService = legalAcceptanceService;
         log.info("PaymentController initialized");
     }
 
@@ -52,6 +56,7 @@ public class PaymentController {
         Long userId = currentUser.getUserId();
         log.info("User {} creating payment: amount={}", userId, request.amount());
         verifiedIdentityGate.requireVerified(userId);
+        legalAcceptanceService.requireCurrent(userId);   // LEGAL-DATA-01
 
         PaymentCreationView view = paymentCreationOrchestrator.createPayment(
                 userId, request.amount(), request.idempotencyKey());

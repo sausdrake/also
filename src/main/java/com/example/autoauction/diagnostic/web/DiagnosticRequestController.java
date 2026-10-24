@@ -6,6 +6,7 @@ import com.example.autoauction.diagnostic.application.DiagnosticRequestService;
 import com.example.autoauction.diagnostic.web.dto.CreateDiagnosticRequest;
 import com.example.autoauction.diagnostic.web.dto.DiagnosticRequestResponse;
 import com.example.autoauction.identity.application.VerifiedIdentityGate;
+import com.example.autoauction.legal.application.LegalAcceptanceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,6 +29,7 @@ public class DiagnosticRequestController {
 
     private final DiagnosticRequestService requestService;
     private final VerifiedIdentityGate verifiedIdentityGate;
+    private final LegalAcceptanceService legalAcceptanceService;
 
     /**
      * Создать заявку на диагностику (покупатель)
@@ -41,6 +43,7 @@ public class DiagnosticRequestController {
     ) {
         log.info("POST /api/diagnostic-requests - user: {}", currentUser.getUserId());
         verifiedIdentityGate.requireVerified(currentUser.getUserId());
+        legalAcceptanceService.requireCurrent(currentUser.getUserId());   // LEGAL-DATA-01
         DiagnosticRequestResponse response = requestService.createRequest(request, currentUser.getUserId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
