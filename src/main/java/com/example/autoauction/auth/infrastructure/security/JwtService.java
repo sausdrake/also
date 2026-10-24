@@ -18,6 +18,17 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
+    /**
+     * JWT-TYPE-01: access and refresh tokens are signed with the same key, so before this claim a refresh
+     * token (7 days) was accepted as a Bearer access token (24 h) on every protected endpoint - and kept
+     * working after logout, since logout only revokes the refresh token's database row. Every token now
+     * names its type; only {@value #ACCESS} authenticates API and WebSocket requests. Tokens issued before
+     * the claim existed carry no type and are refused (users sign in again once).
+     */
+    static final String TOKEN_TYPE_CLAIM = "token_type";
+    static final String ACCESS = "access";
+    static final String REFRESH = "refresh";
+
     @Value("${jwt.secret}")
     private String secretKey;
 
@@ -41,11 +52,15 @@ public class JwtService {
     }
 
     public String generateToken(Map<String, Object> extraClaims, UserDetails userDetails) {
-        return buildToken(extraClaims, userDetails, jwtExpiration);
+        Map<String, Object> claims = new HashMap<>(extraClaims);
+        claims.put(TOKEN_TYPE_CLAIM, ACCESS);
+        return buildToken(claims, userDetails, jwtExpiration);
     }
 
     public String generateRefreshToken(UserDetails userDetails) {
-        return buildToken(new HashMap<>(), userDetails, refreshExpiration);
+        Map<String, Object> claims = new HashMap<>();
+        claims.put(TOKEN_TYPE_CLAIM, REFRESH);
+        return buildToken(claims, userDetails, refreshExpiration);
     }
 
     private String buildToken(Map<String, Object> extraClaims, UserDetails userDetails, long expiration) {
@@ -63,17 +78,12 @@ public class JwtService {
                 .compact();
     }
 
+    /** An ACCESS token of this user that has not expired - the only kind that authenticates a request. */
     public boolean isTokenValid(String token, UserDetails userDetails) {
-        final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
-    }
-
-    private boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
-    }
-
-    private Date extractExpiration(String token) {
-        return extractClaim(token, Claims::getExpiration);
+        final Claims claims = extractAllClaims(token);
+        return userDetails.getUsername().equals(claims.getSubject())
+                && claims.getExpiration() != null && claims.getExpiration().after(new Date())
+                && ACCESS.equals(claims.get(TOKEN_TYPE_CLAIM, String.class));
     }
 
     private Claims extractAllClaims(String token) {

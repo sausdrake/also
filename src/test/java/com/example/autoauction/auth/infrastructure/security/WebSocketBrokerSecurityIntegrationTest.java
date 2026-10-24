@@ -220,6 +220,26 @@ class WebSocketBrokerSecurityIntegrationTest {
     }
 
     @Test
+    @DisplayName("JWT-TYPE-01: CONNECT with a refresh token is refused")
+    void connectWithRefreshTokenRefused() {
+        Role role = roleRepository.findByName("ROLE_USER")
+                .orElseGet(() -> roleRepository.save(new Role(null, "ROLE_USER", "USER")));
+        String name = "wsr" + System.nanoTime();
+        userRepository.save(new User(null, name, name + "@t.test", "x", true, Set.of(role)));
+        String refresh = jwtService.generateRefreshToken(userDetailsService.loadUserByUsername(name));
+        List<Throwable> errors = new CopyOnWriteArrayList<>();
+        boolean connected;
+        try {
+            StompSession s = connect(refresh, errors);
+            awaitClosed(s);
+            connected = s.isConnected() && errors.isEmpty();
+        } catch (Exception refused) {
+            connected = false;
+        }
+        assertThat(connected).isFalse();
+    }
+
+    @Test
     @DisplayName("CONNECT without a valid access token is refused")
     void connectWithoutTokenRefused() {
         for (String token : new String[]{null, "not.a.jwt"}) {
