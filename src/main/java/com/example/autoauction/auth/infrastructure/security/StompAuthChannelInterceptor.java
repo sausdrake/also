@@ -13,6 +13,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 
 import java.security.Principal;
+import java.util.regex.Pattern;
 
 @Component
 public class StompAuthChannelInterceptor implements ChannelInterceptor {
@@ -25,11 +26,37 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         this.userDetailsService = userDetailsService;
     }
 
+    /**
+     * WS-SEC-01: the only destinations a client may subscribe to - the public events of one lot and the
+     * user's own queues (Spring resolves {@code /user/queue/...} to this session's principal).
+     */
+    private static final Pattern ALLOWED_SUBSCRIPTION =
+            Pattern.compile("^/topic/auction/\\d+$|^/user/queue/(notifications|auction-updates)$");
+
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
-        if (accessor == null || !StompCommand.CONNECT.equals(accessor.getCommand())) {
+        if (accessor == null) {
+            return message;
+        }
+
+        // WS-SEC-01: every event is server -> client; the server has no client command handler at all
+        // (no @MessageMapping), so a client SEND can only be an attempt to write straight into a broker
+        // topic - e.g. a forged "new leader" / "auction ended" on /topic/auction/{id}. Refused for every
+        // destination. The server's own events go through the broker channel, never through here.
+        if (StompCommand.SEND.equals(accessor.getCommand())) {
+            throw new MessageDeliveryException(message, "WebSocket SEND rejected: clients may not publish");
+        }
+        if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
+            String destination = accessor.getDestination();
+            if (destination == null || !ALLOWED_SUBSCRIPTION.matcher(destination).matches()) {
+                throw new MessageDeliveryException(message, "WebSocket SUBSCRIBE rejected: destination not allowed");
+            }
+            return message;
+        }
+
+        if (!StompCommand.CONNECT.equals(accessor.getCommand())) {
             return message;
         }
 

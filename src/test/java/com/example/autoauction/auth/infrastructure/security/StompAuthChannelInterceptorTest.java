@@ -98,7 +98,14 @@ class StompAuthChannelInterceptorTest {
     }
 
     private Message<?> nonConnectMessage(StompCommand command) {
+        return nonConnectMessage(command, null);
+    }
+
+    private Message<?> nonConnectMessage(StompCommand command, String destination) {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(command);
+        if (destination != null) {
+            accessor.setDestination(destination);
+        }
         accessor.setLeaveMutable(true);
         return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
     }
@@ -228,13 +235,13 @@ class StompAuthChannelInterceptorTest {
     // ═════════════════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("Тест 7 — Не-CONNECT команды пропускаются без проверки")
+    @DisplayName("Тест 7 — Не-CONNECT команды: без проверки токена; SEND запрещён, SUBSCRIBE — только разрешённые назначения")
     class NonConnectPassthrough {
 
         @Test
-        @DisplayName("7a. SUBSCRIBE проходит без вызова JwtService")
+        @DisplayName("7a. SUBSCRIBE на топик лота проходит без вызова JwtService")
         void subscribe_passesThrough_withoutAuthCheck() {
-            Message<?> msg = nonConnectMessage(StompCommand.SUBSCRIBE);
+            Message<?> msg = nonConnectMessage(StompCommand.SUBSCRIBE, "/topic/auction/5");
             Message<?> result = interceptor.preSend(msg, null);
 
             assertThat(result).isSameAs(msg);
@@ -242,12 +249,15 @@ class StompAuthChannelInterceptorTest {
         }
 
         @Test
-        @DisplayName("7b. SEND проходит без вызова JwtService")
+        @DisplayName("7b. WS-SEC-01: SEND клиента отклоняется для любого назначения, без вызова JwtService")
         void send_passesThrough_withoutAuthCheck() {
-            Message<?> msg = nonConnectMessage(StompCommand.SEND);
-            Message<?> result = interceptor.preSend(msg, null);
-
-            assertThat(result).isSameAs(msg);
+            // WS-SEC-01: a client SEND is never forwarded - every destination, with or without a destination header
+            for (String destination : new String[]{null, "/topic/auction/5", "/app/anything", "/queue/x", "/user/1/queue/notifications"}) {
+                Message<?> msg = nonConnectMessage(StompCommand.SEND, destination);
+                assertThatThrownBy(() -> interceptor.preSend(msg, null))
+                        .isInstanceOf(MessageDeliveryException.class)
+                        .hasMessageContaining("SEND rejected");
+            }
             verifyNoInteractions(jwtService, userDetailsService);
         }
 
@@ -337,11 +347,20 @@ class StompAuthChannelInterceptorTest {
         void authenticated_user_canSubscribeToPublicAuctionTopic() {
             // Verify that the interceptor does NOT block SUBSCRIBE frames —
             // the public auction topic /topic/auction/{id} is open to all connected (authenticated) users.
-            Message<?> subscribeMsg = nonConnectMessage(StompCommand.SUBSCRIBE);
+            Message<?> subscribeMsg = nonConnectMessage(StompCommand.SUBSCRIBE, "/topic/auction/42");
             Message<?> result = interceptor.preSend(subscribeMsg, null);
 
             assertThat(result).isSameAs(subscribeMsg);
             verifyNoInteractions(jwtService);
+            // WS-SEC-01: only the lot topics and the caller's own queues
+            for (String destination : new String[]{"/user/queue/notifications", "/user/queue/auction-updates"}) {
+                Message<?> own = nonConnectMessage(StompCommand.SUBSCRIBE, destination);
+                assertThat(interceptor.preSend(own, null)).isSameAs(own);
+            }
+            for (String destination : new String[]{null, "/topic/x", "/queue/notifications-user1", "/topic/auction/1/x", "/user/2/queue/notifications"}) {
+                Message<?> other = nonConnectMessage(StompCommand.SUBSCRIBE, destination);
+                assertThatThrownBy(() -> interceptor.preSend(other, null)).isInstanceOf(MessageDeliveryException.class);
+            }
         }
 
         @Test
