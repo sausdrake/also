@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { profilePath } from '../navigation/navigation';
 import api from '../api/client';
 import { useAuthStore } from '../store/authStore';
 
@@ -12,7 +13,7 @@ export function ChangePasswordPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const required = new URLSearchParams(location.search).get('required') === '1';
-  const { logout } = useAuthStore();
+  const { logout, user } = useAuthStore();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -42,6 +43,12 @@ export function ChangePasswordPage() {
 
   return (
     <div className="max-w-md mx-auto p-6">
+      {/* G1: a child of the profile; not offered while the temporary password must be replaced */}
+      {!required && (
+        <Link to={profilePath(user?.roles)} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-3">
+          ← Профиль
+        </Link>
+      )}
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Смена пароля</h1>
       {required && (
         <p role="status" className="text-sm bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3 mb-4">

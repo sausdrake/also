@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { parseApiError } from '../api/errors';
-import { homePathFor, sessionUserFromToken } from '../auth/session';
+import { homePathFor, isAccessTokenExpired, sessionUserFromToken } from '../auth/session';
+import { safeReturnPath } from '../navigation/navigation';
 import { BrandLogo } from '../components/brand/BrandLogo';
 import { TelegramLoginButton } from '../components/auth/TelegramLoginButton';
 import { useAuthStore } from '../store/authStore';
@@ -14,9 +15,19 @@ export const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuthStore();
-  const navigate = useNavigate();
-  const notice: string | undefined = (useLocation().state as { notice?: string } | null)?.notice;
+  const { login, accessToken, user: sessionUser } = useAuthStore();
+  const locationState = useLocation().state as { notice?: string; from?: unknown } | null;
+  const notice: string | undefined = locationState?.notice;
+  const returnTo = (roles: string[]) => safeReturnPath(locationState?.from) ?? homePathFor(roles);
+
+  // G1 (NAV-BACK-LOGIN): Back across documents can restore this page from the back/forward cache with the
+  // signed-out state it was left with, while the person has signed in since. Re-read the stored session;
+  // a live one is then sent on below.
+  useEffect(() => {
+    const onShow = (e: PageTransitionEvent) => { if (e.persisted) void useAuthStore.persist.rehydrate(); };
+    window.addEventListener('pageshow', onShow);
+    return () => window.removeEventListener('pageshow', onShow);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,9 +43,9 @@ export const LoginPage = () => {
       if (!accessToken) throw new Error('Токен не получен');
 
       const user = sessionUserFromToken(accessToken, username);
+      // G1: the live session now re-renders this page, which sends it on by replace (below) - back to the
+      // page that asked for a sign-in, else the role's home; one way out, and Back never returns to the form
       login(user, accessToken, refreshToken);
-      // Редирект по роли
-      navigate(homePathFor(user.roles));
     } catch (err) {
       // FE-UX-01: every authentication failure is one masked 401 "Invalid username or password" on
       // the backend (it does not reveal whether the account exists or is disabled) - say it in Russian.
@@ -44,6 +55,10 @@ export const LoginPage = () => {
       setLoading(false);
     }
   };
+
+  // G1 (NAV-BACK-LOGIN): a live session never sees the form (Back onto /login, a typed /login) - it goes on
+  // where the sign-in would have gone. An expired token is no session: the form stays (the guard agrees).
+  if (accessToken && !isAccessTokenExpired(accessToken)) return <Navigate to={returnTo(sessionUser?.roles ?? [])} replace />;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">

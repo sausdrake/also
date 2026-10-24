@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -237,6 +237,9 @@ type Tab = 'overview' | 'report' | 'bids' | 'docs';
 export const AuctionPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  // G1: signing in from the lot comes back to the lot
+  const toLogin = () => navigate('/login', { state: { from: { pathname } } });
   const auctionId = parseInt(id || '0');
   const { isAuthenticated, accessToken, user } = useAuthStore();
   const { isConnected, lastMessage } = useWebSocket(auctionId);
@@ -391,7 +394,7 @@ export const AuctionPage = () => {
   };
 
   const placeBid = async () => {
-    if (!isAuthenticated) { navigate('/login'); return; }
+    if (!isAuthenticated) { toLogin(); return; }
     if (moneyActionInFlight.current) return;
     const err = validateBid(bidAmount);
     if (err) { setBidError(err); return; }
@@ -417,7 +420,7 @@ export const AuctionPage = () => {
   };
 
   const buyNow = async () => {
-    if (!isAuthenticated) { navigate('/login'); return; }
+    if (!isAuthenticated) { toLogin(); return; }
     if (!auction?.buyNowPrice) return;
     if (moneyActionInFlight.current) return;
     moneyActionInFlight.current = true;
@@ -856,7 +859,7 @@ export const AuctionPage = () => {
                 <div className="space-y-2">
                   {!isAuthenticated && (
                     <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-xl text-xs text-yellow-800">
-                      <button onClick={() => navigate('/login')} className="text-blue-600 font-semibold hover:underline">Войдите</button>,
+                      <button onClick={toLogin} className="text-blue-600 font-semibold hover:underline">Войдите</button>,
                       {' '}чтобы участвовать в торгах
                     </div>
                   )}

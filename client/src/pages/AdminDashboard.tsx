@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, type ReactElement } from 'react';
 import { CancelAuctionModal } from '../components/admin/CancelAuctionModal';
 import { AdminLegalPage } from './admin/AdminLegalPage';
 import { Routes, Route, NavLink, useLocation, Navigate, useNavigate } from 'react-router-dom';
@@ -7,6 +7,9 @@ import api from '../api/client';
 import { apiErrorMessage } from '../api/errors';
 import { LoadErrorAlert } from '../components/LoadErrorAlert';
 import { SidebarLayout } from '../components/layout/SidebarLayout';
+import { RoleAreaFooter } from '../components/layout/RoleAreaFooter';
+import { NotificationBell } from '../components/notifications/NotificationBell';
+import { ADMIN_NAV, type AdminNavEntry } from '../navigation/navigation';
 import { roleLabel } from '../domain/role';
 import { IDENTITY_STATUS_LABELS, parseIdentityStatus } from '../domain/identity';
 import { labelOf } from '../domain/parse';
@@ -15,7 +18,6 @@ import { BrandLogo } from '../components/brand/BrandLogo';
 import { ReportItemMedia } from '../components/admin/diagnostic/ReportItemMedia';
 import { formatDateTime, formatDate, parseDate } from '../utils/formatDate';
 import { MONEY_CAPACITY, formatSom, moneyInputError, toMoney } from '../domain/money';
-import { useAuthStore } from '../store/authStore';
 import { PhotoLightbox } from '../components/PhotoLightbox';
 import { PolicyPage } from './admin/PolicyPage';
 import { LateSuccessPaymentsPage } from './admin/LateSuccessPaymentsPage';
@@ -192,66 +194,69 @@ function ConfirmModal({ message, onYes, onNo }: { message: string; onYes: () => 
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
-const NAV_ITEMS = [
-  { path: '/admin', label: 'Dashboard', exact: true, icon: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-    </svg>
-  )},
-  { path: '/admin/users', label: 'Пользователи', icon: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-    </svg>
-  )},
-  { path: '/admin/auctions', label: 'Аукционы', icon: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-    </svg>
-  )},
-  { path: '/admin/deposits', label: 'Депозиты', icon: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  )},
-  { path: '/admin/settings', label: 'Настройки', icon: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-  )},
-  { path: '/admin/identity', label: 'Личность', icon: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  )},
-  { path: '/admin/legal', label: 'Документы и данные', icon: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-    </svg>
-  )},
-  { path: '/admin/reconciliation', label: 'Сверка платежей', icon: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-    </svg>
-  )},
-];
+// G1: the sidebar is built from ADMIN_NAV (navigation.ts) - paths and labels live there, the icons here.
+const icon = (...paths: string[]) => (
+  <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    {paths.map(d => <path key={d} strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={d} />)}
+  </svg>
+);
+const MONEY = icon('M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z');
+const GEAR = icon('M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z',
+  'M15 12a3 3 0 11-6 0 3 3 0 016 0z');
+const DOCUMENT = icon('M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z');
+const NAV_ICONS: Record<string, ReactElement> = {
+  '/admin': icon('M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6'),
+  '/admin/users': icon('M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z'),
+  '/admin/diagnostic': icon('M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4'),
+  '/admin/auctions': icon('M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'),
+  '/admin/policy': GEAR,
+  '/admin/deposits': MONEY,
+  '/admin/withdrawals': MONEY,
+  '/admin/payments/late-successes': MONEY,
+  '/admin/settings': GEAR,
+  '/admin/identity': icon('M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'),
+  '/admin/legal': icon('M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3'),
+  '/admin/reconciliation': DOCUMENT,
+};
+
+const sectionClass = (isActive: boolean) =>
+  `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+    isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+  }`;
+
+function AdminNavGroup({ entry, onNavigate }: { entry: AdminNavEntry; onNavigate: () => void }) {
+  const { pathname } = useLocation();
+  const children = entry.children ?? [];
+  const isActive = children.some(c => pathname === c.to || pathname.startsWith(c.to + '/'));
+  const [open, setOpen] = useState(isActive);
+
+  return (
+    <div>
+      <button onClick={() => setOpen(v => !v)} aria-expanded={open} className={`w-full ${sectionClass(isActive)}`}>
+        {NAV_ICONS[entry.to]}
+        <span className="flex-1 text-left">{entry.label}</span>
+        <svg className={`w-4 h-4 transition-transform ${open ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="ml-8 mt-1 space-y-1">
+          {children.map(c => (
+            <NavLink key={c.to} onClick={onNavigate} to={c.to}
+              className={({ isActive: on }) =>
+                `block px-3 py-2 rounded-lg text-sm transition-colors ${
+                  on ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                }`}>
+              {c.label}
+            </NavLink>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function AdminSidebar({ onNavigate }: { onNavigate: () => void }) {
-  const location  = useLocation();
-  const navigate  = useNavigate();
-  const logoutFn  = useAuthStore(s => s.logout);
-  const [diagOpen, setDiagOpen] = useState(
-    location.pathname.startsWith('/admin/diagnostic')
-  );
-
-  const isDiagActive = location.pathname.startsWith('/admin/diagnostic');
-
-  const handleLogout = async () => {
-    onNavigate();
-    await logoutFn();
-    navigate('/login');
-  };
-
   return (
     <aside className="w-60 bg-white border-r border-gray-100 flex flex-col shrink-0 h-screen sticky top-0">
       <div className="px-5 py-5 border-b border-gray-100">
@@ -259,155 +264,19 @@ function AdminSidebar({ onNavigate }: { onNavigate: () => void }) {
         <p className="text-xs text-gray-400 mt-1">Администратор</p>
       </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {/* Dashboard */}
-        <NavLink onClick={onNavigate} to="/admin" end
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-              isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`}>
-          {NAV_ITEMS[0].icon}
-          Dashboard
-        </NavLink>
-
-        {/* Пользователи */}
-        <NavLink onClick={onNavigate} to="/admin/users"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-              isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`}>
-          {NAV_ITEMS[1].icon}
-          Пользователи
-        </NavLink>
-
-        {/* Диагностика (expandable) */}
-        <div>
-          <button
-            onClick={() => setDiagOpen(v => !v)}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-              isDiagActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`}>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-            </svg>
-            <span className="flex-1 text-left">Диагностика</span>
-            <svg className={`w-4 h-4 transition-transform ${diagOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-          {diagOpen && (
-            <div className="ml-8 mt-1 space-y-1">
-              <NavLink onClick={onNavigate} to="/admin/diagnostic/templates"
-                className={({ isActive }) =>
-                  `block px-3 py-2 rounded-lg text-sm transition-colors ${
-                    isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-                  }`}>
-                Шаблоны
-              </NavLink>
-              <NavLink onClick={onNavigate} to="/admin/diagnostic/reports"
-                className={({ isActive }) =>
-                  `block px-3 py-2 rounded-lg text-sm transition-colors ${
-                    isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-                  }`}>
-                Отчёты
-              </NavLink>
-            </div>
-          )}
-        </div>
-
-        {/* Аукционы */}
-        <NavLink onClick={onNavigate} to="/admin/auctions"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-              isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`}>
-          {NAV_ITEMS[2].icon}
-          Аукционы
-        </NavLink>
-
-        {/* Ценовая политика */}
-        <NavLink onClick={onNavigate} to="/admin/policy"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-              isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`}>
-          {NAV_ITEMS[4].icon}
-          Политика
-        </NavLink>
-
-        {/* Депозиты */}
-        <NavLink onClick={onNavigate} to="/admin/deposits"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-              isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`}>
-          {NAV_ITEMS[3].icon}
-          Депозиты
-        </NavLink>
-
-        {/* Заявки на вывод (F6, ручная выплата) */}
-        <NavLink onClick={onNavigate} to="/admin/withdrawals"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-              isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`}>
-          {NAV_ITEMS[3].icon}
-          Заявки на вывод
-        </NavLink>
-
-        {/* Поздние успешные платежи */}
-        <NavLink onClick={onNavigate} to="/admin/payments/late-successes"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-              isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`}>
-          {NAV_ITEMS[3].icon}
-          Поздние платежи
-        </NavLink>
-
-        {/* Настройки */}
-        <NavLink onClick={onNavigate} to="/admin/settings"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-              isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`}>
-          {NAV_ITEMS[4].icon}
-          Настройки
-        </NavLink>
-
-        {/* Подтверждение личности */}
-        <NavLink onClick={onNavigate} to="/admin/identity"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-              isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`}>
-          {NAV_ITEMS[5].icon}
-          Личность
-        </NavLink>
-
-        {/* Сверка платежей */}
-        <NavLink onClick={onNavigate} to="/admin/reconciliation"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-              isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`}>
-          {NAV_ITEMS[6].icon}
-          Сверка платежей
-        </NavLink>
+      <nav aria-label="Разделы" className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        {ADMIN_NAV.map(entry => entry.children
+          ? <AdminNavGroup key={entry.to} entry={entry} onNavigate={onNavigate} />
+          : (
+            <NavLink key={entry.to} onClick={onNavigate} to={entry.to} end={entry.end}
+              className={({ isActive }) => sectionClass(isActive)}>
+              {NAV_ICONS[entry.to]}
+              {entry.label}
+            </NavLink>
+          ))}
       </nav>
 
-      {/* Logout */}
-      <div className="border-t border-gray-100 p-3 shrink-0">
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
-          <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-          Выйти
-        </button>
-      </div>
+      <RoleAreaFooter onNavigate={onNavigate} />
     </aside>
   );
 }
@@ -3118,7 +2987,8 @@ function SettingsPage() {
 export function AdminDashboard() {
   return (
     // FE-MOBILE-02: the shared role-area layout - a drawer below lg instead of a fixed 240px column.
-    <SidebarLayout title="Администратор" sidebar={onNavigate => <AdminSidebar onNavigate={onNavigate} />}>
+    <SidebarLayout title="Администратор" sidebar={onNavigate => <AdminSidebar onNavigate={onNavigate} />}
+      actions={<NotificationBell />}>
         <div className="p-4 sm:p-6 max-w-6xl mx-auto">
           <Routes>
             <Route index element={<DashboardPage />} />

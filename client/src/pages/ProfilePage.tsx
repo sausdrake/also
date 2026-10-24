@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { PrivacyTab } from './profile/PrivacyTab';
-import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
+import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
+import { isDiagnosticProfile, profileTabs } from '../navigation/navigation';
 import api from '../api/client';
 import * as subscriptions from '../api/subscriptions';
 import type { WatchedAuction } from '../api/subscriptions';
@@ -864,9 +865,10 @@ function ProfileTab() {
     return () => { cancelled = true; };
   }, []);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  // G1 (NAV-BACK-LOGIN): the session is gone before /login opens; no /login entry is left behind
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
   };
 
   return (
@@ -909,27 +911,11 @@ function ProfileTab() {
 
 // ─────────────────── Main ProfilePage ───────────────────
 
-// USER: депозит, ставки, выигранные, заявки, отслеживаемые, профиль
-const USER_TABS = [
-  { path: '', label: 'Депозит' },
-  { path: 'bids', label: 'Участвовал' },
-  { path: 'won', label: 'Выигранные' },
-  { path: 'requests', label: 'Заявки' },
-  { path: 'watched', label: 'Отслеживаемые' },
-  { path: 'identity', label: 'Подтверждение личности' },
-  { path: 'privacy', label: 'Документы и данные' },
-  { path: 'settings', label: 'Профиль' },
-];
-
-// DIAGNOSTIC: только профиль (торги и депозит не нужны — они работают через /diagnostic)
-const DIAGNOSTIC_TABS = [
-  { path: '', label: 'Профиль' },
-];
-
 export function ProfilePage() {
   const { user } = useAuthStore();
-  const isDiagnostic = user?.roles?.some(r => r === 'ROLE_DIAGNOSTIC' || r === 'DIAGNOSTIC');
-  const tabs = isDiagnostic ? DIAGNOSTIC_TABS : USER_TABS;
+  // G1: the tabs and the role rule live in navigation.ts (the header's account menu links into them)
+  const isDiagnostic = isDiagnosticProfile(user?.roles);
+  const tabs = profileTabs(user?.roles);
 
   return (
     <div className="max-w-5xl mx-auto p-4 md:p-6">
@@ -938,7 +924,7 @@ export function ProfilePage() {
       </h1>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-6 overflow-x-auto">
+      <nav aria-label="Вкладки кабинета" className="flex gap-1 bg-gray-100 p-1 rounded-xl mb-6 overflow-x-auto">
         {tabs.map(({ path, label }) => (
           <NavLink
             key={path}
@@ -953,12 +939,15 @@ export function ProfilePage() {
             {label}
           </NavLink>
         ))}
-      </div>
+      </nav>
 
       {/* Content */}
       <Routes>
         {isDiagnostic ? (
-          <Route index element={<ProfileTab />} />
+          <>
+            <Route index element={<ProfileTab />} />
+            <Route path="privacy" element={<PrivacyTab />} />
+          </>
         ) : (
           <>
             <Route index element={<DepositTab />} />
@@ -971,6 +960,8 @@ export function ProfilePage() {
             <Route path="settings" element={<ProfileTab />} />
           </>
         )}
+        {/* G1: an unknown tab (or one this role does not have) is the profile's first tab, not an empty page */}
+        <Route path="*" element={<Navigate to="/profile" replace />} />
       </Routes>
     </div>
   );

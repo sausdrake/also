@@ -9,6 +9,8 @@ export interface SidebarLayoutProps {
    * logout. On a wide screen it is a no-op.
    */
   sidebar: (onNavigate: () => void) => ReactNode;
+  /** G1: controls at the right of the top bar (the notification bell), on every screen width. */
+  actions?: ReactNode;
   children: ReactNode;
 }
 
@@ -18,7 +20,7 @@ export interface SidebarLayoutProps {
  * the actions; now it is a drawer opened from a top bar ("Открыть меню"), closed by navigating, by
  * Escape or by tapping the backdrop, and the content gets the full width.
  */
-export function SidebarLayout({ title, sidebar, children }: SidebarLayoutProps) {
+export function SidebarLayout({ title, sidebar, actions, children }: SidebarLayoutProps) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 
@@ -49,16 +51,18 @@ export function SidebarLayout({ title, sidebar, children }: SidebarLayoutProps) 
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="lg:hidden h-14 shrink-0 flex items-center gap-2 px-3 bg-white border-b border-gray-100">
+        {/* G1: with `actions` (the bell) the bar stays on a wide screen too, holding only them */}
+        <div className={`${actions ? 'lg:h-12' : 'lg:hidden'} h-14 shrink-0 flex items-center gap-2 px-3 bg-white border-b border-gray-100`}>
           <button type="button" onClick={() => setOpen(true)} aria-label="Открыть меню" aria-expanded={open}
-            className="w-10 h-10 rounded-lg text-gray-700 hover:bg-gray-100 flex items-center justify-center">
+            className="lg:hidden w-10 h-10 rounded-lg text-gray-700 hover:bg-gray-100 flex items-center justify-center">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
           {/* FE-BRAND-01: compact place -> the simple mark */}
-          <BrandLogo variant="simple" className="h-7 w-auto shrink-0" />
-          <span className="font-semibold text-sm text-gray-900 truncate">{title}</span>
+          <BrandLogo variant="simple" className="lg:hidden h-7 w-auto shrink-0" />
+          <span className="lg:hidden font-semibold text-sm text-gray-900 truncate">{title}</span>
+          {actions && <div className="ml-auto flex items-center gap-1">{actions}</div>}
         </div>
         <main className="flex-1 overflow-y-auto min-w-0">{children}</main>
       </div>

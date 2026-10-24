@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Routes, Route, NavLink, useNavigate, Navigate } from 'react-router-dom';
+import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import React from 'react';
 import axios from 'axios';
 import api from '../api/client';
@@ -8,6 +8,8 @@ import { useAuthStore } from '../store/authStore';
 import { DiagnosticMediaSection, type ItemReadiness } from '../components/diagnostic/DiagnosticMediaSection';
 import { TemplateBinding, type TemplateOption } from '../components/diagnostic/TemplateBinding';
 import { SidebarLayout } from '../components/layout/SidebarLayout';
+import { RoleAreaFooter } from '../components/layout/RoleAreaFooter';
+import { NotificationBell } from '../components/notifications/NotificationBell';
 import { BrandLogo } from '../components/brand/BrandLogo';
 import { apiErrorMessage, parseApiError } from '../api/errors';
 import { labelOf } from '../domain/parse';
@@ -1025,15 +1027,7 @@ function MyReportsPage() {
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
 function DiagSidebar({ onNavigate }: { onNavigate: () => void }) {
-  const navigate = useNavigate();
   const user = useAuthStore(s => s.user);
-  const logoutFn = useAuthStore(s => s.logout);
-
-  const handleLogout = async () => {
-    onNavigate();
-    await logoutFn();
-    navigate('/login');
-  };
 
   const navItems = [
     {
@@ -1076,7 +1070,7 @@ function DiagSidebar({ onNavigate }: { onNavigate: () => void }) {
         <p className="text-xs text-gray-400 truncate">{user?.username}</p>
       </div>
 
-      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+      <nav aria-label="Разделы" className="flex-1 p-3 space-y-0.5 overflow-y-auto">
         {navItems.map(item => (
           <NavLink key={item.path} to={item.path} onClick={onNavigate}
             className={({ isActive }) =>
@@ -1092,16 +1086,7 @@ function DiagSidebar({ onNavigate }: { onNavigate: () => void }) {
         ))}
       </nav>
 
-      <div className="border-t border-gray-100 p-3 shrink-0">
-        <button onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-          Выйти
-        </button>
-      </div>
+      <RoleAreaFooter onNavigate={onNavigate} />
     </aside>
   );
 }
@@ -1110,12 +1095,15 @@ function DiagSidebar({ onNavigate }: { onNavigate: () => void }) {
 
 export function DiagnosticDashboard() {
   return (
-    <SidebarLayout title="Диагностика" sidebar={onNavigate => <DiagSidebar onNavigate={onNavigate} />}>
+    <SidebarLayout title="Диагностика" sidebar={onNavigate => <DiagSidebar onNavigate={onNavigate} />}
+      actions={<NotificationBell />}>
       <Routes>
         <Route index element={<Navigate to="/diagnostic/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="available" element={<AvailablePage />} />
         <Route path="reports" element={<MyReportsPage />} />
+        {/* G1: an unknown section is the area's start page, not an empty work area */}
+        <Route path="*" element={<Navigate to="/diagnostic/dashboard" replace />} />
       </Routes>
     </SidebarLayout>
   );

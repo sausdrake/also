@@ -1,32 +1,24 @@
 import type { ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { isAccessTokenExpired } from '../auth/session';
 
 interface ProtectedRouteProps {
   children: ReactNode;
   allowedRoles?: string[];
 }
 
-function isTokenExpired(token: string): boolean {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return true;
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    if (!payload?.exp) return true;
-    return Date.now() / 1000 > payload.exp;
-  } catch {
-    return true;
-  }
-}
-
 export const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
   const { accessToken, user, logout } = useAuthStore();
+  // G1: the login form returns here after signing in (LoginPage accepts only an in-app path)
+  const { pathname, search, hash } = useLocation();
+  const toLogin = <Navigate to="/login" replace state={{ from: { pathname, search, hash } }} />;
 
-  if (!accessToken) return <Navigate to="/login" replace />;
+  if (!accessToken) return toLogin;
 
-  if (isTokenExpired(accessToken)) {
+  if (isAccessTokenExpired(accessToken)) {
     logout();
-    return <Navigate to="/login" replace />;
+    return toLogin;
   }
 
   if (allowedRoles && allowedRoles.length > 0) {

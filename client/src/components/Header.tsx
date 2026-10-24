@@ -1,36 +1,51 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { useNotifications } from '../hooks/useNotifications';
-import { NotificationPanel } from './notifications/NotificationPanel';
+import { NotificationBell } from './notifications/NotificationBell';
 import { BrandLogo } from './brand/BrandLogo';
+import { accountNav, primaryNav } from '../navigation/navigation';
 
+const sectionLink = ({ isActive }: { isActive: boolean }) =>
+  `px-3 py-1.5 rounded-lg ${isActive ? 'text-blue-700 bg-blue-50 font-medium' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`;
+
+const menuLink = ({ isActive }: { isActive: boolean }) =>
+  `flex items-center min-h-11 px-4 text-sm ${isActive ? 'text-blue-700 bg-blue-50 font-medium' : 'text-gray-700 hover:bg-gray-50'}`;
+
+/**
+ * G1: the site header. Sections (Аукционы, Кабинет, role areas) are the primary navigation - a row on
+ * a wide screen; the account menu holds only the person (Профиль, Документы и данные, Выйти). Below
+ * `md` the row does not fit, so the account menu starts with the same sections - one list,
+ * `primaryNav`, for both.
+ */
 export function Header() {
   const { user, isAuthenticated, logout } = useAuthStore();
   const navigate = useNavigate();
-  const { notifications, unreadCount, status, loadError, actionError, markRead, markAllRead, reload } = useNotifications();
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [userOpen, setUserOpen] = useState(false);
-  const notifRef = useRef<HTMLDivElement>(null);
+  const { pathname } = useLocation();
+  // open on the page where it was opened: navigating elsewhere (a link, Back) closes it
+  const [userOpenAt, setUserOpenAt] = useState<string | null>(null);
+  const userOpen = userOpenAt === pathname;
+  const setUserOpen = (v: boolean) => setUserOpenAt(v ? pathname : null);
   const userRef = useRef<HTMLDivElement>(null);
 
-  // Закрываем дропдауны при клике вне
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
-      if (userRef.current && !userRef.current.contains(e.target as Node)) setUserOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+    if (!userOpen) return;
+    const onDown = (e: MouseEvent) => { if (userRef.current && !userRef.current.contains(e.target as Node)) setUserOpenAt(null); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setUserOpenAt(null); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [userOpen]);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  // G1 (NAV-BACK-LOGIN): the session is gone before /login opens (the login page sends a live session on),
+  // and signing out does not leave a /login entry behind
+  const handleLogout = async () => {
+    setUserOpen(false);
+    await logout();
+    navigate('/login', { replace: true });
   };
 
-  const isAdmin = user?.roles?.some(r => r === 'ROLE_ADMIN' || r === 'ADMIN');
-  const isDiagnostic = user?.roles?.some(r => r === 'ROLE_DIAGNOSTIC' || r === 'DIAGNOSTIC');
+  const sections = primaryNav(user?.roles);
+  const account = accountNav(user?.roles);
 
   return (
     <header className="bg-white border-b shadow-sm sticky top-0 z-40">
@@ -43,72 +58,44 @@ export function Header() {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Навигация */}
+        {/* Разделы (wide screen) */}
         {isAuthenticated && (
-          <nav className="hidden md:flex items-center gap-1 text-sm">
-            <Link to="/" className="px-3 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100">Аукционы</Link>
-            <Link to="/profile" className="px-3 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100">Кабинет</Link>
-            {isDiagnostic && <Link to="/diagnostic" className="px-3 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100">Диагностика</Link>}
-            {isAdmin && <Link to="/admin" className="px-3 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100">Админ</Link>}
+          <nav aria-label="Разделы" className="hidden md:flex items-center gap-1 text-sm">
+            {sections.map(s => <NavLink key={s.to} to={s.to} end={s.end} className={sectionLink}>{s.label}</NavLink>)}
           </nav>
         )}
 
         {isAuthenticated ? (
           <div className="flex items-center gap-2">
-            {/* Уведомления */}
-            <div className="relative" ref={notifRef}>
-              <button
-                onClick={() => { setNotifOpen(v => !v); setUserOpen(false); }}
-                className="relative p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                aria-label={unreadCount > 0 ? `Уведомления, непрочитанных: ${unreadCount}` : 'Уведомления'}
-                aria-expanded={notifOpen}
-              >
-                🔔
-                {unreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center leading-none">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
-              </button>
-
-              {notifOpen && (
-                <NotificationPanel
-                  notifications={notifications}
-                  unreadCount={unreadCount}
-                  status={status}
-                  loadError={loadError}
-                  actionError={actionError}
-                  onMarkRead={markRead}
-                  onMarkAllRead={markAllRead}
-                  onRetry={reload}
-                  onClose={() => setNotifOpen(false)}
-                />
-              )}
-            </div>
+            <NotificationBell onOpen={() => setUserOpen(false)} />
 
             {/* Меню пользователя */}
             <div className="relative" ref={userRef}>
               <button
-                onClick={() => { setUserOpen(v => !v); setNotifOpen(false); }}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-gray-700 hover:bg-gray-100"
+                onClick={() => setUserOpen(!userOpen)}
+                aria-label={`Меню пользователя ${user?.username ?? ''}`.trim()}
+                aria-expanded={userOpen}
+                aria-controls="account-menu"
+                className="flex items-center gap-2 px-3 min-h-10 rounded-lg text-sm text-gray-700 hover:bg-gray-100"
               >
                 <span className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
                   {user?.username?.[0]?.toUpperCase() ?? '?'}
                 </span>
                 <span className="hidden sm:inline max-w-[100px] truncate">{user?.username}</span>
-                <span className="text-gray-400 text-xs">▾</span>
+                <span className="text-gray-400 text-xs" aria-hidden="true">▾</span>
               </button>
 
               {userOpen && (
-                <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl shadow-lg border overflow-hidden z-50">
-                  <Link to="/profile" onClick={() => setUserOpen(false)} className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
-                    Личный кабинет
-                  </Link>
-                  <Link to="/profile" onClick={() => setUserOpen(false)} className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
-                    Депозит
-                  </Link>
+                <div id="account-menu" className="absolute right-0 top-full mt-1 w-56 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-lg border overflow-hidden z-50">
+                  <nav aria-label="Разделы (меню)" data-testid="account-menu-sections" className="md:hidden border-b py-1">
+                    {sections.map(s => <NavLink key={s.to} to={s.to} end={s.end} className={menuLink}>{s.label}</NavLink>)}
+                  </nav>
+                  <nav aria-label="Аккаунт" className="py-1">
+                    <p className="px-4 pt-2 pb-1 text-xs text-gray-400 truncate">{user?.username}</p>
+                    {account.map(a => <NavLink key={a.to} to={a.to} end className={menuLink}>{a.label}</NavLink>)}
+                  </nav>
                   <hr />
-                  <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50">
+                  <button onClick={handleLogout} className="w-full text-left flex items-center min-h-11 px-4 text-sm text-red-600 hover:bg-red-50">
                     Выйти
                   </button>
                 </div>

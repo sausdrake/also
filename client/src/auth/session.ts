@@ -33,6 +33,16 @@ export function sessionUserFromToken(accessToken: string, fallbackUsername = '')
   };
 }
 
+/**
+ * The session is over when the access token is unreadable, has no expiry or has expired. G1: one rule for the
+ * route guard and the login page, so the guard's "sign in" and the login page's "already signed in" never
+ * both hold (no redirect loop).
+ */
+export function isAccessTokenExpired(accessToken: string): boolean {
+  const exp = decodePayload(accessToken)?.exp;
+  return typeof exp !== 'number' || Date.now() / 1000 > exp;
+}
+
 /** Where a freshly signed-in user lands, by role. */
 export function homePathFor(roles: string[]): string {
   const normalized = roles.map(r => r.replace('ROLE_', '').toUpperCase());
