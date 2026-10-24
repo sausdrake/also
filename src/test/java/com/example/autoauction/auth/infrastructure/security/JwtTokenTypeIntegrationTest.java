@@ -39,6 +39,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 class JwtTokenTypeIntegrationTest {
 
     private static final String PROTECTED = "/api/notifications/unread-count";
+    /** a distinct client address per registration, so the per-IP registration limit never interferes */
+    private static final java.util.concurrent.atomic.AtomicInteger IP = new java.util.concurrent.atomic.AtomicInteger();
 
     @Autowired private MockMvc mockMvc;
     @Autowired private RoleRepository roleRepository;
@@ -52,7 +54,8 @@ class JwtTokenTypeIntegrationTest {
     void register() throws Exception {
         roleRepository.findByName("ROLE_USER").orElseGet(() -> roleRepository.save(new Role(null, "ROLE_USER", "USER")));
         username = "jwt" + System.nanoTime();
-        MvcResult r = mockMvc.perform(post("/api/auth/register").with(req -> { req.setRemoteAddr("10.77." + (System.nanoTime() % 200) + ".1"); return req; })
+        int ip = IP.incrementAndGet();
+        MvcResult r = mockMvc.perform(post("/api/auth/register").with(req -> { req.setRemoteAddr("10.77." + (ip / 250) + "." + (ip % 250 + 1)); return req; })
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"" + username + "\",\"email\":\"" + username + "@t.test\",\"password\":\"jwt-password-1\"}"))
                 .andReturn();
