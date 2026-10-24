@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { CancelAuctionModal } from '../components/admin/CancelAuctionModal';
 import { AdminLegalPage } from './admin/AdminLegalPage';
 import { Routes, Route, NavLink, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -2272,15 +2273,6 @@ function AuctionsPage() {
     } catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); }
   };
 
-  const cancelAuction = async () => {
-    if (cancelTarget == null) return;
-    try {
-      await api.post(`/admin/auctions/${cancelTarget}/cancel`);
-      notify(`Аукцион #${cancelTarget} отменён`);
-      setCancelTarget(null); loadAuctions();
-    } catch (e: any) { notify(e.response?.data?.message || 'Ошибка', true); setCancelTarget(null); }
-  };
-
   // Guards the detail panel's participant list (and their frozen deposits) against stale
   // responses - an earlier auction's participants, or a force-unfreeze refresh, resolving after
   // the admin opened another auction. Every openDetail() bumps the generation (and resets the
@@ -2403,10 +2395,9 @@ function AuctionsPage() {
   return (
     <div className="space-y-4">
       {cancelTarget != null && (
-        <ConfirmModal
-          message={`Отменить аукцион #${cancelTarget}? Действие необратимо. Депозиты участников и гарантия продавца вернутся полностью, автомобиль уйдёт на повторную диагностику.`}
-          onYes={cancelAuction} onNo={() => setCancelTarget(null)}
-        />
+        <CancelAuctionModal auctionId={cancelTarget}
+          onDone={(text, isError) => { notify(text, isError); setCancelTarget(null); loadAuctions(); }}
+          onClose={() => setCancelTarget(null)} />
       )}
 
       <div className="flex items-center justify-between">
